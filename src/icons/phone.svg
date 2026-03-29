@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- IP Phone: Simple handset outline -->
+  <!-- Left earpiece -->
+  <path d="M 18 28 Q 14 28 14 32 Q 14 36 18 36" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right earpiece -->
+  <path d="M 46 28 Q 50 28 50 32 Q 50 36 46 36" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Handset bridge (connecting bar) -->
+  <line x1="18" y1="32" x2="46" y2="32" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Phone base (cradle) -->
+  <rect x="20" y="38" width="24" height="14" rx="2" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

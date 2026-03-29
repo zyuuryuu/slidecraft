@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Cloud: Simple fluffy cloud shape with rounded bumps -->
+  <path d="M 16 42 Q 10 42 8 36 Q 6 30 12 26 Q 14 18 22 18 Q 26 10 32 10 Q 42 10 46 16 Q 54 18 56 26 Q 60 28 60 36 Q 60 42 54 44 Z"
+        fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

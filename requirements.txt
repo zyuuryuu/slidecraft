@@ -1,0 +1,8 @@
+# Midnight Executive — Diagram Pipeline
+# Core dependencies (必須)
+python-pptx>=1.0.0        # PPTX generation / PPTX生成
+lxml>=4.9.0                # OOXML manipulation / OOXML操作
+
+# Optional: Icon support (アイコン描画用、なくても動作する)
+# Requires ImageMagick system library / ImageMagickのシステムライブラリが別途必要
+# wand>=0.6.0
