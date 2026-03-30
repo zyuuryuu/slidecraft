@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* CodeMirror container sizing */
+.cm-editor {
+  height: 100%;
+}
+
+.cm-scroller {
+  overflow: auto !important;
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/tauri-schema/main/tauri.conf.schema.json",
+  "productName": "Diagram Pipeline",
+  "version": "0.1.0",
+  "identifier": "com.diagram-pipeline.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "title": "Diagram Pipeline",
+    "windows": [
+      {
+        "title": "Diagram Pipeline",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ]
+  }
+}

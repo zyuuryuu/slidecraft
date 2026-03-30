@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Printer: Rectangular body with paper tray on top and output -->
+  <!-- Main body (rounded rectangle) -->
+  <rect x="12" y="24" width="40" height="24" rx="2" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Paper tray on top -->
+  <rect x="16" y="12" width="32" height="12" rx="1" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Output slot (small protruding line at front) -->
+  <line x1="12" y1="44" x2="8" y2="44" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
