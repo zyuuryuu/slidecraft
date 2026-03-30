@@ -105,7 +105,7 @@ export function isBackEdge(backEdges: Set<string>, from: string, to: string): bo
 // ── Layer Assignment ──
 
 export function assignLayers(spec: DiagramSpec): Map<string, number> {
-  const { fwd, rev } = buildAdjacency(spec);
+  const { fwd } = buildAdjacency(spec);
   const nodeIds = spec.nodes.map((n) => n.id);
 
   // Detect back-edges and build DAG
@@ -370,7 +370,7 @@ function computeLayoutV1(
     layerNodes.get(lyr)!.push(n.id);
   }
 
-  for (const [lyr, nids] of layerNodes) {
+  for (const [, nids] of layerNodes) {
     nids.sort((a, b) => (orders.get(a) ?? 0) - (orders.get(b) ?? 0));
   }
 
@@ -1386,7 +1386,7 @@ export function planEdgeRoute(
 export function computePortOffsets(
   spec: DiagramSpec,
   posMap: Map<string, NodePosition>,
-  layerMap: Map<string, number>,
+  _layerMap: Map<string, number>,
   backEdges: Set<string>,
 ): Map<string, [number, number]> {
   const isVertical = spec.direction === "TB" || spec.direction === "BT";
@@ -1406,7 +1406,7 @@ export function computePortOffsets(
   const portOffsets = new Map<string, [number, number]>();
 
   function assignPorts(
-    nodeId: string,
+    _nodeId: string,
     edges: typeof spec.edges,
     isOutgoing: boolean,
   ): void {

@@ -157,11 +157,11 @@ export function paletteHex(palette: Palette, name: keyof Palette): string {
 
 // ── Merge utilities ──
 
-function mergeObject<T extends Record<string, unknown>>(base: T, overrides: Record<string, unknown>): T {
+function mergeObject<T extends object>(base: T, overrides: Partial<T>): T {
   const result = { ...base };
   for (const key of Object.keys(overrides)) {
     if (key in base) {
-      (result as Record<string, unknown>)[key] = overrides[key];
+      (result as Record<string, unknown>)[key] = (overrides as Record<string, unknown>)[key];
     }
   }
   return result;
@@ -202,13 +202,13 @@ export function themeFromYaml(yamlStr: string): ThemeConfig {
     base.name = d.name;
   }
   if ("palette" in d && typeof d.palette === "object" && d.palette !== null) {
-    base.palette = mergeObject(base.palette, d.palette as Record<string, unknown>);
+    base.palette = mergeObject(base.palette, d.palette as Partial<typeof base.palette>);
   }
   if ("fonts" in d && typeof d.fonts === "object" && d.fonts !== null) {
-    base.fonts = mergeObject(base.fonts, d.fonts as Record<string, unknown>);
+    base.fonts = mergeObject(base.fonts, d.fonts as Partial<typeof base.fonts>);
   }
   if ("diagram_style" in d && typeof d.diagram_style === "object" && d.diagram_style !== null) {
-    base.diagram_style = mergeObject(base.diagram_style, d.diagram_style as Record<string, unknown>);
+    base.diagram_style = mergeObject(base.diagram_style, d.diagram_style as Partial<typeof base.diagram_style>);
   }
   if ("node_defaults" in d && typeof d.node_defaults === "object" && d.node_defaults !== null) {
     base.node_defaults = mergeNodeDefaults(base.node_defaults, d.node_defaults as Record<string, unknown>);

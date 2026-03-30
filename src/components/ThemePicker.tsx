@@ -1,4 +1,3 @@
-import type { ThemeConfig } from "../engine/theme";
 
 interface ThemePickerProps {
   currentTheme: string;

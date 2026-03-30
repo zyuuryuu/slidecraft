@@ -42,7 +42,7 @@ export function readFileFromInput(file: File): Promise<string> {
 // ── Browser-compatible file saving ──
 
 export function downloadBlob(data: Uint8Array, filename: string): void {
-  const blob = new Blob([data], {
+  const blob = new Blob([data as BlobPart], {
     type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   });
   const url = URL.createObjectURL(blob);

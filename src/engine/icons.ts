@@ -10,7 +10,7 @@
  */
 
 import { readFileSync, existsSync, statSync } from "fs";
-import { join, resolve, extname, basename } from "path";
+import { join, resolve, extname } from "path";
 import { Resvg } from "@resvg/resvg-js";
 import { BUILTIN_ICONS } from "./schema";
 

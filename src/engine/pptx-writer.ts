@@ -8,8 +8,8 @@
  */
 
 import PptxGenJS from "pptxgenjs";
-import type { DiagramSpec, Node, EdgeStyle, GroupStyle } from "./schema";
-import type { ThemeConfig, DiagramStyle, FontConfig, Palette } from "./theme";
+import type { DiagramSpec, Node, GroupStyle } from "./schema";
+import type { ThemeConfig } from "./theme";
 import { DEFAULT_THEME } from "./theme";
 import {
   computeLayout,
@@ -19,17 +19,14 @@ import {
   findBackEdges,
   isBackEdge,
   cpCoords,
-  detectCp,
   classifyEdgeRoute,
   computePortOffsets,
-  computeGroupBboxes,
   planEdgeRoute,
   SLIDE_W,
   SLIDE_H,
   type NodePosition,
   type LaneInfo,
   type ConnectionPoint,
-  type CpIndex,
 } from "./layout-engine";
 
 // ── Constants ──
@@ -57,10 +54,6 @@ function scaledFontSize(
 ): number {
   if (scale >= 1.0) return baseSize;
   return Math.max(baseSize * scale, minSize);
-}
-
-function inchesToPoints(inches: number): number {
-  return inches * 72;
 }
 
 // ── Shape Drawing ──
@@ -123,7 +116,6 @@ function drawShape(
             color: fontColor,
             bold: false,
             align: "center",
-            breakType: "break",
           },
         },
         {
@@ -563,7 +555,7 @@ function drawFanInBus(
   direction: string,
   isFlowchart: boolean,
   theme: ThemeConfig,
-  layoutScale: number,
+  _layoutScale: number,
 ): Set<string> {
   const tp = posMap.get(targetId);
   if (!tp || sourceEdges.length < 3) return new Set();
@@ -626,7 +618,7 @@ function drawFanOutBus(
   direction: string,
   isFlowchart: boolean,
   theme: ThemeConfig,
-  layoutScale: number,
+  _layoutScale: number,
 ): Set<string> {
   const fp = posMap.get(sourceId);
   if (!fp || targetEdges.length < 3) return new Set();
@@ -842,7 +834,6 @@ export function renderDiagram(
   const faninCandidates = new Map<string, typeof spec.edges>();
 
   for (const edge of spec.edges) {
-    const key = `${edge.from}->${edge.to}`;
     if (isBackEdge(backEdges, edge.from, edge.to)) continue;
 
     if (!fanoutCandidates.has(edge.from)) fanoutCandidates.set(edge.from, []);

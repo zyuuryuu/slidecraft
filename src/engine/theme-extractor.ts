@@ -10,7 +10,7 @@
  */
 
 import JSZip from "jszip";
-import type { Palette, ThemeConfig } from "./theme";
+import type { ThemeConfig } from "./theme";
 import { midnightExecutive } from "./theme";
 
 // ── OOXML Constants ──
