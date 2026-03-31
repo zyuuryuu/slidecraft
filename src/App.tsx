@@ -3,6 +3,8 @@ import yaml from "js-yaml";
 import Editor from "./components/Editor";
 import Preview from "./components/Preview";
 import SlidePreview from "./components/SlidePreview";
+import SlideList from "./components/SlideList";
+import SlideEditor from "./components/SlideEditor";
 import Toolbar from "./components/Toolbar";
 import ThemePicker from "./components/ThemePicker";
 import StatusBar from "./components/StatusBar";
@@ -10,12 +12,14 @@ import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./engi
 import { renderToBuffer } from "./engine/pptx-writer";
 import { midnightExecutive } from "./engine/theme";
 import { parseMd } from "./engine/md-parser";
-import { loadTemplate, type TemplateData } from "./engine/template-loader";
+import { serializeMd } from "./engine/md-serializer";
+import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from "./engine/template-loader";
 import { generatePptx } from "./engine/placeholder-filler";
-import type { DeckIR } from "./engine/slide-schema";
+import type { DeckIR, SlideIR } from "./engine/slide-schema";
 import { readFileFromInput, downloadBlob } from "./ipc/commands";
 
 type AppMode = "diagram" | "markdown";
+type MarkdownSubMode = "import" | "edit";
 
 const SAMPLE_YAML = `type: flowchart
 direction: TB
@@ -222,6 +226,7 @@ Date: プロジェクトマネージャー: 山田 太郎 | taro.yamada@example.
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>("markdown");
+  const [subMode, setSubMode] = useState<MarkdownSubMode>("import");
   const [yamlText, setYamlText] = useState(SAMPLE_YAML);
   const [mdText, setMdText] = useState(SAMPLE_MD);
   const [spec, setSpec] = useState<DiagramSpec | null>(null);
@@ -415,8 +420,42 @@ export default function App() {
   }, [mode, spec, deck, templateData]);
 
   const hasContent = mode === "diagram" ? spec !== null : (deck !== null && templateData !== null);
-  const editorValue = mode === "diagram" ? yamlText : mdText;
-  const editorLang = mode === "diagram" ? "yaml" : "markdown";
+
+
+  // ── Import → Edit transition ──
+  const handleStartEditing = useCallback(() => {
+    if (deck) setSubMode("edit");
+  }, [deck]);
+
+  // ── Export: Edit → Markdown ──
+  const handleExportMd = useCallback(() => {
+    if (!deck) return;
+    const md = serializeMd(deck);
+    setMdText(md);
+    setSubMode("import");
+  }, [deck]);
+
+  // ── Slide editing: update a single slide in the deck ──
+  const handleSlideUpdate = useCallback(
+    (index: number, updated: SlideIR) => {
+      if (!deck) return;
+      const newSlides = [...deck.slides];
+      newSlides[index] = updated;
+      setDeck({ ...deck, slides: newSlides });
+    },
+    [deck],
+  );
+
+  // Get current slide's layout info for editor
+  const currentSlide = deck?.slides[activeSlide];
+  const currentLayoutName = currentSlide
+    ? currentSlide.layout === "auto"
+      ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length)
+      : currentSlide.layout
+    : undefined;
+  const currentLayout = currentLayoutName && templateData
+    ? findLayout(templateData, currentLayoutName)
+    : undefined;
 
   // ── Cursor line → active slide ──
   const handleCursorLine = useCallback(
@@ -502,33 +541,85 @@ export default function App() {
           {mode === "diagram" && (
             <ThemePicker currentTheme={themeName} onThemeChange={setThemeName} />
           )}
+          {mode === "markdown" && (
+            <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs ml-2">
+              <button
+                onClick={() => setSubMode("import")}
+                className={`px-3 py-1 transition-colors ${
+                  subMode === "import"
+                    ? "bg-[#3B82F6] text-white"
+                    : "bg-[#1E2761] text-gray-400 hover:text-white"
+                }`}
+              >
+                Import
+              </button>
+              <button
+                onClick={handleStartEditing}
+                className={`px-3 py-1 transition-colors ${
+                  subMode === "edit"
+                    ? "bg-[#3B82F6] text-white"
+                    : "bg-[#1E2761] text-gray-400 hover:text-white"
+                }`}
+              >
+                Edit
+              </button>
+              {subMode === "edit" && (
+                <button
+                  onClick={handleExportMd}
+                  className="px-3 py-1 transition-colors bg-[#1E2761] text-gray-400 hover:text-white border-l border-[#3B82F6]/40"
+                >
+                  Export MD
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0">
-        <div className="w-1/2 border-r border-[#2D3A6E] flex flex-col min-h-0">
-          <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-            {mode === "diagram" ? "YAML Editor" : "Markdown Editor"}
+      {/* ── Diagram mode (legacy) ── */}
+      {mode === "diagram" && (
+        <div className="flex-1 flex min-h-0">
+          <div className="w-1/2 border-r border-[#2D3A6E] flex flex-col min-h-0">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              YAML Editor
+            </div>
+            <div className="flex-1 min-h-0">
+              <Editor value={yamlText} onChange={handleEditorChange} language="yaml" />
+            </div>
           </div>
-          <div className="flex-1 min-h-0">
-            <Editor
-              value={editorValue}
-              onChange={handleEditorChange}
-              language={editorLang}
-              onCursorLine={handleCursorLine}
-              gotoLine={gotoLine}
-            />
+          <div className="w-1/2 flex flex-col min-h-0 bg-[#0f1117]">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              Mermaid Preview
+            </div>
+            <div className="flex-1 min-h-0">
+              <Preview spec={spec} error={parseError} />
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="w-1/2 flex flex-col min-h-0 bg-[#0f1117]">
-          <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-            {mode === "diagram" ? "Mermaid Preview" : "Slide Preview"}
+      {/* ── Markdown Import mode ── */}
+      {mode === "markdown" && subMode === "import" && (
+        <div className="flex-1 flex min-h-0">
+          <div className="w-1/2 border-r border-[#2D3A6E] flex flex-col min-h-0">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              Markdown Editor
+            </div>
+            <div className="flex-1 min-h-0">
+              <Editor
+                value={mdText}
+                onChange={handleEditorChange}
+                language="markdown"
+                onCursorLine={handleCursorLine}
+                gotoLine={gotoLine}
+              />
+            </div>
           </div>
-          <div className="flex-1 min-h-0">
-            {mode === "diagram" ? (
-              <Preview spec={spec} error={parseError} />
-            ) : (
+          <div className="w-1/2 flex flex-col min-h-0 bg-[#0f1117]">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              Slide Preview
+            </div>
+            <div className="flex-1 min-h-0">
               <SlidePreview
                 deck={deck}
                 template={templateData}
@@ -536,10 +627,66 @@ export default function App() {
                 activeSlide={activeSlide}
                 onSlideClick={handleSlideClick}
               />
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Markdown Edit mode (3-pane) ── */}
+      {mode === "markdown" && subMode === "edit" && (
+        <div className="flex-1 flex min-h-0">
+          {/* Left: Slide list */}
+          <div className="w-[220px] border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0a0e1a]">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              Slides
+            </div>
+            <div className="flex-1 min-h-0">
+              <SlideList
+                deck={deck}
+                template={templateData}
+                activeIndex={activeSlide}
+                onSelect={setActiveSlide}
+              />
+            </div>
+          </div>
+
+          {/* Center: Slide editor */}
+          <div className="flex-1 border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0f1117]">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              Slide Editor — {currentLayoutName || "No slide"}
+            </div>
+            <div className="flex-1 min-h-0">
+              {currentSlide ? (
+                <SlideEditor
+                  slide={currentSlide}
+                  layout={currentLayout}
+                  onChange={(updated) => handleSlideUpdate(activeSlide, updated)}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                  Select a slide
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Preview */}
+          <div className="w-[45%] flex flex-col min-h-0 bg-[#0f1117]">
+            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+              Preview
+            </div>
+            <div className="flex-1 min-h-0">
+              <SlidePreview
+                deck={deck}
+                template={templateData}
+                error={parseError}
+                activeSlide={activeSlide}
+                onSlideClick={setActiveSlide}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <StatusBar spec={spec} error={parseError} filePath={filePath} />
     </>
