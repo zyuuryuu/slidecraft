@@ -43,24 +43,56 @@ function diagramYamlToMermaid(diagramYaml: string): string | null {
   }
 }
 
+// ── Global counter for unique Mermaid render IDs ──
+let mermaidIdCounter = 0;
+
 // ── Inline Mermaid SVG renderer ──
-function MermaidDiagram({ diagramYaml, width, height }: { diagramYaml: string; width: string; height: string }) {
+function MermaidDiagram({ diagramYaml, width, height, instanceId }: { diagramYaml: string; width: string; height: string; instanceId?: string }) {
   const [svg, setSvg] = useState("");
-  const idRef = useRef(0);
+  const cancelRef = useRef(false);
 
   useEffect(() => {
+    cancelRef.current = false;
     const mmd = diagramYamlToMermaid(diagramYaml);
-    if (!mmd) return;
-    const id = `mmd-preview-${++idRef.current}`;
+    if (!mmd) { setSvg(""); return; }
+    const id = instanceId ? `mmd-${instanceId}-${++mermaidIdCounter}` : `mmd-slide-${++mermaidIdCounter}`;
     mermaid.render(id, mmd).then(({ svg: rendered }) => {
-      setSvg(rendered);
-    }).catch(() => setSvg(""));
+      if (!cancelRef.current) setSvg(rendered);
+    }).catch(() => {
+      if (!cancelRef.current) setSvg("");
+    });
+    return () => { cancelRef.current = true; };
   }, [diagramYaml]);
+
+  // Extract width/height from SVG and set viewBox so it scales to fit any container
+  const fittedSvg = svg.replace(
+    /<svg([^>]*)>/,
+    (_match, attrs) => {
+      // Extract original dimensions
+      const wMatch = attrs.match(/width="([\d.]+)/);
+      const hMatch = attrs.match(/height="([\d.]+)/);
+      const origW = wMatch ? wMatch[1] : "400";
+      const origH = hMatch ? hMatch[1] : "300";
+      // Remove fixed width/height, add viewBox + preserveAspectRatio
+      const cleaned = attrs
+        .replace(/width="[^"]*"/g, "")
+        .replace(/height="[^"]*"/g, "")
+        .replace(/style="[^"]*"/g, "");
+      return `<svg${cleaned} viewBox="0 0 ${origW} ${origH}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;">`;
+    },
+  );
 
   return (
     <div
-      style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center" }}
-      dangerouslySetInnerHTML={{ __html: svg }}
+      style={{
+        width,
+        height,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+      dangerouslySetInnerHTML={{ __html: fittedSvg }}
     />
   );
 }
@@ -166,6 +198,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
                 diagramYaml={slide.diagram.yaml}
                 width="100%"
                 height="100%"
+                instanceId={`slide-${slideIndex}-${scale}`}
               />
             </div>
           );
