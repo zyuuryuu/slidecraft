@@ -5,9 +5,12 @@
  * For diagram slides, shows the YAML editor inline.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
+import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
+import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 
 interface SlideEditorProps {
@@ -194,37 +197,152 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
         );
       })}
 
-      {/* Diagram YAML editor */}
-      {slide.diagram && (
-        <div>
-          <label className="text-[10px] text-gray-500 uppercase tracking-wider">
-            Diagram (YAML → PptxGenJS shapes)
-          </label>
-          <textarea
-            value={slide.diagram.yaml}
-            onChange={(e) => updateDiagramYaml(e.target.value)}
-            rows={12}
-            className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-green-300 font-mono resize-y"
-            placeholder="type: flowchart\nnodes:\n  - id: a\n    label: Node A"
-          />
-        </div>
+      {/* Diagram / Mermaid editor with mode switching */}
+      {(slide.diagram || slide.mermaidBlock) && (
+        <DiagramEditor
+          slide={slide}
+          onUpdateDiagramYaml={updateDiagramYaml}
+          onUpdateMermaid={updateMermaid}
+          onChange={onChange}
+        />
       )}
+    </div>
+  );
+}
 
-      {/* Mermaid syntax editor */}
-      {slide.mermaidBlock && (
-        <div>
-          <label className="text-[10px] text-gray-500 uppercase tracking-wider">
-            Mermaid (→ SVG image in PPTX)
-          </label>
-          <textarea
-            value={slide.mermaidBlock.mermaid}
-            onChange={(e) => updateMermaid(e.target.value)}
-            rows={10}
-            className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-cyan-300 font-mono resize-y"
-            placeholder="graph TD&#10;  A[Start] --> B[End]"
-          />
+// ── Diagram editor with mode switching ──
+
+type DiagramMode = "mermaid" | "yaml" | "json";
+
+function DiagramEditor({
+  slide,
+  onUpdateDiagramYaml,
+  onUpdateMermaid,
+  onChange,
+}: {
+  slide: SlideIR;
+  onUpdateDiagramYaml: (yaml: string) => void;
+  onUpdateMermaid: (mermaid: string) => void;
+  onChange: (updated: SlideIR) => void;
+}) {
+  const currentMode: DiagramMode = slide.mermaidBlock ? "mermaid" : "yaml";
+  const [mode, setMode] = useState<DiagramMode>(currentMode);
+
+  // ── Convert between modes ──
+  const switchMode = useCallback(
+    (newMode: DiagramMode) => {
+      if (newMode === mode) return;
+
+      if (mode === "mermaid" && (newMode === "yaml" || newMode === "json")) {
+        // Mermaid → DiagramSpec
+        const mmd = slide.mermaidBlock?.mermaid || "";
+        const spec = mermaidToDiagramSpec(mmd);
+        if (spec) {
+          const yamlStr = diagramSpecToYaml(spec);
+          onChange({
+            ...slide,
+            mermaidBlock: undefined,
+            diagram: { yaml: newMode === "json" ? JSON.stringify(spec, null, 2) : yamlStr, placeholderIdx: "1" },
+          });
+        }
+      } else if (mode === "yaml" && newMode === "mermaid") {
+        // YAML → Mermaid
+        try {
+          const data = yaml.load(slide.diagram?.yaml || "");
+          const result = DiagramSpecSchema.safeParse(data);
+          if (result.success) {
+            const mmd = diagramSpecToMermaid(result.data);
+            onChange({
+              ...slide,
+              diagram: undefined,
+              mermaidBlock: { mermaid: mmd, placeholderIdx: "1" },
+            });
+          }
+        } catch { /* keep current */ }
+      } else if (mode === "yaml" && newMode === "json") {
+        // YAML → JSON
+        try {
+          const data = yaml.load(slide.diagram?.yaml || "");
+          onUpdateDiagramYaml(JSON.stringify(data, null, 2));
+        } catch { /* keep current */ }
+      } else if (mode === "json" && newMode === "yaml") {
+        // JSON → YAML
+        try {
+          const data = JSON.parse(slide.diagram?.yaml || "{}");
+          onUpdateDiagramYaml(diagramSpecToYaml(data));
+        } catch { /* keep current */ }
+      } else if (mode === "json" && newMode === "mermaid") {
+        // JSON → Mermaid
+        try {
+          const data = JSON.parse(slide.diagram?.yaml || "{}");
+          const result = DiagramSpecSchema.safeParse(data);
+          if (result.success) {
+            const mmd = diagramSpecToMermaid(result.data);
+            onChange({
+              ...slide,
+              diagram: undefined,
+              mermaidBlock: { mermaid: mmd, placeholderIdx: "1" },
+            });
+          }
+        } catch { /* keep current */ }
+      }
+
+      setMode(newMode);
+    },
+    [mode, slide, onChange, onUpdateDiagramYaml],
+  );
+
+  const textValue = mode === "mermaid"
+    ? (slide.mermaidBlock?.mermaid || "")
+    : (slide.diagram?.yaml || "");
+
+  const handleTextChange = useCallback(
+    (text: string) => {
+      if (mode === "mermaid") {
+        onUpdateMermaid(text);
+      } else {
+        onUpdateDiagramYaml(text);
+      }
+    },
+    [mode, onUpdateMermaid, onUpdateDiagramYaml],
+  );
+
+  const colorClass = mode === "mermaid" ? "text-cyan-300" : mode === "json" ? "text-amber-300" : "text-green-300";
+  const label = mode === "mermaid"
+    ? "Mermaid (→ SVG image in PPTX)"
+    : mode === "json"
+      ? "JSON (→ PptxGenJS shapes)"
+      : "YAML (→ PptxGenJS shapes)";
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] text-gray-500 uppercase tracking-wider">
+          {label}
+        </label>
+        <div className="flex rounded overflow-hidden border border-[#2D3A6E] text-[10px]">
+          {(["mermaid", "yaml", "json"] as DiagramMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              className={`px-2 py-0.5 transition-colors ${
+                mode === m
+                  ? "bg-[#3B82F6] text-white"
+                  : "bg-[#1a1f3a] text-gray-400 hover:text-white"
+              }`}
+            >
+              {m.toUpperCase()}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
+      <textarea
+        value={textValue}
+        onChange={(e) => handleTextChange(e.target.value)}
+        rows={12}
+        className={`w-full px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm ${colorClass} font-mono resize-y`}
+        placeholder={mode === "mermaid" ? "graph TD\n  A[Start] --> B[End]" : "type: flowchart\nnodes:\n  - id: a\n    label: A"}
+      />
     </div>
   );
 }

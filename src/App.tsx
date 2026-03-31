@@ -145,6 +145,20 @@ edges:
 
 ---
 
+# データフロー
+> Mermaid 記法サンプル
+
+\`\`\`mermaid
+graph LR
+  A[ユーザー入力] --> B{バリデーション}
+  B -->|OK| C[データ処理]
+  B -->|NG| D[エラー表示]
+  C --> E[(データベース)]
+  C --> F[レスポンス返却]
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
