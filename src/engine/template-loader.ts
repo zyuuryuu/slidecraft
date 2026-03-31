@@ -46,12 +46,22 @@ export interface LayoutInfo {
   decorations: DecoRect[]; // decorative shapes (backgrounds, bars, panels)
 }
 
+export interface MasterStyle {
+  fontSize: number;
+  fontColor: string;
+  fontName: string;
+  bold: boolean;
+  align: string;
+}
+
 export interface TemplateData {
   layouts: LayoutInfo[];
   zip: JSZip; // retained for PPTX assembly
   presentationXml: string;
   presentationRels: string;
   contentTypes: string;
+  masterTitleStyle: MasterStyle;
+  masterBodyStyle: MasterStyle;
 }
 
 // ── Namespace normalization ──
@@ -98,14 +108,37 @@ function emuToInch(emu: string | undefined): number {
   return emu ? parseInt(emu) / EMU_PER_INCH : 0;
 }
 
-// ── Extract style from shape XML ──
+// ── Extract master style from titleStyle or bodyStyle XML ──
 
-function extractStyle(sp: string): PlaceholderStyle {
+function parseMasterStyle(xml: string | undefined, fallback: MasterStyle): MasterStyle {
+  if (!xml) return fallback;
+  const szMatch = xml.match(/defRPr[^>]*sz="(\d+)"/);
+  const boldMatch = xml.match(/defRPr[^>]*b="1"/);
+  const colorMatch = xml.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
+  const fontMatch = xml.match(/<a:latin typeface="([^"]+)"/);
+  const alignMatch = xml.match(/algn="(\w+)"/);
+  return {
+    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : fallback.fontSize,
+    fontColor: colorMatch ? colorMatch[1] : fallback.fontColor,
+    fontName: fontMatch ? fontMatch[1] : fallback.fontName,
+    bold: boldMatch ? true : fallback.bold,
+    align: alignMatch ? alignMatch[1] : fallback.align,
+  };
+}
+
+// ── Extract style from shape XML, merging with master defaults ──
+
+function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle): PlaceholderStyle {
+  // Determine if this is a title-type placeholder
+  const phType = sp.match(/<p:ph[^>]*type="(\w+)"/)?.[1] || "body";
+  const isTitle = phType === "ctrTitle" || phType === "title";
+  const master = isTitle ? masterTitle : masterBody;
+
   // Position and size from xfrm
   const offMatch = sp.match(/<a:off x="(\d+)" y="(\d+)"/);
   const extMatch = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
 
-  // Font info from lstStyle defRPr or rPr
+  // Font info: check layout lstStyle first, then rPr, then fall back to master
   const szMatch = sp.match(/defRPr[^>]*sz="(\d+)"/) || sp.match(/<a:rPr[^>]*sz="(\d+)"/);
   const boldMatch = sp.match(/defRPr[^>]*b="1"/) || sp.match(/<a:rPr[^>]*b="1"/);
   const colorMatch = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
@@ -117,11 +150,11 @@ function extractStyle(sp: string): PlaceholderStyle {
     y: emuToInch(offMatch?.[2]),
     w: emuToInch(extMatch?.[1]),
     h: emuToInch(extMatch?.[2]),
-    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : 14,
-    fontColor: colorMatch ? colorMatch[1] : "1E293B",
-    fontName: fontMatch ? fontMatch[1] : "Calibri",
-    bold: !!boldMatch,
-    align: alignMatch ? alignMatch[1] : "l",
+    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : master.fontSize,
+    fontColor: colorMatch ? colorMatch[1] : master.fontColor,
+    fontName: fontMatch ? fontMatch[1] : master.fontName,
+    bold: boldMatch ? true : master.bold,
+    align: alignMatch ? alignMatch[1] : master.align,
   };
 }
 
@@ -156,7 +189,11 @@ function extractDecorations(layoutXml: string): DecoRect[] {
 
 // ── Extract placeholders from layout XML ──
 
-function extractPlaceholders(layoutXml: string): PlaceholderInfo[] {
+function extractPlaceholders(
+  layoutXml: string,
+  masterTitle: MasterStyle,
+  masterBody: MasterStyle,
+): PlaceholderInfo[] {
   const normalized = normalizeNs(layoutXml);
   const shapes = normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
   const placeholders: PlaceholderInfo[] = [];
@@ -173,7 +210,7 @@ function extractPlaceholders(layoutXml: string): PlaceholderInfo[] {
     const idx = idxMatch ? idxMatch[1] : "0";
     const type = typeMatch ? typeMatch[1] : "body";
     const name = nameMatch ? nameMatch[1] : "";
-    const style = extractStyle(sp);
+    const style = extractStyle(sp, masterTitle, masterBody);
 
     placeholders.push({ idx, type, name, shapeXml: sp, style });
   }
@@ -188,6 +225,19 @@ export async function loadTemplate(
 ): Promise<TemplateData> {
   const zip = await JSZip.loadAsync(pptxBuffer);
 
+  // ── Extract master styles ──
+  const defaultStyle: MasterStyle = {
+    fontSize: 14, fontColor: "1E293B", fontName: "Calibri", bold: false, align: "l",
+  };
+  const masterXml = await zip.file("ppt/slideMasters/slideMaster1.xml")?.async("string") ?? "";
+  const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];
+  const bodyStyleXml = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0];
+  const masterTitleStyle = parseMasterStyle(titleStyleXml, {
+    ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF",
+  });
+  const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle);
+
+  // ── Extract layouts ──
   const layouts: LayoutInfo[] = [];
 
   for (let i = 1; i <= 30; i++) {
@@ -198,7 +248,7 @@ export async function loadTemplate(
     const xml = await file.async("string");
     const nameMatch = xml.match(/name="([^"]+)"/);
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
-    const placeholders = extractPlaceholders(xml);
+    const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle);
     const decorations = extractDecorations(xml);
 
     layouts.push({ index: i, name, placeholders, decorations });
@@ -214,7 +264,10 @@ export async function loadTemplate(
     .file("[Content_Types].xml")!
     .async("string");
 
-  return { layouts, zip, presentationXml, presentationRels, contentTypes };
+  return {
+    layouts, zip, presentationXml, presentationRels, contentTypes,
+    masterTitleStyle, masterBodyStyle,
+  };
 }
 
 // ── Auto layout selection ──
