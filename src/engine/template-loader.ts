@@ -11,17 +11,39 @@ import { LAYOUT_NAMES } from "./slide-schema";
 
 // ── Types ──
 
+export interface PlaceholderStyle {
+  x: number; // inches
+  y: number;
+  w: number;
+  h: number;
+  fontSize: number; // points
+  fontColor: string; // hex without #
+  fontName: string;
+  bold: boolean;
+  align: string; // "l", "ctr", "r"
+}
+
 export interface PlaceholderInfo {
   idx: string;
   type: string; // "body", "ctrTitle", "subTitle", "sldNum", etc.
   name: string; // shape name from cNvPr
   shapeXml: string; // full normalized shape XML for cloning into slides
+  style: PlaceholderStyle; // extracted position + style for preview
+}
+
+export interface DecoRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string; // hex without #
 }
 
 export interface LayoutInfo {
   index: number; // 1-based (slideLayout1.xml)
   name: string; // layout name from cSld
   placeholders: PlaceholderInfo[];
+  decorations: DecoRect[]; // decorative shapes (backgrounds, bars, panels)
 }
 
 export interface TemplateData {
@@ -69,6 +91,69 @@ function normalizeNs(xml: string): string {
   return r;
 }
 
+// ── EMU to inches ──
+
+const EMU_PER_INCH = 914400;
+function emuToInch(emu: string | undefined): number {
+  return emu ? parseInt(emu) / EMU_PER_INCH : 0;
+}
+
+// ── Extract style from shape XML ──
+
+function extractStyle(sp: string): PlaceholderStyle {
+  // Position and size from xfrm
+  const offMatch = sp.match(/<a:off x="(\d+)" y="(\d+)"/);
+  const extMatch = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+
+  // Font info from lstStyle defRPr or rPr
+  const szMatch = sp.match(/defRPr[^>]*sz="(\d+)"/) || sp.match(/<a:rPr[^>]*sz="(\d+)"/);
+  const boldMatch = sp.match(/defRPr[^>]*b="1"/) || sp.match(/<a:rPr[^>]*b="1"/);
+  const colorMatch = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
+  const fontMatch = sp.match(/<a:latin typeface="([^"]+)"/);
+  const alignMatch = sp.match(/<a:(?:def)?PPr[^>]*algn="(\w+)"/);
+
+  return {
+    x: emuToInch(offMatch?.[1]),
+    y: emuToInch(offMatch?.[2]),
+    w: emuToInch(extMatch?.[1]),
+    h: emuToInch(extMatch?.[2]),
+    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : 14,
+    fontColor: colorMatch ? colorMatch[1] : "1E293B",
+    fontName: fontMatch ? fontMatch[1] : "Calibri",
+    bold: !!boldMatch,
+    align: alignMatch ? alignMatch[1] : "l",
+  };
+}
+
+// ── Extract decorative rects from layout XML ──
+
+function extractDecorations(layoutXml: string): DecoRect[] {
+  const normalized = normalizeNs(layoutXml);
+  const shapes = normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
+  const decos: DecoRect[] = [];
+
+  for (const sp of shapes) {
+    // Skip placeholder shapes
+    if (sp.includes("<p:ph")) continue;
+
+    const offMatch = sp.match(/<a:off x="(\d+)" y="(\d+)"/);
+    const extMatch = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+    const colorMatch = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
+
+    if (offMatch && extMatch && colorMatch) {
+      decos.push({
+        x: emuToInch(offMatch[1]),
+        y: emuToInch(offMatch[2]),
+        w: emuToInch(extMatch[1]),
+        h: emuToInch(extMatch[2]),
+        color: colorMatch[1],
+      });
+    }
+  }
+
+  return decos;
+}
+
 // ── Extract placeholders from layout XML ──
 
 function extractPlaceholders(layoutXml: string): PlaceholderInfo[] {
@@ -88,8 +173,9 @@ function extractPlaceholders(layoutXml: string): PlaceholderInfo[] {
     const idx = idxMatch ? idxMatch[1] : "0";
     const type = typeMatch ? typeMatch[1] : "body";
     const name = nameMatch ? nameMatch[1] : "";
+    const style = extractStyle(sp);
 
-    placeholders.push({ idx, type, name, shapeXml: sp });
+    placeholders.push({ idx, type, name, shapeXml: sp, style });
   }
 
   return placeholders;
@@ -113,8 +199,9 @@ export async function loadTemplate(
     const nameMatch = xml.match(/name="([^"]+)"/);
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
     const placeholders = extractPlaceholders(xml);
+    const decorations = extractDecorations(xml);
 
-    layouts.push({ index: i, name, placeholders });
+    layouts.push({ index: i, name, placeholders, decorations });
   }
 
   const presentationXml = await zip

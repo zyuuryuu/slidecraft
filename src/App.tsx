@@ -10,7 +10,7 @@ import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./engi
 import { renderToBuffer } from "./engine/pptx-writer";
 import { midnightExecutive } from "./engine/theme";
 import { parseMd } from "./engine/md-parser";
-import { loadTemplate } from "./engine/template-loader";
+import { loadTemplate, type TemplateData } from "./engine/template-loader";
 import { generatePptx } from "./engine/placeholder-filler";
 import type { DeckIR } from "./engine/slide-schema";
 import { readFileFromInput, downloadBlob } from "./ipc/commands";
@@ -127,6 +127,7 @@ export default function App() {
   const [mdText, setMdText] = useState(SAMPLE_MD);
   const [spec, setSpec] = useState<DiagramSpec | null>(null);
   const [deck, setDeck] = useState<DeckIR | null>(null);
+  const [templateData, setTemplateData] = useState<TemplateData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [themeName, setThemeName] = useState("midnight_executive");
@@ -206,10 +207,16 @@ export default function App() {
     [mode, parseYaml, parseMdText],
   );
 
-  // Initial parse
+  // Initial parse + template load
   useState(() => {
     parseYaml(SAMPLE_YAML);
     parseMdText(SAMPLE_MD);
+    // Load template for preview
+    fetch("/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")
+      .then((r) => r.arrayBuffer())
+      .then((buf) => loadTemplate(buf))
+      .then(setTemplateData)
+      .catch(() => {}); // silently fail if template not available
   });
 
   // Open file
@@ -350,6 +357,7 @@ export default function App() {
             ) : (
               <SlidePreview
                 deck={deck}
+                template={templateData}
                 error={parseError}
                 activeSlide={activeSlide}
                 onSlideClick={setActiveSlide}
