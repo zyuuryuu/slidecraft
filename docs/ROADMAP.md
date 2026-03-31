@@ -49,28 +49,18 @@
 
 ### v2 改善 (優先度高)
 
-#### スライドテンプレート再作成
-- **サイズ**: M
-- **内容**: JSZip で 30 レイアウトのテンプレートを正しく再構築
-- **背景**: PowerPoint でスライド削除時に `ctrTitle` (idx=0) が消失。Closing レイアウト等でプレースホルダー欠損
-- **要件**:
-  - 全30レイアウトの全プレースホルダーが存在すること
-  - OOXML スタイル階層: Theme(フォント名) → Master(デフォルトサイズ/色) → Layout lstStyle(差分のみ)
-  - スライドマスターが PowerPoint で編集可能であること
-  - `create_30_layouts.py` の設計意図と一致すること
+#### スライドテンプレート再作成 — 完了
+- 全30レイアウト × 151プレースホルダー復元済み
+- OOXML スタイル階層正しく構築済み
 
-#### ダイアグラムスライドの修正
-- **サイズ**: M
-- **内容**:
-  - Mermaid 記法 (```` ```mermaid ````) のサポート追加（現状は DiagramSpec YAML のみ）
-  - ダイアグラムスライドのサムネイル描画が壊れる問題の修正（選択時に消える、一部しか表示されない）
-  - Mermaid → DiagramSpec JSON 変換、もしくは Mermaid を直接 PptxGenJS に渡す方式の検討
-- **背景**: ユーザーとの合意では Mermaid 記法 or Mermaid から変換した JSON の2択だったが、現状 YAML のみ
+#### ダイアグラムスライド — 完了
+- 3つの入力形式: ```` ```mermaid ```` (SVG画像), ```` ```diagram ```` (PptxGenJSシェイプ), ```` ```mermaid-shapes ```` (変換シェイプ)
+- Mermaid↔YAML↔JSON 相互変換（Edit モードで切替可能）
+- サムネイル: SVG viewBox スケーリングで修正済み
 
-#### Diagram モードの Mermaid プレビュー修復
-- **サイズ**: S
-- **内容**: モード切替後に Mermaid が再レンダリングしない問題
-- **原因**: Preview コンポーネントの `useEffect` で `spec` 参照が変わらないとレンダリングしない
+#### Diagram モードの Mermaid プレビュー修復 — 完了
+- `specKey` (JSON.stringify) による useEffect 再トリガー
+- Mermaid 予約語 (`end` 等) のエスケープ
 
 #### テンプレートの色完全復元
 - **サイズ**: M
