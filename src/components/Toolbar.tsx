@@ -2,17 +2,29 @@ interface ToolbarProps {
   onOpen: () => void;
   onSave: () => void;
   onGenerate: () => void;
+  onLoadTemplate?: () => void;
   generating: boolean;
   hasSpec: boolean;
+  templateName?: string;
+  mode?: "diagram" | "markdown";
 }
 
-export default function Toolbar({ onOpen, onSave, onGenerate, generating, hasSpec }: ToolbarProps) {
+export default function Toolbar({
+  onOpen,
+  onSave,
+  onGenerate,
+  onLoadTemplate,
+  generating,
+  hasSpec,
+  templateName,
+  mode,
+}: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
       <div className="flex items-center gap-1 mr-4">
         <div className="w-1 h-6 bg-[#3B82F6] rounded-full" />
         <h1 className="text-white font-semibold text-lg tracking-tight">
-          Diagram Pipeline
+          SlideCraft
         </h1>
       </div>
 
@@ -29,6 +41,16 @@ export default function Toolbar({ onOpen, onSave, onGenerate, generating, hasSpe
       >
         Save
       </button>
+
+      {mode === "markdown" && onLoadTemplate && (
+        <button
+          onClick={onLoadTemplate}
+          className="px-3 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded transition-colors"
+          title={templateName ? `Template: ${templateName}` : "Load template"}
+        >
+          {templateName ? `Template: ${templateName}` : "Load Template"}
+        </button>
+      )}
 
       <div className="flex-1" />
 

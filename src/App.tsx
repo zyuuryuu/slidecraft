@@ -133,7 +133,9 @@ export default function App() {
   const [themeName, setThemeName] = useState("midnight_executive");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [templateName, setTemplateName] = useState("Midnight Executive");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const templateInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Diagram mode: parse YAML ──
@@ -207,17 +209,48 @@ export default function App() {
     [mode, parseYaml, parseMdText],
   );
 
-  // Initial parse + template load
+  // Initial parse (no debounce) + template load
   useState(() => {
-    parseYaml(SAMPLE_YAML);
-    parseMdText(SAMPLE_MD);
+    // Parse both immediately without debounce
+    try {
+      const data = yaml.load(SAMPLE_YAML);
+      if (data && typeof data === "object") {
+        const result = DiagramSpecSchema.safeParse(data);
+        if (result.success) setSpec(result.data);
+      }
+    } catch { /* ignore */ }
+    try {
+      setDeck(parseMd(SAMPLE_MD));
+    } catch { /* ignore */ }
     // Load template for preview
     fetch("/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")
       .then((r) => r.arrayBuffer())
       .then((buf) => loadTemplate(buf))
       .then(setTemplateData)
-      .catch(() => {}); // silently fail if template not available
+      .catch(() => {});
   });
+
+  // Load custom template
+  const handleLoadTemplate = useCallback(() => {
+    templateInputRef.current?.click();
+  }, []);
+
+  const handleTemplateSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const buf = await file.arrayBuffer();
+        const tpl = await loadTemplate(buf);
+        setTemplateData(tpl);
+        setTemplateName(file.name.replace(/\.pptx$/i, ""));
+      } catch (err) {
+        setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      e.target.value = "";
+    },
+    [],
+  );
 
   // Open file
   const handleOpen = useCallback(() => {
@@ -270,12 +303,8 @@ export default function App() {
           : "diagram_output.pptx";
         downloadBlob(buffer, filename);
       } else {
-        if (!deck) return;
-        // Fetch template
-        const resp = await fetch("/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
-        const tplBuf = await resp.arrayBuffer();
-        const tpl = await loadTemplate(tplBuf);
-        const buffer = await generatePptx(deck, tpl);
+        if (!deck || !templateData) return;
+        const buffer = await generatePptx(deck, templateData);
         downloadBlob(buffer as unknown as Uint8Array, "slides_output.pptx");
       }
     } catch (e) {
@@ -283,9 +312,9 @@ export default function App() {
     } finally {
       setGenerating(false);
     }
-  }, [mode, spec, deck]);
+  }, [mode, spec, deck, templateData]);
 
-  const hasContent = mode === "diagram" ? spec !== null : deck !== null;
+  const hasContent = mode === "diagram" ? spec !== null : (deck !== null && templateData !== null);
   const editorValue = mode === "diagram" ? yamlText : mdText;
   const editorLang = mode === "diagram" ? "yaml" : "yaml"; // CodeMirror: markdown mode TBD
 
@@ -298,20 +327,30 @@ export default function App() {
         className="hidden"
         onChange={handleFileSelected}
       />
+      <input
+        ref={templateInputRef}
+        type="file"
+        accept=".pptx"
+        className="hidden"
+        onChange={handleTemplateSelected}
+      />
 
       <div className="flex items-center">
         <Toolbar
           onOpen={handleOpen}
           onSave={handleSave}
           onGenerate={handleGenerate}
+          onLoadTemplate={handleLoadTemplate}
           generating={generating}
           hasSpec={hasContent}
+          templateName={templateName}
+          mode={mode}
         />
         <div className="flex items-center gap-2 px-3 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
           {/* Mode toggle */}
           <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">
             <button
-              onClick={() => setMode("diagram")}
+              onClick={() => { setMode("diagram"); parseYaml(yamlText); }}
               className={`px-3 py-1 transition-colors ${
                 mode === "diagram"
                   ? "bg-[#3B82F6] text-white"
@@ -321,7 +360,7 @@ export default function App() {
               Diagram
             </button>
             <button
-              onClick={() => setMode("markdown")}
+              onClick={() => { setMode("markdown"); parseMdText(mdText); }}
               className={`px-3 py-1 transition-colors ${
                 mode === "markdown"
                   ? "bg-[#3B82F6] text-white"
