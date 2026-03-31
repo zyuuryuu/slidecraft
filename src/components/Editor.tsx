@@ -11,7 +11,31 @@ import {
   defaultHighlightStyle,
   bracketMatching,
 } from "@codemirror/language";
-import { closeBrackets } from "@codemirror/autocomplete";
+import { closeBrackets, autocompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import { LAYOUT_NAMES } from "../engine/slide-schema";
+
+// ── Layout name autocomplete for <!-- slide: ... --> ──
+
+function layoutCompletion(context: CompletionContext): CompletionResult | null {
+  // Match `<!-- slide: ` followed by partial layout name
+  const line = context.state.doc.lineAt(context.pos);
+  const textBefore = line.text.slice(0, context.pos - line.from);
+  const match = textBefore.match(/<!--\s*slide:\s*(\S*)$/);
+  if (!match) return null;
+
+  const prefix = match[1];
+  const from = context.pos - prefix.length;
+
+  return {
+    from,
+    options: LAYOUT_NAMES.map((name) => ({
+      label: name,
+      type: "keyword",
+      detail: name.split(".")[0], // category: Title, Section, Content, etc.
+    })),
+    filter: true,
+  };
+}
 
 interface EditorProps {
   value: string;
@@ -40,6 +64,7 @@ export default function Editor({ value, onChange, language = "yaml", onCursorLin
         history(),
         bracketMatching(),
         closeBrackets(),
+        language === "markdown" ? autocompletion({ override: [layoutCompletion] }) : [],
         syntaxHighlighting(defaultHighlightStyle),
         langExt,
         oneDark,
