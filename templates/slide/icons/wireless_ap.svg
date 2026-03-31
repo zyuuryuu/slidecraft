@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Wireless AP: Vertical antenna with dot on top and 2 concentric arc waves -->
+  <!-- Antenna pole (vertical line) -->
+  <line x1="32" y1="50" x2="32" y2="24" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Antenna head (small circle at top) -->
+  <circle cx="32" cy="20" r="3" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Inner wave arc -->
+  <path d="M 26 14 Q 32 8 38 14" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Outer wave arc -->
+  <path d="M 20 8 Q 32 2 44 8" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

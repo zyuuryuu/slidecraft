@@ -1,6 +1,6 @@
 # SlideCraft ロードマップ
 
-## 完了フェーズ
+## v1 完了フェーズ (ダイアグラム → PPTX)
 
 | Phase | 内容 | テスト数 | 状態 |
 |-------|------|---------|------|
@@ -16,7 +16,37 @@
 
 ---
 
-## 今後の改善項目
+## v2 Markdown → PPTX (テンプレート流し込み)
+
+設計書: [MarkdownToPptx_Design.md](MarkdownToPptx_Design.md)
+
+| Phase | 内容 | 工数目安 | 状態 |
+|-------|------|---------|------|
+| S0 | スパイク: JSZip OOXML 操作検証 | 2 日 | 進行中 — テンプレートのスライドマスター問題を調査中 |
+| S1 | slide-schema.ts + md-parser.ts | 3-4 日 | 未着手 |
+| S2 | template-loader.ts + レイアウトレジストリ | 2-3 日 | 未着手 |
+| S3 | placeholder-filler.ts + md-to-ooxml.ts | 5-7 日 | 未着手 |
+| S4 | SlidePreview.tsx (WYSIWYG) | 4-5 日 | 未着手 |
+| S5 | GUI 統合 + テンプレート選択 | 3-4 日 | 未着手 |
+| S6 | テスト + ポリッシュ | 2-3 日 | 未着手 |
+
+### S0 ブロッカー (解決済み)
+
+- **問題**: テンプレート PPTX のスライドマスターが PowerPoint で編集不可
+- **原因**: `lstStyle` + `rPr` にフォント・サイズ・色がハードコードされ、マスターの設定を上書きしていた
+- **対応**: `lstStyle` を空にし、`rPr` のハードコードを除去。マスターの `titleStyle`/`bodyStyle` にスタイルを移行
+- **残課題**: 白文字だった箇所が黒くなっている（レイアウト固有の色指定が消えた）→ 後回し
+
+### S0 完了済み項目
+
+- JSZip でテンプレートからスライド生成: 成功
+- レイアウトのプレースホルダーコピー + テキスト差し替え: 成功 (lstStyle, spPr 保持)
+- リレーション更新 (presentation.xml, Content_Types, rels): 成功
+- LibreOffice での表示確認: OK
+
+---
+
+## v1 改善項目
 
 ### アプリアイコン正式デザイン
 - **サイズ**: S

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Storage: 3 stacked horizontal ovals (disks) -->
+  <!-- Top disk -->
+  <ellipse cx="32" cy="18" rx="20" ry="6" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Middle disk -->
+  <ellipse cx="32" cy="32" rx="20" ry="6" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bottom disk -->
+  <ellipse cx="32" cy="46" rx="20" ry="6" fill="none" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Left connecting line -->
+  <line x1="12" y1="18" x2="12" y2="46" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right connecting line -->
+  <line x1="52" y1="18" x2="52" y2="46" stroke="#1E2761" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
