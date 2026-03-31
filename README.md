@@ -1,16 +1,17 @@
 # SlideCraft
 
-YAML/JSON で定義したダイアグラムを PowerPoint (.pptx) に変換するデスクトップアプリ。
+Markdown で書いたスライドを会社テンプレート PPTX に流し込むデスクトップアプリ。
+LLM が Markdown を書き、人間が WYSIWYG プレビューで確認・PPTX を生成するワークフローを想定。
 
-Tauri v2 + React + TypeScript + PptxGenJS で構築。
+Tauri v2 + React + TypeScript + JSZip で構築。
 
 ## 機能
 
-- **YAML/JSON エディタ** — CodeMirror 6 によるシンタックスハイライト付きエディタ
-- **リアルタイムプレビュー** — Mermaid.js によるダイアグラムプレビュー
-- **PPTX 生成** — PptxGenJS でフローチャート・スイムレーン・バスラインを PowerPoint に出力
-- **テーマシステム** — YAML ベースのカスタマイズ可能なテーマ
-- **テーマ抽出** — 既存 PPTX テンプレートからテーマを自動抽出
+- **Markdown → PPTX** — Markdown を書くだけでテンプレート PPTX のプレースホルダーにテキストを流し込み
+- **WYSIWYG プレビュー** — テンプレートの装飾・色・フォントを反映したスライドプレビュー
+- **30種レイアウト** — タイトル / セクション / コンテンツ / カラム / KPI / チャート / 比較 / プロセス等
+- **テンプレート読み込み** — 既存の .pptx テンプレートを読み込んでスタイルを適用
+- **ダイアグラムモード** — YAML/JSON でフローチャート・スイムレーンを PPTX 出力 (PptxGenJS)
 - **クロスプラットフォーム** — Windows (.msi) / macOS (.dmg) / Linux (.AppImage, .deb)
 
 ## セットアップ

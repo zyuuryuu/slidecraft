@@ -12,73 +12,91 @@
 | P5 | Tauri GUI + IPC | - | 完了 |
 | P6 | E2E テスト + インストーラ | 6 (E2E) | 完了 |
 
-**合計: 118 ユニットテスト + 6 E2E テスト**
+**v1 合計: 118 ユニットテスト + 6 E2E テスト**
 
 ---
 
-## v2 Markdown → PPTX (テンプレート流し込み)
+## v2 完了フェーズ (Markdown → PPTX テンプレート流し込み)
 
 設計書: [MarkdownToPptx_Design.md](MarkdownToPptx_Design.md)
 
-| Phase | 内容 | 工数目安 | 状態 |
+| Phase | 内容 | テスト数 | 状態 |
 |-------|------|---------|------|
-| S0 | スパイク: JSZip OOXML 操作検証 | 2 日 | 進行中 — テンプレートのスライドマスター問題を調査中 |
-| S1 | slide-schema.ts + md-parser.ts | 3-4 日 | 未着手 |
-| S2 | template-loader.ts + レイアウトレジストリ | 2-3 日 | 未着手 |
-| S3 | placeholder-filler.ts + md-to-ooxml.ts | 5-7 日 | 未着手 |
-| S4 | SlidePreview.tsx (WYSIWYG) | 4-5 日 | 未着手 |
-| S5 | GUI 統合 + テンプレート選択 | 3-4 日 | 未着手 |
-| S6 | テスト + ポリッシュ | 2-3 日 | 未着手 |
+| S0 | スパイク: JSZip OOXML 操作検証 | - | 完了 |
+| S1 | slide-schema.ts + md-parser.ts | 15 | 完了 |
+| S2 | template-loader.ts + レイアウトレジストリ | 14 | 完了 |
+| S3 | placeholder-filler.ts + md-to-ooxml.ts | 12 | 完了 |
+| S4 | SlidePreview.tsx (WYSIWYG) | - | 完了 |
+| S5 | GUI 統合 + テンプレート選択 + E2E | 11 (E2E) | 完了 |
 
-### S0 ブロッカー (解決済み)
+**v2 合計: 41 ユニットテスト + 11 E2E テスト**
 
-- **問題**: テンプレート PPTX のスライドマスターが PowerPoint で編集不可
-- **原因**: `lstStyle` + `rPr` にフォント・サイズ・色がハードコードされ、マスターの設定を上書きしていた
-- **対応**: `lstStyle` を空にし、`rPr` のハードコードを除去。マスターの `titleStyle`/`bodyStyle` にスタイルを移行
-- **残課題**: 白文字だった箇所が黒くなっている（レイアウト固有の色指定が消えた）→ 後回し
+**プロジェクト全体: 159 ユニットテスト + 11 E2E テスト**
 
-### S0 完了済み項目
+### 解決した技術課題
 
-- JSZip でテンプレートからスライド生成: 成功
-- レイアウトのプレースホルダーコピー + テキスト差し替え: 成功 (lstStyle, spPr 保持)
-- リレーション更新 (presentation.xml, Content_Types, rels): 成功
-- LibreOffice での表示確認: OK
+**OOXML スタイル階層の正しい設計:**
+- Theme: `majorFont=Georgia`, `minorFont=Calibri`
+- Master: `titleStyle`/`bodyStyle` でテーマフォント参照 (`+mj-lt`/`+mn-lt`)
+- Layout `lstStyle`: マスターとの差分のみ（サイズ・色）をオーバーライド
+- Slide: テキスト内容のみ、スタイル情報なし
+
+**教訓:** `lstStyle` にフォント名・サイズ・色を全レベルでハードコードすると、スライドマスターの UI 編集が無効化される。レイアウトには差分のみ指定する。
 
 ---
 
-## v1 改善項目
+## 今後の改善項目
 
-### アプリアイコン正式デザイン
+### v2 改善 (優先度高)
+
+#### Markdown↔プレビュー連携
+- **サイズ**: M
+- **内容**: エディタのカーソル位置からスライド特定、プレビュークリックでエディタジャンプ
+- **設計**: `sourceLineStart`/`sourceLineEnd` を使って双方向マッピング
+
+#### Diagram モードの Mermaid プレビュー修復
+- **サイズ**: S
+- **内容**: モード切替後に Mermaid が再レンダリングしない問題
+- **原因**: Preview コンポーネントの `useEffect` で `spec` 参照が変わらないとレンダリングしない
+
+#### テンプレートの色完全復元
+- **サイズ**: M
+- **内容**: 一部のプレースホルダーでフォント色が元のデザインと異なる
+- **対応**: `create_30_layouts.py` の意図に合わせて `lstStyle` の色オーバーライドを精査
+
+### インフラ改善
+
+#### アプリアイコン正式デザイン
 - **サイズ**: S
 - **内容**: 仮アイコン（青背景に "S"）を正式デザインに差し替え
-- **手順**: 1024x1024 PNG を用意し `npx tauri icon <file>` で全サイズ生成
 
-### バンドル識別子の修正
+#### バンドル識別子の修正
 - **サイズ**: S
-- **内容**: `com.diagram-pipeline.app` の `.app` 末尾が macOS で警告を出す
-- **対応**: `com.slidecraft.desktop` 等に変更 (`tauri.conf.json` の `identifier`)
+- **内容**: `com.diagram-pipeline.app` → `com.slidecraft.desktop` に変更
 
-### CI ビルド結果の確認・修正
+#### CI ビルド結果の確認・修正
 - **サイズ**: S
 - **内容**: GitHub Actions で Win/macOS/Linux ビルドが通ることを確認
-- **対応**: 失敗があればプラットフォーム固有の問題を修正
 
-### 自動アップデート (Tauri Updater)
+#### 自動アップデート (Tauri Updater)
 - **サイズ**: M
 - **内容**: GitHub Releases 経由の自動アップデート機能
-- **参照**: 設計書 9.3 節
 
-### macOS コード署名・公証
-- **サイズ**: M
-- **内容**: Apple Developer Program 加入 + Notarization 設定
-- **備考**: 未加入なら「開発元不明」警告を許容
+### 機能拡張 (将来)
 
-### ゴールデンファイルテスト拡充
-- **サイズ**: M
-- **内容**: Python 版出力との座標比較テストを追加
-- **参照**: 設計書 7.3 節
+#### CodeMirror Markdown ハイライト
+- **サイズ**: S
+- **内容**: エディタの言語モードを YAML から Markdown に切り替え
+- **現状**: Markdown モードでも YAML ハイライトが適用されている
 
-### テーマ切り替え機能の実装
+#### テーマ切り替え機能
 - **サイズ**: M
-- **内容**: ThemePicker で選択したテーマを PPTX 生成に反映
-- **現状**: UI はあるが生成時は常に midnight_executive を使用
+- **内容**: 複数テンプレート PPTX の管理・切り替え
+
+#### 追加レイアウト自動選択の改善
+- **サイズ**: S
+- **内容**: KPI / Process / Compare 等のレイアウト自動判定精度向上
+
+#### 画像・チャートの Markdown 埋め込み
+- **サイズ**: L
+- **内容**: `![alt](path)` や ```` ```chart ```` ブロックの対応
