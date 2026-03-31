@@ -17,6 +17,7 @@ import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from ".
 import { generatePptx } from "./engine/placeholder-filler";
 import type { DeckIR, SlideIR } from "./engine/slide-schema";
 import { readFileFromInput, downloadBlob } from "./ipc/commands";
+import LlmAssist from "./components/LlmAssist";
 
 type AppMode = "diagram" | "markdown";
 type MarkdownSubMode = "import" | "edit";
@@ -241,6 +242,7 @@ Date: プロジェクトマネージャー: 山田 太郎 | taro.yamada@example.
 export default function App() {
   const [mode, setMode] = useState<AppMode>("markdown");
   const [subMode, setSubMode] = useState<MarkdownSubMode>("import");
+  const [showLlmAssist, setShowLlmAssist] = useState(false);
   const [yamlText, setYamlText] = useState(SAMPLE_YAML);
   const [mdText, setMdText] = useState(SAMPLE_MD);
   const [spec, setSpec] = useState<DiagramSpec | null>(null);
@@ -450,6 +452,17 @@ export default function App() {
   const hasContent = mode === "diagram" ? spec !== null : (deck !== null && templateData !== null);
 
 
+  // ── LLM Assist: import result ──
+  const handleLlmImport = useCallback(
+    (text: string) => {
+      setMdText(text);
+      parseMdText(text);
+      setMode("markdown");
+      setSubMode("import");
+    },
+    [parseMdText],
+  );
+
   // ── Import → Edit transition ──
   const handleStartEditing = useCallback(() => {
     if (deck) setSubMode("edit");
@@ -537,6 +550,7 @@ export default function App() {
           onSave={handleSave}
           onGenerate={handleGenerate}
           onLoadTemplate={handleLoadTemplate}
+          onAiAssist={() => setShowLlmAssist(true)}
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
@@ -717,6 +731,12 @@ export default function App() {
       )}
 
       <StatusBar spec={spec} error={parseError} filePath={filePath} />
+
+      <LlmAssist
+        isOpen={showLlmAssist}
+        onClose={() => setShowLlmAssist(false)}
+        onImportResult={handleLlmImport}
+      />
     </>
   );
 }

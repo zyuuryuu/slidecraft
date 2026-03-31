@@ -3,6 +3,7 @@ interface ToolbarProps {
   onSave: () => void;
   onGenerate: () => void;
   onLoadTemplate?: () => void;
+  onAiAssist?: () => void;
   generating: boolean;
   hasSpec: boolean;
   templateName?: string;
@@ -14,6 +15,7 @@ export default function Toolbar({
   onSave,
   onGenerate,
   onLoadTemplate,
+  onAiAssist,
   generating,
   hasSpec,
   templateName,
@@ -49,6 +51,15 @@ export default function Toolbar({
           title={templateName ? `Template: ${templateName}` : "Load template"}
         >
           {templateName ? `Template: ${templateName}` : "Load Template"}
+        </button>
+      )}
+
+      {onAiAssist && (
+        <button
+          onClick={onAiAssist}
+          className="px-3 py-1.5 text-sm bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded transition-colors"
+        >
+          AI Assist
         </button>
       )}
 
