@@ -44,22 +44,19 @@ interface SlideCardProps {
   slideIndex: number;
   totalSlides: number;
   layout: LayoutInfo | undefined;
+  masterBgColor: string; // hex without #
   scale: number;
   isActive?: boolean;
   onClick?: () => void;
 }
 
-function SlideCard({ slide, slideIndex, layout, scale, isActive, onClick }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, onClick }: SlideCardProps) {
   const contentMap = new Map(slide.placeholders.map((p) => [p.idx, p]));
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
-  // Fallback background: derive from decorations
-  // Largest decoration by area = slide background
-  const sortedDecos = [...(layout?.decorations || [])].sort(
-    (a, b) => b.w * b.h - a.w * a.h,
-  );
-  const bgColor = sortedDecos.length > 0 ? `#${sortedDecos[0].color}` : "#F5F7FA";
+  // Background = master bg color. Decorative shapes are painted on top.
+  const bgColor = `#${masterBgColor}`;
 
   return (
     <div
@@ -199,6 +196,7 @@ export default function SlidePreview({
             slideIndex={i}
             totalSlides={deck.slides.length}
             layout={layout}
+            masterBgColor={template?.masterBgColor ?? "FFFFFF"}
             scale={scale}
             isActive={activeSlide === i}
             onClick={() => onSlideClick?.(i)}

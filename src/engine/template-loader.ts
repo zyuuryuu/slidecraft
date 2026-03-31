@@ -62,6 +62,7 @@ export interface TemplateData {
   contentTypes: string;
   masterTitleStyle: MasterStyle;
   masterBodyStyle: MasterStyle;
+  masterBgColor: string; // hex without #, from theme bg1/lt1
 }
 
 // ── Namespace normalization ──
@@ -264,9 +265,15 @@ export async function loadTemplate(
     .file("[Content_Types].xml")!
     .async("string");
 
+  // ── Extract master background color from theme ──
+  const themeXml = await zip.file("ppt/theme/theme1.xml")?.async("string") ?? "";
+  const lt1Match = themeXml.match(/<a:lt1>[\s\S]*?lastClr="([A-Fa-f0-9]{6})"/) ||
+    themeXml.match(/<a:lt1>[\s\S]*?srgbClr val="([A-Fa-f0-9]{6})"/);
+  const masterBgColor = lt1Match ? lt1Match[1] : "FFFFFF";
+
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
-    masterTitleStyle, masterBodyStyle,
+    masterTitleStyle, masterBodyStyle, masterBgColor,
   };
 }
 
