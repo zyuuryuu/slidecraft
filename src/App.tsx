@@ -133,7 +133,7 @@ export default function App() {
   const [themeName, setThemeName] = useState("midnight_executive");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
-  const [gotoLine, setGotoLine] = useState<number | undefined>(undefined);
+  const [gotoLine, setGotoLine] = useState<{ line: number; ts: number } | undefined>(undefined);
   const [templateName, setTemplateName] = useState("Midnight Executive");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
@@ -342,7 +342,7 @@ export default function App() {
       if (mode !== "markdown" || !deck) return;
       const slide = deck.slides[index];
       if (slide?.sourceLineStart) {
-        setGotoLine(slide.sourceLineStart);
+        setGotoLine({ line: slide.sourceLineStart, ts: Date.now() });
       }
     },
     [mode, deck],

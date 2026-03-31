@@ -18,7 +18,7 @@ interface EditorProps {
   onChange: (value: string) => void;
   language?: "yaml" | "json" | "markdown";
   onCursorLine?: (line: number) => void;
-  gotoLine?: number; // when changed, scroll editor to this line
+  gotoLine?: { line: number; ts: number }; // ts forces re-trigger even for same line
 }
 
 export default function Editor({ value, onChange, language = "yaml", onCursorLine, gotoLine }: EditorProps) {
@@ -90,9 +90,9 @@ export default function Editor({ value, onChange, language = "yaml", onCursorLin
   // Scroll to line when gotoLine changes
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !gotoLine || gotoLine < 1) return;
+    if (!view || !gotoLine || gotoLine.line < 1) return;
     const lineCount = view.state.doc.lines;
-    const target = Math.min(gotoLine, lineCount);
+    const target = Math.min(gotoLine.line, lineCount);
     const line = view.state.doc.line(target);
     view.dispatch({
       selection: { anchor: line.from },
