@@ -1,0 +1,195 @@
+/**
+ * md-serializer.ts — Serialize DeckIR back to Markdown.
+ *
+ * Inverse of md-parser.ts. Used for:
+ * - Exporting edited slides back to Markdown for LLM re-modification
+ * - Round-trip preservation
+ */
+
+import type {
+  DeckIR,
+  SlideIR,
+  PlaceholderContent,
+  Paragraph,
+  InlineSegment,
+} from "./slide-schema";
+import { autoSelectLayout } from "./template-loader";
+
+// ── Title layout detection ──
+
+function isTitleLayout(layout: string): boolean {
+  return layout.startsWith("Title.") || layout.startsWith("Closing.");
+}
+
+function isColumnLayout(layout: string): boolean {
+  return layout.startsWith("Column.");
+}
+
+function isKpiLayout(layout: string): boolean {
+  return layout.startsWith("KPI.");
+}
+
+function isProcessLayout(layout: string): boolean {
+  return layout.startsWith("Process.");
+}
+
+// ── Placeholder idx → title field name (reverse of TITLE_FIELD_MAP) ──
+
+const IDX_TO_FIELD: Record<string, string> = {
+  "10": "Category",
+  "11": "Date",
+  "12": "Footer",
+};
+
+// ── Inline segments → Markdown text ──
+
+function serializeSegments(segments: InlineSegment[]): string {
+  return segments
+    .map((seg) => {
+      let text = seg.text;
+      if (seg.bold) text = `**${text}**`;
+      if (seg.italic) text = `*${text}*`;
+      return text;
+    })
+    .join("");
+}
+
+// ── Paragraphs → Markdown lines ──
+
+function serializeParagraphs(paragraphs: Paragraph[]): string {
+  return paragraphs
+    .map((p) => {
+      const text = serializeSegments(p.segments);
+      if (p.bullet) return `- ${text}`;
+      return text;
+    })
+    .join("\n");
+}
+
+// ── Get placeholder text by idx ──
+
+function getPlaceholder(
+  slide: SlideIR,
+  idx: string,
+): PlaceholderContent | undefined {
+  return slide.placeholders.find((p) => p.idx === idx);
+}
+
+function getPlaceholderText(slide: SlideIR, idx: string): string | undefined {
+  const ph = getPlaceholder(slide, idx);
+  if (!ph) return undefined;
+  return serializeParagraphs(ph.paragraphs);
+}
+
+// ── Determine separator type for multi-section layouts ──
+
+function getSeparatorType(
+  layout: string,
+): "col" | "kpi" | "step" | null {
+  if (isColumnLayout(layout)) return "col";
+  if (isKpiLayout(layout)) return "kpi";
+  if (isProcessLayout(layout)) return "step";
+  return null;
+}
+
+// ── Serialize a single slide ──
+
+function serializeSlide(
+  slide: SlideIR,
+  slideIndex: number,
+  totalSlides: number,
+): string {
+  const lines: string[] = [];
+  const layout =
+    slide.layout === "auto"
+      ? autoSelectLayout(slide, slideIndex, totalSlides)
+      : slide.layout;
+
+  // Always emit layout directive for round-trip fidelity
+  lines.push(`<!-- slide: ${layout} -->`);
+
+  if (isTitleLayout(layout)) {
+    // Title layouts: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = fields
+    const title = getPlaceholderText(slide, "0");
+    const subtitle = getPlaceholderText(slide, "1");
+    if (title) lines.push(`# ${title}`);
+    if (subtitle) lines.push(`## ${subtitle}`);
+    lines.push("");
+
+    // Fields
+    for (const [idx, fieldName] of Object.entries(IDX_TO_FIELD)) {
+      const text = getPlaceholderText(slide, idx);
+      if (text) lines.push(`${fieldName}: ${text}`);
+    }
+  } else {
+    // Content layouts: idx 15 = title, idx 16 = subtitle
+    const title = getPlaceholderText(slide, "15");
+    const subtitle = getPlaceholderText(slide, "16");
+    if (title) lines.push(`# ${title}`);
+    if (subtitle) lines.push(`> ${subtitle}`);
+    lines.push("");
+
+    const sepType = getSeparatorType(layout);
+
+    if (sepType) {
+      // Multi-section: emit sections with separators
+      // Find all numbered placeholders (1, 2, 3, ...)
+      const sectionPhs = slide.placeholders
+        .filter((p) => /^\d+$/.test(p.idx) && parseInt(p.idx) >= 1 && parseInt(p.idx) <= 10)
+        .sort((a, b) => parseInt(a.idx) - parseInt(b.idx));
+
+      for (const ph of sectionPhs) {
+        lines.push(`<!-- ${sepType} -->`);
+        lines.push(serializeParagraphs(ph.paragraphs));
+        lines.push("");
+      }
+    } else {
+      // Single body: idx 1
+      if (slide.diagram) {
+        lines.push("```diagram");
+        lines.push(slide.diagram.yaml);
+        lines.push("```");
+      } else {
+        const body = getPlaceholderText(slide, "1");
+        if (body) lines.push(body);
+      }
+
+      // Secondary placeholders (2, 3, etc.) for non-column layouts
+      for (let idx = 2; idx <= 6; idx++) {
+        const text = getPlaceholderText(slide, String(idx));
+        if (text) {
+          lines.push("");
+          lines.push(text);
+        }
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+// ── Main serializer ──
+
+export function serializeMd(deck: DeckIR): string {
+  const parts: string[] = [];
+
+  // Front matter
+  if (deck.template) {
+    parts.push("---");
+    parts.push(`template: ${deck.template}`);
+    parts.push("---");
+    parts.push("");
+  }
+
+  // Slides
+  for (let i = 0; i < deck.slides.length; i++) {
+    if (i > 0) {
+      parts.push("");
+      parts.push("---");
+      parts.push("");
+    }
+    parts.push(serializeSlide(deck.slides[i], i, deck.slides.length));
+  }
+
+  return parts.join("\n").trimEnd() + "\n";
+}

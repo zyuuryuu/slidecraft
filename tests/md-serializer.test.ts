@@ -1,0 +1,251 @@
+/**
+ * md-serializer.test.ts — Tests for SlideIR[] → Markdown serialization.
+ *
+ * Round-trip: parseMd(serializeMd(parseMd(md))) should produce
+ * equivalent SlideIR[] to parseMd(md).
+ */
+
+import { describe, it, expect } from "vitest";
+import { serializeMd } from "../src/engine/md-serializer";
+import { parseMd } from "../src/engine/md-parser";
+import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
+
+describe("serializeMd", () => {
+  // ── Basic serialization ──
+
+  it("serializes a simple content slide", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Title" }] }] },
+            { idx: "16", paragraphs: [{ segments: [{ text: "Subtitle" }] }] },
+            { idx: "1", paragraphs: [{ segments: [{ text: "Body text" }] }] },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("<!-- slide: Content.1Body.Single -->");
+    expect(md).toContain("# Title");
+    expect(md).toContain("> Subtitle");
+    expect(md).toContain("Body text");
+  });
+
+  it("serializes a title slide with fields", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Title.1Title.Single",
+          placeholders: [
+            { idx: "0", paragraphs: [{ segments: [{ text: "Main Title" }] }] },
+            { idx: "1", paragraphs: [{ segments: [{ text: "Sub" }] }] },
+            { idx: "10", paragraphs: [{ segments: [{ text: "REPORT" }] }] },
+            { idx: "11", paragraphs: [{ segments: [{ text: "2026-03-31" }] }] },
+            { idx: "12", paragraphs: [{ segments: [{ text: "Confidential" }] }] },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("# Main Title");
+    expect(md).toContain("## Sub");
+    expect(md).toContain("Category: REPORT");
+    expect(md).toContain("Date: 2026-03-31");
+    expect(md).toContain("Footer: Confidential");
+  });
+
+  it("serializes multiple slides with separators", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Slide 1" }] }] },
+          ],
+        },
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Slide 2" }] }] },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("---");
+    expect(md.split("---").length).toBe(2); // one separator between two slides
+  });
+
+  it("serializes column layout with <!-- col -->", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Column.2Body.Equal",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Title" }] }] },
+            { idx: "1", paragraphs: [{ segments: [{ text: "Left" }] }] },
+            { idx: "2", paragraphs: [{ segments: [{ text: "Right" }] }] },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("<!-- col -->");
+    expect(md).toContain("Left");
+    expect(md).toContain("Right");
+  });
+
+  it("serializes diagram block", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Architecture" }] }] },
+          ],
+          diagram: {
+            yaml: "type: flowchart\nnodes:\n  - id: a\n    label: A",
+            placeholderIdx: "1",
+          },
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("```diagram");
+    expect(md).toContain("type: flowchart");
+    expect(md).toContain("```");
+  });
+
+  it("serializes bold and italic inline formatting", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Title" }] }] },
+            {
+              idx: "1",
+              paragraphs: [
+                {
+                  segments: [
+                    { text: "Normal " },
+                    { text: "bold", bold: true },
+                    { text: " and " },
+                    { text: "italic", italic: true },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("**bold**");
+    expect(md).toContain("*italic*");
+  });
+
+  it("serializes bullet lists", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "Title" }] }] },
+            {
+              idx: "1",
+              paragraphs: [
+                { segments: [{ text: "Item A" }], bullet: true },
+                { segments: [{ text: "Item B" }], bullet: true },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("- Item A");
+    expect(md).toContain("- Item B");
+  });
+
+  it("includes template in front matter", () => {
+    const deck: DeckIR = {
+      template: "MyTemplate.pptx",
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          placeholders: [
+            { idx: "15", paragraphs: [{ segments: [{ text: "T" }] }] },
+          ],
+        },
+      ],
+    };
+
+    const md = serializeMd(deck);
+    expect(md).toContain("---");
+    expect(md).toContain("template: MyTemplate.pptx");
+  });
+
+  // ── Round-trip ──
+
+  it("round-trips a complex deck", () => {
+    const original = `<!-- slide: Title.1Title.Single -->
+# Project Report
+## Q1 2026
+
+Category: REPORT
+Date: 2026-03-31
+Footer: Confidential
+
+---
+
+# Agenda
+> Today's Agenda
+
+- Item 1
+- Item 2
+- Item 3
+
+---
+
+<!-- slide: Column.2Body.Equal -->
+# Comparison
+
+<!-- col -->
+**Option A**
+
+- Pro 1
+- Pro 2
+
+<!-- col -->
+**Option B**
+
+- Pro 3
+- Pro 4`;
+
+    const deck1 = parseMd(original);
+    const serialized = serializeMd(deck1);
+    const deck2 = parseMd(serialized);
+
+    // Same number of slides
+    expect(deck2.slides.length).toBe(deck1.slides.length);
+
+    // Same layouts
+    for (let i = 0; i < deck1.slides.length; i++) {
+      expect(deck2.slides[i].layout).toBe(deck1.slides[i].layout);
+      // Same placeholder count
+      expect(deck2.slides[i].placeholders.length).toBe(
+        deck1.slides[i].placeholders.length,
+      );
+    }
+  });
+});
