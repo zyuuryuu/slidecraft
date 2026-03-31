@@ -22,91 +22,106 @@ interface ParsedEdge {
 // ── Node shape detection from Mermaid syntax ──
 
 function parseNodeDef(raw: string): ParsedNode | null {
-  // id["label"]  → rect
-  let m = raw.match(/^(\w+)\["(.+?)"\]/);
-  if (m) return { id: m[1], label: m[2], shape: "rect" };
+  const s = raw.trim();
+  if (!s) return null;
 
-  // id("label")  → rounded_rect
-  m = raw.match(/^(\w+)\("(.+?)"\)/);
-  if (m) return { id: m[1], label: m[2], shape: "rounded_rect" };
+  let m: RegExpMatchArray | null;
 
-  // id(("label")) → circle
-  m = raw.match(/^(\w+)\(\("(.+?)"\)\)/);
+  // id(("label")) → circle (must be before rounded_rect)
+  m = s.match(/^(\w+)\(\("?(.+?)"?\)\)/);
   if (m) return { id: m[1], label: m[2], shape: "circle" };
 
-  // id{{"label"}} → diamond
-  m = raw.match(/^(\w+)\{\{"(.+?)"\}\}/);
+  // id{{"label"}} → diamond (double brace)
+  m = s.match(/^(\w+)\{\{"?(.+?)"?\}\}/);
   if (m) return { id: m[1], label: m[2], shape: "diamond" };
 
-  // id{label} → diamond (no quotes)
-  m = raw.match(/^(\w+)\{(.+?)\}/);
-  if (m) return { id: m[1], label: m[2], shape: "diamond" };
-
-  // id[(label)] → database (cylinder)
-  m = raw.match(/^(\w+)\[\((.+?)\)\]/);
+  // id[(label)] → database/cylinder → treat as rect
+  m = s.match(/^(\w+)\[\("?(.+?)"?\)\]/);
   if (m) return { id: m[1], label: m[2], shape: "rect" };
 
-  // id>label] → asymmetric (flag)
-  m = raw.match(/^(\w+)>(.+?)\]/);
+  // id["label"] → rect
+  m = s.match(/^(\w+)\["(.+?)"\]/);
+  if (m) return { id: m[1], label: m[2], shape: "rect" };
+
+  // id[label] → rect (no quotes)
+  m = s.match(/^(\w+)\[(.+?)\]/);
+  if (m) return { id: m[1], label: m[2], shape: "rect" };
+
+  // id("label") → rounded_rect
+  m = s.match(/^(\w+)\("(.+?)"\)/);
+  if (m) return { id: m[1], label: m[2], shape: "rounded_rect" };
+
+  // id(label) → rounded_rect (no quotes)
+  m = s.match(/^(\w+)\((.+?)\)/);
+  if (m) return { id: m[1], label: m[2], shape: "rounded_rect" };
+
+  // id{label} → diamond (single brace, no quotes)
+  m = s.match(/^(\w+)\{(.+?)\}/);
+  if (m) return { id: m[1], label: m[2], shape: "diamond" };
+
+  // id>label] → asymmetric
+  m = s.match(/^(\w+)>(.+?)\]/);
   if (m) return { id: m[1], label: m[2], shape: "rect" };
 
   // bare id (no shape syntax)
-  m = raw.match(/^(\w+)$/);
+  m = s.match(/^(\w+)$/);
   if (m) return { id: m[1], label: m[1], shape: "rect" };
 
   return null;
 }
 
 // ── Parse edge line ──
+// Handles: A --> B, A -->|label| B, A -.-> B, chained A --> B --> C
 
 function parseEdgeLine(line: string): { nodes: ParsedNode[]; edges: ParsedEdge[] } | null {
   const nodes: ParsedNode[] = [];
   const edges: ParsedEdge[] = [];
 
-  // Split by arrow patterns: -->, --->, -.->, ---|label|, -->|label|
-  const parts = line.split(/(-->|---->|-.->|===|---)/);
-  if (parts.length < 3) return null;
+  // Regex to match: nodeExpr (arrow with optional label) nodeExpr ...
+  // Arrow patterns: -->, -.->, ===>, ---
+  // Label patterns: -->|label|, ---|label|
+  const arrowRe = /\s+(-->|-.->|===|---)\s*(?:\|([^|]*)\|\s*)?/g;
 
-  const segments: { nodeStr: string; label?: string }[] = [];
-  let pendingLabel: string | undefined;
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i].trim();
-    if (!part) continue;
-
-    if (/^(-->|---->|-\.->|===|---)$/.test(part)) {
-      // Arrow - check if next part has a label
-      continue;
-    }
-
-    // Check for label syntax: |label| at start
-    const labelMatch = part.match(/^\|(.+?)\|\s*(.*)/);
-    if (labelMatch) {
-      pendingLabel = labelMatch[1];
-      if (labelMatch[2]) {
-        segments.push({ nodeStr: labelMatch[2], label: pendingLabel });
-        pendingLabel = undefined;
-      }
-    } else {
-      segments.push({ nodeStr: part, label: pendingLabel });
-      pendingLabel = undefined;
-    }
+  // Find all arrows and their positions
+  const arrows: { index: number; end: number; label?: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = arrowRe.exec(line)) !== null) {
+    arrows.push({
+      index: m.index,
+      end: m.index + m[0].length,
+      label: m[2] || undefined,
+    });
   }
 
-  for (const seg of segments) {
-    const node = parseNodeDef(seg.nodeStr);
-    if (node) nodes.push(node);
+  if (arrows.length === 0) return null;
+
+  // Extract node expressions between arrows
+  const nodeExprs: string[] = [];
+  const edgeLabels: (string | undefined)[] = [];
+
+  // First node: from start of line to first arrow
+  nodeExprs.push(line.substring(0, arrows[0].index).trim());
+
+  for (let i = 0; i < arrows.length; i++) {
+    edgeLabels.push(arrows[i].label);
+    const start = arrows[i].end;
+    const end = i + 1 < arrows.length ? arrows[i + 1].index : line.length;
+    nodeExprs.push(line.substring(start, end).trim());
   }
 
-  for (let i = 0; i < segments.length - 1; i++) {
-    const fromNode = parseNodeDef(segments[i].nodeStr);
-    const toNode = parseNodeDef(segments[i + 1].nodeStr);
-    if (fromNode && toNode) {
-      edges.push({
-        from: fromNode.id,
-        to: toNode.id,
-        label: segments[i + 1].label,
-      });
+  // Parse each node expression
+  const parsedNodes: (ParsedNode | null)[] = nodeExprs.map(expr => parseNodeDef(expr));
+
+  for (const pn of parsedNodes) {
+    if (pn) nodes.push(pn);
+  }
+
+  // Create edges
+  for (let i = 0; i < parsedNodes.length - 1; i++) {
+    const from = parsedNodes[i];
+    const to = parsedNodes[i + 1];
+    if (from && to) {
+      edges.push({ from: from.id, to: to.id, label: edgeLabels[i] });
     }
   }
 
