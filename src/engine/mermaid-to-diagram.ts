@@ -130,6 +130,12 @@ function parseEdgeLine(line: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
 
 // ── Main converter ──
 
+interface ParsedGroup {
+  id: string;
+  label: string;
+  nodeIds: string[];
+}
+
 export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null {
   const lines = mermaidSyntax.trim().split("\n").map(l => l.trim());
   if (lines.length === 0) return null;
@@ -143,10 +149,48 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
 
   const allNodes = new Map<string, ParsedNode>();
   const allEdges: ParsedEdge[] = [];
+  const groups: ParsedGroup[] = [];
+
+  // Track current subgraph context
+  const groupStack: ParsedGroup[] = [];
+  // Track which group each node belongs to
+  const nodeToGroup = new Map<string, string>();
+
+  function addNode(node: ParsedNode) {
+    if (!allNodes.has(node.id)) {
+      allNodes.set(node.id, node);
+    }
+    // Assign to current group if inside a subgraph
+    if (groupStack.length > 0 && !nodeToGroup.has(node.id)) {
+      const currentGroup = groupStack[groupStack.length - 1];
+      currentGroup.nodeIds.push(node.id);
+      nodeToGroup.set(node.id, currentGroup.id);
+    }
+  }
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    if (!line || line.startsWith("%%") || line.startsWith("style") || line.startsWith("classDef")) {
+    if (!line || line.startsWith("%%") || line.startsWith("style") || line.startsWith("classDef") || line.startsWith("class ")) {
+      continue;
+    }
+
+    // subgraph id["label"] or subgraph id[label] or subgraph label
+    const subgraphMatch = line.match(/^subgraph\s+(\w+)\s*\["?(.+?)"?\]/) ||
+      line.match(/^subgraph\s+(\w+)\s*$/);
+    if (subgraphMatch) {
+      const group: ParsedGroup = {
+        id: subgraphMatch[1],
+        label: subgraphMatch[2] || subgraphMatch[1],
+        nodeIds: [],
+      };
+      groupStack.push(group);
+      groups.push(group);
+      continue;
+    }
+
+    // end (close subgraph)
+    if (line === "end") {
+      groupStack.pop();
       continue;
     }
 
@@ -154,18 +198,32 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
     const result = parseEdgeLine(line);
     if (result && (result.edges.length > 0 || result.nodes.length > 0)) {
       for (const node of result.nodes) {
-        if (!allNodes.has(node.id)) {
-          allNodes.set(node.id, node);
-        }
+        addNode(node);
       }
       for (const edge of result.edges) {
         allEdges.push(edge);
       }
-    } else {
-      // Try as standalone node definition
-      const node = parseNodeDef(line);
-      if (node && !allNodes.has(node.id)) {
-        allNodes.set(node.id, node);
+      continue;
+    }
+
+    // Try as standalone node definition
+    const node = parseNodeDef(line);
+    if (node) {
+      addNode(node);
+      continue;
+    }
+
+    // Try as bare node id reference inside subgraph
+    const bareRef = line.match(/^(\w+)$/);
+    if (bareRef && groupStack.length > 0) {
+      // Just a node reference inside subgraph, assign to group
+      if (!allNodes.has(bareRef[1])) {
+        allNodes.set(bareRef[1], { id: bareRef[1], label: bareRef[1], shape: "rect" });
+      }
+      const currentGroup = groupStack[groupStack.length - 1];
+      if (!nodeToGroup.has(bareRef[1])) {
+        currentGroup.nodeIds.push(bareRef[1]);
+        nodeToGroup.set(bareRef[1], currentGroup.id);
       }
     }
   }
@@ -180,11 +238,16 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
       id: n.id,
       label: n.label,
       shape: n.shape,
+      ...(nodeToGroup.has(n.id) ? { group: nodeToGroup.get(n.id) } : {}),
     })),
     edges: allEdges.map(e => ({
       from: e.from,
       to: e.to,
       ...(e.label ? { label: e.label } : {}),
+    })),
+    groups: groups.map(g => ({
+      id: g.id,
+      label: g.label,
     })),
   };
 
@@ -194,31 +257,53 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
 
 // ── DiagramSpec → Mermaid (reverse) ──
 
+function nodeToMermaid(id: string, label: string, shape?: string): string {
+  const safeLabel = label.replace(/"/g, "'").replace(/\n/g, "<br>");
+  switch (shape) {
+    case "diamond":
+      return `${id}{{"${safeLabel}"}}`;
+    case "rounded_rect":
+      return `${id}("${safeLabel}")`;
+    case "circle":
+    case "oval":
+      return `${id}(("${safeLabel}"))`;
+    default:
+      return `${id}["${safeLabel}"]`;
+  }
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
   const dir = spec.direction === "LR" || spec.direction === "RL" ? "LR" : "TD";
   let mmd = `graph ${dir}\n`;
 
+  // Build group membership map
+  const nodeGroupMap = new Map<string, string>();
   for (const node of spec.nodes) {
-    const label = node.label.replace(/"/g, "'");
-    switch (node.shape) {
-      case "diamond":
-        mmd += `  ${node.id}{{"${label}"}}\n`;
-        break;
-      case "rounded_rect":
-        mmd += `  ${node.id}("${label}")\n`;
-        break;
-      case "circle":
-      case "oval":
-        mmd += `  ${node.id}(("${label}"))\n`;
-        break;
-      default:
-        mmd += `  ${node.id}["${label}"]\n`;
-    }
+    if (node.group) nodeGroupMap.set(node.id, node.group);
   }
 
+  // Nodes not in any group
+  const ungroupedNodes = spec.nodes.filter(n => !n.group);
+  for (const node of ungroupedNodes) {
+    mmd += `  ${nodeToMermaid(node.id, node.label, node.shape)}\n`;
+  }
+
+  // Subgraphs
+  for (const group of spec.groups) {
+    const groupNodes = spec.nodes.filter(n => n.group === group.id);
+    if (groupNodes.length === 0) continue;
+    mmd += `  subgraph ${group.id}["${group.label}"]\n`;
+    for (const node of groupNodes) {
+      mmd += `    ${nodeToMermaid(node.id, node.label, node.shape)}\n`;
+    }
+    mmd += `  end\n`;
+  }
+
+  // Edges
   for (const edge of spec.edges) {
     const label = edge.label ? `|${edge.label}|` : "";
-    mmd += `  ${edge.from} -->${label} ${edge.to}\n`;
+    const arrow = edge.style?.dash ? "-.->" : "-->";
+    mmd += `  ${edge.from} ${arrow}${label} ${edge.to}\n`;
   }
 
   return mmd;

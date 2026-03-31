@@ -56,6 +56,41 @@ describe("mermaidToDiagramSpec", () => {
     expect(spec!.nodes[1].label).toBe("処理");
   });
 
+  it("parses subgraph into groups", () => {
+    const mmd = `graph TD
+  subgraph web["Web Tier"]
+    A["Nginx 1"]
+    B["Nginx 2"]
+  end
+  subgraph app["App Tier"]
+    C["API Gateway"]
+  end
+  A --> C
+  B --> C`;
+    const spec = mermaidToDiagramSpec(mmd);
+    expect(spec).not.toBeNull();
+    expect(spec!.groups).toHaveLength(2);
+    expect(spec!.groups[0].label).toBe("Web Tier");
+    expect(spec!.groups[1].label).toBe("App Tier");
+    // Nodes should have group assignment
+    expect(spec!.nodes.find(n => n.id === "A")!.group).toBe("web");
+    expect(spec!.nodes.find(n => n.id === "C")!.group).toBe("app");
+    expect(spec!.edges).toHaveLength(2);
+  });
+
+  it("handles nested references in subgraph", () => {
+    const mmd = `graph LR
+  subgraph dmz["DMZ"]
+    fw["Firewall"]
+    lb["Load Balancer"]
+  end
+  inet["Internet"] --> fw
+  fw --> lb`;
+    const spec = mermaidToDiagramSpec(mmd);
+    expect(spec!.nodes.find(n => n.id === "fw")!.group).toBe("dmz");
+    expect(spec!.nodes.find(n => n.id === "inet")!.group).toBeUndefined();
+  });
+
   it("returns null for invalid input", () => {
     expect(mermaidToDiagramSpec("not a graph")).toBeNull();
     expect(mermaidToDiagramSpec("")).toBeNull();
