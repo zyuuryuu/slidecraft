@@ -73,11 +73,21 @@ export const PlaceholderContentSchema = z.object({
 
 export type PlaceholderContent = z.infer<typeof PlaceholderContentSchema>;
 
+// ── Diagram block (embedded in a slide) ──
+
+export const DiagramBlockSchema = z.object({
+  yaml: z.string(), // raw YAML for DiagramSpec
+  placeholderIdx: z.string(), // which placeholder to replace with diagram
+});
+
+export type DiagramBlock = z.infer<typeof DiagramBlockSchema>;
+
 // ── Single slide IR ──
 
 export const SlideIRSchema = z.object({
   layout: z.string(), // layout name or "auto"
   placeholders: z.array(PlaceholderContentSchema),
+  diagram: DiagramBlockSchema.optional(), // embedded diagram
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });

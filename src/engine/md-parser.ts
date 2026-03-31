@@ -13,11 +13,13 @@
  *   **bold**  *italic*         inline formatting
  *   - item                     bullet list
  *   Category: / Date: / Footer: / Meta: / Summary:   title slide fields
+ *   ```diagram ... ```           embedded diagram (DiagramSpec YAML)
  */
 
 import type {
   DeckIR,
   SlideIR,
+  DiagramBlock,
   PlaceholderContent,
   Paragraph,
   InlineSegment,
@@ -92,6 +94,7 @@ function parseSlideBlock(
   let subtitle: string | undefined;
   const bodyLines: string[] = [];
   const titleFields: Record<string, string> = {};
+  let diagram: DiagramBlock | undefined;
   let cursor = 0;
 
   // Check for layout directive
@@ -159,9 +162,40 @@ function parseSlideBlock(
   }
 
   // Standard parsing (no separators)
+  let inCodeBlock = false;
+  let codeBlockLang = "";
+  let codeBlockLines: string[] = [];
+
   for (let i = cursor; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
+
+    // ``` fenced code block detection
+    if (trimmed.startsWith("```")) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockLang = trimmed.slice(3).trim().toLowerCase();
+        codeBlockLines = [];
+        continue;
+      } else {
+        // End of code block
+        if (codeBlockLang === "diagram") {
+          diagram = {
+            yaml: codeBlockLines.join("\n"),
+            placeholderIdx: "1", // diagram goes into main body placeholder
+          };
+        }
+        inCodeBlock = false;
+        codeBlockLang = "";
+        codeBlockLines = [];
+        continue;
+      }
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line);
+      continue;
+    }
 
     // # Heading → title
     if (trimmed.match(/^#\s+/) && !title) {
@@ -244,11 +278,12 @@ function parseSlideBlock(
     });
   }
 
-  if (placeholders.length === 0) return null;
+  if (placeholders.length === 0 && !diagram) return null;
 
   return {
     layout,
     placeholders,
+    diagram,
     sourceLineStart: startLine,
     sourceLineEnd: startLine + lines.length - 1,
   };

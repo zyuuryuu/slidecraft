@@ -7,10 +7,14 @@
  */
 
 import JSZip from "jszip";
+import yaml from "js-yaml";
 import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
+import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { paragraphsToOoxml } from "./md-to-ooxml";
+import { renderToBuffer } from "./pptx-writer";
+import { midnightExecutive } from "./theme";
 
 // ── Replace text in a placeholder shape XML ──
 
@@ -56,12 +60,35 @@ function replaceTextInShape(
   );
 }
 
+// ── Extract diagram shapes from PptxGenJS output ──
+
+async function extractDiagramShapes(diagramYaml: string): Promise<string> {
+  const data = yaml.load(diagramYaml);
+  const result = DiagramSpecSchema.safeParse(data);
+  if (!result.success) {
+    throw new Error("Invalid diagram YAML: " + result.error.issues[0]?.message);
+  }
+  const spec: DiagramSpec = result.data;
+  const theme = midnightExecutive();
+  const pptxBuf = await renderToBuffer(spec, { theme });
+
+  // Open the PptxGenJS-generated PPTX and extract shapes from slide1
+  const diagZip = await JSZip.loadAsync(pptxBuf);
+  const slideXml = await diagZip.file("ppt/slides/slide1.xml")?.async("string");
+  if (!slideXml) return "";
+
+  // Extract all shapes except the group wrapper
+  const shapesMatch = slideXml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
+  const cxnMatches = slideXml.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || [];
+  return [...shapesMatch, ...cxnMatches].join("");
+}
+
 // ── Build slide XML from layout placeholders + content ──
 
-function buildSlideXml(
+async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
-): string {
+): Promise<string> {
   const contentMap = new Map(
     slide.placeholders.map((p) => [p.idx, p]),
   );
@@ -70,6 +97,9 @@ function buildSlideXml(
   let id = 2;
 
   for (const ph of layout.placeholders) {
+    // Skip the placeholder that will be replaced by a diagram
+    if (slide.diagram && ph.idx === slide.diagram.placeholderIdx) continue;
+
     const content = contentMap.get(ph.idx);
     if (!content) continue;
 
@@ -81,6 +111,23 @@ function buildSlideXml(
     );
     shapes += shapeXml;
     id++;
+  }
+
+  // Add diagram shapes if present
+  if (slide.diagram) {
+    const diagramShapes = await extractDiagramShapes(slide.diagram.yaml);
+    // Re-number shape IDs to avoid conflicts
+    let reNumbered = diagramShapes;
+    const idMatches = [...reNumbered.matchAll(/<p:cNvPr[^>]*id="(\d+)"/g)];
+    const usedIds = new Set(idMatches.map(m => m[1]));
+    for (const oldId of usedIds) {
+      reNumbered = reNumbered.replace(
+        new RegExp(`id="${oldId}"`, "g"),
+        `id="${id}"`,
+      );
+      id++;
+    }
+    shapes += reNumbered;
   }
 
   return (
@@ -149,7 +196,7 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const slideXml = buildSlideXml(layout, slide);
+    const slideXml = await buildSlideXml(layout, slide);
     const slideRels = buildSlideRels(layout.index);
 
     zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);

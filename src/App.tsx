@@ -106,6 +106,41 @@ Footer: Confidential
 
 ---
 
+# システム構成図
+> System Architecture
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: CRM システム構成
+
+nodes:
+  - id: client
+    label: ブラウザ
+    shape: rounded_rect
+  - id: api
+    label: API Gateway
+  - id: crm
+    label: CRM Service
+  - id: db
+    label: Database
+    shape: rounded_rect
+  - id: ai
+    label: AI Engine
+
+edges:
+  - from: client
+    to: api
+  - from: api
+    to: crm
+  - from: crm
+    to: db
+  - from: crm
+    to: ai
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope

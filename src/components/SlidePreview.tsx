@@ -5,9 +5,60 @@
  * shapes extracted from the template PPTX, ensuring preview matches output.
  */
 
+import { useEffect, useRef, useState } from "react";
+import mermaid from "mermaid";
+import yaml from "js-yaml";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
+
+// ── Mermaid initialization ──
+mermaid.initialize({ startOnLoad: false, theme: "dark" });
+
+// ── Diagram YAML → Mermaid syntax (simplified) ──
+function diagramYamlToMermaid(diagramYaml: string): string | null {
+  try {
+    const spec = yaml.load(diagramYaml) as Record<string, unknown>;
+    if (!spec || typeof spec !== "object") return null;
+    const dir = spec.direction === "LR" || spec.direction === "RL" ? "LR" : "TD";
+    let mmd = `graph ${dir}\n`;
+    const nodes = (spec.nodes as Array<Record<string, string>>) || [];
+    for (const node of nodes) {
+      const label = (node.label || node.id).replace(/"/g, "'");
+      mmd += `  ${node.id}["${label}"]\n`;
+    }
+    const edges = (spec.edges as Array<Record<string, string>>) || [];
+    for (const edge of edges) {
+      const label = edge.label ? `|${edge.label}|` : "";
+      mmd += `  ${edge.from} -->${label} ${edge.to}\n`;
+    }
+    return mmd;
+  } catch {
+    return null;
+  }
+}
+
+// ── Inline Mermaid SVG renderer ──
+function MermaidDiagram({ diagramYaml, width, height }: { diagramYaml: string; width: string; height: string }) {
+  const [svg, setSvg] = useState("");
+  const idRef = useRef(0);
+
+  useEffect(() => {
+    const mmd = diagramYamlToMermaid(diagramYaml);
+    if (!mmd) return;
+    const id = `mmd-preview-${++idRef.current}`;
+    mermaid.render(id, mmd).then(({ svg: rendered }) => {
+      setSvg(rendered);
+    }).catch(() => setSvg(""));
+  }, [diagramYaml]);
+
+  return (
+    <div
+      style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center" }}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
 
 // ── Slide dimensions (inches) ──
 const SLIDE_W = 13.33;
@@ -90,9 +141,33 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
 
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {
+        const s = ph.style;
+
+        // If this placeholder is replaced by a diagram, render Mermaid
+        if (slide.diagram && ph.idx === slide.diagram.placeholderIdx) {
+          return (
+            <div
+              key={`diagram-${ph.idx}`}
+              style={{
+                position: "absolute",
+                left: `${(s.x / SLIDE_W) * 100}%`,
+                top: `${(s.y / SLIDE_H) * 100}%`,
+                width: `${(s.w / SLIDE_W) * 100}%`,
+                height: `${(s.h / SLIDE_H) * 100}%`,
+                overflow: "hidden",
+              }}
+            >
+              <MermaidDiagram
+                diagramYaml={slide.diagram.yaml}
+                width="100%"
+                height="100%"
+              />
+            </div>
+          );
+        }
+
         const content = contentMap.get(ph.idx);
         if (!content) return null;
-        const s = ph.style;
 
         return (
           <div

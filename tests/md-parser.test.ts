@@ -273,6 +273,66 @@ Body`;
     );
   });
 
+  // ── Diagram blocks ──
+
+  it("parses ```diagram block into DiagramBlock", () => {
+    const md = `# Architecture
+> System Overview
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+nodes:
+  - id: a
+    label: Client
+  - id: b
+    label: Server
+edges:
+  - from: a
+    to: b
+\`\`\``;
+
+    const deck = parseMd(md);
+    const s = deck.slides[0];
+    expect(s.diagram).toBeDefined();
+    expect(s.diagram!.yaml).toContain("type: flowchart");
+    expect(s.diagram!.yaml).toContain("Client");
+    expect(s.diagram!.placeholderIdx).toBe("1");
+  });
+
+  it("slide with diagram still has title and subtitle", () => {
+    const md = `# Diagram Slide
+> Subtitle
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: x
+    label: X
+\`\`\``;
+
+    const deck = parseMd(md);
+    const s = deck.slides[0];
+    expect(s.placeholders).toContainEqual(
+      expect.objectContaining({ idx: "15" }),
+    );
+    expect(s.placeholders).toContainEqual(
+      expect.objectContaining({ idx: "16" }),
+    );
+    expect(s.diagram).toBeDefined();
+  });
+
+  it("non-diagram code blocks are ignored", () => {
+    const md = `# Code Example
+
+\`\`\`python
+print("hello")
+\`\`\``;
+
+    const deck = parseMd(md);
+    expect(deck.slides[0].diagram).toBeUndefined();
+  });
+
   // ── Edge cases ──
 
   it("handles empty body", () => {
