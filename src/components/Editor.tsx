@@ -91,14 +91,20 @@ export default function Editor({ value, onChange, language = "yaml", onCursorLin
   useEffect(() => {
     const view = viewRef.current;
     if (!view || !gotoLine || gotoLine.line < 1) return;
-    const lineCount = view.state.doc.lines;
-    const target = Math.min(gotoLine.line, lineCount);
-    const line = view.state.doc.line(target);
-    view.dispatch({
-      selection: { anchor: line.from },
-      scrollIntoView: true,
-    });
-    view.focus();
+    // Small delay to ensure view is fully mounted after language change
+    const timer = setTimeout(() => {
+      const v = viewRef.current;
+      if (!v) return;
+      const lineCount = v.state.doc.lines;
+      const target = Math.min(gotoLine.line, lineCount);
+      const lineInfo = v.state.doc.line(target);
+      v.dispatch({
+        selection: { anchor: lineInfo.from },
+        effects: EditorView.scrollIntoView(lineInfo.from, { y: "start" }),
+      });
+      v.focus();
+    }, 50);
+    return () => clearTimeout(timer);
   }, [gotoLine]);
 
   return (
