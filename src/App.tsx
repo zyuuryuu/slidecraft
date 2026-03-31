@@ -133,6 +133,7 @@ export default function App() {
   const [themeName, setThemeName] = useState("midnight_executive");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [gotoLine, setGotoLine] = useState<number | undefined>(undefined);
   const [templateName, setTemplateName] = useState("Midnight Executive");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
@@ -316,7 +317,36 @@ export default function App() {
 
   const hasContent = mode === "diagram" ? spec !== null : (deck !== null && templateData !== null);
   const editorValue = mode === "diagram" ? yamlText : mdText;
-  const editorLang = mode === "diagram" ? "yaml" : "yaml"; // CodeMirror: markdown mode TBD
+  const editorLang = mode === "diagram" ? "yaml" : "markdown";
+
+  // ── Cursor line → active slide ──
+  const handleCursorLine = useCallback(
+    (line: number) => {
+      if (mode !== "markdown" || !deck) return;
+      for (let i = deck.slides.length - 1; i >= 0; i--) {
+        const s = deck.slides[i];
+        if (s.sourceLineStart && line >= s.sourceLineStart) {
+          setActiveSlide(i);
+          return;
+        }
+      }
+      setActiveSlide(0);
+    },
+    [mode, deck],
+  );
+
+  // ── Preview click → editor jump ──
+  const handleSlideClick = useCallback(
+    (index: number) => {
+      setActiveSlide(index);
+      if (mode !== "markdown" || !deck) return;
+      const slide = deck.slides[index];
+      if (slide?.sourceLineStart) {
+        setGotoLine(slide.sourceLineStart);
+      }
+    },
+    [mode, deck],
+  );
 
   return (
     <>
@@ -382,7 +412,13 @@ export default function App() {
             {mode === "diagram" ? "YAML Editor" : "Markdown Editor"}
           </div>
           <div className="flex-1 min-h-0">
-            <Editor value={editorValue} onChange={handleEditorChange} language={editorLang} />
+            <Editor
+              value={editorValue}
+              onChange={handleEditorChange}
+              language={editorLang}
+              onCursorLine={handleCursorLine}
+              gotoLine={gotoLine}
+            />
           </div>
         </div>
 
@@ -399,7 +435,7 @@ export default function App() {
                 template={templateData}
                 error={parseError}
                 activeSlide={activeSlide}
-                onSlideClick={setActiveSlide}
+                onSlideClick={handleSlideClick}
               />
             )}
           </div>

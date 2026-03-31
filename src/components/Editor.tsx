@@ -3,6 +3,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { yaml } from "@codemirror/lang-yaml";
 import { json } from "@codemirror/lang-json";
+import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import {
@@ -15,17 +16,21 @@ import { closeBrackets } from "@codemirror/autocomplete";
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
-  language?: "yaml" | "json";
+  language?: "yaml" | "json" | "markdown";
+  onCursorLine?: (line: number) => void;
+  gotoLine?: number; // when changed, scroll editor to this line
 }
 
-export default function Editor({ value, onChange, language = "yaml" }: EditorProps) {
+export default function Editor({ value, onChange, language = "yaml", onCursorLine, gotoLine }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const onCursorLineRef = useRef(onCursorLine);
+  onCursorLineRef.current = onCursorLine;
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const langExt = language === "json" ? json() : yaml();
+    const langExt = language === "markdown" ? markdown() : language === "json" ? json() : yaml();
 
     const state = EditorState.create({
       doc: value,
@@ -42,6 +47,11 @@ export default function Editor({ value, onChange, language = "yaml" }: EditorPro
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChange(update.state.doc.toString());
+          }
+          if (update.selectionSet || update.docChanged) {
+            const pos = update.state.selection.main.head;
+            const line = update.state.doc.lineAt(pos).number;
+            onCursorLineRef.current?.(line);
           }
         }),
         EditorView.theme({
@@ -76,6 +86,20 @@ export default function Editor({ value, onChange, language = "yaml" }: EditorPro
       });
     }
   }, [value]);
+
+  // Scroll to line when gotoLine changes
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !gotoLine || gotoLine < 1) return;
+    const lineCount = view.state.doc.lines;
+    const target = Math.min(gotoLine, lineCount);
+    const line = view.state.doc.line(target);
+    view.dispatch({
+      selection: { anchor: line.from },
+      scrollIntoView: true,
+    });
+    view.focus();
+  }, [gotoLine]);
 
   return (
     <div ref={containerRef} className="h-full w-full overflow-hidden" />
