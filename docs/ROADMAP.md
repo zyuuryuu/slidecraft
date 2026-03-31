@@ -59,6 +59,14 @@
   - スライドマスターが PowerPoint で編集可能であること
   - `create_30_layouts.py` の設計意図と一致すること
 
+#### ダイアグラムスライドの修正
+- **サイズ**: M
+- **内容**:
+  - Mermaid 記法 (```` ```mermaid ````) のサポート追加（現状は DiagramSpec YAML のみ）
+  - ダイアグラムスライドのサムネイル描画が壊れる問題の修正（選択時に消える、一部しか表示されない）
+  - Mermaid → DiagramSpec JSON 変換、もしくは Mermaid を直接 PptxGenJS に渡す方式の検討
+- **背景**: ユーザーとの合意では Mermaid 記法 or Mermaid から変換した JSON の2択だったが、現状 YAML のみ
+
 #### Diagram モードの Mermaid プレビュー修復
 - **サイズ**: S
 - **内容**: モード切替後に Mermaid が再レンダリングしない問題
