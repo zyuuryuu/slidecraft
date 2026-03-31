@@ -97,6 +97,46 @@ function MermaidDiagram({ diagramYaml, width, height, instanceId }: { diagramYam
   );
 }
 
+// ── Direct Mermaid syntax renderer (for ```mermaid blocks) ──
+function MermaidDirect({ mermaidSyntax, width, height, instanceId }: { mermaidSyntax: string; width: string; height: string; instanceId?: string }) {
+  const [svg, setSvg] = useState("");
+  const cancelRef = useRef(false);
+
+  useEffect(() => {
+    cancelRef.current = false;
+    if (!mermaidSyntax.trim()) { setSvg(""); return; }
+    const id = instanceId ? `mmd-direct-${instanceId}-${++mermaidIdCounter}` : `mmd-direct-${++mermaidIdCounter}`;
+    mermaid.render(id, mermaidSyntax).then(({ svg: rendered }) => {
+      if (!cancelRef.current) setSvg(rendered);
+    }).catch(() => {
+      if (!cancelRef.current) setSvg("");
+    });
+    return () => { cancelRef.current = true; };
+  }, [mermaidSyntax, instanceId]);
+
+  const fittedSvg = svg.replace(
+    /<svg([^>]*)>/,
+    (_match, attrs) => {
+      const wMatch = attrs.match(/width="([\d.]+)/);
+      const hMatch = attrs.match(/height="([\d.]+)/);
+      const origW = wMatch ? wMatch[1] : "400";
+      const origH = hMatch ? hMatch[1] : "300";
+      const cleaned = attrs
+        .replace(/width="[^"]*"/g, "")
+        .replace(/height="[^"]*"/g, "")
+        .replace(/style="[^"]*"/g, "");
+      return `<svg${cleaned} viewBox="0 0 ${origW} ${origH}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;">`;
+    },
+  );
+
+  return (
+    <div
+      style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}
+      dangerouslySetInnerHTML={{ __html: fittedSvg }}
+    />
+  );
+}
+
 // ── Slide dimensions (inches) ──
 const SLIDE_W = 13.33;
 const SLIDE_H = 7.5;
@@ -180,11 +220,14 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
       {layout?.placeholders.map((ph) => {
         const s = ph.style;
 
-        // If this placeholder is replaced by a diagram, render Mermaid
-        if (slide.diagram && ph.idx === slide.diagram.placeholderIdx) {
+        // If this placeholder is replaced by a diagram or mermaid, render it
+        const isDiagramPh = slide.diagram && ph.idx === slide.diagram.placeholderIdx;
+        const isMermaidPh = slide.mermaidBlock && ph.idx === slide.mermaidBlock.placeholderIdx;
+
+        if (isDiagramPh || isMermaidPh) {
           return (
             <div
-              key={`diagram-${ph.idx}`}
+              key={`visual-${ph.idx}`}
               style={{
                 position: "absolute",
                 left: `${(s.x / SLIDE_W) * 100}%`,
@@ -194,12 +237,21 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
                 overflow: "hidden",
               }}
             >
-              <MermaidDiagram
-                diagramYaml={slide.diagram.yaml}
-                width="100%"
-                height="100%"
-                instanceId={`slide-${slideIndex}-${scale}`}
-              />
+              {isDiagramPh ? (
+                <MermaidDiagram
+                  diagramYaml={slide.diagram!.yaml}
+                  width="100%"
+                  height="100%"
+                  instanceId={`slide-${slideIndex}-${scale}`}
+                />
+              ) : (
+                <MermaidDirect
+                  mermaidSyntax={slide.mermaidBlock!.mermaid}
+                  width="100%"
+                  height="100%"
+                  instanceId={`mmd-${slideIndex}-${scale}`}
+                />
+              )}
             </div>
           );
         }

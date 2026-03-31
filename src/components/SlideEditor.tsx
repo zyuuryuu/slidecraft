@@ -126,6 +126,19 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
     [slide, onChange],
   );
 
+  // ── Update mermaid syntax ──
+  const updateMermaid = useCallback(
+    (mermaidText: string) => {
+      onChange({
+        ...slide,
+        mermaidBlock: slide.mermaidBlock
+          ? { ...slide.mermaidBlock, mermaid: mermaidText }
+          : { mermaid: mermaidText, placeholderIdx: "1" },
+      });
+    },
+    [slide, onChange],
+  );
+
   // Determine which placeholders to show
   const editablePhs = layout
     ? layout.placeholders.filter((ph) => ph.idx !== "50") // skip slide number
@@ -160,8 +173,9 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
           slide.placeholders.find((p) => p.idx === idx)?.paragraphs || [],
         );
 
-        // Skip if this is the diagram placeholder
+        // Skip if this is the diagram/mermaid placeholder
         if (slide.diagram && idx === slide.diagram.placeholderIdx) return null;
+        if (slide.mermaidBlock && idx === slide.mermaidBlock.placeholderIdx) return null;
 
         return (
           <div key={idx}>
@@ -184,7 +198,7 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
       {slide.diagram && (
         <div>
           <label className="text-[10px] text-gray-500 uppercase tracking-wider">
-            Diagram (YAML)
+            Diagram (YAML → PptxGenJS shapes)
           </label>
           <textarea
             value={slide.diagram.yaml}
@@ -192,6 +206,22 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
             rows={12}
             className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-green-300 font-mono resize-y"
             placeholder="type: flowchart\nnodes:\n  - id: a\n    label: Node A"
+          />
+        </div>
+      )}
+
+      {/* Mermaid syntax editor */}
+      {slide.mermaidBlock && (
+        <div>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">
+            Mermaid (→ SVG image in PPTX)
+          </label>
+          <textarea
+            value={slide.mermaidBlock.mermaid}
+            onChange={(e) => updateMermaid(e.target.value)}
+            rows={10}
+            className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-cyan-300 font-mono resize-y"
+            placeholder="graph TD&#10;  A[Start] --> B[End]"
           />
         </div>
       )}

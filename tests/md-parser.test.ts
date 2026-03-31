@@ -322,6 +322,23 @@ nodes:
     expect(s.diagram).toBeDefined();
   });
 
+  it("parses ```mermaid block into MermaidBlock", () => {
+    const md = `# Flow
+> Overview
+
+\`\`\`mermaid
+graph TD
+  A[Start] --> B[End]
+\`\`\``;
+
+    const deck = parseMd(md);
+    const s = deck.slides[0];
+    expect(s.mermaidBlock).toBeDefined();
+    expect(s.mermaidBlock!.mermaid).toContain("graph TD");
+    expect(s.mermaidBlock!.placeholderIdx).toBe("1");
+    expect(s.diagram).toBeUndefined();
+  });
+
   it("non-diagram code blocks are ignored", () => {
     const md = `# Code Example
 

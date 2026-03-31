@@ -409,7 +409,21 @@ export default function App() {
         downloadBlob(buffer, filename);
       } else {
         if (!deck || !templateData) return;
-        const buffer = await generatePptx(deck, templateData);
+        // Pre-render mermaid SVGs for PPTX embedding
+        const { default: mermaidLib } = await import("mermaid");
+        const deckWithSvg: DeckIR = {
+          ...deck,
+          slides: await Promise.all(deck.slides.map(async (slide, i) => {
+            if (!slide.mermaidBlock) return slide;
+            try {
+              const { svg } = await mermaidLib.render(`pptx-mmd-${i}`, slide.mermaidBlock.mermaid);
+              return { ...slide, mermaidBlock: { ...slide.mermaidBlock, svgCache: svg } };
+            } catch {
+              return slide;
+            }
+          })),
+        };
+        const buffer = await generatePptx(deckWithSvg, templateData);
         downloadBlob(buffer as unknown as Uint8Array, "slides_output.pptx");
       }
     } catch (e) {

@@ -149,6 +149,10 @@ function serializeSlide(
         lines.push("```diagram");
         lines.push(slide.diagram.yaml);
         lines.push("```");
+      } else if (slide.mermaidBlock) {
+        lines.push("```mermaid");
+        lines.push(slide.mermaidBlock.mermaid);
+        lines.push("```");
       } else {
         const body = getPlaceholderText(slide, "1");
         if (body) lines.push(body);

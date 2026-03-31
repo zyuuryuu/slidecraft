@@ -20,6 +20,7 @@ import type {
   DeckIR,
   SlideIR,
   DiagramBlock,
+  MermaidBlock,
   PlaceholderContent,
   Paragraph,
   InlineSegment,
@@ -95,6 +96,7 @@ function parseSlideBlock(
   const bodyLines: string[] = [];
   const titleFields: Record<string, string> = {};
   let diagram: DiagramBlock | undefined;
+  let mermaidBlock: MermaidBlock | undefined;
   let cursor = 0;
 
   // Check for layout directive
@@ -179,10 +181,15 @@ function parseSlideBlock(
         continue;
       } else {
         // End of code block
-        if (codeBlockLang === "diagram") {
+        if (codeBlockLang === "diagram" || codeBlockLang === "mermaid-shapes") {
           diagram = {
             yaml: codeBlockLines.join("\n"),
-            placeholderIdx: "1", // diagram goes into main body placeholder
+            placeholderIdx: "1",
+          };
+        } else if (codeBlockLang === "mermaid") {
+          mermaidBlock = {
+            mermaid: codeBlockLines.join("\n"),
+            placeholderIdx: "1",
           };
         }
         inCodeBlock = false;
@@ -278,12 +285,13 @@ function parseSlideBlock(
     });
   }
 
-  if (placeholders.length === 0 && !diagram) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock) return null;
 
   return {
     layout,
     placeholders,
     diagram,
+    mermaidBlock,
     sourceLineStart: startLine,
     sourceLineEnd: startLine + lines.length - 1,
   };

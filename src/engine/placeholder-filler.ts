@@ -88,7 +88,7 @@ async function extractDiagramShapes(diagramYaml: string): Promise<string> {
 async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
-): Promise<string> {
+): Promise<{ xml: string; mermaidImageRId: string | undefined }> {
   const contentMap = new Map(
     slide.placeholders.map((p) => [p.idx, p]),
   );
@@ -97,8 +97,9 @@ async function buildSlideXml(
   let id = 2;
 
   for (const ph of layout.placeholders) {
-    // Skip the placeholder that will be replaced by a diagram
+    // Skip placeholders replaced by diagram or mermaid
     if (slide.diagram && ph.idx === slide.diagram.placeholderIdx) continue;
+    if (slide.mermaidBlock && ph.idx === slide.mermaidBlock.placeholderIdx) continue;
 
     const content = contentMap.get(ph.idx);
     if (!content) continue;
@@ -111,6 +112,28 @@ async function buildSlideXml(
     );
     shapes += shapeXml;
     id++;
+  }
+
+  // Add mermaid image placeholder if present
+  // The actual image is added to the ZIP separately; here we add a <p:pic> reference
+  let mermaidImageRId: string | undefined;
+  if (slide.mermaidBlock?.svgCache) {
+    const phInfo = layout.placeholders.find(p => p.idx === slide.mermaidBlock!.placeholderIdx);
+    if (phInfo) {
+      const s = phInfo.style;
+      const EMU = (inches: number) => Math.round(inches * 914400);
+      mermaidImageRId = "rId2"; // rId1 is slideLayout
+      shapes += `<p:pic>`
+        + `<p:nvPicPr><p:cNvPr id="${id}" name="MermaidImage"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
+        + `<p:blipFill><a:blip r:embed="${mermaidImageRId}"/>`
+        + `<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
+        + `<p:spPr><a:xfrm>`
+        + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
+        + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
+        + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
+        + `</p:pic>`;
+      id++;
+    }
   }
 
   // Add diagram shapes if present
@@ -130,7 +153,7 @@ async function buildSlideXml(
     shapes += reNumbered;
   }
 
-  return (
+  const xml =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"` +
     ` xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"` +
@@ -141,19 +164,27 @@ async function buildSlideXml(
     shapes +
     `</p:spTree></p:cSld>` +
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
-    `</p:sld>`
-  );
+    `</p:sld>`;
+
+  return { xml, mermaidImageRId };
 }
 
-function buildSlideRels(layoutIndex: number): string {
-  return (
+function buildSlideRels(layoutIndex: number, imageRId?: string, imageTarget?: string): string {
+  let rels =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
     `<Relationship Id="rId1"` +
     ` Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"` +
-    ` Target="../slideLayouts/slideLayout${layoutIndex}.xml"/>` +
-    `</Relationships>`
-  );
+    ` Target="../slideLayouts/slideLayout${layoutIndex}.xml"/>`;
+
+  if (imageRId && imageTarget) {
+    rels += `<Relationship Id="${imageRId}"` +
+      ` Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"` +
+      ` Target="${imageTarget}"/>`;
+  }
+
+  rels += `</Relationships>`;
+  return rels;
 }
 
 // ── Main: generate PPTX buffer from DeckIR + template ──
@@ -196,8 +227,29 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const slideXml = await buildSlideXml(layout, slide);
-    const slideRels = buildSlideRels(layout.index);
+    const { xml: slideXml, mermaidImageRId } = await buildSlideXml(layout, slide);
+
+    // Handle mermaid SVG → PNG image embedding
+    let imageTarget: string | undefined;
+    if (mermaidImageRId && slide.mermaidBlock?.svgCache) {
+      const { Resvg } = await import("@resvg/resvg-js");
+      const resvg = new Resvg(slide.mermaidBlock.svgCache, {
+        fitTo: { mode: "width" as const, value: 1200 },
+      });
+      const pngData = resvg.render().asPng();
+      const imagePath = `ppt/media/mermaid${slideNum}.png`;
+      zip.file(imagePath, pngData);
+      imageTarget = `../media/mermaid${slideNum}.png`;
+
+      // Add content type for PNG if not already present
+      let ct = await zip.file("[Content_Types].xml")!.async("string");
+      if (!ct.includes('Extension="png"')) {
+        ct = ct.replace("</Types>", '<Default Extension="png" ContentType="image/png"/></Types>');
+        zip.file("[Content_Types].xml", ct);
+      }
+    }
+
+    const slideRels = buildSlideRels(layout.index, mermaidImageRId, imageTarget);
 
     zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
     zip.file(

@@ -76,18 +76,27 @@ export type PlaceholderContent = z.infer<typeof PlaceholderContentSchema>;
 // ── Diagram block (embedded in a slide) ──
 
 export const DiagramBlockSchema = z.object({
-  yaml: z.string(), // raw YAML for DiagramSpec
+  yaml: z.string(), // raw YAML for DiagramSpec (type: "diagram")
   placeholderIdx: z.string(), // which placeholder to replace with diagram
 });
 
 export type DiagramBlock = z.infer<typeof DiagramBlockSchema>;
+
+export const MermaidBlockSchema = z.object({
+  mermaid: z.string(), // raw Mermaid syntax
+  placeholderIdx: z.string(),
+  svgCache: z.string().optional(), // pre-rendered SVG (set by UI before PPTX generation)
+});
+
+export type MermaidBlock = z.infer<typeof MermaidBlockSchema>;
 
 // ── Single slide IR ──
 
 export const SlideIRSchema = z.object({
   layout: z.string(), // layout name or "auto"
   placeholders: z.array(PlaceholderContentSchema),
-  diagram: DiagramBlockSchema.optional(), // embedded diagram
+  diagram: DiagramBlockSchema.optional(), // embedded diagram (DiagramSpec YAML → PptxGenJS shapes)
+  mermaidBlock: MermaidBlockSchema.optional(), // embedded mermaid (raw syntax → SVG image in PPTX)
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });
