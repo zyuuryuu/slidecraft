@@ -62,6 +62,16 @@
 - `specKey` (JSON.stringify) による useEffect 再トリガー
 - Mermaid 予約語 (`end` 等) のエスケープ
 
+#### AI Assist / LLM 連携 — 完了 (基本)
+- プロンプトテンプレート: スライドデッキ生成用 + ダイアグラム生成用
+- コピー&ペーストワークフロー: リクエスト入力 → プロンプト生成 → LLM にコピー → 結果をインポート
+- 将来: API 直接呼び出し、ローカル LLM 同梱
+
+#### Mermaid↔DiagramSpec 変換 — 完了
+- subgraph ↔ groups 双方向変換
+- Edit モードで MERMAID/YAML/JSON 切替
+- enterprise_network.json (36ノード, 49エッジ, 8グループ) ラウンドトリップ確認済み
+
 #### テンプレートの色完全復元
 - **サイズ**: M
 - **内容**: 一部のプレースホルダーでフォント色が元のデザインと異なる
