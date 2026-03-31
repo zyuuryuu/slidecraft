@@ -670,10 +670,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right: Preview */}
+          {/* Right: Single slide preview */}
           <div className="w-[45%] flex flex-col min-h-0 bg-[#0f1117]">
             <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              Preview
+              Preview — Slide {activeSlide + 1}
             </div>
             <div className="flex-1 min-h-0">
               <SlidePreview
@@ -681,7 +681,7 @@ export default function App() {
                 template={templateData}
                 error={parseError}
                 activeSlide={activeSlide}
-                onSlideClick={setActiveSlide}
+                singleSlide
               />
             </div>
           </div>

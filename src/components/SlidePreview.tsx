@@ -219,6 +219,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
   );
 }
 
+// ── Exported for reuse as thumbnail ──
+export { SlideCard };
+
 // ── Main preview component ──
 
 interface SlidePreviewProps {
@@ -227,6 +230,8 @@ interface SlidePreviewProps {
   error: string | null;
   activeSlide?: number;
   onSlideClick?: (index: number) => void;
+  singleSlide?: boolean; // show only the active slide
+  scale?: number;
 }
 
 export default function SlidePreview({
@@ -235,8 +240,10 @@ export default function SlidePreview({
   error,
   activeSlide,
   onSlideClick,
+  singleSlide = false,
+  scale: scaleProp,
 }: SlidePreviewProps) {
-  const scale = 72;
+  const scale = scaleProp ?? 72;
 
   if (error) {
     return (
@@ -256,6 +263,30 @@ export default function SlidePreview({
           <p className="text-sm">Markdown を入力すると</p>
           <p className="text-sm">ここにプレビューが表示されます</p>
         </div>
+      </div>
+    );
+  }
+
+  if (singleSlide) {
+    const idx = activeSlide ?? 0;
+    const slide = deck.slides[idx];
+    if (!slide) return null;
+    const layoutName = slide.layout === "auto"
+      ? autoSelectLayout(slide, idx, deck.slides.length)
+      : slide.layout;
+    const layout = template ? findLayout(template, layoutName) : undefined;
+
+    return (
+      <div className="h-full overflow-auto p-4 flex items-start justify-center">
+        <SlideCard
+          slide={slide}
+          slideIndex={idx}
+          totalSlides={deck.slides.length}
+          layout={layout}
+          masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+          scale={scale}
+          isActive={true}
+        />
       </div>
     );
   }
