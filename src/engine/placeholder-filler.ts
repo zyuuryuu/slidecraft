@@ -10,7 +10,6 @@ import JSZip from "jszip";
 import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { layoutIndex } from "./slide-schema";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 
 // ── Replace text in a placeholder shape XML ──
@@ -116,7 +115,9 @@ export async function generatePptx(
   deck: DeckIR,
   template: TemplateData,
 ): Promise<Uint8Array> {
-  const zip = template.zip.clone();
+  // Clone by re-serializing + re-loading (JSZip has no clone method)
+  const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
+  const zip = await JSZip.loadAsync(tplBuf);
 
   // Find max rId in presentation.xml.rels
   const existingRIds = [
