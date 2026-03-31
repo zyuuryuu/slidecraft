@@ -20,6 +20,13 @@ mermaid.initialize({
   },
 });
 
+// Mermaid reserved words that cannot be used as bare node IDs
+const MERMAID_RESERVED = new Set(["end", "graph", "subgraph", "direction", "click", "style", "classDef", "class"]);
+
+function safeId(id: string): string {
+  return MERMAID_RESERVED.has(id.toLowerCase()) ? `_${id}` : id;
+}
+
 function specToMermaid(spec: DiagramSpec): string {
   const dir = spec.direction === "LR" || spec.direction === "RL" ? "LR" : "TD";
   let mmd = `graph ${dir}\n`;
@@ -27,22 +34,23 @@ function specToMermaid(spec: DiagramSpec): string {
   // Add nodes
   for (const node of spec.nodes) {
     const label = node.label.replace(/"/g, "'");
+    const nid = safeId(node.id);
     switch (node.shape) {
       case "diamond":
-        mmd += `  ${node.id}{{"${label}"}}\n`;
+        mmd += `  ${nid}{{"${label}"}}\n`;
         break;
       case "rounded_rect":
-        mmd += `  ${node.id}("${label}")\n`;
+        mmd += `  ${nid}("${label}")\n`;
         break;
       case "circle":
       case "oval":
-        mmd += `  ${node.id}(("${label}"))\n`;
+        mmd += `  ${nid}(("${label}"))\n`;
         break;
       case "hexagon":
-        mmd += `  ${node.id}{{{"${label}"}}}\n`;
+        mmd += `  ${nid}{{{"${label}"}}}\n`;
         break;
       default:
-        mmd += `  ${node.id}["${label}"]\n`;
+        mmd += `  ${nid}["${label}"]\n`;
     }
   }
 
@@ -50,17 +58,16 @@ function specToMermaid(spec: DiagramSpec): string {
   for (const edge of spec.edges) {
     const label = edge.label ? `|${edge.label}|` : "";
     const style = edge.style?.dash ? "-.->" : "-->";
-    mmd += `  ${edge.from} ${style}${label} ${edge.to}\n`;
+    mmd += `  ${safeId(edge.from)} ${style}${label} ${safeId(edge.to)}\n`;
   }
 
   // Add subgraphs for groups
   for (const group of spec.groups) {
     if (!group.parent) {
-      mmd += `  subgraph ${group.id}["${group.label}"]\n`;
-      // Add child nodes
+      mmd += `  subgraph ${safeId(group.id)}["${group.label}"]\n`;
       for (const node of spec.nodes) {
         if (node.group === group.id) {
-          mmd += `    ${node.id}\n`;
+          mmd += `    ${safeId(node.id)}\n`;
         }
       }
       mmd += `  end\n`;
@@ -74,6 +81,9 @@ export default function Preview({ spec, error }: PreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgContent, setSvgContent] = useState<string>("");
   const renderIdRef = useRef(0);
+
+  // Serialize spec to detect changes even when object reference is same
+  const specKey = spec ? JSON.stringify(spec) : "";
 
   useEffect(() => {
     if (!spec || !containerRef.current) {
@@ -98,7 +108,8 @@ export default function Preview({ spec, error }: PreviewProps) {
     }
 
     render();
-  }, [spec]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [specKey]);
 
   if (error) {
     return (

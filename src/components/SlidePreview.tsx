@@ -16,6 +16,11 @@ import { autoSelectLayout, findLayout } from "../engine/template-loader";
 mermaid.initialize({ startOnLoad: false, theme: "dark" });
 
 // ── Diagram YAML → Mermaid syntax (simplified) ──
+const MERMAID_RESERVED = new Set(["end", "graph", "subgraph", "direction", "click", "style", "classDef", "class"]);
+function safeId(id: string): string {
+  return MERMAID_RESERVED.has(id.toLowerCase()) ? `_${id}` : id;
+}
+
 function diagramYamlToMermaid(diagramYaml: string): string | null {
   try {
     const spec = yaml.load(diagramYaml) as Record<string, unknown>;
@@ -25,12 +30,12 @@ function diagramYamlToMermaid(diagramYaml: string): string | null {
     const nodes = (spec.nodes as Array<Record<string, string>>) || [];
     for (const node of nodes) {
       const label = (node.label || node.id).replace(/"/g, "'");
-      mmd += `  ${node.id}["${label}"]\n`;
+      mmd += `  ${safeId(node.id)}["${label}"]\n`;
     }
     const edges = (spec.edges as Array<Record<string, string>>) || [];
     for (const edge of edges) {
       const label = edge.label ? `|${edge.label}|` : "";
-      mmd += `  ${edge.from} -->${label} ${edge.to}\n`;
+      mmd += `  ${safeId(edge.from)} -->${label} ${safeId(edge.to)}\n`;
     }
     return mmd;
   } catch {
