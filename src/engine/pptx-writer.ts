@@ -8,7 +8,7 @@
  */
 
 import PptxGenJS from "pptxgenjs";
-import type { DiagramSpec, Node, GroupStyle } from "./schema";
+import type { DiagramSpec, Node, GroupStyle, EdgeStyle } from "./schema";
 import type { ThemeConfig } from "./theme";
 import { DEFAULT_THEME } from "./theme";
 import {
@@ -555,7 +555,6 @@ function drawFanInBus(
   direction: string,
   isFlowchart: boolean,
   theme: ThemeConfig,
-  _layoutScale: number,
 ): Set<string> {
   const tp = posMap.get(targetId);
   if (!tp || sourceEdges.length < 3) return new Set();
@@ -579,11 +578,11 @@ function drawFanInBus(
     const stubXs: number[] = [];
     for (const { edge, pos: fp } of sources) {
       const srcCp = cpCoords(fp, 2, nodeShapeMap.get(edge.from) ?? "rect");
-      const es = edge.style ?? {};
+      const es: Partial<EdgeStyle> = edge.style ?? {};
       drawLine(slide, srcCp, { x: srcCp.x, y: busY }, {
-        color: (es as any).color ?? edgeColor,
-        width: (es as any).width ?? edgeWidth,
-        dash: (es as any).dash ?? false,
+        color: es.color ?? edgeColor,
+        width: es.width ?? edgeWidth,
+        dash: es.dash ?? false,
       });
       stubXs.push(srcCp.x);
       handled.add(`${edge.from}->${edge.to}`);
@@ -618,7 +617,6 @@ function drawFanOutBus(
   direction: string,
   isFlowchart: boolean,
   theme: ThemeConfig,
-  _layoutScale: number,
 ): Set<string> {
   const fp = posMap.get(sourceId);
   if (!fp || targetEdges.length < 3) return new Set();
@@ -642,12 +640,12 @@ function drawFanOutBus(
     const stubXs: number[] = [];
     for (const { edge, pos: tp } of targets) {
       const tgtCp = cpCoords(tp, 0, nodeShapeMap.get(edge.to) ?? "rect");
-      const es = edge.style ?? {};
+      const es: Partial<EdgeStyle> = edge.style ?? {};
       drawLine(slide, { x: tgtCp.x, y: busY }, tgtCp, {
-        color: (es as any).color ?? edgeColor,
-        width: (es as any).width ?? edgeWidth,
+        color: es.color ?? edgeColor,
+        width: es.width ?? edgeWidth,
         arrow: isFlowchart,
-        dash: (es as any).dash ?? false,
+        dash: es.dash ?? false,
       });
       stubXs.push(tgtCp.x);
       handled.add(`${edge.from}->${edge.to}`);
@@ -854,7 +852,7 @@ export function renderDiagram(
     if (edges.some((e) => busHandled.has(`${e.from}->${e.to}`))) continue;
     const h = drawFanOutBus(
       slide, srcId, edges, posMap, nodeShapeMap,
-      direction, isFlowchart, theme, layoutScale,
+      direction, isFlowchart, theme,
     );
     for (const k of h) busHandled.add(k);
   }
@@ -867,7 +865,7 @@ export function renderDiagram(
     if (!isAutoMergeable(remaining)) continue;
     const h = drawFanInBus(
       slide, tgtId, remaining, posMap, nodeShapeMap,
-      direction, isFlowchart, theme, layoutScale,
+      direction, isFlowchart, theme,
     );
     for (const k of h) busHandled.add(k);
   }
@@ -884,11 +882,11 @@ export function renderDiagram(
     const toPos = posMap.get(edge.to);
     if (!fromPos || !toPos) continue;
 
-    const es = edge.style ?? {};
-    const color = (es as any).color ?? ds.edge_color;
-    const width = (es as any).width ?? ds.edge_width;
-    const arrow = isFlowchart ? ((es as any).arrow ?? true) : false;
-    const dash = (es as any).dash ?? false;
+    const es: Partial<EdgeStyle> = edge.style ?? {};
+    const color = es.color ?? ds.edge_color;
+    const width = es.width ?? ds.edge_width;
+    const arrow = isFlowchart ? (es.arrow ?? true) : false;
+    const dash = es.dash ?? false;
 
     const routeType = classifyEdgeRoute(
       edge.from, edge.to, posMap, layers,

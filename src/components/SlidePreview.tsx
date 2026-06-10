@@ -62,7 +62,7 @@ function MermaidDiagram({ diagramYaml, width, height, instanceId }: { diagramYam
       if (!cancelRef.current) setSvg("");
     });
     return () => { cancelRef.current = true; };
-  }, [diagramYaml]);
+  }, [diagramYaml, instanceId]);
 
   // Extract width/height from SVG and set viewBox so it scales to fit any container
   const fittedSvg = svg.replace(
