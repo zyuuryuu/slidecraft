@@ -59,10 +59,21 @@ function parseInline(text: string): InlineSegment[] {
 function linesToParagraphs(lines: string[]): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   for (const line of lines) {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (trimmed === "") {
       paragraphs.push({ segments: [{ text: "" }] });
       continue;
+    }
+    // Blockquote marker → plain body text. Blockquotes consumed as a subtitle
+    // are handled upstream; any that reach here would otherwise render the
+    // literal '>' onto the slide, so strip the leading marker.
+    const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      trimmed = quoteMatch[1];
+      if (trimmed === "") {
+        paragraphs.push({ segments: [{ text: "" }] });
+        continue;
+      }
     }
     const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
     if (bulletMatch) {

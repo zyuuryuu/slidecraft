@@ -381,4 +381,25 @@ print("hello")
     const nonEmpty = deck.slides.filter((s) => s.placeholders.length > 0);
     expect(nonEmpty).toHaveLength(2);
   });
+
+  // ── Blockquote handling ──
+
+  it("does not leak '>' markers when a blockquote is not right after the title", () => {
+    const md = `# システム概要
+
+本文の説明テキスト
+
+> System Architecture`;
+
+    const deck = parseMd(md);
+    const body = deck.slides[0].placeholders.find((p) => p.idx === "1");
+    expect(body).toBeDefined();
+
+    const allText = body!.paragraphs
+      .flatMap((para) => para.segments.map((seg) => seg.text))
+      .join("\n");
+    // The literal '>' must never reach the slide; its content still appears.
+    expect(allText).not.toContain(">");
+    expect(allText).toContain("System Architecture");
+  });
 });
