@@ -7,9 +7,11 @@ interface PreviewProps {
   error: string | null;
 }
 
-mermaid.initialize({
+// Diagram-mode preview config. Re-asserted before each render because mermaid is
+// a global singleton shared with the markdown preview/export (see ./mermaid).
+const DIAGRAM_MERMAID_CONFIG = {
   startOnLoad: false,
-  theme: "dark",
+  theme: "dark" as const,
   themeVariables: {
     primaryColor: "#1E2761",
     primaryTextColor: "#FFFFFF",
@@ -18,7 +20,8 @@ mermaid.initialize({
     secondaryColor: "#2D3A6E",
     tertiaryColor: "#F5F7FA",
   },
-});
+};
+mermaid.initialize(DIAGRAM_MERMAID_CONFIG);
 
 // Mermaid reserved words that cannot be used as bare node IDs
 const MERMAID_RESERVED = new Set(["end", "graph", "subgraph", "direction", "click", "style", "classDef", "class"]);
@@ -96,6 +99,7 @@ export default function Preview({ spec, error }: PreviewProps) {
     async function render() {
       try {
         const mmd = specToMermaid(spec!);
+        mermaid.initialize(DIAGRAM_MERMAID_CONFIG);
         const { svg } = await mermaid.render(`mermaid-${currentId}`, mmd);
         if (currentId === renderIdRef.current) {
           setSvgContent(svg);

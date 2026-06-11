@@ -16,21 +16,12 @@ import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBuffer } from "./pptx-writer";
 import { midnightExecutive } from "./theme";
 
-// ── Mermaid SVG → PNG (resvg-wasm: runs in browser & Tauri webview, unlike the
-// native @resvg/resvg-js which only loads under Node). Init the wasm module once. ──
-
-let resvgWasmReady: Promise<void> | null = null;
-
-function ensureResvgWasm(): Promise<void> {
-  if (!resvgWasmReady) {
-    resvgWasmReady = (async () => {
-      const { initWasm } = await import("@resvg/resvg-wasm");
-      const { default: wasmUrl } = await import("@resvg/resvg-wasm/index_bg.wasm?url");
-      await initWasm(fetch(wasmUrl));
-    })();
-  }
-  return resvgWasmReady;
-}
+/**
+ * Rasterizes an SVG string to PNG bytes. Injected by the caller (the UI layer)
+ * so this engine module stays free of DOM/Node rendering dependencies — the
+ * browser/WebView provides a canvas-based implementation that matches the preview.
+ */
+export type SvgRasterizer = (svg: string) => Promise<Uint8Array>;
 
 // ── Replace text in a placeholder shape XML ──
 
@@ -208,6 +199,7 @@ function buildSlideRels(layoutIndex: number, imageRId?: string, imageTarget?: st
 export async function generatePptx(
   deck: DeckIR,
   template: TemplateData,
+  rasterizeSvg?: SvgRasterizer,
 ): Promise<Uint8Array> {
   // Clone by re-serializing + re-loading (JSZip has no clone method)
   const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
@@ -245,15 +237,11 @@ export async function generatePptx(
     // Build slide XML
     const { xml: slideXml, mermaidImageRId } = await buildSlideXml(layout, slide);
 
-    // Handle mermaid SVG → PNG image embedding
+    // Handle mermaid SVG → PNG image embedding (rasterized by the injected
+    // UI-layer canvas rasterizer so the image matches the WYSIWYG preview).
     let imageTarget: string | undefined;
-    if (mermaidImageRId && slide.mermaidBlock?.svgCache) {
-      await ensureResvgWasm();
-      const { Resvg } = await import("@resvg/resvg-wasm");
-      const resvg = new Resvg(slide.mermaidBlock.svgCache, {
-        fitTo: { mode: "width" as const, value: 1200 },
-      });
-      const pngData = resvg.render().asPng();
+    if (mermaidImageRId && slide.mermaidBlock?.svgCache && rasterizeSvg) {
+      const pngData = await rasterizeSvg(slide.mermaidBlock.svgCache);
       const imagePath = `ppt/media/mermaid${slideNum}.png`;
       zip.file(imagePath, pngData);
       imageTarget = `../media/mermaid${slideNum}.png`;

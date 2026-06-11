@@ -11,9 +11,10 @@ import yaml from "js-yaml";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
+import { MERMAID_CONFIG } from "./mermaid";
 
-// ── Mermaid initialization ──
-mermaid.initialize({ startOnLoad: false, theme: "dark" });
+// ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
+mermaid.initialize(MERMAID_CONFIG);
 
 // ── Diagram YAML → Mermaid syntax (simplified) ──
 const MERMAID_RESERVED = new Set(["end", "graph", "subgraph", "direction", "click", "style", "classDef", "class"]);
@@ -55,6 +56,9 @@ function MermaidDiagram({ diagramYaml, width, height, instanceId }: { diagramYam
     cancelRef.current = false;
     const mmd = diagramYamlToMermaid(diagramYaml);
     if (!mmd) { setSvg(""); return; }
+    // Re-assert the shared config before each render: mermaid is a global
+    // singleton, so the diagram-mode preview must not leave it in another state.
+    mermaid.initialize(MERMAID_CONFIG);
     const id = instanceId ? `mmd-${instanceId}-${++mermaidIdCounter}` : `mmd-slide-${++mermaidIdCounter}`;
     mermaid.render(id, mmd).then(({ svg: rendered }) => {
       if (!cancelRef.current) setSvg(rendered);
