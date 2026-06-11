@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri-schema/main/tauri.conf.schema.json",
-  "productName": "Diagram Pipeline",
+  "productName": "SlideCraft",
   "version": "0.1.0",
-  "identifier": "com.diagram-pipeline.app",
+  "identifier": "com.slidecraft.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Diagram Pipeline",
+        "title": "SlideCraft",
         "width": 1280,
         "height": 800,
         "resizable": true,
