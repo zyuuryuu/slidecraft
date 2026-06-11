@@ -16,6 +16,22 @@ import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBuffer } from "./pptx-writer";
 import { midnightExecutive } from "./theme";
 
+// ── Mermaid SVG → PNG (resvg-wasm: runs in browser & Tauri webview, unlike the
+// native @resvg/resvg-js which only loads under Node). Init the wasm module once. ──
+
+let resvgWasmReady: Promise<void> | null = null;
+
+function ensureResvgWasm(): Promise<void> {
+  if (!resvgWasmReady) {
+    resvgWasmReady = (async () => {
+      const { initWasm } = await import("@resvg/resvg-wasm");
+      const { default: wasmUrl } = await import("@resvg/resvg-wasm/index_bg.wasm?url");
+      await initWasm(fetch(wasmUrl));
+    })();
+  }
+  return resvgWasmReady;
+}
+
 // ── Replace text in a placeholder shape XML ──
 
 function replaceTextInShape(
@@ -232,7 +248,8 @@ export async function generatePptx(
     // Handle mermaid SVG → PNG image embedding
     let imageTarget: string | undefined;
     if (mermaidImageRId && slide.mermaidBlock?.svgCache) {
-      const { Resvg } = await import("@resvg/resvg-js");
+      await ensureResvgWasm();
+      const { Resvg } = await import("@resvg/resvg-wasm");
       const resvg = new Resvg(slide.mermaidBlock.svgCache, {
         fitTo: { mode: "width" as const, value: 1200 },
       });

@@ -425,20 +425,39 @@ export default function App() {
         downloadBlob(buffer, filename);
       } else {
         if (!deck || !templateData) return;
-        // Pre-render mermaid SVGs for PPTX embedding
+        // Pre-render mermaid SVGs for PPTX embedding.
+        // The on-screen preview initializes mermaid with theme "dark" + default
+        // HTML labels, but that output does not survive SVG→PNG rasterization:
+        //   - dark theme → near-black node fills (look "crushed" on the slide)
+        //   - htmlLabels (default) → labels live in <foreignObject>, which resvg
+        //     cannot render, so all text disappears.
+        // Render for export with a light theme and SVG <text> labels instead,
+        // then restore the preview's config.
         const { default: mermaidLib } = await import("mermaid");
-        const deckWithSvg: DeckIR = {
-          ...deck,
-          slides: await Promise.all(deck.slides.map(async (slide, i) => {
-            if (!slide.mermaidBlock) return slide;
-            try {
-              const { svg } = await mermaidLib.render(`pptx-mmd-${i}`, slide.mermaidBlock.mermaid);
-              return { ...slide, mermaidBlock: { ...slide.mermaidBlock, svgCache: svg } };
-            } catch {
-              return slide;
-            }
-          })),
-        };
+        mermaidLib.initialize({
+          startOnLoad: false,
+          theme: "default",
+          securityLevel: "loose",
+          flowchart: { htmlLabels: false },
+        });
+        let deckWithSvg: DeckIR;
+        try {
+          deckWithSvg = {
+            ...deck,
+            slides: await Promise.all(deck.slides.map(async (slide, i) => {
+              if (!slide.mermaidBlock) return slide;
+              try {
+                const { svg } = await mermaidLib.render(`pptx-mmd-${i}`, slide.mermaidBlock.mermaid);
+                return { ...slide, mermaidBlock: { ...slide.mermaidBlock, svgCache: svg } };
+              } catch {
+                return slide;
+              }
+            })),
+          };
+        } finally {
+          // Restore the on-screen preview's mermaid configuration.
+          mermaidLib.initialize({ startOnLoad: false, theme: "dark" });
+        }
         const buffer = await generatePptx(deckWithSvg, templateData);
         downloadBlob(buffer as unknown as Uint8Array, "slides_output.pptx");
       }
