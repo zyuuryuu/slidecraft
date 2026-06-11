@@ -14,7 +14,7 @@ import type { DeckIR } from "../src/engine/slide-schema";
 
 const TEMPLATE_PATH = resolve(
   __dirname,
-  "../templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
+  "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
 );
 
 let tpl: TemplateData;
