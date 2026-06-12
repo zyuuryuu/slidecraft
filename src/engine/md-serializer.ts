@@ -105,8 +105,13 @@ function serializeSlide(
       ? autoSelectLayout(slide, slideIndex, totalSlides)
       : slide.layout;
 
-  // Always emit layout directive for round-trip fidelity
-  lines.push(`<!-- slide: ${layout} -->`);
+  // Emit the layout directive only when it was explicitly set. "auto" slides stay
+  // directive-free so they round-trip as "auto" (re-resolved deterministically on
+  // import) instead of being pinned to a concrete layout. `layout` (resolved) is
+  // still used below to choose the serialization format.
+  if (slide.layout !== "auto") {
+    lines.push(`<!-- slide: ${layout} -->`);
+  }
 
   if (isTitleLayout(layout)) {
     // Title layouts: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = fields

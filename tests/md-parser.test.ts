@@ -402,4 +402,35 @@ print("hello")
     expect(allText).not.toContain(">");
     expect(allText).toContain("System Architecture");
   });
+
+  it("maps '> ' to the subtitle (idx 16) even with a blank line after '---'", () => {
+    // '---' splitting leaves a leading blank line in the next block; the subtitle
+    // detection must still recognize the blockquote (regression: it leaked to body).
+    const md = `# 最初のスライド
+
+本文
+
+---
+
+# リスク分析
+> Risk Assessment
+
+プロジェクトのリスク説明`;
+
+    const deck = parseMd(md);
+    const slide = deck.slides[1];
+
+    const subtitle = slide.placeholders.find((p) => p.idx === "16");
+    expect(subtitle).toBeDefined();
+    expect(
+      subtitle!.paragraphs.flatMap((p) => p.segments.map((s) => s.text)).join(""),
+    ).toContain("Risk Assessment");
+
+    // ...and the subtitle text must NOT leak into the body (idx 1).
+    const body = slide.placeholders.find((p) => p.idx === "1");
+    const bodyText = body
+      ? body.paragraphs.flatMap((p) => p.segments.map((s) => s.text)).join("\n")
+      : "";
+    expect(bodyText).not.toContain("Risk Assessment");
+  });
 });

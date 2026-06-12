@@ -110,15 +110,15 @@ function parseSlideBlock(
   let mermaidBlock: MermaidBlock | undefined;
   let cursor = 0;
 
-  // Check for layout directive
-  if (lines.length > 0) {
-    const layoutMatch = lines[0].match(
-      /^<!--\s*slide:\s*(.+?)\s*-->$/,
-    );
-    if (layoutMatch) {
-      layout = layoutMatch[1];
-      cursor = 1;
-    }
+  // Skip leading blank lines — a "---" split leaves one at the top of each block,
+  // which would otherwise hide the layout directive and the subtitle blockquote.
+  while (cursor < lines.length && lines[cursor].trim() === "") cursor++;
+
+  // Check for layout directive (on the first non-blank line)
+  const layoutMatch = lines[cursor]?.match(/^<!--\s*slide:\s*(.+?)\s*-->$/);
+  if (layoutMatch) {
+    layout = layoutMatch[1];
+    cursor++;
   }
 
   // Check for section separators (col/kpi/step)
@@ -135,7 +135,8 @@ function parseSlideBlock(
       }
     }
 
-    // Check for subtitle (blockquote right after heading)
+    // Check for subtitle (blockquote after heading), skipping any blank lines.
+    while (cursor < lines.length && lines[cursor].trim() === "") cursor++;
     if (cursor < lines.length && lines[cursor].trim().startsWith("> ")) {
       subtitle = lines[cursor].trim().replace(/^>\s*/, "");
       cursor++;
@@ -227,8 +228,15 @@ function parseSlideBlock(
       continue;
     }
 
-    // > Blockquote → subtitle (right after title)
-    if (trimmed.startsWith("> ") && title && !subtitle && bodyLines.length === 0) {
+    // > Blockquote → subtitle (after the title, before any real body content).
+    // Allow leading blank lines (e.g. the blank a "---" split leaves at the top of
+    // a block) — otherwise the subtitle leaks into the body.
+    if (
+      trimmed.startsWith("> ") &&
+      title &&
+      !subtitle &&
+      bodyLines.every((l) => l.trim() === "")
+    ) {
       subtitle = trimmed.replace(/^>\s*/, "");
       continue;
     }
