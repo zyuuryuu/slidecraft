@@ -10,7 +10,7 @@ import { LAYOUT_NAMES } from "./slide-schema";
 
 // ── Slide deck prompt ──
 
-export function generateSlidePrompt(userRequest: string): string {
+export function slideSystemPrompt(): string {
   const layoutList = LAYOUT_NAMES.map((n, i) => `  ${i}. ${n}`).join("\n");
 
   return `You are a presentation assistant. Generate a slide deck in SlideCraft Markdown format based on the user's request.
@@ -97,14 +97,16 @@ graph TD
 - Use bullet points, not paragraphs, for content slides
 - Always specify the layout with \`<!-- slide: LayoutName -->\`
 
-## User Request
+Output ONLY the SlideCraft Markdown — no preamble, no explanation, and do not wrap the whole document in a code fence.`;
+}
 
-${userRequest}`;
+export function generateSlidePrompt(userRequest: string): string {
+  return `${slideSystemPrompt()}\n\n## User Request\n\n${userRequest}`;
 }
 
 // ── Diagram prompt ──
 
-export function generateDiagramPrompt(userRequest: string): string {
+export function diagramSystemPrompt(): string {
   return `You are a technical diagram assistant. Generate a DiagramSpec JSON for SlideCraft based on the user's description.
 
 ## Output Format
@@ -178,11 +180,11 @@ Use these colors for a professional look:
 - For network diagrams, use type "network"
 - For org charts, use type "orgchart"
 - Keep the diagram focused — typically 5-20 nodes
-- Return ONLY the JSON object, no explanation
+- Return ONLY the JSON object, no explanation`;
+}
 
-## User Request
-
-${userRequest}`;
+export function generateDiagramPrompt(userRequest: string): string {
+  return `${diagramSystemPrompt()}\n\n## User Request\n\n${userRequest}`;
 }
 
 // ── Combined prompt (user can choose) ──
@@ -194,4 +196,9 @@ export function generateCombinedPrompt(
   return mode === "slides"
     ? generateSlidePrompt(userRequest)
     : generateDiagramPrompt(userRequest);
+}
+
+/** System prompt (instructions only) for direct Claude API calls. */
+export function systemPromptFor(mode: "slides" | "diagram"): string {
+  return mode === "slides" ? slideSystemPrompt() : diagramSystemPrompt();
 }
