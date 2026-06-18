@@ -129,3 +129,50 @@ export function parseDeckPlan(input: unknown): ParseResult {
       .join("; "),
   };
 }
+
+/** Extract a JSON object from raw model text (tolerates ``` fences / prose). */
+function extractJsonObject(text: string): string | null {
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fence ? fence[1] : text).trim();
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return null;
+  return body.slice(start, end + 1);
+}
+
+/** Parse + validate a DeckPlan from raw model output (JSON, possibly fenced). */
+export function extractDeckPlan(text: string): ParseResult {
+  const json = extractJsonObject(text);
+  if (json === null) return { ok: false, error: "No JSON object found in the response." };
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch (e) {
+    return { ok: false, error: "Invalid JSON: " + (e instanceof Error ? e.message : String(e)) };
+  }
+  return parseDeckPlan(data);
+}
+
+// ── System prompt the model fills (tiny vocabulary — no Markdown DSL) ──
+
+export function deckPlanSystemPrompt(): string {
+  return `You generate a slide deck as a JSON "DeckPlan". Output ONLY the JSON object — no prose, no code fence.
+
+Shape:
+{ "slides": [ Slide, ... ] }
+
+Each Slide is exactly one of:
+- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}  // opening slide; all but title optional
+- {"kind":"section","title":"..."}                                                                // a section divider
+- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}                       // a normal slide; subtitle optional
+- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
+- {"kind":"closing","title":"..."}                                                                // closing message
+
+Rules:
+- Write in the SAME language as the user's request.
+- Typically 6-10 slides. Start with a "title" slide and end with a "closing" slide.
+- Keep each bullet short — one idea, not a paragraph.
+- Use "columns" for comparisons or two/three-sided content.
+- Do NOT add any field not listed above, and do NOT invent other "kind" values.
+- Output valid JSON only.`;
+}

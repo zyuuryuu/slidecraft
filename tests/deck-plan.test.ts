@@ -7,7 +7,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { deckPlanToDeck, parseDeckPlan, type DeckPlan } from "../src/engine/deck-plan";
+import {
+  deckPlanToDeck,
+  parseDeckPlan,
+  extractDeckPlan,
+  type DeckPlan,
+} from "../src/engine/deck-plan";
 import { serializeMd } from "../src/engine/md-serializer";
 import { parseMd } from "../src/engine/md-parser";
 
@@ -84,5 +89,18 @@ describe("deckPlanToDeck", () => {
     expect(parseDeckPlan({ slides: [{ kind: "content", title: "ok" }] }).ok).toBe(true);
     expect(parseDeckPlan({ slides: [{ kind: "bogus", title: "x" }] }).ok).toBe(false);
     expect(parseDeckPlan({}).ok).toBe(false);
+  });
+
+  it("extractDeckPlan tolerates code fences and surrounding prose", () => {
+    const fenced = "Here is the deck:\n```json\n{\"slides\":[{\"kind\":\"closing\",\"title\":\"Bye\"}]}\n```\nDone.";
+    const r = extractDeckPlan(fenced);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.plan.slides[0]).toMatchObject({ kind: "closing", title: "Bye" });
+
+    const bare = 'prose before {"slides":[{"kind":"section","title":"S"}]} prose after';
+    expect(extractDeckPlan(bare).ok).toBe(true);
+
+    expect(extractDeckPlan("no json here").ok).toBe(false);
+    expect(extractDeckPlan("{ not valid json }").ok).toBe(false);
   });
 });

@@ -8,6 +8,8 @@
 
 import { generateWithClaude } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
+import { deckPlanSystemPrompt } from "../engine/deck-plan";
+import { diagramSystemPrompt } from "../engine/llm-prompts";
 
 export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "custom";
 
@@ -46,11 +48,15 @@ export interface AiRequest {
 }
 
 export function generateWithAI(req: AiRequest): Promise<string> {
+  // Slides go through the DeckPlan harness (small constrained JSON the engine
+  // turns into correct layouts); diagrams use the DiagramSpec prompt.
+  const system = req.mode === "slides" ? deckPlanSystemPrompt() : diagramSystemPrompt();
+
   if (req.provider === "claude") {
     return generateWithClaude({
       apiKey: req.apiKey,
       model: req.model || undefined,
-      mode: req.mode,
+      system,
       userRequest: req.userRequest,
       onText: req.onText,
       signal: req.signal,
@@ -60,7 +66,7 @@ export function generateWithAI(req: AiRequest): Promise<string> {
     apiKey: req.apiKey,
     baseURL: req.baseURL,
     model: req.model,
-    mode: req.mode,
+    system,
     userRequest: req.userRequest,
     onText: req.onText,
     signal: req.signal,

@@ -10,13 +10,12 @@
  */
 
 import OpenAI from "openai";
-import { systemPromptFor } from "../engine/llm-prompts";
 
 export interface OpenAICompatOptions {
   apiKey: string;
   baseURL: string;
   model: string;
-  mode: "slides" | "diagram";
+  system: string;
   userRequest: string;
   onText?: (fullText: string) => void;
   signal?: AbortSignal;
@@ -38,7 +37,7 @@ export async function generateWithOpenAICompat(opts: OpenAICompatOptions): Promi
       {
         model: opts.model.trim(),
         messages: [
-          { role: "system", content: systemPromptFor(opts.mode) },
+          { role: "system", content: opts.system },
           { role: "user", content: opts.userRequest },
         ],
         stream: true,

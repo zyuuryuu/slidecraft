@@ -8,13 +8,12 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { systemPromptFor } from "../engine/llm-prompts";
 
 export const DEFAULT_MODEL = "claude-opus-4-8";
 
 export interface GenerateOptions {
   apiKey: string;
-  mode: "slides" | "diagram";
+  system: string;
   userRequest: string;
   model?: string;
   /** Called with the running full text as tokens stream in. */
@@ -42,7 +41,7 @@ export async function generateWithClaude(opts: GenerateOptions): Promise<string>
         model: opts.model ?? DEFAULT_MODEL,
         max_tokens: 32000,
         thinking: { type: "adaptive" },
-        system: systemPromptFor(opts.mode),
+        system: opts.system,
         messages: [{ role: "user", content: opts.userRequest }],
       },
       { signal: opts.signal },

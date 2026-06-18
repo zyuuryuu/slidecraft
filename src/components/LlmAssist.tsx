@@ -9,6 +9,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { generateCombinedPrompt } from "../engine/llm-prompts";
+import { extractDeckPlan, deckPlanToDeck } from "../engine/deck-plan";
+import { serializeMd } from "../engine/md-serializer";
 import {
   generateWithAI,
   PROVIDERS,
@@ -108,7 +110,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
     abortRef.current = controller;
 
     try {
-      await generateWithAI({
+      const raw = await generateWithAI({
         provider,
         apiKey: cfg.apiKey,
         baseURL: cfg.baseURL,
@@ -118,6 +120,16 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
         onText: setLlmResult,
         signal: controller.signal,
       });
+      // Slides come back as a DeckPlan JSON; the engine turns it into correct
+      // SlideCraft Markdown (right layouts/placeholders) for import + editing.
+      if (mode === "slides") {
+        const parsed = extractDeckPlan(raw);
+        if (parsed.ok) {
+          setLlmResult(serializeMd(deckPlanToDeck(parsed.plan)));
+        } else {
+          setError(`Couldn't read the generated plan: ${parsed.error}`);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
