@@ -103,4 +103,42 @@ describe("deckPlanToDeck", () => {
     expect(extractDeckPlan("no json here").ok).toBe(false);
     expect(extractDeckPlan("{ not valid json }").ok).toBe(false);
   });
+
+  it("salvages common weak-model mistakes (bare array, kind synonyms, string bullets, missing kind)", () => {
+    // bare array instead of { slides: [...] }
+    expect(extractDeckPlan('[{"kind":"closing","title":"Bye"}]').ok).toBe(true);
+
+    // bullets as a newline string → split into bullets
+    const r1 = extractDeckPlan(JSON.stringify({
+      slides: [{ kind: "content", title: "T", bullets: "a\nb\nc" }],
+    }));
+    expect(r1.ok).toBe(true);
+    if (r1.ok) {
+      const body = deckPlanToDeck(r1.plan).slides[0].placeholders.find((p) => p.idx === "1");
+      expect(body?.paragraphs).toHaveLength(3);
+    }
+
+    // kind synonym ("Cover" → title) + missing kind inferred from bullets
+    const r2 = extractDeckPlan(JSON.stringify({
+      slides: [
+        { kind: "Cover", title: "X", subtitle: "y" },
+        { title: "Z", bullets: ["1"] },
+      ],
+    }));
+    expect(r2.ok).toBe(true);
+    if (r2.ok) {
+      expect(r2.plan.slides[0].kind).toBe("title");
+      expect(r2.plan.slides[1].kind).toBe("content");
+    }
+
+    // columns with bullets given as strings
+    const r3 = extractDeckPlan(JSON.stringify({
+      slides: [{ kind: "comparison", title: "C", columns: [
+        { heading: "A", bullets: "a1\na2" },
+        { heading: "B", bullets: "b1" },
+      ] }],
+    }));
+    expect(r3.ok).toBe(true);
+    if (r3.ok) expect(r3.plan.slides[0].kind).toBe("columns");
+  });
 });

@@ -130,12 +130,14 @@ export function parseDeckPlan(input: unknown): ParseResult {
   };
 }
 
-/** Extract a JSON object from raw model text (tolerates ``` fences / prose). */
+/** Extract a JSON object or array from raw model text (tolerates ``` fences / prose). */
 function extractJsonObject(text: string): string | null {
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = (fence ? fence[1] : text).trim();
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
+  const firstObj = body.indexOf("{");
+  const firstArr = body.indexOf("[");
+  const start = [firstObj, firstArr].filter((i) => i !== -1).sort((a, b) => a - b)[0] ?? -1;
+  const end = Math.max(body.lastIndexOf("}"), body.lastIndexOf("]"));
   if (start === -1 || end === -1 || end < start) return null;
   return body.slice(start, end + 1);
 }
@@ -150,7 +152,80 @@ export function extractDeckPlan(text: string): ParseResult {
   } catch (e) {
     return { ok: false, error: "Invalid JSON: " + (e instanceof Error ? e.message : String(e)) };
   }
-  return parseDeckPlan(data);
+  return parseDeckPlan(coerceDeckPlanInput(data));
+}
+
+// ── Deterministic salvage of common weak-model mistakes ──
+// Repairs structure in code (cheaper + more reliable than a model round-trip)
+// before validation: bare arrays, kind synonyms, missing kinds, string bullets.
+
+const KIND_SYNONYMS: Record<string, string> = {
+  title: "title", cover: "title", opening: "title", intro: "title", titleslide: "title",
+  section: "section", divider: "section", sectionbreak: "section", sectiondivider: "section",
+  content: "content", body: "content", bullets: "content", text: "content",
+  point: "content", points: "content", bullet: "content", list: "content",
+  columns: "columns", column: "columns", compare: "columns", comparison: "columns",
+  versus: "columns", twocolumn: "columns", twocolumns: "columns", threecolumn: "columns", threecolumns: "columns",
+  closing: "closing", close: "closing", end: "closing", ending: "closing", thanks: "closing", thankyou: "closing",
+};
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v !== null && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x)).filter((s) => s.trim().length > 0);
+  if (typeof v === "string") {
+    return v
+      .split(/\r?\n/)
+      .map((s) => s.replace(/^\s*[-*•]\s*/, "").trim())
+      .filter((s) => s.length > 0);
+  }
+  return [];
+}
+
+function coerceSlide(raw: unknown): unknown {
+  const s = asRecord(raw);
+  if (!s) return raw;
+  const out: Record<string, unknown> = { ...s };
+
+  const rawKind = typeof s.kind === "string" ? s.kind.toLowerCase().replace(/[^a-z]/g, "") : "";
+  let kind = KIND_SYNONYMS[rawKind];
+  if (!kind) {
+    if (Array.isArray(s.columns)) kind = "columns";
+    else if (s.bullets != null) kind = "content";
+    else if (s.subtitle != null || s.category != null || s.footer != null) kind = "title";
+    else kind = "content";
+  }
+  out.kind = kind;
+
+  if (s.title != null) out.title = String(s.title);
+  if (kind === "content") out.bullets = toStringArray(s.bullets);
+  if (kind === "columns") {
+    out.columns = Array.isArray(s.columns)
+      ? s.columns.map((c) => {
+          const col = asRecord(c) ?? {};
+          return {
+            heading: col.heading != null ? String(col.heading) : undefined,
+            bullets: toStringArray(col.bullets),
+          };
+        })
+      : [];
+  }
+  return out;
+}
+
+/** Normalize loosely-shaped model output toward a valid DeckPlan before zod. */
+export function coerceDeckPlanInput(input: unknown): unknown {
+  const rec = asRecord(input);
+  let slides: unknown[] | null = null;
+  if (Array.isArray(input)) slides = input;
+  else if (rec && Array.isArray(rec.slides)) slides = rec.slides;
+  else if (rec && Array.isArray(rec.deck)) slides = rec.deck;
+  if (!slides) return input; // leave it to zod to produce a clear error
+  return { slides: slides.map(coerceSlide) };
 }
 
 // ── System prompt the model fills (tiny vocabulary — no Markdown DSL) ──
