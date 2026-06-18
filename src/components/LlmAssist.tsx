@@ -2,13 +2,19 @@
  * LlmAssist.tsx — AI Assist dialog.
  *
  * Primary flow: describe a request → generate slide Markdown / diagram JSON
- * directly with Claude (BYOK), streamed live → import into SlideCraft.
- * Fallback flow: copy the generated prompt to any LLM and paste the result back.
+ * directly with the selected AI provider (BYOK), streamed live → import.
+ * Providers: Claude (native) + any OpenAI-compatible endpoint
+ * (OpenAI / OpenRouter / Ollama / custom). Fallback: copy prompt to any LLM.
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { generateCombinedPrompt } from "../engine/llm-prompts";
-import { generateWithClaude } from "../ipc/claude";
+import {
+  generateWithAI,
+  PROVIDERS,
+  providerPreset,
+  type ProviderId,
+} from "../ipc/ai";
 
 interface LlmAssistProps {
   isOpen: boolean;
@@ -16,15 +22,31 @@ interface LlmAssistProps {
   onImportResult: (text: string) => void;
 }
 
-const API_KEY_STORAGE = "slidecraft_anthropic_api_key";
+const CONFIG_STORAGE = "slidecraft_ai_config";
+
+interface ProviderConfig {
+  baseURL: string;
+  model: string;
+  apiKey: string;
+}
+type ConfigMap = Record<ProviderId, ProviderConfig>;
+
+function defaultConfigs(): ConfigMap {
+  const out = {} as ConfigMap;
+  for (const p of PROVIDERS) {
+    out[p.id] = { baseURL: p.baseURL, model: p.model, apiKey: "" };
+  }
+  return out;
+}
 
 export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssistProps) {
   const [mode, setMode] = useState<"slides" | "diagram">("slides");
   const [userRequest, setUserRequest] = useState("");
   const [llmResult, setLlmResult] = useState("");
 
-  // BYOK API key
-  const [apiKey, setApiKey] = useState("");
+  // Provider + per-provider config (BYOK)
+  const [provider, setProvider] = useState<ProviderId>("claude");
+  const [configs, setConfigs] = useState<ConfigMap>(defaultConfigs);
   const [rememberKey, setRememberKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
@@ -38,21 +60,46 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
   const [prompt, setPrompt] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Load a saved key when the dialog opens.
+  // Load saved provider + configs when the dialog opens.
   useEffect(() => {
     if (!isOpen) return;
-    const saved = localStorage.getItem(API_KEY_STORAGE);
-    if (saved) {
-      setApiKey(saved);
-      setRememberKey(true);
+    try {
+      const raw = localStorage.getItem(CONFIG_STORAGE);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<ConfigMap> };
+      if (saved.provider) setProvider(saved.provider);
+      if (saved.configs) {
+        setConfigs((cur) => ({ ...cur, ...saved.configs }));
+        setRememberKey(true);
+      }
+    } catch {
+      // ignore corrupt config
     }
   }, [isOpen]);
 
-  const handleGenerate = useCallback(async () => {
-    if (!userRequest.trim() || !apiKey.trim() || generating) return;
+  const preset = providerPreset(provider);
+  const cfg = configs[provider];
+  const setField = useCallback(
+    (key: keyof ProviderConfig, value: string) => {
+      setConfigs((c) => ({ ...c, [provider]: { ...c[provider], [key]: value } }));
+    },
+    [provider],
+  );
 
-    if (rememberKey) localStorage.setItem(API_KEY_STORAGE, apiKey.trim());
-    else localStorage.removeItem(API_KEY_STORAGE);
+  const canGenerate =
+    userRequest.trim().length > 0 &&
+    cfg.model.trim().length > 0 &&
+    (preset.native || cfg.baseURL.trim().length > 0) &&
+    (!preset.keyRequired || cfg.apiKey.trim().length > 0);
+
+  const handleGenerate = useCallback(async () => {
+    if (!canGenerate || generating) return;
+
+    if (rememberKey) {
+      localStorage.setItem(CONFIG_STORAGE, JSON.stringify({ provider, configs }));
+    } else {
+      localStorage.removeItem(CONFIG_STORAGE);
+    }
 
     setError(null);
     setLlmResult("");
@@ -61,8 +108,11 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
     abortRef.current = controller;
 
     try {
-      await generateWithClaude({
-        apiKey,
+      await generateWithAI({
+        provider,
+        apiKey: cfg.apiKey,
+        baseURL: cfg.baseURL,
+        model: cfg.model,
         mode,
         userRequest,
         onText: setLlmResult,
@@ -74,7 +124,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
       setGenerating(false);
       abortRef.current = null;
     }
-  }, [userRequest, apiKey, rememberKey, generating, mode]);
+  }, [canGenerate, generating, rememberKey, provider, configs, cfg, mode, userRequest]);
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
@@ -100,12 +150,15 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
 
   if (!isOpen) return null;
 
+  const fieldClass =
+    "w-full px-3 py-2 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-[#0f1117] border border-[#2D3A6E] rounded-lg w-[800px] max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#2D3A6E]">
-          <h2 className="text-white font-semibold">AI Assist — Generate with Claude</h2>
+          <h2 className="text-white font-semibold">AI Assist — Generate with AI</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-lg">
             ×
           </button>
@@ -139,7 +192,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
               value={userRequest}
               onChange={(e) => setUserRequest(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
+              className={fieldClass}
               placeholder={mode === "slides"
                 ? "例: CRM移行プロジェクトの進捗報告（10枚程度、現状分析・比較・ロードマップを含む）"
                 : "例: 3層Webアプリのネットワーク構成図（LB→Web→App→DB、DMZあり）"
@@ -147,18 +200,50 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
             />
           </div>
 
-          {/* API key (BYOK) */}
-          <div>
+          {/* Step 2: Provider & connection (BYOK) */}
+          <div className="flex flex-col gap-2">
             <label className="text-xs text-gray-400 uppercase tracking-wider">
-              2. Your Claude API key
+              2. AI provider
             </label>
-            <div className="flex gap-2 mt-1 items-center">
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as ProviderId)}
+              className={fieldClass}
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+
+            {!preset.native && (
+              <input
+                type="text"
+                value={cfg.baseURL}
+                onChange={(e) => setField("baseURL", e.target.value)}
+                placeholder="Base URL (e.g. https://api.openai.com/v1)"
+                className={`${fieldClass} font-mono text-xs`}
+                autoComplete="off"
+              />
+            )}
+
+            <input
+              type="text"
+              value={cfg.model}
+              onChange={(e) => setField("model", e.target.value)}
+              placeholder={preset.native ? "claude-opus-4-8" : "Model name (e.g. gpt-4o)"}
+              className={`${fieldClass} font-mono text-xs`}
+              autoComplete="off"
+            />
+
+            <div className="flex gap-2 items-center">
               <input
                 type={showKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
-                className="flex-1 px-3 py-2 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white font-mono"
+                value={cfg.apiKey}
+                onChange={(e) => setField("apiKey", e.target.value)}
+                placeholder={preset.keyRequired ? "API key" : "API key (optional for local)"}
+                className={`${fieldClass} font-mono`}
                 autoComplete="off"
               />
               <button
@@ -169,7 +254,8 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
                 {showKey ? "Hide" : "Show"}
               </button>
             </div>
-            <label className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+
+            <label className="flex items-center gap-2 text-xs text-gray-400">
               <input
                 type="checkbox"
                 checked={rememberKey}
@@ -191,10 +277,10 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
             ) : (
               <button
                 onClick={handleGenerate}
-                disabled={!userRequest.trim() || !apiKey.trim()}
+                disabled={!canGenerate}
                 className="px-4 py-1.5 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 text-white rounded"
               >
-                Generate with Claude
+                Generate
               </button>
             )}
             {generating && (
@@ -205,7 +291,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
               className="ml-auto text-xs text-gray-500 hover:text-gray-300 underline"
               type="button"
             >
-              {showManual ? "Hide manual copy/paste" : "No key? Copy the prompt instead"}
+              {showManual ? "Hide manual copy/paste" : "Or copy the prompt instead"}
             </button>
           </div>
 
@@ -260,8 +346,8 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
               value={llmResult}
               onChange={(e) => setLlmResult(e.target.value)}
               rows={10}
-              className="w-full mt-1 px-3 py-2 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white font-mono"
-              placeholder="Generated Markdown / JSON appears here as Claude writes it…"
+              className={`${fieldClass} mt-1 font-mono`}
+              placeholder="Generated Markdown / JSON appears here as the AI writes it…"
             />
             <button
               onClick={handleImport}
