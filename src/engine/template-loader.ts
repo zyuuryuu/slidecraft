@@ -333,8 +333,14 @@ export function autoSelectLayout(
     role = "content"; regions = 1; fallback = LAYOUT_NAMES[6];
   }
 
-  if (catalog) {
-    const picked = pickLayout(catalog, role, regions);
+  if (catalog && catalog.length > 0) {
+    // Degrade gracefully if THIS template lacks the ideal role (e.g. no columns):
+    // ideal role → content → any layout. Never returns a name not in the template.
+    const picked =
+      pickLayout(catalog, role, regions) ??
+      pickLayout(catalog, "content", regions) ??
+      pickLayout(catalog, "content") ??
+      catalog[0];
     if (picked) return picked.name;
   }
   return fallback;

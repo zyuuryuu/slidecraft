@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./components/useHistoryState";
-import { buildCatalog } from "./engine/template-catalog";
+import { buildCatalog, deckCapabilities } from "./engine/template-catalog";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -448,6 +448,8 @@ export default function App() {
   // content slide into Title format. Pinning the resolved layout keeps it correct.
   // Catalog → layout selection adapts to the loaded template (canonical = unchanged).
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
+  // Template capability summary handed to the deck-generation AI (kinds/columns/capacity).
+  const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
 
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
@@ -705,6 +707,7 @@ export default function App() {
               onApplySlide={handleApplySlide}
               currentDiagramYaml={deck?.slides[activeSlide]?.diagram?.yaml}
               onApplyDiagram={handleDiagramChange}
+              templateHint={deckHint}
             />
           )}
         </div>
@@ -716,6 +719,7 @@ export default function App() {
         isOpen={showLlmAssist}
         onClose={() => setShowLlmAssist(false)}
         onImportResult={handleLlmImport}
+        templateHint={deckHint}
       />
     </>
   );

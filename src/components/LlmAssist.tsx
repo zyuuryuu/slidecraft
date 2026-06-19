@@ -19,9 +19,11 @@ interface LlmAssistProps {
   isOpen: boolean;
   onClose: () => void;
   onImportResult: (text: string) => void;
+  /** Template capability summary prepended to whole-deck generation. */
+  templateHint?: string;
 }
 
-export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssistProps) {
+export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint }: LlmAssistProps) {
   const ai = useAiGeneration();
   // The dialog only offers whole-deck or diagram generation (not single-slide).
   const [mode, setMode] = useState<"slides" | "diagram">("slides");
@@ -35,7 +37,11 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
 
   const canGenerate = ai.canGenerate(userRequest);
 
-  const handleGenerate = useCallback(() => ai.generate(userRequest, mode), [ai, userRequest, mode]);
+  const handleGenerate = useCallback(() => {
+    // Whole-deck generation gets the template's capabilities (kinds/columns/capacity).
+    const req = mode === "slides" && templateHint ? `${templateHint}\n\n${userRequest}` : userRequest;
+    ai.generate(req, mode);
+  }, [ai, userRequest, mode, templateHint]);
 
   const handleGeneratePrompt = useCallback(() => {
     if (!userRequest.trim()) return;

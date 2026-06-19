@@ -21,6 +21,8 @@ interface AiPanelProps {
   currentDiagramYaml?: string;
   /** Apply an AI-edited diagram YAML back to the active slide's diagram. */
   onApplyDiagram?: (yaml: string) => void;
+  /** Template capability summary prepended to whole-deck generation. */
+  templateHint?: string;
 }
 
 export default function AiPanel({
@@ -30,6 +32,7 @@ export default function AiPanel({
   onApplySlide,
   currentDiagramYaml,
   onApplyDiagram,
+  templateHint,
 }: AiPanelProps) {
   const ai = useAiGeneration();
   const [userRequest, setUserRequest] = useState("");
@@ -53,7 +56,8 @@ export default function AiPanel({
       // One slide in, one slide out — far fewer tokens than the whole deck.
       ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
     } else {
-      ai.generate(userRequest, "slides");
+      // Whole-deck generation gets the template's capabilities (kinds/columns/capacity).
+      ai.generate(templateHint ? `${templateHint}\n\n${userRequest}` : userRequest, "slides");
     }
   };
 

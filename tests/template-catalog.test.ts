@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { loadTemplate, autoSelectLayout, type TemplateData } from "../src/engine/template-loader";
-import { buildCatalog, pickLayout, layoutRole, type LayoutCatalog } from "../src/engine/template-catalog";
+import { buildCatalog, pickLayout, layoutRole, deckCapabilities, type LayoutCatalog } from "../src/engine/template-catalog";
 import type { SlideIR } from "../src/engine/slide-schema";
 
 function mk(overrides: Partial<SlideIR>): SlideIR {
@@ -112,5 +112,25 @@ describe("autoSelectLayout parity (catalog === hardcoded for the canonical templ
   ];
   it.each(slides)("%s → same layout with and without the catalog", (_name, slide, i, total) => {
     expect(autoSelectLayout(slide, i, total, catalog)).toBe(autoSelectLayout(slide, i, total));
+  });
+});
+
+describe("autoSelectLayout graceful degrade (template missing a role)", () => {
+  it("degrades columns → content when the template has no column layout", () => {
+    const noCols = buildCatalog({ ...tpl, layouts: tpl.layouts.filter((l) => !l.name.startsWith("Column")) });
+    const slide = mk({ placeholders: [ph("15"), ph("1"), ph("2")] }); // would want columns
+    const name = autoSelectLayout(slide, 1, 6, noCols);
+    expect(noCols.some((e) => e.name === name)).toBe(true); // a real layout in THIS template
+    expect(name.startsWith("Column")).toBe(false); // degraded away from columns
+  });
+});
+
+describe("deckCapabilities", () => {
+  it("summarizes the canonical template's kinds + capacity for the AI", () => {
+    const cap = deckCapabilities(catalog);
+    expect(cap).toContain("content");
+    expect(cap).toContain("columns");
+    expect(cap).toMatch(/up to 3/);
+    expect(cap).toMatch(/\d+ full-width characters/);
   });
 });

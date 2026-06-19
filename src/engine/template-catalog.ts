@@ -149,6 +149,31 @@ export function buildCatalog(template: TemplateData): LayoutCatalog {
  * whatever the template actually offers. Prefers an exact body-count match and
  * the simplest variant (fewest "+addon" sections).
  */
+/**
+ * A short capability summary of the loaded template, for the deck-generation AI
+ * prompt: which slide kinds it offers, the column limit, and rough body capacity.
+ * Lets the model use only what THIS template supports and keep slides within
+ * capacity (split, don't overflow — we never shrink the template's fonts).
+ */
+export function deckCapabilities(catalog: LayoutCatalog): string {
+  const roles = new Set(catalog.map((e) => e.role));
+  const maxCols = Math.max(0, ...catalog.filter((e) => e.role === "columns").map((e) => e.bodyCount));
+  const kinds = ["title"];
+  if (roles.has("section")) kinds.push("section");
+  kinds.push("content");
+  if (maxCols >= 2) kinds.push("columns");
+  if (roles.has("closing")) kinds.push("closing");
+
+  const bodyCap = catalog.find((e) => e.role === "content")?.placeholders.find((p) => p.role === "body")?.capacity ?? 0;
+
+  let s = `This template supports these slide kinds: ${kinds.join(", ")}.`;
+  s += maxCols >= 2 ? ` "columns" can have up to ${maxCols}.` : ` It has NO multi-column layout — use "content" instead of "columns".`;
+  if (bodyCap > 0) {
+    s += ` A content slide's body holds roughly ${bodyCap} full-width characters — keep each slide within that and SPLIT into more slides rather than overflowing.`;
+  }
+  return s;
+}
+
 export function pickLayout(
   catalog: LayoutCatalog,
   role: LayoutRole,
