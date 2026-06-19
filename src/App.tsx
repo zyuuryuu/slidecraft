@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./components/useHistoryState";
 import { buildCatalog, deckCapabilities } from "./engine/template-catalog";
+import { distillDeck } from "./engine/distill";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -200,6 +201,8 @@ export default function App() {
     canRedo,
   } = useHistoryState<DeckIR | null>(null);
   const [templateData, setTemplateData] = useState<TemplateData | null>(null);
+  // Catalog → layout selection + capacity adapt to the loaded template (canonical = unchanged).
+  const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -219,8 +222,10 @@ export default function App() {
       debounceRef.current = setTimeout(() => {
         try {
           const parsed = text.trim() ? parseMd(text) : null;
-          if (mode === "reset") resetDeck(parsed);
-          else setDeck(parsed, mode);
+          // Distill to fit the template: split overflowing content slides (no shrink).
+          const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
+          if (mode === "reset") resetDeck(fitted);
+          else setDeck(fitted, mode);
           setParseError(null);
         } catch (e) {
           setParseError(e instanceof Error ? e.message : String(e));
@@ -228,7 +233,7 @@ export default function App() {
         }
       }, 300);
     },
-    [setDeck, resetDeck],
+    [setDeck, resetDeck, catalog],
   );
 
   // ── Editor change handlers ──
@@ -274,6 +279,22 @@ export default function App() {
       .then(setTemplateData)
       .catch(() => {});
   });
+
+  // When the template (catalog) loads or changes, re-fit the current deck to it —
+  // split slides that overflow the new template. Length-guarded so it only fires
+  // on an actual split (idempotent → no render loop). Covers the initial sample,
+  // which is parsed before the template finishes loading.
+  const deckRef = useRef(deck);
+  useEffect(() => {
+    deckRef.current = deck;
+  }, [deck]);
+  useEffect(() => {
+    if (!catalog || !deckRef.current) return;
+    const fitted = distillDeck(deckRef.current, catalog);
+    if (fitted.slides.length !== deckRef.current.slides.length) {
+      setDeck(fitted, "silent");
+    }
+  }, [catalog, setDeck]);
 
   // Load custom template
   const handleLoadTemplate = useCallback(() => {
@@ -446,8 +467,6 @@ export default function App() {
   // Serialize with the slide's RESOLVED layout: a lone slide is index 0, and
   // autoSelectLayout's "first slide → Title" rule would otherwise mangle a
   // content slide into Title format. Pinning the resolved layout keeps it correct.
-  // Catalog → layout selection adapts to the loaded template (canonical = unchanged).
-  const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
   // Template capability summary handed to the deck-generation AI (kinds/columns/capacity).
   const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
 

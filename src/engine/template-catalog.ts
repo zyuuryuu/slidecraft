@@ -46,6 +46,8 @@ export interface CatalogPlaceholder {
   order: number; // 1-based order among same-role placeholders (body 1, 2, 3…)
   /** Rough full-width char capacity at the template's font (for split/warn, NOT shrink). */
   capacity: number;
+  charsPerLine: number; // full-width chars per line at the template's font
+  maxLines: number; // lines that fit the box height
 }
 
 export interface CatalogEntry {
@@ -105,16 +107,26 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
 }
 
 /**
- * Rough capacity: how many full-width chars fit the box at its font (conservative,
- * full-width assumption). For deciding "too much → split/warn", NOT for shrinking.
+ * Rough fit box: full-width chars per line × lines that fit the box at its font
+ * (conservative, full-width assumption). For deciding "too much → split/warn",
+ * NOT for shrinking. Half-width (latin) text fits more, so this errs toward early
+ * splitting rather than overflow.
  */
-export function placeholderCapacity(style: { w: number; h: number; fontSize: number }): number {
+export function placeholderFitBox(style: { w: number; h: number; fontSize: number }): {
+  charsPerLine: number;
+  maxLines: number;
+} {
   const fontIn = style.fontSize / 72;
-  if (fontIn <= 0) return 0;
+  if (fontIn <= 0) return { charsPerLine: 0, maxLines: 0 };
   const pad = 0.1;
   const charsPerLine = Math.floor(Math.max(style.w - 2 * pad, 0) / fontIn);
-  const lines = Math.floor(Math.max(style.h - 2 * pad, 0) / (fontIn * 1.2));
-  return Math.max(0, charsPerLine * lines);
+  const maxLines = Math.floor(Math.max(style.h - 2 * pad, 0) / (fontIn * 1.2));
+  return { charsPerLine, maxLines };
+}
+
+export function placeholderCapacity(style: { w: number; h: number; fontSize: number }): number {
+  const { charsPerLine, maxLines } = placeholderFitBox(style);
+  return Math.max(0, charsPerLine * maxLines);
 }
 
 /**
@@ -151,7 +163,15 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     .map((ph) => {
       const role = placeholderRole(ph);
       roleCounts[role] = (roleCounts[role] ?? 0) + 1;
-      return { idx: ph.idx, role, order: roleCounts[role], capacity: placeholderCapacity(ph.style) };
+      const { charsPerLine, maxLines } = placeholderFitBox(ph.style);
+      return {
+        idx: ph.idx,
+        role,
+        order: roleCounts[role],
+        capacity: Math.max(0, charsPerLine * maxLines),
+        charsPerLine,
+        maxLines,
+      };
     })
     .sort((a, b) => (a.idx.length - b.idx.length) || a.idx.localeCompare(b.idx));
 
