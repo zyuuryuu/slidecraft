@@ -13,6 +13,7 @@ import { generatePptx } from "./engine/placeholder-filler";
 import type { DeckIR, SlideIR } from "./engine/slide-schema";
 import { readFileFromInput, downloadBlob } from "./ipc/commands";
 import LlmAssist from "./components/LlmAssist";
+import AiPanel from "./components/AiPanel";
 import { MERMAID_CONFIG, rasterizeSvgToPng } from "./components/mermaid";
 
 type MarkdownSubMode = "import" | "edit";
@@ -181,6 +182,7 @@ Date: プロジェクトマネージャー: 山田 太郎 | taro.yamada@example.
 export default function App() {
   const [subMode, setSubMode] = useState<MarkdownSubMode>("import");
   const [showLlmAssist, setShowLlmAssist] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
   const [mdText, setMdText] = useState(SAMPLE_MD);
   const [deck, setDeck] = useState<DeckIR | null>(null);
   const [templateData, setTemplateData] = useState<TemplateData | null>(null);
@@ -333,6 +335,17 @@ export default function App() {
     [parseMdText],
   );
 
+  // AI panel "適用": replace the deck but stay in Edit so you keep refining.
+  const handleAiApply = useCallback(
+    (md: string) => {
+      setMdText(md);
+      parseMdText(md);
+      setActiveSlide(0);
+      setSubMode("edit");
+    },
+    [parseMdText],
+  );
+
   // ── Import → Edit transition ──
   const handleStartEditing = useCallback(() => {
     if (deck) setSubMode("edit");
@@ -434,7 +447,9 @@ export default function App() {
           onSave={handleSave}
           onGenerate={handleGenerate}
           onLoadTemplate={handleLoadTemplate}
-          onAiAssist={() => setShowLlmAssist(true)}
+          onAiAssist={() =>
+            subMode === "edit" ? setShowAiPanel((v) => !v) : setShowLlmAssist(true)
+          }
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
@@ -514,7 +529,8 @@ export default function App() {
 
       {/* ── Markdown Edit mode (3-pane) ── */}
       {subMode === "edit" && (
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
           <div className="w-[220px] border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0a0e1a]">
             <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
@@ -572,6 +588,10 @@ export default function App() {
               </>
             }
           />
+          </div>
+          {showAiPanel && (
+            <AiPanel onApply={handleAiApply} onClose={() => setShowAiPanel(false)} />
+          )}
         </div>
       )}
 
