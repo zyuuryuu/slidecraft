@@ -76,9 +76,12 @@ describe("splitSlideToFit", () => {
     const s = slide({ placeholders: [title("T"), body([bullet("a"), bullet("b"), bullet("c")])] });
     const out = splitSlideToFit(s, box);
     expect(out).toHaveLength(2);
-    // title repeated on both
-    expect(out[0].placeholders.find((p) => p.idx === "15")!.paragraphs[0].segments[0].text).toBe("T");
-    expect(out[1].placeholders.find((p) => p.idx === "15")!.paragraphs[0].segments[0].text).toBe("T");
+    const titleText = (sl: SlideIR) =>
+      sl.placeholders.find((p) => p.idx === "15")!.paragraphs[0].segments.map((g) => g.text).join("");
+    // first slide keeps the title; continuations get a provisional marker
+    expect(titleText(out[0])).toBe("T");
+    expect(titleText(out[1])).toContain("T");
+    expect(titleText(out[1])).toContain("（続き）");
     // body distributed, nothing lost
     const b0 = out[0].placeholders.find((p) => p.idx === "1")!.paragraphs;
     const b1 = out[1].placeholders.find((p) => p.idx === "1")!.paragraphs;

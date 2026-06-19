@@ -70,16 +70,31 @@ export function splitSlideToFit(slide: SlideIR, box: FitBox): SlideIR[] {
   const chunks = packParagraphs(body.paragraphs, box);
   if (chunks.length <= 1) return [slide];
 
-  return chunks.map((chunk) => ({
+  return chunks.map((chunk, ci) => ({
     ...slide,
-    // a fresh deck slide per chunk: keep title/subtitle/meta, swap the body text
-    placeholders: slide.placeholders.map((p) =>
-      p.idx === body.idx ? { ...p, paragraphs: chunk } : p,
-    ),
+    // a fresh deck slide per chunk: keep title/subtitle/meta, swap the body text.
+    placeholders: slide.placeholders.map((p) => {
+      if (p.idx === body.idx) return { ...p, paragraphs: chunk };
+      // Continuation slides get a provisional "（続き）" on the title — a placeholder
+      // the AI re-title lever (or upstream) is meant to replace with a fitting title.
+      if (ci > 0 && slideIdxRole(p.idx, hasCtrTitle) === "title") {
+        return { ...p, paragraphs: appendTitleMarker(p.paragraphs, "（続き）") };
+      }
+      return p;
+    }),
     // these only make sense for the original source span
     sourceLineStart: undefined,
     sourceLineEnd: undefined,
   }));
+}
+
+/** Append a marker segment to the title's last paragraph (provisional split title). */
+function appendTitleMarker(paragraphs: Paragraph[], marker: string): Paragraph[] {
+  if (paragraphs.length === 0) return [{ segments: [{ text: marker }] }];
+  const last = paragraphs.length - 1;
+  return paragraphs.map((p, i) =>
+    i === last ? { ...p, segments: [...p.segments, { text: ` ${marker}` }] } : p,
+  );
 }
 
 /** The content-body fit box for the loaded template, if it has a content layout. */
