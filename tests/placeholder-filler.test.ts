@@ -26,11 +26,11 @@ beforeAll(async () => {
 // ── md-to-ooxml unit tests ──
 
 describe("md-to-ooxml", () => {
-  it("converts plain text paragraph", () => {
+  it("converts plain (non-bullet) text paragraph (bullets suppressed via buNone)", () => {
     const xml = paragraphToOoxml({
       segments: [{ text: "Hello" }],
     });
-    expect(xml).toBe("<a:p><a:r><a:t>Hello</a:t></a:r></a:p>");
+    expect(xml).toBe("<a:p><a:pPr><a:buNone/></a:pPr><a:r><a:t>Hello</a:t></a:r></a:p>");
   });
 
   it("converts bold text", () => {
@@ -48,13 +48,21 @@ describe("md-to-ooxml", () => {
     expect(xml).toContain('i="1"');
   });
 
-  it("converts bullet paragraph", () => {
+  it("bullet paragraph INHERITS the master's bullet (no forced glyph)", () => {
     const xml = paragraphToOoxml({
       segments: [{ text: "Item" }],
       bullet: true,
     });
-    expect(xml).toContain("a:buChar");
+    // Master-conformant: we no longer hardcode a buChar — the placeholder/master
+    // list style decides the bullet (or none).
+    expect(xml).not.toContain("buChar");
+    expect(xml).not.toContain("buNone");
     expect(xml).toContain("Item");
+  });
+
+  it("non-bullet paragraph suppresses bullets (buNone)", () => {
+    const xml = paragraphToOoxml({ segments: [{ text: "Prose" }], bullet: false });
+    expect(xml).toContain("buNone");
   });
 
   it("escapes XML special characters", () => {

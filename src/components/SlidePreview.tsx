@@ -340,10 +340,10 @@ function renderSegments(segments: InlineSegment[]) {
   });
 }
 
-function renderParagraph(para: Paragraph, idx: number) {
+function renderParagraph(para: Paragraph, idx: number, bulletChar: string) {
   return (
     <div key={idx} style={{ marginBottom: "0.15em" }}>
-      {para.bullet && <span style={{ marginRight: "0.4em" }}>▸</span>}
+      {para.bullet && bulletChar && <span style={{ marginRight: "0.4em" }}>{bulletChar}</span>}
       {renderSegments(para.segments)}
     </div>
   );
@@ -479,7 +479,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
               lineHeight: 1.3,
             }}
           >
-            {content.paragraphs.map((p, i) => renderParagraph(p, i))}
+            {content.paragraphs.map((p, i) => renderParagraph(p, i, s.bulletChar))}
           </div>
         );
       })}

@@ -22,6 +22,7 @@ export interface PlaceholderStyle {
   fontName: string;
   bold: boolean;
   align: string; // "l", "ctr", "r"
+  bulletChar: string; // bullet glyph from the master/layout; "" = no bullet
 }
 
 export interface PlaceholderInfo {
@@ -53,6 +54,7 @@ export interface MasterStyle {
   fontName: string;
   bold: boolean;
   align: string;
+  bulletChar: string; // lvl1 bullet glyph; "" = buNone / none
 }
 
 export interface TemplateData {
@@ -119,12 +121,16 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle): Maste
   const colorMatch = xml.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
   const fontMatch = xml.match(/<a:latin typeface="([^"]+)"/);
   const alignMatch = xml.match(/algn="(\w+)"/);
+  // Bullet glyph from the level-1 paragraph style (buChar), or "" when buNone.
+  const lvl1 = xml.match(/<a:lvl1pPr\b[\s\S]*?<\/a:lvl1pPr>/)?.[0] ?? xml;
+  const buChar = lvl1.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
   return {
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : fallback.fontSize,
     fontColor: colorMatch ? colorMatch[1] : fallback.fontColor,
     fontName: fontMatch ? fontMatch[1] : fallback.fontName,
     bold: boldMatch ? true : fallback.bold,
     align: alignMatch ? alignMatch[1] : fallback.align,
+    bulletChar: buChar ?? (/<a:buNone\/>/.test(lvl1) ? "" : fallback.bulletChar),
   };
 }
 
@@ -147,6 +153,11 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const fontMatch = sp.match(/<a:latin typeface="([^"]+)"/);
   const alignMatch = sp.match(/<a:(?:def)?PPr[^>]*algn="(\w+)"/);
 
+  // Bullet: shape's own buChar/buNone wins, else inherit the master's body bullet
+  // (title placeholders never bullet). "" = no bullet.
+  const shapeBuChar = sp.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
+  const bulletChar = shapeBuChar ?? (/<a:buNone\/>/.test(sp) ? "" : isTitle ? "" : master.bulletChar);
+
   return {
     x: emuToInch(offMatch?.[1]),
     y: emuToInch(offMatch?.[2]),
@@ -157,6 +168,7 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
     fontName: fontMatch ? fontMatch[1] : master.fontName,
     bold: boldMatch ? true : master.bold,
     align: alignMatch ? alignMatch[1] : master.align,
+    bulletChar,
   };
 }
 
@@ -229,7 +241,7 @@ export async function loadTemplate(
 
   // ── Extract master styles ──
   const defaultStyle: MasterStyle = {
-    fontSize: 14, fontColor: "1E293B", fontName: "Calibri", bold: false, align: "l",
+    fontSize: 14, fontColor: "1E293B", fontName: "Calibri", bold: false, align: "l", bulletChar: "",
   };
   const masterXml = await zip.file("ppt/slideMasters/slideMaster1.xml")?.async("string") ?? "";
   const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];

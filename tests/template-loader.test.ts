@@ -54,6 +54,13 @@ describe("loadTemplate", () => {
     expect(idxs).toContain("0");
   });
 
+  it("body placeholder inherits the master bullet (this template = none)", () => {
+    const l7 = tpl.layouts.find((l) => l.index === 7)!; // Content.1Body.Single
+    const body = l7.placeholders.find((p) => p.idx === "1")!;
+    // Master uses buNone → no bullet glyph; we must follow that, not force "▸".
+    expect(body.style.bulletChar).toBe("");
+  });
+
   it("placeholder shapes contain XML", () => {
     const l7 = tpl.layouts.find((l) => l.index === 7);
     const ph15 = l7!.placeholders.find((p) => p.idx === "15");

@@ -27,9 +27,9 @@ function segmentToRun(seg: InlineSegment): string {
 
 export function paragraphToOoxml(para: Paragraph): string {
   const runs = para.segments.map(segmentToRun).join("");
-  const pPr = para.bullet
-    ? '<a:pPr><a:buChar char="▸"/></a:pPr>'
-    : "";
+  // Follow the slide master's bullet style — never force a glyph. Bullet lines
+  // inherit the placeholder/master list style; non-bullet lines suppress it.
+  const pPr = para.bullet ? "" : "<a:pPr><a:buNone/></a:pPr>";
   return `<a:p>${pPr}${runs}</a:p>`;
 }
 
