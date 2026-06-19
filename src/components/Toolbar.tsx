@@ -7,7 +7,6 @@ interface ToolbarProps {
   generating: boolean;
   hasSpec: boolean;
   templateName?: string;
-  mode?: "diagram" | "markdown";
 }
 
 export default function Toolbar({
@@ -19,7 +18,6 @@ export default function Toolbar({
   generating,
   hasSpec,
   templateName,
-  mode,
 }: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
@@ -44,7 +42,7 @@ export default function Toolbar({
         Save
       </button>
 
-      {mode === "markdown" && onLoadTemplate && (
+      {onLoadTemplate && (
         <button
           onClick={onLoadTemplate}
           className="px-3 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded transition-colors"

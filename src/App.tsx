@@ -1,16 +1,10 @@
 import { useState, useCallback, useRef } from "react";
-import yaml from "js-yaml";
 import Editor from "./components/Editor";
-import Preview from "./components/Preview";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
 import SlideEditor from "./components/SlideEditor";
 import Toolbar from "./components/Toolbar";
-import ThemePicker from "./components/ThemePicker";
 import StatusBar from "./components/StatusBar";
-import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./engine/schema";
-import { renderToBuffer } from "./engine/pptx-writer";
-import { midnightExecutive } from "./engine/theme";
 import { parseMd } from "./engine/md-parser";
 import { serializeMd } from "./engine/md-serializer";
 import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from "./engine/template-loader";
@@ -20,64 +14,7 @@ import { readFileFromInput, downloadBlob } from "./ipc/commands";
 import LlmAssist from "./components/LlmAssist";
 import { MERMAID_CONFIG, rasterizeSvgToPng } from "./components/mermaid";
 
-type AppMode = "diagram" | "markdown";
 type MarkdownSubMode = "import" | "edit";
-
-const SAMPLE_YAML = `type: flowchart
-direction: TB
-title: API認証フロー
-
-classDefs:
-  process:
-    fill: "#1E2761"
-    border: "#3B82F6"
-    font_color: "#FFFFFF"
-  decision:
-    fill: "#F59E0B"
-    font_color: "#1E293B"
-    font_size: 10
-  terminal:
-    fill: "#3B82F6"
-
-nodes:
-  - id: start
-    label: 開始
-    shape: rounded_rect
-    class: terminal
-  - id: proc1
-    label: リクエスト受付
-    class: process
-  - id: auth
-    label: 認証OK？
-    shape: diamond
-    class: decision
-  - id: ok
-    label: データ処理
-    class: process
-  - id: ng
-    label: エラー返却
-    class: process
-  - id: end
-    label: 終了
-    shape: rounded_rect
-    class: terminal
-
-edges:
-  - from: start
-    to: proc1
-  - from: proc1
-    to: auth
-  - from: auth
-    to: ok
-    label: "Yes"
-  - from: auth
-    to: ng
-    label: "No"
-  - from: ok
-    to: end
-  - from: ng
-    to: end
-`;
 
 const SAMPLE_MD = `<!-- slide: Title.1Title.Single -->
 # NextGen CRM プロジェクト
@@ -241,17 +178,13 @@ Date: プロジェクトマネージャー: 山田 太郎 | taro.yamada@example.
 `;
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>("markdown");
   const [subMode, setSubMode] = useState<MarkdownSubMode>("import");
   const [showLlmAssist, setShowLlmAssist] = useState(false);
-  const [yamlText, setYamlText] = useState(SAMPLE_YAML);
   const [mdText, setMdText] = useState(SAMPLE_MD);
-  const [spec, setSpec] = useState<DiagramSpec | null>(null);
   const [deck, setDeck] = useState<DeckIR | null>(null);
   const [templateData, setTemplateData] = useState<TemplateData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [themeName, setThemeName] = useState("midnight_executive");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [gotoLine, setGotoLine] = useState<{ line: number; ts: number } | undefined>(undefined);
@@ -259,43 +192,6 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Diagram mode: parse YAML ──
-  const parseYaml = useCallback((text: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      try {
-        if (!text.trim()) {
-          setSpec(null);
-          setParseError(null);
-          return;
-        }
-        const data = yaml.load(text);
-        if (!data || typeof data !== "object") {
-          setParseError("YAML must produce an object");
-          setSpec(null);
-          return;
-        }
-        const result = DiagramSpecSchema.safeParse(data);
-        if (!result.success) {
-          setParseError(result.error.issues.map((i: { message: string }) => i.message).join("\n"));
-          setSpec(null);
-          return;
-        }
-        const errors = validateDiagramSpec(result.data);
-        if (errors.length > 0) {
-          setParseError(errors.map((e) => e.message).join("\n"));
-          setSpec(null);
-          return;
-        }
-        setSpec(result.data);
-        setParseError(null);
-      } catch (e) {
-        setParseError(e instanceof Error ? e.message : String(e));
-        setSpec(null);
-      }
-    }, 300);
-  }, []);
 
   // ── Markdown mode: parse MD ──
   const parseMdText = useCallback((text: string) => {
@@ -320,27 +216,14 @@ export default function App() {
   // ── Editor change handlers ──
   const handleEditorChange = useCallback(
     (value: string) => {
-      if (mode === "diagram") {
-        setYamlText(value);
-        parseYaml(value);
-      } else {
-        setMdText(value);
-        parseMdText(value);
-      }
+      setMdText(value);
+      parseMdText(value);
     },
-    [mode, parseYaml, parseMdText],
+    [parseMdText],
   );
 
   // Initial parse (no debounce) + template load
   useState(() => {
-    // Parse both immediately without debounce
-    try {
-      const data = yaml.load(SAMPLE_YAML);
-      if (data && typeof data === "object") {
-        const result = DiagramSpecSchema.safeParse(data);
-        if (result.success) setSpec(result.data);
-      }
-    } catch { /* ignore */ }
     try {
       setDeck(parseMd(SAMPLE_MD));
     } catch { /* ignore */ }
@@ -385,76 +268,58 @@ export default function App() {
       if (!file) return;
 
       const text = await readFileFromInput(file);
-      if (mode === "diagram") {
-        setYamlText(text);
-        parseYaml(text);
-      } else {
-        setMdText(text);
-        parseMdText(text);
-      }
+      setMdText(text);
+      parseMdText(text);
       setFilePath(file.name);
       e.target.value = "";
     },
-    [mode, parseYaml, parseMdText],
+    [parseMdText],
   );
 
   // Save
   const handleSave = useCallback(() => {
-    const text = mode === "diagram" ? yamlText : mdText;
-    const mimeType = mode === "diagram" ? "text/yaml" : "text/markdown";
-    const ext = mode === "diagram" ? ".yaml" : ".md";
-    const blob = new Blob([text], { type: mimeType });
+    const blob = new Blob([mdText], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filePath ?? `slidecraft${ext}`;
+    a.download = filePath ?? "slidecraft.md";
     a.click();
     URL.revokeObjectURL(url);
-  }, [mode, yamlText, mdText, filePath]);
+  }, [mdText, filePath]);
 
   // Generate PPTX
   const handleGenerate = useCallback(async () => {
+    if (!deck || !templateData) return;
     setGenerating(true);
     try {
-      if (mode === "diagram") {
-        if (!spec) return;
-        const theme = midnightExecutive();
-        const buffer = await renderToBuffer(spec, { theme });
-        const filename = spec.title
-          ? `${spec.title.replace(/[^\w\s-]/g, "").trim()}.pptx`
-          : "diagram_output.pptx";
-        downloadBlob(buffer, filename);
-      } else {
-        if (!deck || !templateData) return;
-        // Pre-render each ```mermaid block to an SVG using the SAME config as the
-        // on-screen preview, then rasterize it with the browser's own canvas
-        // (rasterizeSvgToPng) so the embedded image is pixel-faithful to the
-        // preview — same theme, fonts and text. WYSIWYG: preview === output.
-        const { default: mermaidLib } = await import("mermaid");
-        mermaidLib.initialize(MERMAID_CONFIG);
-        const deckWithSvg: DeckIR = {
-          ...deck,
-          slides: await Promise.all(deck.slides.map(async (slide, i) => {
-            if (!slide.mermaidBlock) return slide;
-            try {
-              const { svg } = await mermaidLib.render(`pptx-mmd-${i}`, slide.mermaidBlock.mermaid);
-              return { ...slide, mermaidBlock: { ...slide.mermaidBlock, svgCache: svg } };
-            } catch {
-              return slide;
-            }
-          })),
-        };
-        const buffer = await generatePptx(deckWithSvg, templateData, rasterizeSvgToPng);
-        downloadBlob(buffer as unknown as Uint8Array, "slides_output.pptx");
-      }
+      // Pre-render each ```mermaid block to an SVG using the SAME config as the
+      // on-screen preview, then rasterize it with the browser's own canvas
+      // (rasterizeSvgToPng) so the embedded image is pixel-faithful to the
+      // preview — same theme, fonts and text. WYSIWYG: preview === output.
+      const { default: mermaidLib } = await import("mermaid");
+      mermaidLib.initialize(MERMAID_CONFIG);
+      const deckWithSvg: DeckIR = {
+        ...deck,
+        slides: await Promise.all(deck.slides.map(async (slide, i) => {
+          if (!slide.mermaidBlock) return slide;
+          try {
+            const { svg } = await mermaidLib.render(`pptx-mmd-${i}`, slide.mermaidBlock.mermaid);
+            return { ...slide, mermaidBlock: { ...slide.mermaidBlock, svgCache: svg } };
+          } catch {
+            return slide;
+          }
+        })),
+      };
+      const buffer = await generatePptx(deckWithSvg, templateData, rasterizeSvgToPng);
+      downloadBlob(buffer as unknown as Uint8Array, "slides_output.pptx");
     } catch (e) {
       setParseError(`PPTX generation failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setGenerating(false);
     }
-  }, [mode, spec, deck, templateData]);
+  }, [deck, templateData]);
 
-  const hasContent = mode === "diagram" ? spec !== null : (deck !== null && templateData !== null);
+  const hasContent = deck !== null && templateData !== null;
 
 
   // ── LLM Assist: import result ──
@@ -462,7 +327,6 @@ export default function App() {
     (text: string) => {
       setMdText(text);
       parseMdText(text);
-      setMode("markdown");
       setSubMode("import");
     },
     [parseMdText],
@@ -506,7 +370,7 @@ export default function App() {
   // ── Cursor line → active slide ──
   const handleCursorLine = useCallback(
     (line: number) => {
-      if (mode !== "markdown" || !deck) return;
+      if (!deck) return;
       for (let i = deck.slides.length - 1; i >= 0; i--) {
         const s = deck.slides[i];
         if (s.sourceLineStart && line >= s.sourceLineStart) {
@@ -516,20 +380,20 @@ export default function App() {
       }
       setActiveSlide(0);
     },
-    [mode, deck],
+    [deck],
   );
 
   // ── Preview click → editor jump ──
   const handleSlideClick = useCallback(
     (index: number) => {
       setActiveSlide(index);
-      if (mode !== "markdown" || !deck) return;
+      if (!deck) return;
       const slide = deck.slides[index];
       if (slide?.sourceLineStart) {
         setGotoLine({ line: slide.sourceLineStart, ts: Date.now() });
       }
     },
-    [mode, deck],
+    [deck],
   );
 
   return (
@@ -537,7 +401,7 @@ export default function App() {
       <input
         ref={fileInputRef}
         type="file"
-        accept={mode === "diagram" ? ".yaml,.yml,.json" : ".md,.markdown,.txt"}
+        accept=".md,.markdown,.txt"
         className="hidden"
         onChange={handleFileSelected}
       />
@@ -559,94 +423,43 @@ export default function App() {
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
-          mode={mode}
         />
         <div className="flex items-center gap-2 px-3 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
-          {/* Mode toggle */}
           <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">
             <button
-              onClick={() => { setMode("diagram"); parseYaml(yamlText); }}
+              onClick={() => setSubMode("import")}
               className={`px-3 py-1 transition-colors ${
-                mode === "diagram"
+                subMode === "import"
                   ? "bg-[#3B82F6] text-white"
                   : "bg-[#1E2761] text-gray-400 hover:text-white"
               }`}
             >
-              Diagram
+              Import
             </button>
             <button
-              onClick={() => { setMode("markdown"); parseMdText(mdText); }}
+              onClick={handleStartEditing}
               className={`px-3 py-1 transition-colors ${
-                mode === "markdown"
+                subMode === "edit"
                   ? "bg-[#3B82F6] text-white"
                   : "bg-[#1E2761] text-gray-400 hover:text-white"
               }`}
             >
-              Markdown
+              Edit
             </button>
+            {subMode === "edit" && (
+              <button
+                onClick={handleExportMd}
+                className="px-3 py-1 transition-colors bg-[#1E2761] text-gray-400 hover:text-white border-l border-[#3B82F6]/40"
+              >
+                Export MD
+              </button>
+            )}
           </div>
-          {mode === "diagram" && (
-            <ThemePicker currentTheme={themeName} onThemeChange={setThemeName} />
-          )}
-          {mode === "markdown" && (
-            <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs ml-2">
-              <button
-                onClick={() => setSubMode("import")}
-                className={`px-3 py-1 transition-colors ${
-                  subMode === "import"
-                    ? "bg-[#3B82F6] text-white"
-                    : "bg-[#1E2761] text-gray-400 hover:text-white"
-                }`}
-              >
-                Import
-              </button>
-              <button
-                onClick={handleStartEditing}
-                className={`px-3 py-1 transition-colors ${
-                  subMode === "edit"
-                    ? "bg-[#3B82F6] text-white"
-                    : "bg-[#1E2761] text-gray-400 hover:text-white"
-                }`}
-              >
-                Edit
-              </button>
-              {subMode === "edit" && (
-                <button
-                  onClick={handleExportMd}
-                  className="px-3 py-1 transition-colors bg-[#1E2761] text-gray-400 hover:text-white border-l border-[#3B82F6]/40"
-                >
-                  Export MD
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ── Diagram mode (legacy) ── */}
-      {mode === "diagram" && (
-        <div className="flex-1 flex min-h-0">
-          <div className="w-1/2 border-r border-[#2D3A6E] flex flex-col min-h-0">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              YAML Editor
-            </div>
-            <div className="flex-1 min-h-0">
-              <Editor value={yamlText} onChange={handleEditorChange} language="yaml" />
-            </div>
-          </div>
-          <div className="w-1/2 flex flex-col min-h-0 bg-[#0f1117]">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              Mermaid Preview
-            </div>
-            <div className="flex-1 min-h-0">
-              <Preview spec={spec} error={parseError} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Markdown Import mode ── */}
-      {mode === "markdown" && subMode === "import" && (
+      {/* ── Markdown editor + live preview ── */}
+      {subMode === "import" && (
         <div className="flex-1 flex min-h-0">
           <div className="w-1/2 border-r border-[#2D3A6E] flex flex-col min-h-0">
             <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
@@ -680,7 +493,7 @@ export default function App() {
       )}
 
       {/* ── Markdown Edit mode (3-pane) ── */}
-      {mode === "markdown" && subMode === "edit" && (
+      {subMode === "edit" && (
         <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
           <div className="w-[220px] border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0a0e1a]">
@@ -735,7 +548,7 @@ export default function App() {
         </div>
       )}
 
-      <StatusBar spec={spec} error={parseError} filePath={filePath} />
+      <StatusBar spec={null} error={parseError} filePath={filePath} />
 
       <LlmAssist
         isOpen={showLlmAssist}
