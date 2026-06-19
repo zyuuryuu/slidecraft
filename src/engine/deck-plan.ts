@@ -259,7 +259,7 @@ export function coerceDeckPlanInput(input: unknown): unknown {
 
 // ── System prompt the model fills (tiny vocabulary — no Markdown DSL) ──
 
-export function deckPlanSystemPrompt(): string {
+export function deckPlanSystemPrompt(today?: string): string {
   return `You generate a slide deck as a JSON "DeckPlan". Output ONLY the JSON object — no prose, no code fence.
 
 Shape:
@@ -277,6 +277,10 @@ Rules:
 - Typically 6-10 slides. Start with a "title" slide and end with a "closing" slide.
 - Keep each bullet short — one idea, not a paragraph.
 - Use "columns" for comparisons or two/three-sided content.
+- "section" is JUST a divider (title only, no body). Only use it to separate major
+  parts. If a topic has actual content, use "content" with bullets — never an empty "section".
+- The "closing" title must be a complete takeaway SENTENCE (the key message), not a
+  single word like "Summary"/"まとめ".${today ? `\n- Use ${today} (or a future date) for any "date" field — never a past year.` : ""}
 - Do NOT add any field not listed above, and do NOT invent other "kind" values.
 - Output valid JSON only.`;
 }

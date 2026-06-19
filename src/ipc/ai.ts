@@ -51,9 +51,10 @@ export function generateWithAI(req: AiRequest): Promise<string> {
   // Slides go through the DeckPlan harness (small constrained JSON the engine
   // turns into correct layouts); "slide" edits one slide (token-cheap);
   // "diagram" generates / "diagram-edit" revises a DiagramSpec.
+  const today = new Date().toISOString().slice(0, 10);
   const system =
     req.mode === "slides"
-      ? deckPlanSystemPrompt()
+      ? deckPlanSystemPrompt(today)
       : req.mode === "slide"
         ? slidePlanSystemPrompt()
         : req.mode === "diagram-edit"
