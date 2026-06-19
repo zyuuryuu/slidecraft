@@ -293,6 +293,82 @@ describe("computeLayout", () => {
   });
 });
 
+describe("node overrides", () => {
+  it("uses an explicit full override for position and size", () => {
+    const spec = makeSpec({
+      type: "flowchart",
+      direction: "TB",
+      nodes: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B", override: { x: 9.1, y: 5.2, w: 1.3, h: 0.9 } },
+      ],
+      edges: [{ from: "a", to: "b" }],
+    });
+    const b = computeLayout(spec).find((p) => p.nodeId === "b")!;
+    expect(b.x).toBe(9.1);
+    expect(b.y).toBe(5.2);
+    expect(b.w).toBe(1.3);
+    expect(b.h).toBe(0.9);
+  });
+
+  it("applies a partial override (position only) and keeps computed size", () => {
+    const spec = makeSpec({
+      type: "flowchart",
+      nodes: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B", override: { x: 2.0, y: 3.0 } },
+      ],
+      edges: [{ from: "a", to: "b" }],
+    });
+    const base = computeLayout(makeSpec({
+      type: "flowchart",
+      nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      edges: [{ from: "a", to: "b" }],
+    })).find((p) => p.nodeId === "b")!;
+    const b = computeLayout(spec).find((p) => p.nodeId === "b")!;
+    expect(b.x).toBe(2.0);
+    expect(b.y).toBe(3.0);
+    expect(b.w).toBe(base.w); // size untouched
+    expect(b.h).toBe(base.h);
+  });
+
+  it("leaves non-overridden nodes exactly as auto-computed", () => {
+    const base = computeLayout(SIMPLE_FLOW);
+    const withOv = computeLayout(makeSpec({
+      type: "flowchart",
+      direction: "TB",
+      nodes: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B", override: { x: 0.5, y: 0.5 } },
+        { id: "c", label: "C" },
+      ],
+      edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }],
+    }));
+    const baseMap = new Map(base.map((p) => [p.nodeId, p]));
+    const ovMap = new Map(withOv.map((p) => [p.nodeId, p]));
+    for (const id of ["a", "c"]) {
+      expect(ovMap.get(id)).toEqual(baseMap.get(id));
+    }
+    expect(ovMap.get("b")!.x).toBe(0.5);
+  });
+
+  it("honors overrides on the swimlane path too", () => {
+    const spec = makeSpec({
+      type: "flowchart",
+      direction: "LR",
+      nodes: [
+        { id: "a", label: "A", lane: "l1", override: { x: 7.7, y: 1.1 } },
+        { id: "b", label: "B", lane: "l2" },
+      ],
+      edges: [{ from: "a", to: "b" }],
+      lanes: [{ id: "l1", label: "L1" }, { id: "l2", label: "L2" }],
+    });
+    const a = computeLayoutWithLanes(spec).positions.find((p) => p.nodeId === "a")!;
+    expect(a.x).toBe(7.7);
+    expect(a.y).toBe(1.1);
+  });
+});
+
 describe("computeLayoutWithLanes", () => {
   it("returns lane info alongside positions", () => {
     const { positions, laneInfos } = computeLayoutWithLanes(SWIMLANE_FLOW);

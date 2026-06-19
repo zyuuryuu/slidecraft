@@ -1485,25 +1485,53 @@ export function computeGroupBboxes(
 
 // ── Main Entry Point ──
 
+/**
+ * Apply manual per-node position/size overrides (inches) onto the computed
+ * layout. Nodes without an override are left exactly as auto-computed, so
+ * Python coordinate parity (R5) and the golden output are unaffected.
+ */
+function applyNodeOverrides(
+  positions: NodePosition[],
+  spec: DiagramSpec,
+): NodePosition[] {
+  const overrides = new Map(
+    spec.nodes.filter((n) => n.override).map((n) => [n.id, n.override!]),
+  );
+  if (overrides.size === 0) return positions;
+  return positions.map((p) => {
+    const o = overrides.get(p.nodeId);
+    if (!o) return p;
+    return {
+      ...p,
+      x: o.x ?? p.x,
+      y: o.y ?? p.y,
+      w: o.w ?? p.w,
+      h: o.h ?? p.h,
+    };
+  });
+}
+
 export function computeLayout(
   spec: DiagramSpec,
   contentTop: number = 0.8,
 ): NodePosition[] {
+  let positions: NodePosition[];
   if (spec.lanes.length > 0) {
-    const { positions } = computeLayoutSwimlane(spec, contentTop);
-    return positions;
+    positions = computeLayoutSwimlane(spec, contentTop).positions;
+  } else if (spec.groups.length > 0) {
+    positions = computeLayoutV2(spec, contentTop);
+  } else {
+    positions = computeLayoutV1(spec, contentTop);
   }
-  if (spec.groups.length > 0) {
-    return computeLayoutV2(spec, contentTop);
-  }
-  return computeLayoutV1(spec, contentTop);
+  return applyNodeOverrides(positions, spec);
 }
 
 export function computeLayoutWithLanes(
   spec: DiagramSpec,
   contentTop: number = 0.8,
 ): { positions: NodePosition[]; laneInfos: LaneInfo[] } {
-  return computeLayoutSwimlane(spec, contentTop);
+  const { positions, laneInfos } = computeLayoutSwimlane(spec, contentTop);
+  return { positions: applyNodeOverrides(positions, spec), laneInfos };
 }
 
 // ── Utility Functions ──

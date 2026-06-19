@@ -73,6 +73,19 @@ export const LaneSchema = z.object({
 });
 export type Lane = z.infer<typeof LaneSchema>;
 
+/**
+ * Manual position/size override (inches, absolute slide coords). When present,
+ * layout-engine uses these instead of the auto-computed value for that field.
+ * Written by drag/resize in the preview; all sub-fields optional.
+ */
+export const NodeOverrideSchema = z.object({
+  x: z.number().optional(),
+  y: z.number().optional(),
+  w: z.number().optional(),
+  h: z.number().optional(),
+});
+export type NodeOverride = z.infer<typeof NodeOverrideSchema>;
+
 export const NodeSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -83,6 +96,7 @@ export const NodeSchema = z.object({
   group: z.string().optional(),
   lane: z.string().optional(),
   icon: z.string().optional(),
+  override: NodeOverrideSchema.optional(),
 });
 export type Node = z.infer<typeof NodeSchema>;
 
