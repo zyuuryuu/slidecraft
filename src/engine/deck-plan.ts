@@ -275,12 +275,15 @@ Each Slide is exactly one of:
 Rules:
 - Write in the SAME language as the user's request.
 - Typically 6-10 slides. Start with a "title" slide and end with a "closing" slide.
-- Keep each bullet short — one idea, not a paragraph.
+- Each bullet is a SHORT key phrase, not a full sentence: aim for ≤ ~20 full-width
+  characters (~6-8 words). Drop filler words and any trailing "。"/".". 3-5 bullets per slide.
+  Bad: "情報共有の遅れによるプロジェクトの遅延が発生しています。"  Good: "情報共有の遅れ→遅延"
+- Headings/labels stay short too (a few words), so they fit the placeholder.
 - Use "columns" for comparisons or two/three-sided content.
 - "section" is JUST a divider (title only, no body). Only use it to separate major
   parts. If a topic has actual content, use "content" with bullets — never an empty "section".
-- The "closing" title must be a complete takeaway SENTENCE (the key message), not a
-  single word like "Summary"/"まとめ".${today ? `\n- Use ${today} (or a future date) for any "date" field — never a past year.` : ""}
+- The "closing" title is a CONCISE takeaway in ONE short line (not a single word like
+  "Summary"/"まとめ", and not a long sentence that overflows).${today ? `\n- Use ${today} (or a future date) for any "date" field — never a past year.` : ""}
 - Do NOT add any field not listed above, and do NOT invent other "kind" values.
 - Output valid JSON only.`;
 }
@@ -301,7 +304,7 @@ You are given the current slide and an instruction. Apply ONLY what the instruct
 
 Rules:
 - Write in the SAME language as the slide / instruction.
-- Keep each bullet short — one idea, not a paragraph.
+- Each bullet is a SHORT key phrase (≤ ~20 full-width chars), not a full sentence; no trailing "。"/".".
 - Do NOT add fields not listed above, and do NOT invent other "kind" values.
 - Output valid JSON only (a single object).`;
 }
