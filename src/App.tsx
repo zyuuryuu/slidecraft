@@ -3,6 +3,7 @@ import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
 import SlideEditor from "./components/SlideEditor";
+import ResizableSplit from "./components/ResizableSplit";
 import Toolbar from "./components/Toolbar";
 import StatusBar from "./components/StatusBar";
 import { parseMd } from "./engine/md-parser";
@@ -460,36 +461,41 @@ export default function App() {
 
       {/* ── Markdown editor + live preview ── */}
       {subMode === "import" && (
-        <div className="flex-1 flex min-h-0">
-          <div className="w-1/2 border-r border-[#2D3A6E] flex flex-col min-h-0">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              Markdown Editor
-            </div>
-            <div className="flex-1 min-h-0">
-              <Editor
-                value={mdText}
-                onChange={handleEditorChange}
-                language="markdown"
-                onCursorLine={handleCursorLine}
-                gotoLine={gotoLine}
-              />
-            </div>
-          </div>
-          <div className="w-1/2 flex flex-col min-h-0 bg-[#0f1117]">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              Slide Preview
-            </div>
-            <div className="flex-1 min-h-0">
-              <SlidePreview
-                deck={deck}
-                template={templateData}
-                error={parseError}
-                activeSlide={activeSlide}
-                onSlideClick={handleSlideClick}
-              />
-            </div>
-          </div>
-        </div>
+        <ResizableSplit
+          storageKey="slidecraft_split_import"
+          left={
+            <>
+              <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+                Markdown Editor
+              </div>
+              <div className="flex-1 min-h-0">
+                <Editor
+                  value={mdText}
+                  onChange={handleEditorChange}
+                  language="markdown"
+                  onCursorLine={handleCursorLine}
+                  gotoLine={gotoLine}
+                />
+              </div>
+            </>
+          }
+          right={
+            <>
+              <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+                Slide Preview
+              </div>
+              <div className="flex-1 min-h-0 bg-[#0f1117]">
+                <SlidePreview
+                  deck={deck}
+                  template={templateData}
+                  error={parseError}
+                  activeSlide={activeSlide}
+                  onSlideClick={handleSlideClick}
+                />
+              </div>
+            </>
+          }
+        />
       )}
 
       {/* ── Markdown Edit mode (3-pane) ── */}
@@ -510,41 +516,47 @@ export default function App() {
             </div>
           </div>
 
-          {/* Center: Slide editor */}
-          <div className="flex-1 border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0f1117]">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              Slide Editor — {currentLayoutName || "No slide"}
-            </div>
-            <div className="flex-1 min-h-0">
-              {currentSlide ? (
-                <SlideEditor
-                  slide={currentSlide}
-                  layout={currentLayout}
-                  onChange={(updated) => handleSlideUpdate(activeSlide, updated)}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-                  Select a slide
+          {/* Center+Right: Slide editor | preview (draggable divider) */}
+          <ResizableSplit
+            storageKey="slidecraft_split_edit"
+            initialLeftPct={55}
+            left={
+              <>
+                <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+                  Slide Editor — {currentLayoutName || "No slide"}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Single slide preview */}
-          <div className="w-[45%] flex flex-col min-h-0 bg-[#0f1117]">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-              Preview — Slide {activeSlide + 1}
-            </div>
-            <div className="flex-1 min-h-0">
-              <SlidePreview
-                deck={deck}
-                template={templateData}
-                error={parseError}
-                activeSlide={activeSlide}
-                singleSlide
-              />
-            </div>
-          </div>
+                <div className="flex-1 min-h-0 bg-[#0f1117]">
+                  {currentSlide ? (
+                    <SlideEditor
+                      slide={currentSlide}
+                      layout={currentLayout}
+                      onChange={(updated) => handleSlideUpdate(activeSlide, updated)}
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                      Select a slide
+                    </div>
+                  )}
+                </div>
+              </>
+            }
+            right={
+              <>
+                <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+                  Preview — Slide {activeSlide + 1}
+                </div>
+                <div className="flex-1 min-h-0 bg-[#0f1117]">
+                  <SlidePreview
+                    deck={deck}
+                    template={templateData}
+                    error={parseError}
+                    activeSlide={activeSlide}
+                    singleSlide
+                  />
+                </div>
+              </>
+            }
+          />
         </div>
       )}
 
