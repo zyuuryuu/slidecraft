@@ -26,6 +26,8 @@ let mermaidIdCounter = 0;
 // Renders the DiagramSpec via the SAME engine as the exporter (svg-writer →
 // paintDiagram) and overlays the shapes (transparent, full-slide) exactly like
 // the export embeds them. No more divergent Mermaid layout for diagrams.
+type Override = { x?: number; y?: number; w?: number; h?: number };
+
 function DiagramSvgOverlay({
   diagramYaml,
   editable = false,
@@ -36,8 +38,11 @@ function DiagramSvgOverlay({
   onChange?: (yaml: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
-  const [draft, setDraft] = useState<{ id: string; x: number; y: number } | null>(null);
+  const moveRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
+  const resizeRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  const movedRef = useRef(false);
+  const [draft, setDraft] = useState<{ id: string; ov: Override } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const spec = useMemo(() => {
     try {
@@ -48,20 +53,27 @@ function DiagramSvgOverlay({
     }
   }, [diagramYaml]);
 
-  // While dragging, apply the draft override so the preview follows live.
-  const svg = useMemo(() => {
-    if (!spec) return "";
-    const s = draft
-      ? {
-          ...spec,
-          nodes: spec.nodes.map((n) =>
-            n.id === draft.id ? { ...n, override: { ...n.override, x: draft.x, y: draft.y } } : n,
-          ),
-        }
-      : spec;
-    // Embedded in a titled slide → omit the diagram's own title (matches export).
-    return renderDiagramToSvg(s, { transparent: true, omitTitle: true });
+  // Spec with the live draft override applied (preview follows the drag).
+  const draftSpec = useMemo(() => {
+    if (!spec) return null;
+    if (!draft) return spec;
+    return {
+      ...spec,
+      nodes: spec.nodes.map((n) =>
+        n.id === draft.id ? { ...n, override: { ...n.override, ...draft.ov } } : n,
+      ),
+    };
   }, [spec, draft]);
+
+  const svg = useMemo(
+    () => (draftSpec ? renderDiagramToSvg(draftSpec, { transparent: true, omitTitle: true }) : ""),
+    [draftSpec],
+  );
+
+  // Live positions (incl. draft) used to place selection handles.
+  const positions = useMemo(() => (draftSpec ? computeLayout(draftSpec) : []), [draftSpec]);
+  const selectedPos = selected ? positions.find((p) => p.nodeId === selected) : undefined;
+  const selectedHasOverride = !!selected && !!spec?.nodes.find((n) => n.id === selected)?.override;
 
   function toInches(e: React.PointerEvent) {
     const r = ref.current!.getBoundingClientRect();
@@ -71,46 +83,95 @@ function DiagramSvgOverlay({
     };
   }
 
-  function onPointerDown(e: React.PointerEvent) {
-    if (!spec) return;
-    const c = toInches(e);
-    // Topmost node under the cursor (positions are drawn in order; reverse).
-    const hit = [...computeLayout(spec)]
-      .reverse()
-      .find((p) => c.x >= p.x && c.x <= p.x + p.w && c.y >= p.y && c.y <= p.y + p.h);
-    if (!hit) return;
-    dragRef.current = { id: hit.nodeId, offX: c.x - hit.x, offY: c.y - hit.y };
-    setDraft({ id: hit.nodeId, x: hit.x, y: hit.y });
-    ref.current!.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!dragRef.current) return;
-    const c = toInches(e);
-    setDraft({ id: dragRef.current.id, x: c.x - dragRef.current.offX, y: c.y - dragRef.current.offY });
-  }
-
-  function onPointerUp() {
-    const d = dragRef.current;
-    const cur = draft;
-    dragRef.current = null;
-    setDraft(null);
-    if (!d || !cur || !onChange) return;
+  function writeOverride(id: string, ov: Override) {
     try {
-      // Write into the raw YAML object (no schema defaults injected) to keep it tidy.
       const raw = yaml.load(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
-      const node = raw.nodes?.find((n) => n.id === d.id);
+      const node = raw.nodes?.find((n) => n.id === id);
       if (!node) return;
       const round = (v: number) => Math.round(v * 100) / 100;
-      node.override = { ...(node.override as object), x: round(cur.x), y: round(cur.y) };
-      onChange(yaml.dump(raw, { lineWidth: 1000 }));
+      const next: Record<string, number> = { ...(node.override as Record<string, number>) };
+      (["x", "y", "w", "h"] as const).forEach((k) => {
+        if (ov[k] !== undefined) next[k] = round(ov[k]!);
+      });
+      node.override = next;
+      onChange?.(yaml.dump(raw, { lineWidth: 1000 }));
     } catch {
       /* ignore malformed YAML */
     }
   }
 
+  function clearOverride(id: string) {
+    try {
+      const raw = yaml.load(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
+      const node = raw.nodes?.find((n) => n.id === id);
+      if (!node) return;
+      delete node.override;
+      onChange?.(yaml.dump(raw, { lineWidth: 1000 }));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (!spec) return;
+    const c = toInches(e);
+    const hit = [...computeLayout(spec)]
+      .reverse()
+      .find((p) => c.x >= p.x && c.x <= p.x + p.w && c.y >= p.y && c.y <= p.y + p.h);
+    if (!hit) {
+      setSelected(null);
+      return;
+    }
+    setSelected(hit.nodeId);
+    moveRef.current = { id: hit.nodeId, offX: c.x - hit.x, offY: c.y - hit.y };
+    movedRef.current = false;
+    ref.current!.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  function onResizeDown(e: React.PointerEvent) {
+    if (!selectedPos) return;
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = { id: selectedPos.nodeId, x: selectedPos.x, y: selectedPos.y };
+    movedRef.current = false;
+    ref.current!.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    const c = toInches(e);
+    if (resizeRef.current) {
+      movedRef.current = true;
+      const r = resizeRef.current;
+      setDraft({ id: r.id, ov: { w: Math.max(0.3, c.x - r.x), h: Math.max(0.2, c.y - r.y) } });
+    } else if (moveRef.current) {
+      movedRef.current = true;
+      const m = moveRef.current;
+      setDraft({ id: m.id, ov: { x: c.x - m.offX, y: c.y - m.offY } });
+    }
+  }
+
+  function onPointerUp() {
+    const id = resizeRef.current?.id ?? moveRef.current?.id;
+    const cur = draft;
+    resizeRef.current = null;
+    moveRef.current = null;
+    setDraft(null);
+    if (movedRef.current && id && cur) writeOverride(id, cur.ov);
+  }
+
   if (!svg) return null;
+
+  // Selection box / handle geometry in % of the slide.
+  const pct = selectedPos
+    ? {
+        left: (selectedPos.x / DIAGRAM_W) * 100,
+        top: (selectedPos.y / DIAGRAM_H) * 100,
+        width: (selectedPos.w / DIAGRAM_W) * 100,
+        height: (selectedPos.h / DIAGRAM_H) * 100,
+      }
+    : null;
+
   return (
     <div
       ref={ref}
@@ -121,11 +182,74 @@ function DiagramSvgOverlay({
         position: "absolute",
         inset: 0,
         pointerEvents: editable ? "auto" : "none",
-        cursor: editable ? (draft ? "grabbing" : "grab") : "default",
+        cursor: editable ? (draft ? "grabbing" : "default") : "default",
         touchAction: "none",
       }}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    >
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: svg }} />
+
+      {editable && pct && (
+        <>
+          {/* selection outline */}
+          <div
+            style={{
+              position: "absolute",
+              left: `${pct.left}%`,
+              top: `${pct.top}%`,
+              width: `${pct.width}%`,
+              height: `${pct.height}%`,
+              border: "1.5px solid #3B82F6",
+              boxSizing: "border-box",
+              pointerEvents: "none",
+            }}
+          />
+          {/* bottom-right resize handle */}
+          <div
+            onPointerDown={onResizeDown}
+            title="ドラッグでリサイズ"
+            style={{
+              position: "absolute",
+              left: `${pct.left + pct.width}%`,
+              top: `${pct.top + pct.height}%`,
+              width: 11,
+              height: 11,
+              transform: "translate(-50%, -50%)",
+              background: "#3B82F6",
+              border: "1.5px solid #fff",
+              borderRadius: 2,
+              cursor: "nwse-resize",
+              pointerEvents: "auto",
+            }}
+          />
+          {/* reset-to-auto chip (only when the node has an override) */}
+          {selectedHasOverride && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => clearOverride(selected!)}
+              title="自動配置に戻す"
+              style={{
+                position: "absolute",
+                left: `${pct.left + pct.width}%`,
+                top: `${pct.top}%`,
+                transform: "translate(4px, -100%)",
+                fontSize: 10,
+                lineHeight: "14px",
+                padding: "1px 5px",
+                background: "#1E2761",
+                color: "#93C5FD",
+                border: "1px solid #3B82F6",
+                borderRadius: 3,
+                cursor: "pointer",
+                pointerEvents: "auto",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ⟲ auto
+            </button>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
