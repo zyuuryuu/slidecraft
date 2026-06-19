@@ -15,6 +15,7 @@ import { MERMAID_CONFIG } from "./mermaid";
 import { renderDiagramToSvg } from "../engine/svg-writer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { computeLayout, SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H } from "../engine/layout-engine";
+import { fitTransform } from "../engine/draw-target";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -67,12 +68,31 @@ function DiagramSvgOverlay({
     };
   }, [spec, draft]);
 
+  // Region→pixels transform, computed from the COMMITTED spec so it stays fixed
+  // while a node is dragged (no rescale jank). Identity when there's no region.
+  const baseTf = useMemo(() => {
+    if (!region || !spec) return { scale: 1, offsetX: 0, offsetY: 0 };
+    const ps = computeLayout(spec);
+    if (ps.length === 0) return { scale: 1, offsetX: 0, offsetY: 0 };
+    const bbox = {
+      minX: Math.min(...ps.map((p) => p.x)),
+      minY: Math.min(...ps.map((p) => p.y)),
+      maxX: Math.max(...ps.map((p) => p.x + p.w)),
+      maxY: Math.max(...ps.map((p) => p.y + p.h)),
+    };
+    return fitTransform(bbox, region);
+  }, [spec, region]);
+
   const svg = useMemo(
     () =>
       draftSpec
-        ? renderDiagramToSvg(draftSpec, { transparent: true, omitTitle: true, region })
+        ? renderDiagramToSvg(draftSpec, {
+            transparent: true,
+            omitTitle: true,
+            transform: region ? baseTf : undefined,
+          })
         : "",
-    [draftSpec, region],
+    [draftSpec, region, baseTf],
   );
 
   // Live positions (incl. draft) used to place selection handles.
@@ -80,12 +100,13 @@ function DiagramSvgOverlay({
   const selectedPos = selected ? positions.find((p) => p.nodeId === selected) : undefined;
   const selectedHasOverride = !!selected && !!spec?.nodes.find((n) => n.id === selected)?.override;
 
+  // Cursor → diagram LAYOUT inches (inverse of the region transform), so drag math
+  // and overrides stay in the diagram's own coordinate space (region or full-slide).
   function toInches(e: React.PointerEvent) {
     const r = ref.current!.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) / r.width) * DIAGRAM_W,
-      y: ((e.clientY - r.top) / r.height) * DIAGRAM_H,
-    };
+    const sx = ((e.clientX - r.left) / r.width) * DIAGRAM_W;
+    const sy = ((e.clientY - r.top) / r.height) * DIAGRAM_H;
+    return { x: (sx - baseTf.offsetX) / baseTf.scale, y: (sy - baseTf.offsetY) / baseTf.scale };
   }
 
   function writeOverride(id: string, ov: Override) {
@@ -168,12 +189,13 @@ function DiagramSvgOverlay({
   if (!svg) return null;
 
   // Selection box / handle geometry in % of the slide.
+  // Handles sit on the RENDERED node box (layout → region via the transform).
   const pct = selectedPos
     ? {
-        left: (selectedPos.x / DIAGRAM_W) * 100,
-        top: (selectedPos.y / DIAGRAM_H) * 100,
-        width: (selectedPos.w / DIAGRAM_W) * 100,
-        height: (selectedPos.h / DIAGRAM_H) * 100,
+        left: ((selectedPos.x * baseTf.scale + baseTf.offsetX) / DIAGRAM_W) * 100,
+        top: ((selectedPos.y * baseTf.scale + baseTf.offsetY) / DIAGRAM_H) * 100,
+        width: ((selectedPos.w * baseTf.scale) / DIAGRAM_W) * 100,
+        height: ((selectedPos.h * baseTf.scale) / DIAGRAM_H) * 100,
       }
     : null;
 
@@ -390,16 +412,16 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         // Diagram: full-slide transparent SVG overlay (matches how the export
         // embeds diagram shapes at absolute slide coordinates).
         if (isDiagramPh) {
-          // Solo diagram (idx 1) = full-slide + drag-editable; beside-text
-          // diagram (idx 2) is confined to its placeholder box (drag disabled,
-          // since hit-testing is full-slide — edit via the YAML editor instead).
+          // Solo diagram (idx 1) = full-slide; beside-text diagram (idx 2) is
+          // confined to its placeholder box. Both are drag-editable (the overlay
+          // inverse-maps the region transform for hit-testing).
           const isSolo = slide.diagram!.placeholderIdx === "1";
           return (
             <DiagramSvgOverlay
               key={`diagram-${ph.idx}`}
               diagramYaml={slide.diagram!.yaml}
               region={isSolo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
-              editable={isSolo && !!onDiagramChange}
+              editable={!!onDiagramChange}
               onChange={onDiagramChange}
             />
           );

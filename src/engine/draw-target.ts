@@ -76,6 +76,12 @@ export interface PaintOptions {
    * taking the full slide. Omit for the full-slide default.
    */
   region?: Box;
+  /**
+   * Explicit scale+offset, used instead of fitting to `region`. The preview
+   * passes a FIXED transform while dragging a node in a region diagram, so the
+   * whole diagram doesn't rescale as the dragged node's bbox changes.
+   */
+  transform?: { scale: number; offsetX: number; offsetY: number };
 }
 
 /**

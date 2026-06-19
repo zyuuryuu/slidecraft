@@ -95,8 +95,12 @@ export function paintDiagram(
 
   // Confine to a region (diagram-beside-text): scale+translate every draw call.
   // Title/background were already drawn (or omitted) on the untransformed target.
+  // An explicit `transform` wins over `region` (fixed transform while dragging).
   let dt: DrawTarget = t;
-  if (options.region && positions.length > 0) {
+  if (options.transform) {
+    const { scale, offsetX, offsetY } = options.transform;
+    dt = new TransformedTarget(t, scale, offsetX, offsetY);
+  } else if (options.region && positions.length > 0) {
     const bbox = {
       minX: Math.min(...positions.map((p) => p.x)),
       minY: Math.min(...positions.map((p) => p.y)),
