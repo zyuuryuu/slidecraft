@@ -3,7 +3,50 @@ import {
   mermaidToDiagramSpec,
   diagramSpecToMermaid,
   diagramSpecToYaml,
+  validateDiagramSource,
 } from "../src/engine/mermaid-to-diagram";
+
+describe("validateDiagramSource", () => {
+  const validYaml = `type: flowchart
+nodes:
+  - id: a
+    label: A
+  - id: b
+    label: B
+edges:
+  - from: a
+    to: b`;
+
+  it("returns null for a valid YAML diagram", () => {
+    expect(validateDiagramSource(validYaml, "yaml")).toBeNull();
+  });
+
+  it("returns null for mermaid and empty input (no precise check)", () => {
+    expect(validateDiagramSource("graph TD\n A-->B", "mermaid")).toBeNull();
+    expect(validateDiagramSource("   ", "yaml")).toBeNull();
+  });
+
+  it("reports a YAML parse error with a message", () => {
+    const err = validateDiagramSource("type: [unclosed", "yaml");
+    expect(err).toMatch(/Parse error/i);
+  });
+
+  it("reports an edge that references a missing node", () => {
+    const bad = `type: flowchart
+nodes:
+  - id: a
+    label: A
+edges:
+  - from: a
+    to: ghost`;
+    expect(validateDiagramSource(bad, "yaml")).toMatch(/unknown node|ghost/i);
+  });
+
+  it("validates JSON input too", () => {
+    expect(validateDiagramSource('{"type":"flowchart","nodes":[{"id":"a","label":"A"}]}', "json")).toBeNull();
+    expect(validateDiagramSource("{ not json }", "json")).toMatch(/Parse error/i);
+  });
+});
 
 describe("mermaidToDiagramSpec", () => {
   it("parses simple TD graph", () => {

@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 import yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
-import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
+import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 
@@ -313,6 +313,7 @@ function DiagramEditor({
     : mode === "json"
       ? "JSON (→ PptxGenJS shapes)"
       : "YAML (→ PptxGenJS shapes)";
+  const validationError = validateDiagramSource(textValue, mode);
 
   return (
     <div>
@@ -340,9 +341,18 @@ function DiagramEditor({
         value={textValue}
         onChange={(e) => handleTextChange(e.target.value)}
         rows={12}
-        className={`w-full px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm ${colorClass} font-mono resize-y`}
+        className={`w-full px-2 py-1.5 bg-[#1a1f3a] border rounded text-sm ${colorClass} font-mono resize-y ${
+          validationError ? "border-[#C0504D]" : "border-[#2D3A6E]"
+        }`}
         placeholder={mode === "mermaid" ? "graph TD\n  A[Start] --> B[End]" : "type: flowchart\nnodes:\n  - id: a\n    label: A"}
       />
+      {validationError ? (
+        <div className="mt-1 text-[10px] text-[#F87171] font-mono break-words">
+          {validationError}
+        </div>
+      ) : textValue.trim() && mode !== "mermaid" ? (
+        <div className="mt-1 text-[10px] text-[#06B6D4]">✓ valid</div>
+      ) : null}
     </div>
   );
 }

@@ -5,7 +5,43 @@
  * Limitations: subgraphs, styling, click handlers not supported.
  */
 
-import { DiagramSpecSchema, type DiagramSpec } from "./schema";
+import yaml from "js-yaml";
+import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
+
+export type DiagramFormat = "yaml" | "json" | "mermaid";
+
+/**
+ * Validate diagram source text and return a human-readable error, or null if
+ * it's valid (or a format we don't statically check, like mermaid). Lets the
+ * editor show *why* a diagram failed instead of silently rendering nothing.
+ */
+export function validateDiagramSource(text: string, format: DiagramFormat): string | null {
+  if (format === "mermaid" || !text.trim()) return null;
+
+  let data: unknown;
+  try {
+    data = format === "json" ? JSON.parse(text) : yaml.load(text);
+  } catch (e) {
+    return `Parse error: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  const result = DiagramSpecSchema.safeParse(data);
+  if (!result.success) {
+    return (
+      "Invalid spec — " +
+      result.error.issues
+        .slice(0, 3)
+        .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+        .join("; ")
+    );
+  }
+
+  const errors = validateDiagramSpec(result.data);
+  if (errors.length > 0) {
+    return errors.slice(0, 3).map((e) => e.message).join("; ");
+  }
+  return null;
+}
 
 interface ParsedNode {
   id: string;
