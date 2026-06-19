@@ -5,98 +5,43 @@
  * shapes extracted from the template PPTX, ensuring preview matches output.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import yaml from "js-yaml";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { MERMAID_CONFIG } from "./mermaid";
+import { renderDiagramToSvg } from "../engine/svg-writer";
+import { DiagramSpecSchema } from "../engine/schema";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
 
-// ── Diagram YAML → Mermaid syntax (simplified) ──
-const MERMAID_RESERVED = new Set(["end", "graph", "subgraph", "direction", "click", "style", "classDef", "class"]);
-function safeId(id: string): string {
-  return MERMAID_RESERVED.has(id.toLowerCase()) ? `_${id}` : id;
-}
-
-function diagramYamlToMermaid(diagramYaml: string): string | null {
-  try {
-    const spec = yaml.load(diagramYaml) as Record<string, unknown>;
-    if (!spec || typeof spec !== "object") return null;
-    const dir = spec.direction === "LR" || spec.direction === "RL" ? "LR" : "TD";
-    let mmd = `graph ${dir}\n`;
-    const nodes = (spec.nodes as Array<Record<string, string>>) || [];
-    for (const node of nodes) {
-      const label = (node.label || node.id).replace(/"/g, "'");
-      mmd += `  ${safeId(node.id)}["${label}"]\n`;
-    }
-    const edges = (spec.edges as Array<Record<string, string>>) || [];
-    for (const edge of edges) {
-      const label = edge.label ? `|${edge.label}|` : "";
-      mmd += `  ${safeId(edge.from)} -->${label} ${safeId(edge.to)}\n`;
-    }
-    return mmd;
-  } catch {
-    return null;
-  }
-}
-
 // ── Global counter for unique Mermaid render IDs ──
 let mermaidIdCounter = 0;
 
-// ── Inline Mermaid SVG renderer ──
-function MermaidDiagram({ diagramYaml, width, height, instanceId }: { diagramYaml: string; width: string; height: string; instanceId?: string }) {
-  const [svg, setSvg] = useState("");
-  const cancelRef = useRef(false);
+// ── Diagram (```diagram) renderer — shares the PPTX painter for true WYSIWYG ──
+// Renders the DiagramSpec via the SAME engine as the exporter (svg-writer →
+// paintDiagram) and overlays the shapes (transparent, full-slide) exactly like
+// the export embeds them. No more divergent Mermaid layout for diagrams.
+function DiagramSvgOverlay({ diagramYaml }: { diagramYaml: string }) {
+  const svg = useMemo(() => {
+    try {
+      const data = yaml.load(diagramYaml);
+      const parsed = DiagramSpecSchema.safeParse(data);
+      if (!parsed.success) return "";
+      return renderDiagramToSvg(parsed.data, { transparent: true });
+    } catch {
+      return "";
+    }
+  }, [diagramYaml]);
 
-  useEffect(() => {
-    cancelRef.current = false;
-    const mmd = diagramYamlToMermaid(diagramYaml);
-    if (!mmd) { setSvg(""); return; }
-    // Re-assert the shared config before each render: mermaid is a global
-    // singleton, so the diagram-mode preview must not leave it in another state.
-    mermaid.initialize(MERMAID_CONFIG);
-    const id = instanceId ? `mmd-${instanceId}-${++mermaidIdCounter}` : `mmd-slide-${++mermaidIdCounter}`;
-    mermaid.render(id, mmd).then(({ svg: rendered }) => {
-      if (!cancelRef.current) setSvg(rendered);
-    }).catch(() => {
-      if (!cancelRef.current) setSvg("");
-    });
-    return () => { cancelRef.current = true; };
-  }, [diagramYaml, instanceId]);
-
-  // Extract width/height from SVG and set viewBox so it scales to fit any container
-  const fittedSvg = svg.replace(
-    /<svg([^>]*)>/,
-    (_match, attrs) => {
-      // Extract original dimensions
-      const wMatch = attrs.match(/width="([\d.]+)/);
-      const hMatch = attrs.match(/height="([\d.]+)/);
-      const origW = wMatch ? wMatch[1] : "400";
-      const origH = hMatch ? hMatch[1] : "300";
-      // Remove fixed width/height, add viewBox + preserveAspectRatio
-      const cleaned = attrs
-        .replace(/width="[^"]*"/g, "")
-        .replace(/height="[^"]*"/g, "")
-        .replace(/style="[^"]*"/g, "");
-      return `<svg${cleaned} viewBox="0 0 ${origW} ${origH}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;">`;
-    },
-  );
-
+  if (!svg) return null;
   return (
     <div
-      style={{
-        width,
-        height,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-      }}
-      dangerouslySetInnerHTML={{ __html: fittedSvg }}
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
 }
@@ -228,7 +173,14 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         const isDiagramPh = slide.diagram && ph.idx === slide.diagram.placeholderIdx;
         const isMermaidPh = slide.mermaidBlock && ph.idx === slide.mermaidBlock.placeholderIdx;
 
-        if (isDiagramPh || isMermaidPh) {
+        // Diagram: full-slide transparent SVG overlay (matches how the export
+        // embeds diagram shapes at absolute slide coordinates).
+        if (isDiagramPh) {
+          return <DiagramSvgOverlay key={`diagram-${ph.idx}`} diagramYaml={slide.diagram!.yaml} />;
+        }
+
+        // Mermaid (```mermaid): an image confined to the placeholder box.
+        if (isMermaidPh) {
           return (
             <div
               key={`visual-${ph.idx}`}
@@ -241,21 +193,12 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
                 overflow: "hidden",
               }}
             >
-              {isDiagramPh ? (
-                <MermaidDiagram
-                  diagramYaml={slide.diagram!.yaml}
-                  width="100%"
-                  height="100%"
-                  instanceId={`slide-${slideIndex}-${scale}`}
-                />
-              ) : (
-                <MermaidDirect
-                  mermaidSyntax={slide.mermaidBlock!.mermaid}
-                  width="100%"
-                  height="100%"
-                  instanceId={`mmd-${slideIndex}-${scale}`}
-                />
-              )}
+              <MermaidDirect
+                mermaidSyntax={slide.mermaidBlock!.mermaid}
+                width="100%"
+                height="100%"
+                instanceId={`mmd-${slideIndex}-${scale}`}
+              />
             </div>
           );
         }
