@@ -9,7 +9,7 @@
 import { generateWithClaude } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
 import { deckPlanSystemPrompt, slidePlanSystemPrompt } from "../engine/deck-plan";
-import { diagramSystemPrompt } from "../engine/llm-prompts";
+import { diagramSystemPrompt, diagramEditSystemPrompt } from "../engine/llm-prompts";
 
 export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "custom";
 
@@ -41,7 +41,7 @@ export interface AiRequest {
   apiKey: string;
   baseURL: string;
   model: string;
-  mode: "slides" | "slide" | "diagram";
+  mode: "slides" | "slide" | "diagram" | "diagram-edit";
   userRequest: string;
   onText?: (fullText: string) => void;
   signal?: AbortSignal;
@@ -50,13 +50,15 @@ export interface AiRequest {
 export function generateWithAI(req: AiRequest): Promise<string> {
   // Slides go through the DeckPlan harness (small constrained JSON the engine
   // turns into correct layouts); "slide" edits one slide (token-cheap);
-  // diagrams use the DiagramSpec prompt.
+  // "diagram" generates / "diagram-edit" revises a DiagramSpec.
   const system =
     req.mode === "slides"
       ? deckPlanSystemPrompt()
       : req.mode === "slide"
         ? slidePlanSystemPrompt()
-        : diagramSystemPrompt();
+        : req.mode === "diagram-edit"
+          ? diagramEditSystemPrompt()
+          : diagramSystemPrompt();
 
   if (req.provider === "claude") {
     return generateWithClaude({

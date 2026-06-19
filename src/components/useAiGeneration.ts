@@ -8,6 +8,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { extractDeckPlan, deckPlanToDeck, extractSlidePlan, slidePlanToSlide } from "../engine/deck-plan";
 import { serializeMd } from "../engine/md-serializer";
+import { DiagramSpecSchema } from "../engine/schema";
+import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import { generateWithAI, PROVIDERS, providerPreset, type ProviderId } from "../ipc/ai";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
@@ -18,7 +20,7 @@ export interface AiProviderConfig {
   apiKey: string;
 }
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
-export type AiMode = "slides" | "slide" | "diagram";
+export type AiMode = "slides" | "slide" | "diagram" | "diagram-edit";
 
 function defaultConfigs(): AiConfigMap {
   const out = {} as AiConfigMap;
@@ -115,6 +117,20 @@ export function useAiGeneration() {
             setResult(serializeMd({ slides: [slidePlanToSlide(parsed.slide)] }));
           } else {
             setError(`Couldn't read the edited slide: ${parsed.error}`);
+          }
+        } else if (mode === "diagram-edit") {
+          // AI returns the updated DiagramSpec JSON → validate → back to YAML.
+          const m = raw.match(/\{[\s\S]*\}/);
+          if (!m) {
+            setError("Couldn't find a diagram in the response.");
+          } else {
+            try {
+              const parsed = DiagramSpecSchema.safeParse(JSON.parse(m[0]));
+              if (parsed.success) setResult(diagramSpecToYaml(parsed.data));
+              else setError(`Invalid diagram: ${parsed.error.issues[0]?.message}`);
+            } catch (e) {
+              setError("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
+            }
           }
         }
       } catch (e) {

@@ -699,6 +699,8 @@ export default function App() {
               onClose={() => setShowAiPanel(false)}
               currentSlideMd={currentSlideMd}
               onApplySlide={handleApplySlide}
+              currentDiagramYaml={deck?.slides[activeSlide]?.diagram?.yaml}
+              onApplyDiagram={handleDiagramChange}
             />
           )}
         </div>

@@ -187,6 +187,16 @@ export function generateDiagramPrompt(userRequest: string): string {
   return `${diagramSystemPrompt()}\n\n## User Request\n\n${userRequest}`;
 }
 
+/** Edit an EXISTING diagram: same schema, but apply one change and keep the rest. */
+export function diagramEditSystemPrompt(): string {
+  return `${diagramSystemPrompt()}
+
+## Editing mode
+You are given the CURRENT diagram (as YAML) and an instruction. Apply ONLY what the
+instruction asks, keep everything else (ids, labels, styles, layout) intact, and
+return the FULL updated DiagramSpec as a single JSON object.`;
+}
+
 // ── Combined prompt (user can choose) ──
 
 export function generateCombinedPrompt(
