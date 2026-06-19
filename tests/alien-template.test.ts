@@ -69,6 +69,24 @@ describe("alien CC0 template flows through the harness", () => {
     expect(cat.find((e) => e.name === content)?.role).toBe("content");
   });
 
+  it("degrades an explicit layout name the alien template lacks (no crash)", () => {
+    // A deck pinned to canonical names must NOT crash on a different master —
+    // autoSelectLayout falls back through the catalog instead of returning the
+    // unmatched name (which findLayout would later reject).
+    const pinned = mk([ph("15", "T"), ph("1", "L"), ph("2", "R")]);
+    pinned.layout = "Column.2Body.Equal"; // not present in the alien template
+    const resolved = autoSelectLayout(pinned, 1, 5, cat);
+    expect(cat.some((e) => e.name === resolved)).toBe(true); // a REAL alien layout
+    expect(resolved).not.toBe("Column.2Body.Equal");
+  });
+
+  it("renders a deck pinned to canonical layout names on the alien template (no crash)", async () => {
+    const deck = parseMd("<!-- slide: Content.1Body.Single -->\n# 背景\n\n- A\n- B\n");
+    const buf = await generatePptx(deck, tpl);
+    const zip = await JSZip.loadAsync(buf);
+    expect(Object.keys(zip.files).some((f) => /ppt\/slides\/slide1\.xml$/.test(f))).toBe(true);
+  });
+
   it("generates a valid PPTX on the alien template (end-to-end, no crash)", async () => {
     const deck = parseMd("# 提案\n## 副題\n\n---\n\n# 背景\n\n- 要点A\n- 要点B\n\n---\n\n# まとめ\n");
     const buf = await generatePptx(deck, tpl);

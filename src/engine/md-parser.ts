@@ -94,6 +94,24 @@ function isTitleLayout(layout: string): boolean {
   return layout.startsWith("Title.") || layout.startsWith("Closing.");
 }
 
+/** First ```lang … ``` fenced block in a set of lines, or null. */
+function extractFencedBlock(lines: string[]): { lang: string; content: string } | null {
+  let start = -1;
+  let lang = "";
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (start === -1) {
+      if (t.startsWith("```")) {
+        start = i;
+        lang = t.slice(3).trim().toLowerCase();
+      }
+    } else if (t.startsWith("```")) {
+      return { lang, content: lines.slice(start + 1, i).join("\n") };
+    }
+  }
+  return null;
+}
+
 // ── Parse a single slide block ──
 
 function parseSlideBlock(
@@ -159,17 +177,28 @@ function parseSlideBlock(
     }
 
     sections.forEach((sectionLines, i) => {
-      const paras = linesToParagraphs(sectionLines);
-      if (paras.length > 0) {
-        placeholders.push({ idx: String(i + 1), paragraphs: paras });
+      const colIdx = String(i + 1);
+      const sl = trimBodyLines(sectionLines); // drop the blank lines around each column
+      // A column may be a FIGURE (a ```diagram / ```mermaid block) instead of text —
+      // bind it to THIS column's idx so the figure coexists beside the other columns.
+      const fig = extractFencedBlock(sl);
+      if (fig && (fig.lang === "diagram" || fig.lang === "mermaid-shapes")) {
+        diagram = { yaml: fig.content, placeholderIdx: colIdx };
+      } else if (fig && fig.lang === "mermaid") {
+        mermaidBlock = { mermaid: fig.content, placeholderIdx: colIdx };
+      } else {
+        const paras = linesToParagraphs(sl);
+        if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
       }
     });
 
-    if (placeholders.length === 0) return null;
+    if (placeholders.length === 0 && !diagram && !mermaidBlock) return null;
 
     return {
       layout,
       placeholders,
+      ...(diagram ? { diagram } : {}),
+      ...(mermaidBlock ? { mermaidBlock } : {}),
       sourceLineStart: startLine,
       sourceLineEnd: startLine + lines.length - 1,
     };
@@ -412,11 +441,19 @@ export function parseMd(md: string): DeckIR {
     ? md.split("\n").indexOf(allLines[0]) + 1
     : 1;
 
+  let inFence = false;
   for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i];
 
-    // --- as slide separator (but not the first line if it's part of front matter)
-    if (line.trim() === "---") {
+    // Track fenced code blocks so a "---" INSIDE a ```diagram/```mermaid block
+    // (a YAML document marker, or Mermaid frontmatter "---\ntitle:…\n---") is NOT
+    // mistaken for a slide separator — which would tear the figure in half.
+    if (line.trim().startsWith("```")) {
+      inFence = !inFence;
+    }
+
+    // --- as slide separator (only outside a fenced block)
+    if (!inFence && line.trim() === "---") {
       if (currentLines.length > 0) {
         slideBlocks.push({
           lines: currentLines,

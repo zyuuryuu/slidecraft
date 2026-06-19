@@ -11,6 +11,107 @@ import { parseMd } from "../src/engine/md-parser";
 import { autoSelectLayout } from "../src/engine/template-loader";
 import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
 
+describe("text + figure COEXISTENCE round-trips (stage ①)", () => {
+  const bullets = (txts: string[]) => txts.map((t) => ({ segments: [{ text: t }], bullet: true }));
+  const rt = (deck: DeckIR) => parseMd(serializeMd(deck)).slides[0];
+
+  it("bullets (col 1) + diagram (col 2) survive together", () => {
+    const back = rt({ slides: [{
+      layout: "Column.2Body.Equal",
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "構成" }] }] },
+        { idx: "1", paragraphs: bullets(["要点A", "要点B"]) },
+      ],
+      diagram: { yaml: "type: flowchart\nnodes:\n  - id: A\n    label: 入力\nedges: []", placeholderIdx: "2" },
+    }] });
+    expect(back.diagram?.placeholderIdx).toBe("2");
+    expect(back.diagram?.yaml).toContain("flowchart");
+    const body = back.placeholders.find((p) => p.idx === "1");
+    expect(body?.paragraphs).toHaveLength(2); // no spurious empty paragraph
+    expect(back.placeholders.find((p) => p.idx === "15")?.paragraphs[0].segments[0].text).toBe("構成");
+  });
+
+  it("diagram (col 1) + bullets (col 2) keep their columns", () => {
+    const back = rt({ slides: [{
+      layout: "Column.2Body.Equal",
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "T" }] }] },
+        { idx: "2", paragraphs: bullets(["右の説明"]) },
+      ],
+      diagram: { yaml: "type: flowchart\nnodes: []\nedges: []", placeholderIdx: "1" },
+    }] });
+    expect(back.diagram?.placeholderIdx).toBe("1");
+    expect(back.placeholders.find((p) => p.idx === "2")?.paragraphs[0].segments[0].text).toBe("右の説明");
+  });
+
+  it("mermaid coexists with bullets", () => {
+    const back = rt({ slides: [{
+      layout: "Column.2Body.Equal",
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "T" }] }] },
+        { idx: "1", paragraphs: bullets(["x"]) },
+      ],
+      mermaidBlock: { mermaid: "graph LR\n A-->B", placeholderIdx: "2" },
+    }] });
+    expect(back.mermaidBlock?.placeholderIdx).toBe("2");
+    expect(back.mermaidBlock?.mermaid).toContain("A-->B");
+    expect(back.placeholders.find((p) => p.idx === "1")?.paragraphs).toHaveLength(1);
+  });
+
+  it("a pure 2-column text slide still round-trips (no figure, no empty paragraphs)", () => {
+    const back = rt({ slides: [{
+      layout: "Column.2Body.Equal",
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "T" }] }] },
+        { idx: "1", paragraphs: bullets(["L"]) },
+        { idx: "2", paragraphs: bullets(["R"]) },
+      ],
+    }] });
+    expect(back.diagram).toBeUndefined();
+    expect(back.placeholders.find((p) => p.idx === "1")?.paragraphs).toHaveLength(1);
+    expect(back.placeholders.find((p) => p.idx === "2")?.paragraphs[0].segments[0].text).toBe("R");
+  });
+
+  it("a solo diagram (single body) still round-trips", () => {
+    const back = rt({ slides: [{
+      layout: "Content.1Body.Single",
+      placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "T" }] }] }],
+      diagram: { yaml: "type: flowchart\nnodes: []\nedges: []", placeholderIdx: "1" },
+    }] });
+    expect(back.diagram?.placeholderIdx).toBe("1");
+  });
+
+  it("a figure whose body contains a '---' line is NOT torn into extra slides", () => {
+    // YAML doc markers / Mermaid frontmatter contain '---'; the slide splitter must
+    // be fence-aware so it doesn't mistake them for a slide separator.
+    const deck = {
+      slides: [{
+        layout: "Content.1Body.Single",
+        placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "図" }] }] }],
+        diagram: { yaml: "type: flowchart\n---\nnodes:\n  - id: a\n    label: A\nedges: []", placeholderIdx: "1" },
+      }],
+    };
+    const out = parseMd(serializeMd(deck));
+    expect(out.slides).toHaveLength(1); // not split mid-fence
+    expect(out.slides[0].diagram?.yaml).toContain("---");
+    expect(out.slides[0].diagram?.yaml).toContain("nodes:");
+  });
+
+  it("a Mermaid block with '---title---' frontmatter round-trips intact", () => {
+    const deck = {
+      slides: [{
+        layout: "Content.1Body.Single",
+        placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "M" }] }] }],
+        mermaidBlock: { mermaid: "---\ntitle: My Graph\n---\ngraph TD\n A-->B", placeholderIdx: "1" },
+      }],
+    };
+    const out = parseMd(serializeMd(deck));
+    expect(out.slides).toHaveLength(1);
+    expect(out.slides[0].mermaidBlock?.mermaid).toContain("title: My Graph");
+    expect(out.slides[0].mermaidBlock?.mermaid).toContain("graph TD");
+  });
+});
+
 describe("single-slide serialization (per-slide editing / AI context)", () => {
   it("a lone content slide keeps content format when its resolved layout is set", () => {
     const deck = parseMd("# First\n\n---\n\n# 見出し\n> サブ\n\n- A\n- B\n");

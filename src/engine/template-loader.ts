@@ -298,9 +298,13 @@ export function autoSelectLayout(
   totalSlides: number,
   catalog?: LayoutCatalog,
 ): string {
-  // If explicitly specified, use it
+  // An explicit layout name is honored only if THIS template actually has it.
+  // A deck pinned to ANOTHER template's names (e.g. canonical names loaded onto a
+  // different master) degrades like "auto" below instead of crashing the renderer.
   if (slide.layout !== "auto") {
-    return slide.layout;
+    if (!catalog || catalog.some((e) => e.name === slide.layout)) {
+      return slide.layout;
+    }
   }
 
   const idxs = new Set(slide.placeholders.map((p) => p.idx));

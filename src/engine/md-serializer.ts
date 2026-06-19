@@ -137,15 +137,35 @@ function serializeSlide(
     const sepType = getSeparatorType(layout);
 
     if (sepType) {
-      // Multi-section: emit sections with separators
-      // Find all numbered placeholders (1, 2, 3, ...)
-      const sectionPhs = slide.placeholders
-        .filter((p) => /^\d+$/.test(p.idx) && parseInt(p.idx) >= 1 && parseInt(p.idx) <= 10)
-        .sort((a, b) => parseInt(a.idx) - parseInt(b.idx));
+      // Multi-section: each numbered region (column) becomes a section. A region may
+      // hold TEXT or a FIGURE (diagram/mermaid) — emit the figure's fenced block in
+      // its own column so text+figure COEXISTENCE round-trips (the figure sits beside
+      // the bullets instead of replacing them). Iterate 1..max so column positions
+      // (hence the figure's placeholderIdx) survive even with gaps/empties.
+      const diagIdx = slide.diagram ? parseInt(slide.diagram.placeholderIdx) : NaN;
+      const mermIdx = slide.mermaidBlock ? parseInt(slide.mermaidBlock.placeholderIdx) : NaN;
+      let maxCol = 0;
+      for (const p of slide.placeholders) {
+        const n = parseInt(p.idx);
+        if (/^\d+$/.test(p.idx) && n >= 1 && n <= 10) maxCol = Math.max(maxCol, n);
+      }
+      if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
+      if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
 
-      for (const ph of sectionPhs) {
+      for (let col = 1; col <= maxCol; col++) {
         lines.push(`<!-- ${sepType} -->`);
-        lines.push(serializeParagraphs(ph.paragraphs));
+        if (col === diagIdx) {
+          lines.push("```diagram");
+          lines.push(slide.diagram!.yaml);
+          lines.push("```");
+        } else if (col === mermIdx) {
+          lines.push("```mermaid");
+          lines.push(slide.mermaidBlock!.mermaid);
+          lines.push("```");
+        } else {
+          const ph = slide.placeholders.find((p) => p.idx === String(col));
+          if (ph) lines.push(serializeParagraphs(ph.paragraphs));
+        }
         lines.push("");
       }
     } else {
