@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useHistoryState, type HistoryMode } from "./components/useHistoryState";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -184,7 +185,16 @@ export default function App() {
   const [showLlmAssist, setShowLlmAssist] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [mdText, setMdText] = useState(SAMPLE_MD);
-  const [deck, setDeck] = useState<DeckIR | null>(null);
+  // Deck state with unified undo/redo (covers drag/resize, slide edits, AI edits).
+  const {
+    state: deck,
+    set: setDeck,
+    reset: resetDeck,
+    undo: undoDeck,
+    redo: redoDeck,
+    canUndo,
+    canRedo,
+  } = useHistoryState<DeckIR | null>(null);
   const [templateData, setTemplateData] = useState<TemplateData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -197,24 +207,25 @@ export default function App() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Markdown mode: parse MD ──
-  const parseMdText = useCallback((text: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      try {
-        if (!text.trim()) {
-          setDeck(null);
+  // mode controls undo history: "silent" = editor typing (text owns its undo),
+  // "reset" = brand-new deck (file/AI-deck import), "commit" = undoable load.
+  const parseMdText = useCallback(
+    (text: string, mode: HistoryMode | "reset" = "silent") => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        try {
+          const parsed = text.trim() ? parseMd(text) : null;
+          if (mode === "reset") resetDeck(parsed);
+          else setDeck(parsed, mode);
           setParseError(null);
-          return;
+        } catch (e) {
+          setParseError(e instanceof Error ? e.message : String(e));
+          setDeck(null, "silent");
         }
-        const parsed = parseMd(text);
-        setDeck(parsed);
-        setParseError(null);
-      } catch (e) {
-        setParseError(e instanceof Error ? e.message : String(e));
-        setDeck(null);
-      }
-    }, 300);
-  }, []);
+      }, 300);
+    },
+    [setDeck, resetDeck],
+  );
 
   // ── Editor change handlers ──
   const handleEditorChange = useCallback(
@@ -225,10 +236,29 @@ export default function App() {
     [parseMdText],
   );
 
+  // Keyboard undo/redo — Edit mode only (the Import Markdown editor owns its own
+  // text undo, so we don't hijack ⌘Z there).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (subMode !== "edit" || !(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redoDeck();
+        else undoDeck();
+      } else if (k === "y") {
+        e.preventDefault();
+        redoDeck();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [subMode, undoDeck, redoDeck]);
+
   // Initial parse (no debounce) + template load
   useState(() => {
     try {
-      setDeck(parseMd(SAMPLE_MD));
+      resetDeck(parseMd(SAMPLE_MD));
     } catch { /* ignore */ }
     // Load template for preview
     fetch("/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")
@@ -272,7 +302,7 @@ export default function App() {
 
       const text = await readFileFromInput(file);
       setMdText(text);
-      parseMdText(text);
+      parseMdText(text, "reset");
       setFilePath(file.name);
       e.target.value = "";
     },
@@ -329,7 +359,7 @@ export default function App() {
   const handleLlmImport = useCallback(
     (text: string) => {
       setMdText(text);
-      parseMdText(text);
+      parseMdText(text, "reset");
       setSubMode("import");
     },
     [parseMdText],
@@ -339,7 +369,7 @@ export default function App() {
   const handleAiApply = useCallback(
     (md: string) => {
       setMdText(md);
-      parseMdText(md);
+      parseMdText(md, "commit");
       setActiveSlide(0);
       setSubMode("edit");
     },
@@ -361,13 +391,13 @@ export default function App() {
 
   // ── Slide editing: update a single slide in the deck ──
   const handleSlideUpdate = useCallback(
-    (index: number, updated: SlideIR) => {
+    (index: number, updated: SlideIR, mode: HistoryMode = "coalesce") => {
       if (!deck) return;
       const newSlides = [...deck.slides];
       newSlides[index] = updated;
-      setDeck({ ...deck, slides: newSlides });
+      setDeck({ ...deck, slides: newSlides }, mode);
     },
-    [deck],
+    [deck, setDeck],
   );
 
   // Drag-to-move in the preview writes the new diagram YAML (with overrides) back.
@@ -392,11 +422,15 @@ export default function App() {
       const newSlide = parseMd(md).slides[0];
       if (!newSlide) return;
       const old = deck.slides[activeSlide];
-      handleSlideUpdate(activeSlide, {
-        ...newSlide,
-        diagram: newSlide.diagram ?? old?.diagram,
-        mermaidBlock: newSlide.mermaidBlock ?? old?.mermaidBlock,
-      });
+      handleSlideUpdate(
+        activeSlide,
+        {
+          ...newSlide,
+          diagram: newSlide.diagram ?? old?.diagram,
+          mermaidBlock: newSlide.mermaidBlock ?? old?.mermaidBlock,
+        },
+        "commit", // AI edit = one discrete undo step
+      );
     },
     [deck, activeSlide, handleSlideUpdate],
   );
@@ -474,6 +508,10 @@ export default function App() {
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
+          onUndo={undoDeck}
+          onRedo={redoDeck}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
         <div className="flex items-center gap-2 px-3 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
           <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">

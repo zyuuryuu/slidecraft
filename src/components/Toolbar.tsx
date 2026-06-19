@@ -7,6 +7,10 @@ interface ToolbarProps {
   generating: boolean;
   hasSpec: boolean;
   templateName?: string;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export default function Toolbar({
@@ -18,6 +22,10 @@ export default function Toolbar({
   generating,
   hasSpec,
   templateName,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
@@ -41,6 +49,27 @@ export default function Toolbar({
       >
         Save
       </button>
+
+      {onUndo && (
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="元に戻す (⌘/Ctrl+Z)"
+            className="px-2 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 disabled:opacity-30 disabled:hover:bg-[#2D3A6E] text-white rounded transition-colors"
+          >
+            ↶
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="やり直す (⌘/Ctrl+Shift+Z)"
+            className="px-2 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 disabled:opacity-30 disabled:hover:bg-[#2D3A6E] text-white rounded transition-colors"
+          >
+            ↷
+          </button>
+        </div>
+      )}
 
       {onLoadTemplate && (
         <button
