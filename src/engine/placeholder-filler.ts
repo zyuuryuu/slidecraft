@@ -77,7 +77,9 @@ async function extractDiagramShapes(diagramYaml: string): Promise<string> {
   }
   const spec: DiagramSpec = result.data;
   const theme = midnightExecutive();
-  const pptxBuf = await renderToBuffer(spec, { theme });
+  // Embedded in a titled slide → the diagram omits its own title bar so it
+  // doesn't duplicate / overlap the slide's title placeholder.
+  const pptxBuf = await renderToBuffer(spec, { theme, omitTitle: true });
 
   // Open the PptxGenJS-generated PPTX and extract shapes from slide1
   const diagZip = await JSZip.loadAsync(pptxBuf);

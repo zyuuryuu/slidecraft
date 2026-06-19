@@ -130,6 +130,7 @@ class PptxDrawTarget implements DrawTarget {
 export interface RenderOptions {
   theme?: ThemeConfig;
   useHeaderBar?: boolean;
+  omitTitle?: boolean;
   templatePath?: string;
 }
 

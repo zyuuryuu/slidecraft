@@ -57,13 +57,16 @@ export function paintDiagram(
     t.background(ds.slide_bg);
   }
 
+  // When embedded in a titled slide, the diagram draws no title of its own.
+  const title = options.omitTitle ? undefined : spec.title;
+
   let contentTop = 0.8;
-  if (useHeaderBar && spec.title) {
-    paintHeaderBar(t, spec.title, theme);
+  if (useHeaderBar && title) {
+    paintHeaderBar(t, title, theme);
     contentTop = 1.35;
-  } else if (spec.title) {
+  } else if (title) {
     t.text(
-      [{ text: spec.title, fontSize: ds.title_font_size, fontFace: fonts.heading, color: ds.title_font_color, bold: ds.title_font_bold }],
+      [{ text: title, fontSize: ds.title_font_size, fontFace: fonts.heading, color: ds.title_font_color, bold: ds.title_font_bold }],
       { x: 0.5, y: 0.15, w: 10, h: 0.45 },
       {},
     );

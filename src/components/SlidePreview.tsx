@@ -31,7 +31,9 @@ function DiagramSvgOverlay({ diagramYaml }: { diagramYaml: string }) {
       const data = yaml.load(diagramYaml);
       const parsed = DiagramSpecSchema.safeParse(data);
       if (!parsed.success) return "";
-      return renderDiagramToSvg(parsed.data, { transparent: true });
+      // Embedded in a titled slide → omit the diagram's own title (matches the
+      // export, which also embeds the shapes without a duplicate title bar).
+      return renderDiagramToSvg(parsed.data, { transparent: true, omitTitle: true });
     } catch {
       return "";
     }

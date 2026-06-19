@@ -64,6 +64,12 @@ export interface DrawTarget {
 export interface PaintOptions {
   theme?: ThemeConfig;
   useHeaderBar?: boolean;
+  /**
+   * Suppress the diagram's OWN title (header bar or plain text). Used when the
+   * diagram is embedded in a slide that already has a title placeholder, so the
+   * two don't overlap/duplicate. Keeps preview and export in agreement.
+   */
+  omitTitle?: boolean;
 }
 
 /** Resolved node style after merging classDefs + inline style onto defaults. */
