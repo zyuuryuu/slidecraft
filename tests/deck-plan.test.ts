@@ -11,10 +11,50 @@ import {
   deckPlanToDeck,
   parseDeckPlan,
   extractDeckPlan,
+  extractSlidePlan,
+  slidePlanToSlide,
   type DeckPlan,
 } from "../src/engine/deck-plan";
 import { serializeMd } from "../src/engine/md-serializer";
 import { parseMd } from "../src/engine/md-parser";
+
+describe("extractSlidePlan (single-slide AI edit)", () => {
+  it("parses a bare content slide object", () => {
+    const r = extractSlidePlan('{"kind":"content","title":"概要","bullets":["A","B"]}');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.slide.kind).toBe("content");
+      expect(r.slide.title).toBe("概要");
+    }
+  });
+
+  it("tolerates code fences and a {slides:[one]} wrapper", () => {
+    const fenced = '```json\n{"slides":[{"kind":"section","title":"次へ"}]}\n```';
+    const r = extractSlidePlan(fenced);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.slide.kind).toBe("section");
+  });
+
+  it("coerces a missing/synonym kind", () => {
+    const r = extractSlidePlan('{"title":"X","bullets":["one"]}'); // no kind → content
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.slide.kind).toBe("content");
+  });
+
+  it("rejects non-JSON", () => {
+    expect(extractSlidePlan("sorry, here is the slide").ok).toBe(false);
+  });
+
+  it("round-trips through slidePlanToSlide → Markdown", () => {
+    const r = extractSlidePlan('{"kind":"content","title":"T","bullets":["x","y"]}');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const md = serializeMd({ slides: [slidePlanToSlide(r.slide)] });
+      expect(parseMd(md).slides).toHaveLength(1);
+      expect(md).toContain("T");
+    }
+  });
+});
 
 describe("deckPlanToDeck", () => {
   it("builds a title slide with fields (idx 0/1/10/11/12)", () => {

@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { extractDeckPlan, deckPlanToDeck } from "../engine/deck-plan";
+import { extractDeckPlan, deckPlanToDeck, extractSlidePlan, slidePlanToSlide } from "../engine/deck-plan";
 import { serializeMd } from "../engine/md-serializer";
 import { generateWithAI, PROVIDERS, providerPreset, type ProviderId } from "../ipc/ai";
 
@@ -18,7 +18,7 @@ export interface AiProviderConfig {
   apiKey: string;
 }
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
-export type AiMode = "slides" | "diagram";
+export type AiMode = "slides" | "slide" | "diagram";
 
 function defaultConfigs(): AiConfigMap {
   const out = {} as AiConfigMap;
@@ -107,6 +107,14 @@ export function useAiGeneration() {
             setResult(serializeMd(deckPlanToDeck(parsed.plan)));
           } else {
             setError(`Couldn't read the generated plan: ${parsed.error}`);
+          }
+        } else if (mode === "slide") {
+          // One slide in, one slide out → engine renders just that slide's Markdown.
+          const parsed = extractSlidePlan(raw);
+          if (parsed.ok) {
+            setResult(serializeMd({ slides: [slidePlanToSlide(parsed.slide)] }));
+          } else {
+            setError(`Couldn't read the edited slide: ${parsed.error}`);
           }
         }
       } catch (e) {

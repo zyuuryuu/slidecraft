@@ -70,7 +70,7 @@ function bulletParagraphs(items: string[]): Paragraph[] {
 
 // ── DeckPlan → SlideIR (the engine owns layout + placeholder mapping) ──
 
-function slidePlanToSlide(s: SlidePlan): SlideIR {
+export function slidePlanToSlide(s: SlidePlan): SlideIR {
   switch (s.kind) {
     case "title": {
       const ph: PlaceholderContent[] = [textPh("0", s.title)];
@@ -153,6 +153,35 @@ export function extractDeckPlan(text: string): ParseResult {
     return { ok: false, error: "Invalid JSON: " + (e instanceof Error ? e.message : String(e)) };
   }
   return parseDeckPlan(coerceDeckPlanInput(data));
+}
+
+export type SlideParseResult =
+  | { ok: true; slide: SlidePlan }
+  | { ok: false; error: string };
+
+/**
+ * Parse + validate ONE slide from raw model output (a single JSON Slide object).
+ * Used by per-slide AI edits, where only that slide is sent + returned — far
+ * cheaper in tokens than regenerating the whole deck.
+ */
+export function extractSlidePlan(text: string): SlideParseResult {
+  const json = extractJsonObject(text);
+  if (json === null) return { ok: false, error: "No JSON object found in the response." };
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch (e) {
+    return { ok: false, error: "Invalid JSON: " + (e instanceof Error ? e.message : String(e)) };
+  }
+  // Tolerate a {slides:[one]} wrapper or a bare slide object.
+  const rec = asRecord(data);
+  const candidate = rec && Array.isArray(rec.slides) ? rec.slides[0] : data;
+  const r = SlidePlanSchema.safeParse(coerceSlide(candidate));
+  if (r.success) return { ok: true, slide: r.data };
+  return {
+    ok: false,
+    error: r.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "),
+  };
 }
 
 // ── Deterministic salvage of common weak-model mistakes ──
@@ -250,4 +279,25 @@ Rules:
 - Use "columns" for comparisons or two/three-sided content.
 - Do NOT add any field not listed above, and do NOT invent other "kind" values.
 - Output valid JSON only.`;
+}
+
+// ── Single-slide edit prompt (token-cheap: one slide in, one slide out) ──
+
+export function slidePlanSystemPrompt(): string {
+  return `You revise ONE slide. Output ONLY a single JSON Slide object — no prose, no code fence, and NOT a {"slides":[...]} array.
+
+The Slide is exactly one of:
+- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}
+- {"kind":"section","title":"..."}
+- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}
+- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}
+- {"kind":"closing","title":"..."}
+
+You are given the current slide and an instruction. Apply ONLY what the instruction asks; keep everything else as-is. Return the FULL revised slide.
+
+Rules:
+- Write in the SAME language as the slide / instruction.
+- Keep each bullet short — one idea, not a paragraph.
+- Do NOT add fields not listed above, and do NOT invent other "kind" values.
+- Output valid JSON only (a single object).`;
 }

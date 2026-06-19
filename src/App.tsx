@@ -335,7 +335,7 @@ export default function App() {
     [parseMdText],
   );
 
-  // AI panel "適用": replace the deck but stay in Edit so you keep refining.
+  // AI panel "適用"（デッキ全体）: replace the deck but stay in Edit to keep refining.
   const handleAiApply = useCallback(
     (md: string) => {
       setMdText(md);
@@ -383,6 +383,27 @@ export default function App() {
     },
     [deck, activeSlide, handleSlideUpdate],
   );
+
+  // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
+  // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
+  const handleApplySlide = useCallback(
+    (md: string) => {
+      if (!deck) return;
+      const newSlide = parseMd(md).slides[0];
+      if (!newSlide) return;
+      const old = deck.slides[activeSlide];
+      handleSlideUpdate(activeSlide, {
+        ...newSlide,
+        diagram: newSlide.diagram ?? old?.diagram,
+        mermaidBlock: newSlide.mermaidBlock ?? old?.mermaidBlock,
+      });
+    },
+    [deck, activeSlide, handleSlideUpdate],
+  );
+
+  // Markdown of the active slide → lets the AI panel edit just that slide.
+  const currentSlideMd =
+    deck && deck.slides[activeSlide] ? serializeMd({ slides: [deck.slides[activeSlide]] }) : undefined;
 
   // Get current slide's layout info for editor
   const currentSlide = deck?.slides[activeSlide];
@@ -590,7 +611,12 @@ export default function App() {
           />
           </div>
           {showAiPanel && (
-            <AiPanel onApply={handleAiApply} onClose={() => setShowAiPanel(false)} />
+            <AiPanel
+              onApply={handleAiApply}
+              onClose={() => setShowAiPanel(false)}
+              currentSlideMd={currentSlideMd}
+              onApplySlide={handleApplySlide}
+            />
           )}
         </div>
       )}

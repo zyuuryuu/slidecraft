@@ -13,15 +13,37 @@ import { useAiGeneration } from "./useAiGeneration";
 interface AiPanelProps {
   onApply: (markdown: string) => void;
   onClose: () => void;
+  /** Markdown of the active slide — enables the token-cheap "this slide" scope. */
+  currentSlideMd?: string;
+  /** Apply an edited single slide back to the active slide only. */
+  onApplySlide?: (markdown: string) => void;
 }
 
-export default function AiPanel({ onApply, onClose }: AiPanelProps) {
+export default function AiPanel({ onApply, onClose, currentSlideMd, onApplySlide }: AiPanelProps) {
   const ai = useAiGeneration();
   const [userRequest, setUserRequest] = useState("");
   const [showSettings, setShowSettings] = useState(false);
 
+  const canSlide = !!currentSlideMd && !!onApplySlide;
+  const [scope, setScope] = useState<"deck" | "slide">("slide");
+  const slideScope = canSlide && scope === "slide";
+
   const ready = ai.canGenerate(userRequest);
   const field = "px-2 py-1 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-xs text-white";
+
+  const doGenerate = () => {
+    if (slideScope && currentSlideMd) {
+      // One slide in, one slide out — far fewer tokens than the whole deck.
+      ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
+    } else {
+      ai.generate(userRequest, "slides");
+    }
+  };
+
+  const doApply = () => {
+    if (slideScope && onApplySlide) onApplySlide(ai.result);
+    else onApply(ai.result);
+  };
 
   return (
     <div className="border-t border-[#3B82F6]/40 bg-[#0a0e1a] flex flex-col shrink-0" style={{ maxHeight: 340 }}>
@@ -85,31 +107,55 @@ export default function AiPanel({ onApply, onClose }: AiPanelProps) {
         </div>
       )}
 
-      {/* Prompt */}
-      <div className="flex gap-2 px-3 py-2">
-        <textarea
-          value={userRequest}
-          onChange={(e) => setUserRequest(e.target.value)}
-          rows={2}
-          placeholder="作りたいスライドを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
-          className="flex-1 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white resize-none"
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) ai.generate(userRequest, "slides");
-          }}
-        />
-        {ai.generating ? (
-          <button onClick={ai.cancel} className="px-4 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded shrink-0">
-            停止
-          </button>
-        ) : (
-          <button
-            onClick={() => ai.generate(userRequest, "slides")}
-            disabled={!ready}
-            className="px-4 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 disabled:text-white/40 text-white font-medium rounded shrink-0"
-          >
-            {ai.generating ? "生成中…" : "生成"}
-          </button>
+      {/* Scope + Prompt */}
+      <div className="px-3 py-2 flex flex-col gap-2">
+        {canSlide && (
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-gray-500 mr-1">対象:</span>
+            <button
+              onClick={() => setScope("slide")}
+              className={`px-2 py-0.5 rounded ${scope === "slide" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
+            >
+              このスライド
+            </button>
+            <button
+              onClick={() => setScope("deck")}
+              className={`px-2 py-0.5 rounded ${scope === "deck" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
+            >
+              デッキ全体
+            </button>
+            {slideScope && <span className="text-gray-500 ml-1">— このスライドだけ送って編集（トークン節約）</span>}
+          </div>
         )}
+        <div className="flex gap-2">
+          <textarea
+            value={userRequest}
+            onChange={(e) => setUserRequest(e.target.value)}
+            rows={2}
+            placeholder={
+              slideScope
+                ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / KPIを強調 / 英語にする）"
+                : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
+            }
+            className="flex-1 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white resize-none"
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) doGenerate();
+            }}
+          />
+          {ai.generating ? (
+            <button onClick={ai.cancel} className="px-4 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded shrink-0">
+              停止
+            </button>
+          ) : (
+            <button
+              onClick={doGenerate}
+              disabled={!ready}
+              className="px-4 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 disabled:text-white/40 text-white font-medium rounded shrink-0"
+            >
+              生成
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error */}
@@ -125,11 +171,11 @@ export default function AiPanel({ onApply, onClose }: AiPanelProps) {
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-gray-400">{ai.generating ? "生成中…" : "プレビュー（Markdown）"}</span>
             <button
-              onClick={() => onApply(ai.result)}
+              onClick={doApply}
               disabled={ai.generating || !ai.result.trim()}
               className="px-3 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
             >
-              適用 → 編集へ
+              {slideScope ? "適用 → このスライド" : "適用 → 編集へ"}
             </button>
           </div>
           <pre className="overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap" style={{ maxHeight: 150 }}>

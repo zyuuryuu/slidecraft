@@ -13,7 +13,7 @@
 import { useState, useCallback } from "react";
 import { generateCombinedPrompt } from "../engine/llm-prompts";
 import { PROVIDERS, type ProviderId } from "../ipc/ai";
-import { useAiGeneration, type AiMode } from "./useAiGeneration";
+import { useAiGeneration } from "./useAiGeneration";
 
 interface LlmAssistProps {
   isOpen: boolean;
@@ -23,7 +23,8 @@ interface LlmAssistProps {
 
 export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssistProps) {
   const ai = useAiGeneration();
-  const [mode, setMode] = useState<AiMode>("slides");
+  // The dialog only offers whole-deck or diagram generation (not single-slide).
+  const [mode, setMode] = useState<"slides" | "diagram">("slides");
   const [userRequest, setUserRequest] = useState("");
 
   // Show/hide API key + manual copy/paste fallback (UI-only state).
