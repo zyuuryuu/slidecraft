@@ -1,0 +1,47 @@
+/**
+ * SlideMarkdownEditor.tsx — Edit one slide as raw SlideCraft Markdown.
+ *
+ * The Edit-mode alternative to the structured form: shows just THIS slide's
+ * Markdown (heading, subtitle, bullets, and any ```diagram block) and parses it
+ * back into the slide. Lets you work one slide at a time in Markdown without the
+ * whole-deck Import editor.
+ */
+
+import { useState, useRef } from "react";
+
+interface SlideMarkdownEditorProps {
+  md: string;
+  onChange: (md: string) => void;
+}
+
+export default function SlideMarkdownEditor({ md, onChange }: SlideMarkdownEditorProps) {
+  const [text, setText] = useState(md);
+  const [prevMd, setPrevMd] = useState(md);
+  const [focused, setFocused] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reflect external changes (undo/redo, AI apply) when the user isn't typing.
+  // Render-phase prop sync — React's "adjust state on prop change" pattern.
+  if (md !== prevMd) {
+    setPrevMd(md);
+    if (!focused) setText(md);
+  }
+
+  const handle = (v: string) => {
+    setText(v);
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => onChange(v), 300);
+  };
+
+  return (
+    <textarea
+      value={text}
+      onChange={(e) => handle(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      spellCheck={false}
+      className="h-full w-full px-3 py-2 bg-[#0f1117] text-sm text-gray-200 font-mono resize-none outline-none leading-relaxed"
+      placeholder={"# 見出し\n> サブタイトル\n\n- 箇条書き\n- 箇条書き"}
+    />
+  );
+}

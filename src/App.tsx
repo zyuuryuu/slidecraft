@@ -4,6 +4,7 @@ import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
 import SlideEditor from "./components/SlideEditor";
+import SlideMarkdownEditor from "./components/SlideMarkdownEditor";
 import ResizableSplit from "./components/ResizableSplit";
 import Toolbar from "./components/Toolbar";
 import StatusBar from "./components/StatusBar";
@@ -184,6 +185,8 @@ export default function App() {
   const [subMode, setSubMode] = useState<MarkdownSubMode>("import");
   const [showLlmAssist, setShowLlmAssist] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  // Edit-mode center pane: structured form vs raw per-slide Markdown.
+  const [slideEditView, setSlideEditView] = useState<"form" | "markdown">("form");
   const [mdText, setMdText] = useState(SAMPLE_MD);
   // Deck state with unified undo/redo (covers drag/resize, slide edits, AI edits).
   const {
@@ -241,6 +244,9 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (subMode !== "edit" || !(e.metaKey || e.ctrlKey)) return;
+      // Don't hijack undo while editing a text field — it owns its own text undo.
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable)) return;
       const k = e.key.toLowerCase();
       if (k === "z") {
         e.preventDefault();
@@ -435,9 +441,28 @@ export default function App() {
     [deck, activeSlide, handleSlideUpdate],
   );
 
-  // Markdown of the active slide → lets the AI panel edit just that slide.
-  const currentSlideMd =
-    deck && deck.slides[activeSlide] ? serializeMd({ slides: [deck.slides[activeSlide]] }) : undefined;
+  // Markdown of the active slide → AI panel "this slide" + the Markdown view.
+  // Serialize with the slide's RESOLVED layout: a lone slide is index 0, and
+  // autoSelectLayout's "first slide → Title" rule would otherwise mangle a
+  // content slide into Title format. Pinning the resolved layout keeps it correct.
+  const currentSlideMd = (() => {
+    const s = deck?.slides[activeSlide];
+    if (!s) return undefined;
+    const resolved = s.layout === "auto" ? autoSelectLayout(s, activeSlide, deck!.slides.length) : s.layout;
+    return serializeMd({ slides: [{ ...s, layout: resolved }] });
+  })();
+
+  // Per-slide Markdown editing: the Markdown is the full source for this slide,
+  // so parse it and replace the active slide (coalesced for live typing).
+  const handleSlideMdChange = useCallback(
+    (md: string) => {
+      if (!deck) return;
+      const newSlide = parseMd(md).slides[0];
+      if (!newSlide) return;
+      handleSlideUpdate(activeSlide, newSlide, "coalesce");
+    },
+    [deck, activeSlide, handleSlideUpdate],
+  );
 
   // Get current slide's layout info for editor
   const currentSlide = deck?.slides[activeSlide];
@@ -611,20 +636,40 @@ export default function App() {
             initialLeftPct={55}
             left={
               <>
-                <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-                  Slide Editor — {currentLayoutName || "No slide"}
+                <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E] flex items-center justify-between">
+                  <span>Slide Editor — {currentLayoutName || "No slide"}</span>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => setSlideEditView("form")}
+                      className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "form" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+                    >
+                      フォーム
+                    </button>
+                    <button
+                      onClick={() => setSlideEditView("markdown")}
+                      className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "markdown" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+                    >
+                      Markdown
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  {currentSlide ? (
+                  {!currentSlide ? (
+                    <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                      Select a slide
+                    </div>
+                  ) : slideEditView === "markdown" ? (
+                    <SlideMarkdownEditor
+                      key={activeSlide}
+                      md={currentSlideMd ?? ""}
+                      onChange={handleSlideMdChange}
+                    />
+                  ) : (
                     <SlideEditor
                       slide={currentSlide}
                       layout={currentLayout}
                       onChange={(updated) => handleSlideUpdate(activeSlide, updated)}
                     />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-                      Select a slide
-                    </div>
                   )}
                 </div>
               </>

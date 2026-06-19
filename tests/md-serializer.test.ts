@@ -8,7 +8,30 @@
 import { describe, it, expect } from "vitest";
 import { serializeMd } from "../src/engine/md-serializer";
 import { parseMd } from "../src/engine/md-parser";
+import { autoSelectLayout } from "../src/engine/template-loader";
 import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
+
+describe("single-slide serialization (per-slide editing / AI context)", () => {
+  it("a lone content slide keeps content format when its resolved layout is set", () => {
+    const deck = parseMd("# First\n\n---\n\n# 見出し\n> サブ\n\n- A\n- B\n");
+    const content = deck.slides[1];
+    expect(content.layout).toBe("auto");
+    // App serializes a single slide with its RESOLVED layout so the index-0
+    // "first slide → Title" rule doesn't mangle a content slide.
+    const resolved = autoSelectLayout(content, 1, deck.slides.length);
+    const md = serializeMd({ slides: [{ ...content, layout: resolved }] });
+    const rt = parseMd(md).slides[0];
+    expect(rt.placeholders.find((p) => p.idx === "15")?.paragraphs[0]?.segments[0]?.text).toBe("見出し");
+    expect(rt.placeholders.find((p) => p.idx === "16")).toBeDefined();
+    expect(rt.placeholders.find((p) => p.idx === "1")).toBeDefined();
+  });
+
+  it("serializing a lone content slide WITHOUT a resolved layout mangles it (documents the bug)", () => {
+    const deck = parseMd("# First\n\n---\n\n# 見出し\n> サブ\n\n- A\n\n");
+    const md = serializeMd({ slides: [deck.slides[1]] }); // index 0 → Title coercion
+    expect(md.includes("# 見出し")).toBe(false);
+  });
+});
 
 describe("serializeMd", () => {
   // ── Basic serialization ──
