@@ -11,6 +11,7 @@ import yaml from "js-yaml";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
+import { buildCatalog } from "../engine/template-catalog";
 import { MERMAID_CONFIG } from "./mermaid";
 import { renderDiagramToSvg } from "../engine/svg-writer";
 import { DiagramSpecSchema } from "../engine/schema";
@@ -527,6 +528,8 @@ export default function SlidePreview({
   onDiagramChange,
 }: SlidePreviewProps) {
   const scale = scaleProp ?? 72;
+  // Catalog → layout selection adapts to the template (canonical = unchanged).
+  const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
 
   if (error) {
     return (
@@ -555,7 +558,7 @@ export default function SlidePreview({
     const slide = deck.slides[idx];
     if (!slide) return null;
     const layoutName = slide.layout === "auto"
-      ? autoSelectLayout(slide, idx, deck.slides.length)
+      ? autoSelectLayout(slide, idx, deck.slides.length, catalog)
       : slide.layout;
     const layout = template ? findLayout(template, layoutName) : undefined;
 
@@ -580,7 +583,7 @@ export default function SlidePreview({
       {deck.slides.map((slide, i) => {
         const layoutName =
           slide.layout === "auto"
-            ? autoSelectLayout(slide, i, deck.slides.length)
+            ? autoSelectLayout(slide, i, deck.slides.length, catalog)
             : slide.layout;
         const layout = template ? findLayout(template, layoutName) : undefined;
 

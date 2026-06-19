@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./components/useHistoryState";
+import { buildCatalog } from "./engine/template-catalog";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -445,10 +446,13 @@ export default function App() {
   // Serialize with the slide's RESOLVED layout: a lone slide is index 0, and
   // autoSelectLayout's "first slide → Title" rule would otherwise mangle a
   // content slide into Title format. Pinning the resolved layout keeps it correct.
+  // Catalog → layout selection adapts to the loaded template (canonical = unchanged).
+  const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
+
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
     if (!s) return undefined;
-    const resolved = s.layout === "auto" ? autoSelectLayout(s, activeSlide, deck!.slides.length) : s.layout;
+    const resolved = s.layout === "auto" ? autoSelectLayout(s, activeSlide, deck!.slides.length, catalog) : s.layout;
     return serializeMd({ slides: [{ ...s, layout: resolved }] });
   })();
 
@@ -468,7 +472,7 @@ export default function App() {
   const currentSlide = deck?.slides[activeSlide];
   const currentLayoutName = currentSlide
     ? currentSlide.layout === "auto"
-      ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length)
+      ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length, catalog)
       : currentSlide.layout
     : undefined;
   const currentLayout = currentLayoutName && templateData

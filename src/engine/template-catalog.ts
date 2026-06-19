@@ -44,6 +44,8 @@ export interface CatalogPlaceholder {
   idx: string;
   role: PlaceholderRole;
   order: number; // 1-based order among same-role placeholders (body 1, 2, 3…)
+  /** Rough full-width char capacity at the template's font (for split/warn, NOT shrink). */
+  capacity: number;
 }
 
 export interface CatalogEntry {
@@ -102,13 +104,26 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   return "other";
 }
 
+/**
+ * Rough capacity: how many full-width chars fit the box at its font (conservative,
+ * full-width assumption). For deciding "too much → split/warn", NOT for shrinking.
+ */
+export function placeholderCapacity(style: { w: number; h: number; fontSize: number }): number {
+  const fontIn = style.fontSize / 72;
+  if (fontIn <= 0) return 0;
+  const pad = 0.1;
+  const charsPerLine = Math.floor(Math.max(style.w - 2 * pad, 0) / fontIn);
+  const lines = Math.floor(Math.max(style.h - 2 * pad, 0) / (fontIn * 1.2));
+  return Math.max(0, charsPerLine * lines);
+}
+
 function catalogEntry(layout: LayoutInfo): CatalogEntry {
   const roleCounts: Record<string, number> = {};
   const placeholders: CatalogPlaceholder[] = layout.placeholders
     .map((ph) => {
       const role = placeholderRole(ph);
       roleCounts[role] = (roleCounts[role] ?? 0) + 1;
-      return { idx: ph.idx, role, order: roleCounts[role] };
+      return { idx: ph.idx, role, order: roleCounts[role], capacity: placeholderCapacity(ph.style) };
     })
     .sort((a, b) => (a.idx.length - b.idx.length) || a.idx.localeCompare(b.idx));
 

@@ -4,8 +4,14 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
+import { loadTemplate, autoSelectLayout, type TemplateData } from "../src/engine/template-loader";
 import { buildCatalog, pickLayout, layoutRole, type LayoutCatalog } from "../src/engine/template-catalog";
+import type { SlideIR } from "../src/engine/slide-schema";
+
+function mk(overrides: Partial<SlideIR>): SlideIR {
+  return { layout: "auto", placeholders: [], ...overrides };
+}
+const ph = (idx: string, text = "x") => ({ idx, paragraphs: [{ segments: [{ text }] }] });
 
 const TEMPLATE_PATH = resolve(
   __dirname,
@@ -84,5 +90,27 @@ describe("pickLayout", () => {
   it("returns undefined for a role the template lacks", () => {
     const empty = buildCatalog({ ...tpl, layouts: [] });
     expect(pickLayout(empty, "content", 1)).toBeUndefined();
+  });
+});
+
+describe("placeholder capacity", () => {
+  it("a body placeholder has a positive char capacity", () => {
+    const e = catalog.find((c) => c.name === "Content.1Body.Single")!;
+    const body = e.placeholders.find((p) => p.role === "body")!;
+    expect(body.capacity).toBeGreaterThan(0);
+  });
+});
+
+describe("autoSelectLayout parity (catalog === hardcoded for the canonical template)", () => {
+  const slides: Array<[string, SlideIR, number, number]> = [
+    ["title (first)", mk({ placeholders: [ph("15", "T")] }), 0, 6],
+    ["content", mk({ placeholders: [ph("15", "T"), ph("1", "body")] }), 1, 6],
+    ["2 columns", mk({ placeholders: [ph("15"), ph("1"), ph("2")] }), 1, 6],
+    ["3 columns", mk({ placeholders: [ph("15"), ph("1"), ph("2"), ph("3")] }), 1, 6],
+    ["section", mk({ placeholders: [ph("15", "Section")] }), 1, 6],
+    ["closing", mk({ placeholders: [ph("0", "Thank you")] }), 5, 6],
+  ];
+  it.each(slides)("%s → same layout with and without the catalog", (_name, slide, i, total) => {
+    expect(autoSelectLayout(slide, i, total, catalog)).toBe(autoSelectLayout(slide, i, total));
   });
 });

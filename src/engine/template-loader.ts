@@ -8,6 +8,7 @@
 import JSZip from "jszip";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
+import { pickLayout, type LayoutCatalog, type LayoutRole } from "./template-catalog";
 
 // ── Types ──
 
@@ -283,6 +284,7 @@ export function autoSelectLayout(
   slide: SlideIR,
   slideIndex: number,
   totalSlides: number,
+  catalog?: LayoutCatalog,
 ): string {
   // If explicitly specified, use it
   if (slide.layout !== "auto") {
@@ -308,38 +310,34 @@ export function autoSelectLayout(
   const isClosing =
     allText.includes("thank") || allText.includes("感謝") || allText.includes("ありがとう");
 
-  // First slide → Title
+  // Classify into a semantic role + number of body regions, then resolve a
+  // concrete layout. WITH a catalog we pick from what the LOADED template
+  // actually offers (template-driven); WITHOUT one we fall back to the canonical
+  // layout names (so behavior is unchanged when no template is supplied).
+  let role: LayoutRole;
+  let regions: number | undefined;
+  let fallback: string;
   if (slideIndex === 0) {
-    return LAYOUT_NAMES[0]; // Title.1Title.Single
+    role = "title"; regions = undefined; fallback = LAYOUT_NAMES[0];
+  } else if (isClosing && slideIndex === totalSlides - 1) {
+    role = "closing"; regions = undefined; fallback = LAYOUT_NAMES[28];
+  } else if (hasTitle && hasBody && hasIdx2 && hasIdx3) {
+    role = "columns"; regions = 3; fallback = LAYOUT_NAMES[12];
+  } else if (hasTitle && hasBody && hasIdx2) {
+    role = "columns"; regions = 2; fallback = LAYOUT_NAMES[10];
+  } else if ((hasTitle || hasCtrTitle) && hasBody) {
+    role = "content"; regions = 1; fallback = LAYOUT_NAMES[6];
+  } else if (hasTitle && !hasBody) {
+    role = "section"; regions = undefined; fallback = LAYOUT_NAMES[3];
+  } else {
+    role = "content"; regions = 1; fallback = LAYOUT_NAMES[6];
   }
 
-  // Closing keywords on last slide
-  if (isClosing && slideIndex === totalSlides - 1) {
-    return LAYOUT_NAMES[28]; // Closing.1Message.Single
+  if (catalog) {
+    const picked = pickLayout(catalog, role, regions);
+    if (picked) return picked.name;
   }
-
-  // 3 content sections → 3 column
-  if (hasTitle && hasBody && hasIdx2 && hasIdx3) {
-    return LAYOUT_NAMES[12]; // Column.3Body.Equal
-  }
-
-  // 2 content sections → 2 column
-  if (hasTitle && hasBody && hasIdx2) {
-    return LAYOUT_NAMES[10]; // Column.2Body.Equal
-  }
-
-  // Title + body → Content
-  if ((hasTitle || hasCtrTitle) && hasBody) {
-    return LAYOUT_NAMES[6]; // Content.1Body.Single
-  }
-
-  // Title only → Section
-  if (hasTitle && !hasBody) {
-    return LAYOUT_NAMES[3]; // Section.1Title.Single
-  }
-
-  // Fallback
-  return LAYOUT_NAMES[6]; // Content.1Body.Single
+  return fallback;
 }
 
 // ── Find layout by name ──

@@ -12,6 +12,7 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
+import { buildCatalog } from "./template-catalog";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBuffer } from "./pptx-writer";
 import { midnightExecutive } from "./theme";
@@ -227,6 +228,8 @@ export async function generatePptx(
   const relEntries: string[] = [];
   const ctEntries: string[] = [];
   const slideIdBase = 256;
+  // Catalog → layout selection adapts to THIS template (canonical = unchanged).
+  const catalog = buildCatalog(template);
 
   for (let i = 0; i < deck.slides.length; i++) {
     const slide = deck.slides[i];
@@ -238,6 +241,7 @@ export async function generatePptx(
       slide,
       i,
       deck.slides.length,
+      catalog,
     );
     const layout = findLayout(template, layoutName);
     if (!layout) {
