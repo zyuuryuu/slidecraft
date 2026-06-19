@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./components/useHistoryState";
 import { buildCatalog, deckCapabilities } from "./engine/template-catalog";
 import { distillDeck } from "./engine/distill";
+import { mermaidToDiagramSpec, diagramSpecToYaml } from "./engine/mermaid-to-diagram";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -428,19 +429,39 @@ export default function App() {
     [deck, setDeck],
   );
 
-  // Drag-to-move in the preview writes the new diagram YAML (with overrides) back.
+  // Drag-to-move in the preview, or an AI diagram edit, writes the new diagram YAML
+  // back. A Mermaid slide GRADUATES to the canonical DiagramSpec on its first edit:
+  // we replace the mermaidBlock with a diagram so every diagram tool (NL edit, node
+  // drag/resize/override, shared-painter WYSIWYG) applies from then on.
   const handleDiagramChange = useCallback(
     (yaml: string) => {
       if (!deck) return;
       const slide = deck.slides[activeSlide];
-      if (!slide?.diagram) return;
-      handleSlideUpdate(activeSlide, {
-        ...slide,
-        diagram: { ...slide.diagram, yaml },
-      });
+      if (!slide) return;
+      if (slide.diagram) {
+        handleSlideUpdate(activeSlide, { ...slide, diagram: { ...slide.diagram, yaml } });
+      } else if (slide.mermaidBlock) {
+        const { mermaidBlock, ...rest } = slide;
+        handleSlideUpdate(activeSlide, {
+          ...rest,
+          diagram: { yaml, placeholderIdx: mermaidBlock.placeholderIdx },
+        });
+      }
     },
     [deck, activeSlide, handleSlideUpdate],
   );
+
+  // Diagram YAML for the active slide's "図表" AI scope — from the DiagramSpec, or
+  // converted on the fly from a Mermaid slide so Mermaid diagrams are editable too.
+  const currentDiagramYaml = useMemo(() => {
+    const s = deck?.slides[activeSlide];
+    if (s?.diagram) return s.diagram.yaml;
+    if (s?.mermaidBlock) {
+      const spec = mermaidToDiagramSpec(s.mermaidBlock.mermaid);
+      return spec ? diagramSpecToYaml(spec) : undefined;
+    }
+    return undefined;
+  }, [deck, activeSlide]);
 
   // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
   // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
@@ -724,7 +745,7 @@ export default function App() {
               onClose={() => setShowAiPanel(false)}
               currentSlideMd={currentSlideMd}
               onApplySlide={handleApplySlide}
-              currentDiagramYaml={deck?.slides[activeSlide]?.diagram?.yaml}
+              currentDiagramYaml={currentDiagramYaml}
               onApplyDiagram={handleDiagramChange}
               templateHint={deckHint}
             />
