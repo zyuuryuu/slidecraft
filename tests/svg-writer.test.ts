@@ -56,6 +56,17 @@ describe("renderDiagramToSvg", () => {
     expect(svg).toContain(`x="${expectedX}"`);
   });
 
+  it("confines the whole diagram to a region when given one", () => {
+    const region = { x: 7, y: 1.5, w: 5.5, h: 5 }; // right side of the slide
+    const svg = renderDiagramToSvg(FLOW, { region, omitTitle: true, transparent: true });
+    const xs = [...svg.matchAll(/<rect x="([\d.]+)"/g)].map((m) => Number(m[1]));
+    expect(xs.length).toBeGreaterThan(0);
+    for (const x of xs) {
+      expect(x).toBeGreaterThanOrEqual(region.x * 96 - 2);
+      expect(x).toBeLessThanOrEqual((region.x + region.w) * 96 + 2);
+    }
+  });
+
   it("escapes markup in labels", () => {
     const spec = { ...FLOW, nodes: [{ id: "x", label: "<b>&", shape: "rect" }], edges: [] } as unknown as DiagramSpec;
     const svg = renderDiagramToSvg(spec);

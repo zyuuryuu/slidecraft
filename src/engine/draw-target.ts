@@ -70,6 +70,71 @@ export interface PaintOptions {
    * two don't overlap/duplicate. Keeps preview and export in agreement.
    */
   omitTitle?: boolean;
+  /**
+   * Confine the whole diagram (shapes, edges, text, all uniformly scaled) into
+   * this slide region (inches). Lets a diagram sit beside body text instead of
+   * taking the full slide. Omit for the full-slide default.
+   */
+  region?: Box;
+}
+
+/**
+ * Wraps a DrawTarget to scale+translate everything into a sub-region, so the
+ * painter can keep emitting full-slide coordinates while the output lands in a
+ * box (diagram-beside-text). Font sizes and stroke widths scale uniformly too.
+ */
+export class TransformedTarget implements DrawTarget {
+  private t: DrawTarget;
+  private s: number;
+  private ox: number;
+  private oy: number;
+
+  constructor(target: DrawTarget, scale: number, offsetX: number, offsetY: number) {
+    this.t = target;
+    this.s = scale;
+    this.ox = offsetX;
+    this.oy = offsetY;
+  }
+
+  private box(b: Box): Box {
+    return { x: b.x * this.s + this.ox, y: b.y * this.s + this.oy, w: b.w * this.s, h: b.h * this.s };
+  }
+  private pt<P extends { x: number; y: number }>(p: P): P {
+    return { ...p, x: p.x * this.s + this.ox, y: p.y * this.s + this.oy };
+  }
+
+  background(color: string): void {
+    this.t.background(color);
+  }
+  shape(kind: ShapeType, box: Box, opts: { fill: string | null; line?: LineSpec; rectRadius?: number }): void {
+    this.t.shape(kind, this.box(box), {
+      fill: opts.fill,
+      line: opts.line ? { ...opts.line, width: opts.line.width * this.s } : undefined,
+      rectRadius: opts.rectRadius !== undefined ? opts.rectRadius * this.s : undefined,
+    });
+  }
+  line(from: ConnectionPoint, to: ConnectionPoint, opts: EdgeLineOpts): void {
+    this.t.line(this.pt(from), this.pt(to), { ...opts, width: opts.width * this.s });
+  }
+  text(lines: TextRun[], box: Box, opts: TextOpts): void {
+    this.t.text(lines.map((l) => ({ ...l, fontSize: l.fontSize * this.s })), this.box(box), opts);
+  }
+}
+
+/** Fit a content bounding box into a region (preserve aspect, centered, padded). */
+export function fitTransform(
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  region: Box,
+  pad = 0.12,
+): { scale: number; offsetX: number; offsetY: number } {
+  const bw = Math.max(bbox.maxX - bbox.minX, 0.01);
+  const bh = Math.max(bbox.maxY - bbox.minY, 0.01);
+  const availW = Math.max(region.w - 2 * pad, 0.1);
+  const availH = Math.max(region.h - 2 * pad, 0.1);
+  const scale = Math.min(availW / bw, availH / bh);
+  const offsetX = region.x + pad + (availW - bw * scale) / 2 - bbox.minX * scale;
+  const offsetY = region.y + pad + (availH - bh * scale) / 2 - bbox.minY * scale;
+  return { scale, offsetX, offsetY };
 }
 
 /** Resolved node style after merging classDefs + inline style onto defaults. */

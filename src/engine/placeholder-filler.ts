@@ -69,7 +69,10 @@ function replaceTextInShape(
 
 // ── Extract diagram shapes from PptxGenJS output ──
 
-async function extractDiagramShapes(diagramYaml: string): Promise<string> {
+async function extractDiagramShapes(
+  diagramYaml: string,
+  region?: { x: number; y: number; w: number; h: number },
+): Promise<string> {
   const data = yaml.load(diagramYaml);
   const result = DiagramSpecSchema.safeParse(data);
   if (!result.success) {
@@ -78,8 +81,9 @@ async function extractDiagramShapes(diagramYaml: string): Promise<string> {
   const spec: DiagramSpec = result.data;
   const theme = midnightExecutive();
   // Embedded in a titled slide → the diagram omits its own title bar so it
-  // doesn't duplicate / overlap the slide's title placeholder.
-  const pptxBuf = await renderToBuffer(spec, { theme, omitTitle: true });
+  // doesn't duplicate / overlap the slide's title placeholder. When `region` is
+  // given (diagram beside body text), confine the shapes to that placeholder box.
+  const pptxBuf = await renderToBuffer(spec, { theme, omitTitle: true, region });
 
   // Open the PptxGenJS-generated PPTX and extract shapes from slide1
   const diagZip = await JSZip.loadAsync(pptxBuf);
@@ -147,7 +151,13 @@ async function buildSlideXml(
 
   // Add diagram shapes if present
   if (slide.diagram) {
-    const diagramShapes = await extractDiagramShapes(slide.diagram.yaml);
+    // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is
+    // confined to its placeholder region so it doesn't cover the bullets.
+    const diagPh =
+      slide.diagram.placeholderIdx !== "1"
+        ? layout.placeholders.find((p) => p.idx === slide.diagram!.placeholderIdx)
+        : undefined;
+    const diagramShapes = await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
     // Re-number shape IDs to avoid conflicts
     let reNumbered = diagramShapes;
     const idMatches = [...reNumbered.matchAll(/<p:cNvPr[^>]*id="(\d+)"/g)];

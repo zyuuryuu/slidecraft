@@ -292,11 +292,13 @@ export function autoSelectLayout(
   const idxs = new Set(slide.placeholders.map((p) => p.idx));
   const hasTitle = idxs.has("15");
   const hasCtrTitle = idxs.has("0");
-  // A diagram/mermaid occupies the body placeholder (idx 1) even though it isn't
-  // in `placeholders`, so it needs a Content layout (with idx 1), not a Section one.
-  const hasBody = idxs.has("1") || slide.diagram != null || slide.mermaidBlock != null;
-  const hasIdx2 = idxs.has("2");
-  const hasIdx3 = idxs.has("3");
+  // A diagram/mermaid occupies a body placeholder even though it isn't in
+  // `placeholders`. It lands at idx 1 (solo → Content) or idx 2 (beside body
+  // bullets → 2-column), so count it toward whichever region it targets.
+  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
+  const hasBody = idxs.has("1") || visualIdx === "1";
+  const hasIdx2 = idxs.has("2") || visualIdx === "2";
+  const hasIdx3 = idxs.has("3") || visualIdx === "3";
 
   // Check for closing keywords
   const allText = slide.placeholders

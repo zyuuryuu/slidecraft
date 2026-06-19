@@ -306,6 +306,15 @@ function parseSlideBlock(
 
   if (placeholders.length === 0 && !diagram && !mermaidBlock) return null;
 
+  // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
+  // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
+  const hasBodyText = placeholders.some((p) => p.idx === "1");
+  if (hasBodyText && diagram) {
+    diagram = { ...diagram, placeholderIdx: "2" };
+  } else if (hasBodyText && mermaidBlock) {
+    mermaidBlock = { ...mermaidBlock, placeholderIdx: "2" };
+  }
+
   return {
     layout,
     placeholders,

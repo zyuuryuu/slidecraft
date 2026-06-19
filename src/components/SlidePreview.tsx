@@ -32,10 +32,12 @@ function DiagramSvgOverlay({
   diagramYaml,
   editable = false,
   onChange,
+  region,
 }: {
   diagramYaml: string;
   editable?: boolean;
   onChange?: (yaml: string) => void;
+  region?: { x: number; y: number; w: number; h: number };
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const moveRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
@@ -66,8 +68,11 @@ function DiagramSvgOverlay({
   }, [spec, draft]);
 
   const svg = useMemo(
-    () => (draftSpec ? renderDiagramToSvg(draftSpec, { transparent: true, omitTitle: true }) : ""),
-    [draftSpec],
+    () =>
+      draftSpec
+        ? renderDiagramToSvg(draftSpec, { transparent: true, omitTitle: true, region })
+        : "",
+    [draftSpec, region],
   );
 
   // Live positions (incl. draft) used to place selection handles.
@@ -385,11 +390,16 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         // Diagram: full-slide transparent SVG overlay (matches how the export
         // embeds diagram shapes at absolute slide coordinates).
         if (isDiagramPh) {
+          // Solo diagram (idx 1) = full-slide + drag-editable; beside-text
+          // diagram (idx 2) is confined to its placeholder box (drag disabled,
+          // since hit-testing is full-slide — edit via the YAML editor instead).
+          const isSolo = slide.diagram!.placeholderIdx === "1";
           return (
             <DiagramSvgOverlay
               key={`diagram-${ph.idx}`}
               diagramYaml={slide.diagram!.yaml}
-              editable={!!onDiagramChange}
+              region={isSolo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
+              editable={isSolo && !!onDiagramChange}
               onChange={onDiagramChange}
             />
           );

@@ -131,6 +131,8 @@ export interface RenderOptions {
   theme?: ThemeConfig;
   useHeaderBar?: boolean;
   omitTitle?: boolean;
+  /** Confine the diagram to a slide region (inches) — diagram-beside-text. */
+  region?: { x: number; y: number; w: number; h: number };
   templatePath?: string;
 }
 

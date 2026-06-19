@@ -28,7 +28,14 @@ import {
   type NodePosition,
   type LaneInfo,
 } from "./layout-engine";
-import { scaledFontSize, type DrawTarget, type PaintOptions, type ResolvedStyle } from "./draw-target";
+import {
+  scaledFontSize,
+  TransformedTarget,
+  fitTransform,
+  type DrawTarget,
+  type PaintOptions,
+  type ResolvedStyle,
+} from "./draw-target";
 import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel } from "./diagram-draw";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
@@ -86,16 +93,30 @@ export function paintDiagram(
   const posMap = new Map(positions.map((p) => [p.nodeId, p]));
   const layoutScale = positions.length > 0 ? positions[0].scale : 1.0;
 
+  // Confine to a region (diagram-beside-text): scale+translate every draw call.
+  // Title/background were already drawn (or omitted) on the untransformed target.
+  let dt: DrawTarget = t;
+  if (options.region && positions.length > 0) {
+    const bbox = {
+      minX: Math.min(...positions.map((p) => p.x)),
+      minY: Math.min(...positions.map((p) => p.y)),
+      maxX: Math.max(...positions.map((p) => p.x + p.w)),
+      maxY: Math.max(...positions.map((p) => p.y + p.h)),
+    };
+    const { scale, offsetX, offsetY } = fitTransform(bbox, options.region);
+    dt = new TransformedTarget(t, scale, offsetX, offsetY);
+  }
+
   const nodeShapeMap = new Map<string, string>();
   for (const n of spec.nodes) nodeShapeMap.set(n.id, n.shape);
 
   if (laneInfos.length > 0) {
-    paintSwimlanes(t, laneInfos, spec.direction, contentTop, theme);
+    paintSwimlanes(dt, laneInfos, spec.direction, contentTop, theme);
   }
 
   let groupBboxes = new Map<string, [number, number, number, number]>();
   if (spec.groups.length > 0) {
-    groupBboxes = paintGroupZones(t, spec, posMap, theme, layoutScale);
+    groupBboxes = paintGroupZones(dt, spec, posMap, theme, layoutScale);
   }
 
   const nodeMap = new Map(spec.nodes.map((n) => [n.id, n]));
@@ -121,7 +142,7 @@ export function paintDiagram(
       Object.assign(baseStyle, node.style);
     }
 
-    paintShape(t, node, pos, baseStyle, theme, layoutScale);
+    paintShape(dt, node, pos, baseStyle, theme, layoutScale);
   }
 
   // Connectors
@@ -155,14 +176,14 @@ export function paintDiagram(
   for (const [srcId, edges] of fanoutCandidates) {
     if (!isAutoMergeable(edges)) continue;
     if (edges.some((e) => busHandled.has(`${e.from}->${e.to}`))) continue;
-    const h = paintFanOutBus(t, srcId, edges, posMap, nodeShapeMap, direction, isFlowchart, theme);
+    const h = paintFanOutBus(dt, srcId, edges, posMap, nodeShapeMap, direction, isFlowchart, theme);
     for (const k of h) busHandled.add(k);
   }
 
   for (const [tgtId, edges] of faninCandidates) {
     const remaining = edges.filter((e) => !busHandled.has(`${e.from}->${e.to}`));
     if (!isAutoMergeable(remaining)) continue;
-    const h = paintFanInBus(t, tgtId, remaining, posMap, nodeShapeMap, direction, isFlowchart, theme);
+    const h = paintFanInBus(dt, tgtId, remaining, posMap, nodeShapeMap, direction, isFlowchart, theme);
     for (const k of h) busHandled.add(k);
   }
 
@@ -196,12 +217,12 @@ export function paintDiagram(
       direction, routeType, srcPortOff, tgtPortOff,
     );
 
-    paintPath(t, points, { color, width, arrow, dash: routeType === "back_edge" ? true : dash });
+    paintPath(dt, points, { color, width, arrow, dash: routeType === "back_edge" ? true : dash });
 
     if (edge.label) {
       const labelPos = placeEdgeLabel(points, edge.label);
       const edgeFs = scaledFontSize(ds.edge_label_font_size, layoutScale);
-      t.text(
+      dt.text(
         [{ text: edge.label, fontSize: edgeFs, fontFace: fonts.body, color, bold: true }],
         labelPos,
         {},
