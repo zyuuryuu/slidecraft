@@ -357,6 +357,20 @@ export default function App() {
     [deck],
   );
 
+  // Drag-to-move in the preview writes the new diagram YAML (with overrides) back.
+  const handleDiagramChange = useCallback(
+    (yaml: string) => {
+      if (!deck) return;
+      const slide = deck.slides[activeSlide];
+      if (!slide?.diagram) return;
+      handleSlideUpdate(activeSlide, {
+        ...slide,
+        diagram: { ...slide.diagram, yaml },
+      });
+    },
+    [deck, activeSlide, handleSlideUpdate],
+  );
+
   // Get current slide's layout info for editor
   const currentSlide = deck?.slides[activeSlide];
   const currentLayoutName = currentSlide
@@ -552,6 +566,7 @@ export default function App() {
                     error={parseError}
                     activeSlide={activeSlide}
                     singleSlide
+                    onDiagramChange={handleDiagramChange}
                   />
                 </div>
               </>

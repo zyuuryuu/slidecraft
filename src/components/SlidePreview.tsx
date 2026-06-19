@@ -14,6 +14,7 @@ import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { MERMAID_CONFIG } from "./mermaid";
 import { renderDiagramToSvg } from "../engine/svg-writer";
 import { DiagramSpecSchema } from "../engine/schema";
+import { computeLayout, SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H } from "../engine/layout-engine";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -25,24 +26,104 @@ let mermaidIdCounter = 0;
 // Renders the DiagramSpec via the SAME engine as the exporter (svg-writer →
 // paintDiagram) and overlays the shapes (transparent, full-slide) exactly like
 // the export embeds them. No more divergent Mermaid layout for diagrams.
-function DiagramSvgOverlay({ diagramYaml }: { diagramYaml: string }) {
-  const svg = useMemo(() => {
+function DiagramSvgOverlay({
+  diagramYaml,
+  editable = false,
+  onChange,
+}: {
+  diagramYaml: string;
+  editable?: boolean;
+  onChange?: (yaml: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
+  const [draft, setDraft] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  const spec = useMemo(() => {
     try {
-      const data = yaml.load(diagramYaml);
-      const parsed = DiagramSpecSchema.safeParse(data);
-      if (!parsed.success) return "";
-      // Embedded in a titled slide → omit the diagram's own title (matches the
-      // export, which also embeds the shapes without a duplicate title bar).
-      return renderDiagramToSvg(parsed.data, { transparent: true, omitTitle: true });
+      const parsed = DiagramSpecSchema.safeParse(yaml.load(diagramYaml));
+      return parsed.success ? parsed.data : null;
     } catch {
-      return "";
+      return null;
     }
   }, [diagramYaml]);
+
+  // While dragging, apply the draft override so the preview follows live.
+  const svg = useMemo(() => {
+    if (!spec) return "";
+    const s = draft
+      ? {
+          ...spec,
+          nodes: spec.nodes.map((n) =>
+            n.id === draft.id ? { ...n, override: { ...n.override, x: draft.x, y: draft.y } } : n,
+          ),
+        }
+      : spec;
+    // Embedded in a titled slide → omit the diagram's own title (matches export).
+    return renderDiagramToSvg(s, { transparent: true, omitTitle: true });
+  }, [spec, draft]);
+
+  function toInches(e: React.PointerEvent) {
+    const r = ref.current!.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / r.width) * DIAGRAM_W,
+      y: ((e.clientY - r.top) / r.height) * DIAGRAM_H,
+    };
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (!spec) return;
+    const c = toInches(e);
+    // Topmost node under the cursor (positions are drawn in order; reverse).
+    const hit = [...computeLayout(spec)]
+      .reverse()
+      .find((p) => c.x >= p.x && c.x <= p.x + p.w && c.y >= p.y && c.y <= p.y + p.h);
+    if (!hit) return;
+    dragRef.current = { id: hit.nodeId, offX: c.x - hit.x, offY: c.y - hit.y };
+    setDraft({ id: hit.nodeId, x: hit.x, y: hit.y });
+    ref.current!.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragRef.current) return;
+    const c = toInches(e);
+    setDraft({ id: dragRef.current.id, x: c.x - dragRef.current.offX, y: c.y - dragRef.current.offY });
+  }
+
+  function onPointerUp() {
+    const d = dragRef.current;
+    const cur = draft;
+    dragRef.current = null;
+    setDraft(null);
+    if (!d || !cur || !onChange) return;
+    try {
+      // Write into the raw YAML object (no schema defaults injected) to keep it tidy.
+      const raw = yaml.load(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
+      const node = raw.nodes?.find((n) => n.id === d.id);
+      if (!node) return;
+      const round = (v: number) => Math.round(v * 100) / 100;
+      node.override = { ...(node.override as object), x: round(cur.x), y: round(cur.y) };
+      onChange(yaml.dump(raw, { lineWidth: 1000 }));
+    } catch {
+      /* ignore malformed YAML */
+    }
+  }
 
   if (!svg) return null;
   return (
     <div
-      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      ref={ref}
+      onPointerDown={editable ? onPointerDown : undefined}
+      onPointerMove={editable ? onPointerMove : undefined}
+      onPointerUp={editable ? onPointerUp : undefined}
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: editable ? "auto" : "none",
+        cursor: editable ? (draft ? "grabbing" : "grab") : "default",
+        touchAction: "none",
+      }}
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
@@ -127,9 +208,11 @@ interface SlideCardProps {
   scale: number;
   isActive?: boolean;
   onClick?: () => void;
+  /** When set, the embedded diagram is drag-editable and reports new YAML. */
+  onDiagramChange?: (yaml: string) => void;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, onClick }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, onClick, onDiagramChange }: SlideCardProps) {
   const contentMap = new Map(slide.placeholders.map((p) => [p.idx, p]));
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
@@ -178,7 +261,14 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         // Diagram: full-slide transparent SVG overlay (matches how the export
         // embeds diagram shapes at absolute slide coordinates).
         if (isDiagramPh) {
-          return <DiagramSvgOverlay key={`diagram-${ph.idx}`} diagramYaml={slide.diagram!.yaml} />;
+          return (
+            <DiagramSvgOverlay
+              key={`diagram-${ph.idx}`}
+              diagramYaml={slide.diagram!.yaml}
+              editable={!!onDiagramChange}
+              onChange={onDiagramChange}
+            />
+          );
         }
 
         // Mermaid (```mermaid): an image confined to the placeholder box.
@@ -266,6 +356,8 @@ interface SlidePreviewProps {
   onSlideClick?: (index: number) => void;
   singleSlide?: boolean; // show only the active slide
   scale?: number;
+  /** Enables drag-to-move on the active slide's diagram (Edit mode). */
+  onDiagramChange?: (yaml: string) => void;
 }
 
 export default function SlidePreview({
@@ -276,6 +368,7 @@ export default function SlidePreview({
   onSlideClick,
   singleSlide = false,
   scale: scaleProp,
+  onDiagramChange,
 }: SlidePreviewProps) {
   const scale = scaleProp ?? 72;
 
@@ -320,6 +413,7 @@ export default function SlidePreview({
           masterBgColor={template?.masterBgColor ?? "FFFFFF"}
           scale={scale}
           isActive={true}
+          onDiagramChange={onDiagramChange}
         />
       </div>
     );
