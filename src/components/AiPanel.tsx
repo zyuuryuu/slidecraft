@@ -40,7 +40,11 @@ export default function AiPanel({
 
   const canSlide = !!currentSlideMd && !!onApplySlide;
   const canDiagram = !!currentDiagramYaml && !!onApplyDiagram;
-  const [scope, setScope] = useState<"deck" | "slide" | "diagram">("slide");
+  // Open on a diagram/Mermaid slide → default to the "図表" scope, so a request like
+  // "make it flashier" edits the diagram instead of mangling it as slide text.
+  const [scope, setScope] = useState<"deck" | "slide" | "diagram">(
+    () => (currentDiagramYaml && onApplyDiagram ? "diagram" : "slide"),
+  );
   // Fall back to deck if the chosen scope isn't available on this slide.
   const eff = scope === "slide" && !canSlide ? "deck" : scope === "diagram" && !canDiagram ? "deck" : scope;
   const slideScope = eff === "slide";
