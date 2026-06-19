@@ -10,6 +10,7 @@ import { extractDeckPlan, deckPlanToDeck, extractSlidePlan, slidePlanToSlide } f
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
+import { parseJsonLoose } from "../engine/json-salvage";
 import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, type ProviderId } from "../ipc/ai";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
@@ -148,17 +149,13 @@ export function useAiGeneration() {
           }
         } else if (mode === "diagram-edit") {
           // AI returns the updated DiagramSpec JSON → validate → back to YAML.
-          const m = raw.match(/\{[\s\S]*\}/);
-          if (!m) {
+          const r = parseJsonLoose(raw);
+          if (!r.ok) {
             setError("Couldn't find a diagram in the response.");
           } else {
-            try {
-              const parsed = DiagramSpecSchema.safeParse(JSON.parse(m[0]));
-              if (parsed.success) setResult(diagramSpecToYaml(parsed.data));
-              else setError(`Invalid diagram: ${parsed.error.issues[0]?.message}`);
-            } catch (e) {
-              setError("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
-            }
+            const parsed = DiagramSpecSchema.safeParse(r.value);
+            if (parsed.success) setResult(diagramSpecToYaml(parsed.data));
+            else setError(`Invalid diagram: ${parsed.error.issues[0]?.message}`);
           }
         }
       } catch (e) {

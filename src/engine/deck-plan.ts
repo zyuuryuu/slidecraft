@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import type { DeckIR, SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
+import { parseJsonLoose } from "./json-salvage";
 
 // ── DeckPlan schema (what the model returns) ──
 
@@ -130,29 +131,11 @@ export function parseDeckPlan(input: unknown): ParseResult {
   };
 }
 
-/** Extract a JSON object or array from raw model text (tolerates ``` fences / prose). */
-function extractJsonObject(text: string): string | null {
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = (fence ? fence[1] : text).trim();
-  const firstObj = body.indexOf("{");
-  const firstArr = body.indexOf("[");
-  const start = [firstObj, firstArr].filter((i) => i !== -1).sort((a, b) => a - b)[0] ?? -1;
-  const end = Math.max(body.lastIndexOf("}"), body.lastIndexOf("]"));
-  if (start === -1 || end === -1 || end < start) return null;
-  return body.slice(start, end + 1);
-}
-
 /** Parse + validate a DeckPlan from raw model output (JSON, possibly fenced). */
 export function extractDeckPlan(text: string): ParseResult {
-  const json = extractJsonObject(text);
-  if (json === null) return { ok: false, error: "No JSON object found in the response." };
-  let data: unknown;
-  try {
-    data = JSON.parse(json);
-  } catch (e) {
-    return { ok: false, error: "Invalid JSON: " + (e instanceof Error ? e.message : String(e)) };
-  }
-  return parseDeckPlan(coerceDeckPlanInput(data));
+  const r = parseJsonLoose(text);
+  if (!r.ok) return { ok: false, error: "Invalid JSON: " + r.error };
+  return parseDeckPlan(coerceDeckPlanInput(r.value));
 }
 
 export type SlideParseResult =
@@ -165,14 +148,9 @@ export type SlideParseResult =
  * cheaper in tokens than regenerating the whole deck.
  */
 export function extractSlidePlan(text: string): SlideParseResult {
-  const json = extractJsonObject(text);
-  if (json === null) return { ok: false, error: "No JSON object found in the response." };
-  let data: unknown;
-  try {
-    data = JSON.parse(json);
-  } catch (e) {
-    return { ok: false, error: "Invalid JSON: " + (e instanceof Error ? e.message : String(e)) };
-  }
+  const jr = parseJsonLoose(text);
+  if (!jr.ok) return { ok: false, error: "Invalid JSON: " + jr.error };
+  const data = jr.value;
   // Tolerate a {slides:[one]} wrapper or a bare slide object.
   const rec = asRecord(data);
   const candidate = rec && Array.isArray(rec.slides) ? rec.slides[0] : data;
@@ -285,6 +263,7 @@ Rules:
 - The "closing" title is a CONCISE takeaway in ONE short line (not a single word like
   "Summary"/"まとめ", and not a long sentence that overflows).${today ? `\n- Use ${today} (or a future date) for any "date" field — never a past year.` : ""}
 - Do NOT add any field not listed above, and do NOT invent other "kind" values.
+- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.
 - Output valid JSON only.`;
 }
 
@@ -306,5 +285,6 @@ Rules:
 - Write in the SAME language as the slide / instruction.
 - Each bullet is a SHORT key phrase (≤ ~20 full-width chars), not a full sentence; no trailing "。"/".".
 - Do NOT add fields not listed above, and do NOT invent other "kind" values.
+- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.
 - Output valid JSON only (a single object).`;
 }
