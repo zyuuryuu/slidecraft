@@ -168,9 +168,11 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
                 ↻
               </button>
             </div>
-            {ai.modelsError && (
+            {!ai.preset.native && ai.models.length === 0 && (
               <span className="text-[10px] text-gray-500">
-                モデル一覧を取得できません（{ai.modelsError}）。手入力できます。
+                {ai.modelsError
+                  ? `モデル一覧を取得できません（${ai.modelsError}）。Base URL を確認、↻ で再取得。手入力も可。`
+                  : "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。"}
               </span>
             )}
 
