@@ -117,6 +117,34 @@ export function placeholderCapacity(style: { w: number; h: number; fontSize: num
   return Math.max(0, charsPerLine * lines);
 }
 
+/**
+ * Role of a SlideIR content placeholder from its (canonical) idx convention.
+ * The SlideIR has no PPTX `type`, so we map by idx: 0/15=title, 16=subtitle,
+ * 1=body (or subtitle on a title slide), 2-9=body, 10=category, 11=date,
+ * 12=footer, 50=slideNumber. Lets injection bind by ROLE into any template.
+ */
+export function slideIdxRole(idx: string, hasCtrTitle: boolean): PlaceholderRole {
+  switch (idx) {
+    case "0":
+    case "15":
+      return "title";
+    case "16":
+      return "subtitle";
+    case "1":
+      return hasCtrTitle ? "subtitle" : "body";
+    case "10":
+      return "category";
+    case "11":
+      return "date";
+    case "12":
+      return "footer";
+    case "50":
+      return "slideNumber";
+    default:
+      return /^\d+$/.test(idx) && Number(idx) >= 2 && Number(idx) <= 9 ? "body" : "other";
+  }
+}
+
 function catalogEntry(layout: LayoutInfo): CatalogEntry {
   const roleCounts: Record<string, number> = {};
   const placeholders: CatalogPlaceholder[] = layout.placeholders

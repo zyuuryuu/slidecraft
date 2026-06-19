@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { loadTemplate, autoSelectLayout, type TemplateData } from "../src/engine/template-loader";
-import { buildCatalog, pickLayout, layoutRole, deckCapabilities, type LayoutCatalog } from "../src/engine/template-catalog";
+import { buildCatalog, pickLayout, layoutRole, deckCapabilities, slideIdxRole, type LayoutCatalog } from "../src/engine/template-catalog";
 import type { SlideIR } from "../src/engine/slide-schema";
 
 function mk(overrides: Partial<SlideIR>): SlideIR {
@@ -122,6 +122,21 @@ describe("autoSelectLayout graceful degrade (template missing a role)", () => {
     const name = autoSelectLayout(slide, 1, 6, noCols);
     expect(noCols.some((e) => e.name === name)).toBe(true); // a real layout in THIS template
     expect(name.startsWith("Column")).toBe(false); // degraded away from columns
+  });
+});
+
+describe("slideIdxRole (SlideIR idx → role for injection)", () => {
+  it("maps the canonical idx convention to roles", () => {
+    expect(slideIdxRole("0", true)).toBe("title");
+    expect(slideIdxRole("15", false)).toBe("title");
+    expect(slideIdxRole("16", false)).toBe("subtitle");
+    expect(slideIdxRole("1", false)).toBe("body");
+    expect(slideIdxRole("1", true)).toBe("subtitle"); // title slide: idx 1 is the subtitle
+    expect(slideIdxRole("2", false)).toBe("body");
+    expect(slideIdxRole("10", false)).toBe("category");
+    expect(slideIdxRole("11", false)).toBe("date");
+    expect(slideIdxRole("12", false)).toBe("footer");
+    expect(slideIdxRole("50", false)).toBe("slideNumber");
   });
 });
 

@@ -12,7 +12,7 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { buildCatalog } from "./template-catalog";
+import { buildCatalog, placeholderRole, slideIdxRole, type PlaceholderRole } from "./template-catalog";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBuffer } from "./pptx-writer";
 import { midnightExecutive } from "./theme";
@@ -103,27 +103,48 @@ async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
 ): Promise<{ xml: string; mermaidImageRId: string | undefined }> {
-  const contentMap = new Map(
-    slide.placeholders.map((p) => [p.idx, p]),
-  );
+  // Bind content to placeholders BY ROLE (not idx), so any template's layout —
+  // whatever idxs it uses — gets the right content. For the canonical template
+  // (idx convention == roles) this is identical to the old idx matching.
+  const byIdx = <T extends { idx: string }>(a: T, b: T) =>
+    a.idx.length - b.idx.length || a.idx.localeCompare(b.idx);
+  const hasCtrTitle = slide.placeholders.some((p) => p.idx === "0");
+
+  const contentByRole = new Map<PlaceholderRole, PlaceholderContent[]>();
+  for (const c of [...slide.placeholders].sort(byIdx)) {
+    const role = slideIdxRole(c.idx, hasCtrTitle);
+    const list = contentByRole.get(role);
+    if (list) list.push(c);
+    else contentByRole.set(role, [c]);
+  }
+
+  const layoutMeta = new Map<string, { role: PlaceholderRole; order: number }>();
+  const roleSeen: Record<string, number> = {};
+  for (const lph of [...layout.placeholders].sort(byIdx)) {
+    const role = placeholderRole(lph);
+    roleSeen[role] = (roleSeen[role] ?? 0) + 1;
+    layoutMeta.set(lph.idx, { role, order: roleSeen[role] });
+  }
+
+  // Diagram/mermaid occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
+  const bodyPhs = [...layout.placeholders].sort(byIdx).filter((p) => placeholderRole(p) === "body");
+  const visualBody = (pi?: string) => (pi ? bodyPhs[Math.max(1, parseInt(pi) || 1) - 1] : undefined);
+  const diagBodyIdx = slide.diagram ? visualBody(slide.diagram.placeholderIdx)?.idx : undefined;
+  const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
 
   let shapes = "";
   let id = 2;
 
   for (const ph of layout.placeholders) {
-    // Skip placeholders replaced by diagram or mermaid
-    if (slide.diagram && ph.idx === slide.diagram.placeholderIdx) continue;
-    if (slide.mermaidBlock && ph.idx === slide.mermaidBlock.placeholderIdx) continue;
-
-    const content = contentMap.get(ph.idx);
+    if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx) continue; // replaced by the visual
+    const meta = layoutMeta.get(ph.idx);
+    if (!meta) continue;
+    const content = contentByRole.get(meta.role)?.[meta.order - 1];
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content);
     // Update shape ID to be unique within the slide
-    shapeXml = shapeXml.replace(
-      /(<p:cNvPr[^>]*id=")\d+"/,
-      `$1${id}"`,
-    );
+    shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
     shapes += shapeXml;
     id++;
   }
@@ -132,7 +153,7 @@ async function buildSlideXml(
   // The actual image is added to the ZIP separately; here we add a <p:pic> reference
   let mermaidImageRId: string | undefined;
   if (slide.mermaidBlock?.svgCache) {
-    const phInfo = layout.placeholders.find(p => p.idx === slide.mermaidBlock!.placeholderIdx);
+    const phInfo = visualBody(slide.mermaidBlock.placeholderIdx);
     if (phInfo) {
       const s = phInfo.style;
       const EMU = (inches: number) => Math.round(inches * 914400);
@@ -155,8 +176,8 @@ async function buildSlideXml(
     // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is
     // confined to its placeholder region so it doesn't cover the bullets.
     const diagPh =
-      slide.diagram.placeholderIdx !== "1"
-        ? layout.placeholders.find((p) => p.idx === slide.diagram!.placeholderIdx)
+      (parseInt(slide.diagram.placeholderIdx) || 1) !== 1
+        ? visualBody(slide.diagram.placeholderIdx)
         : undefined;
     const diagramShapes = await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
     // Re-number shape IDs to avoid conflicts
