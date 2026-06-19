@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./components/useHistoryState";
 import { buildCatalog, deckCapabilities } from "./engine/template-catalog";
 import { distillDeck } from "./engine/distill";
-import { mermaidToDiagramSpec, diagramSpecToYaml } from "./engine/mermaid-to-diagram";
+import { validateDiagramSource } from "./engine/mermaid-to-diagram";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -451,17 +451,6 @@ export default function App() {
     [deck, activeSlide, handleSlideUpdate],
   );
 
-  // Diagram YAML for the active slide's "図表" AI scope — from the DiagramSpec, or
-  // converted on the fly from a Mermaid slide so Mermaid diagrams are editable too.
-  const currentDiagramYaml = useMemo(() => {
-    const s = deck?.slides[activeSlide];
-    if (s?.diagram) return s.diagram.yaml;
-    if (s?.mermaidBlock) {
-      const spec = mermaidToDiagramSpec(s.mermaidBlock.mermaid);
-      return spec ? diagramSpecToYaml(spec) : undefined;
-    }
-    return undefined;
-  }, [deck, activeSlide]);
 
   // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
   // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
@@ -471,11 +460,21 @@ export default function App() {
       const newSlide = parseMd(md).slides[0];
       if (!newSlide) return;
       const old = deck.slides[activeSlide];
+      // Validate an edited figure (DiagramSpec YAML). If the model returned broken
+      // YAML, keep the previous valid diagram + warn instead of rendering a broken one.
+      let diagram = newSlide.diagram ?? old?.diagram;
+      if (newSlide.diagram) {
+        const err = validateDiagramSource(newSlide.diagram.yaml, "yaml");
+        if (err) {
+          diagram = old?.diagram;
+          setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${err}）`);
+        }
+      }
       handleSlideUpdate(
         activeSlide,
         {
           ...newSlide,
-          diagram: newSlide.diagram ?? old?.diagram,
+          diagram,
           mermaidBlock: newSlide.mermaidBlock ?? old?.mermaidBlock,
         },
         "commit", // AI edit = one discrete undo step
@@ -745,8 +744,6 @@ export default function App() {
               onClose={() => setShowAiPanel(false)}
               currentSlideMd={currentSlideMd}
               onApplySlide={handleApplySlide}
-              currentDiagramYaml={currentDiagramYaml}
-              onApplyDiagram={handleDiagramChange}
               templateHint={deckHint}
             />
           )}

@@ -17,10 +17,6 @@ interface AiPanelProps {
   currentSlideMd?: string;
   /** Apply an edited single slide back to the active slide only. */
   onApplySlide?: (markdown: string) => void;
-  /** YAML of the active slide's diagram — enables the "diagram" (NL edit) scope. */
-  currentDiagramYaml?: string;
-  /** Apply an AI-edited diagram YAML back to the active slide's diagram. */
-  onApplyDiagram?: (yaml: string) => void;
   /** Template capability summary prepended to whole-deck generation. */
   templateHint?: string;
 }
@@ -30,8 +26,6 @@ export default function AiPanel({
   onClose,
   currentSlideMd,
   onApplySlide,
-  currentDiagramYaml,
-  onApplyDiagram,
   templateHint,
 }: AiPanelProps) {
   const ai = useAiGeneration();
@@ -39,24 +33,19 @@ export default function AiPanel({
   const [showSettings, setShowSettings] = useState(false);
 
   const canSlide = !!currentSlideMd && !!onApplySlide;
-  const canDiagram = !!currentDiagramYaml && !!onApplyDiagram;
-  // Default to "このスライド": it now edits the WHOLE slide as Markdown (text + any
-  // figure together), so it handles diagram slides coherently. "図表" stays as a
-  // focused diagram-only shortcut the user can pick.
-  const [scope, setScope] = useState<"deck" | "slide" | "diagram">("slide");
-  // Fall back to deck if the chosen scope isn't available on this slide.
-  const eff = scope === "slide" && !canSlide ? "deck" : scope === "diagram" && !canDiagram ? "deck" : scope;
+  // "このスライド" edits the WHOLE slide as Markdown (text + any figure together) —
+  // it covers diagram editing too, so there's no separate "図表" scope. Falls back
+  // to whole-deck when no single slide is active.
+  const [scope, setScope] = useState<"deck" | "slide">("slide");
+  const eff = scope === "slide" && !canSlide ? "deck" : scope;
   const slideScope = eff === "slide";
-  const diagramScope = eff === "diagram";
 
   const ready = ai.canGenerate(userRequest);
   const field = "px-2 py-1 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-xs text-white";
 
   const doGenerate = () => {
-    if (diagramScope && currentDiagramYaml) {
-      ai.generate(`Current diagram (YAML):\n${currentDiagramYaml}\n\nInstruction: ${userRequest}`, "diagram-edit");
-    } else if (slideScope && currentSlideMd) {
-      // One slide in, one slide out — far fewer tokens than the whole deck.
+    if (slideScope && currentSlideMd) {
+      // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
       ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
     } else {
       // Whole-deck generation gets the template's capabilities (kinds/columns/capacity).
@@ -65,8 +54,7 @@ export default function AiPanel({
   };
 
   const doApply = () => {
-    if (diagramScope && onApplyDiagram) onApplyDiagram(ai.result);
-    else if (slideScope && onApplySlide) onApplySlide(ai.result);
+    if (slideScope && onApplySlide) onApplySlide(ai.result);
     else onApply(ai.result);
   };
 
@@ -157,35 +145,23 @@ export default function AiPanel({
 
       {/* Scope + Prompt */}
       <div className="px-3 py-2 flex flex-col gap-2">
-        {(canSlide || canDiagram) && (
+        {canSlide && (
           <div className="flex items-center gap-1 text-xs flex-wrap">
             <span className="text-gray-500 mr-1">対象:</span>
-            {canSlide && (
-              <button
-                onClick={() => setScope("slide")}
-                className={`px-2 py-0.5 rounded ${eff === "slide" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
-              >
-                このスライド
-              </button>
-            )}
-            {canDiagram && (
-              <button
-                onClick={() => setScope("diagram")}
-                className={`px-2 py-0.5 rounded ${eff === "diagram" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
-              >
-                図表
-              </button>
-            )}
+            <button
+              onClick={() => setScope("slide")}
+              className={`px-2 py-0.5 rounded ${eff === "slide" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
+            >
+              このスライド
+            </button>
             <button
               onClick={() => setScope("deck")}
               className={`px-2 py-0.5 rounded ${eff === "deck" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
             >
               デッキ全体
             </button>
-            {(slideScope || diagramScope) && (
-              <span className="text-gray-500 ml-1">
-                — {diagramScope ? "この図表だけ" : "このスライドだけ"}送って編集（トークン節約）
-              </span>
+            {slideScope && (
+              <span className="text-gray-500 ml-1">— このスライドだけ送って編集（トークン節約）</span>
             )}
           </div>
         )}
@@ -195,11 +171,9 @@ export default function AiPanel({
             onChange={(e) => setUserRequest(e.target.value)}
             rows={2}
             placeholder={
-              diagramScope
-                ? "図表への指示（例: キャッシュを追加 / DB を右へ / 矢印に『非同期』ラベル / 配色を変更）"
-                : slideScope
-                  ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / KPIを強調 / 英語にする）"
-                  : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
+              slideScope
+                ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / 図を追加 / DBノードを足す / 英語にする）"
+                : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
             }
             className="flex-1 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white resize-none"
             onKeyDown={(e) => {
@@ -234,14 +208,14 @@ export default function AiPanel({
         <div className="flex flex-col min-h-0 border-t border-[#2D3A6E]">
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-gray-400">
-              {ai.generating ? "生成中…" : diagramScope ? "プレビュー（図表YAML）" : "プレビュー（Markdown）"}
+              {ai.generating ? "生成中…" : "プレビュー（Markdown）"}
             </span>
             <button
               onClick={doApply}
               disabled={ai.generating || !ai.result.trim()}
               className="px-3 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
             >
-              {diagramScope ? "適用 → 図表" : slideScope ? "適用 → このスライド" : "適用 → 編集へ"}
+              {slideScope ? "適用 → このスライド" : "適用 → 編集へ"}
             </button>
           </div>
           <pre className="overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap" style={{ maxHeight: 150 }}>
