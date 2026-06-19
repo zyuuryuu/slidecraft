@@ -292,7 +292,9 @@ export function autoSelectLayout(
   const idxs = new Set(slide.placeholders.map((p) => p.idx));
   const hasTitle = idxs.has("15");
   const hasCtrTitle = idxs.has("0");
-  const hasBody = idxs.has("1");
+  // A diagram/mermaid occupies the body placeholder (idx 1) even though it isn't
+  // in `placeholders`, so it needs a Content layout (with idx 1), not a Section one.
+  const hasBody = idxs.has("1") || slide.diagram != null || slide.mermaidBlock != null;
   const hasIdx2 = idxs.has("2");
   const hasIdx3 = idxs.has("3");
 

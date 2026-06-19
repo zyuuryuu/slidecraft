@@ -157,4 +157,27 @@ describe("autoSelectLayout", () => {
     const name = autoSelectLayout(slide, 0, 1);
     expect(name).toBe("KPI.3Value.Equal");
   });
+
+  it("selects a Content layout (idx 1) for a title+diagram slide, not Section", () => {
+    // A diagram occupies placeholder idx 1 even though it isn't in `placeholders`;
+    // without this the slide picked Section (no idx 1) and the diagram never rendered.
+    const slide = makeSlide({
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "System" }] }] },
+        { idx: "16", paragraphs: [{ segments: [{ text: "Architecture" }] }] },
+      ],
+      diagram: { yaml: "type: flowchart\nnodes: []", placeholderIdx: "1" },
+    });
+    expect(autoSelectLayout(slide, 1, 5)).toMatch(/^Content\./);
+  });
+
+  it("selects a Content layout (idx 1) for a title+mermaid slide", () => {
+    const slide = makeSlide({
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "Flow" }] }] },
+      ],
+      mermaidBlock: { mermaid: "graph TD\n A-->B", placeholderIdx: "1" },
+    });
+    expect(autoSelectLayout(slide, 1, 5)).toMatch(/^Content\./);
+  });
 });
