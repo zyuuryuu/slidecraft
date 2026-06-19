@@ -267,6 +267,37 @@ Rules:
 - Output valid JSON only.`;
 }
 
+// ── Whole-slide Markdown edit (stage ①: content) ──
+// The per-slide edit operates on the slide's Markdown — which natively holds text
+// AND a diagram block — so one edit can revise the text, the diagram, or REBALANCE
+// between them (the visualize lever). This is the coexistence the SlidePlan JSON
+// (text-only) could not express. Round-trips via parseMd on apply.
+
+export function slideMarkdownEditPrompt(): string {
+  return `You revise ONE slide written in a simple Markdown format. You are given the current slide's Markdown and an instruction. Return the FULL revised slide as Markdown.
+
+The format (mirror what you are given):
+- "# Title" on the first line.
+- "## Subtitle" — optional.
+- "- bullet" lines for the body points.
+- An optional figure as a fenced block — keep the fence EXACTLY: a \`\`\`diagram block (YAML) or a \`\`\`mermaid block. Edit the figure's contents when the instruction is about the figure; otherwise leave it unchanged.
+- Lines like "Category: …", "Date: …", "Footer: …" are metadata — keep them.
+
+Rules:
+- Apply ONLY what the instruction asks; keep everything else as-is.
+- Write in the SAME language as the slide / instruction.
+- Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
+- You MAY rebalance between text and the figure when it makes the slide clearer (turn dense bullets into a diagram, or pull a point out of the figure into a bullet).
+- Output ONLY the slide's Markdown — no surrounding code fence, no prose, no commentary.`;
+}
+
+/** Strip an OUTER ```markdown wrapper a model may add, preserving inner ```diagram fences. */
+export function stripMarkdownFence(raw: string): string {
+  const t = raw.trim();
+  const m = t.match(/^```(?:markdown|md)\s*\n([\s\S]*)\n```$/i);
+  return (m ? m[1] : t).trim();
+}
+
 // ── Single-slide edit prompt (token-cheap: one slide in, one slide out) ──
 
 export function slidePlanSystemPrompt(): string {

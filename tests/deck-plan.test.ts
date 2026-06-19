@@ -13,6 +13,7 @@ import {
   extractDeckPlan,
   extractSlidePlan,
   slidePlanToSlide,
+  stripMarkdownFence,
   type DeckPlan,
 } from "../src/engine/deck-plan";
 import { serializeMd } from "../src/engine/md-serializer";
@@ -53,6 +54,32 @@ describe("extractSlidePlan (single-slide AI edit)", () => {
       expect(parseMd(md).slides).toHaveLength(1);
       expect(md).toContain("T");
     }
+  });
+});
+
+describe("stage ①: whole-slide Markdown edit", () => {
+  it("stripMarkdownFence unwraps an outer ```markdown wrapper, keeps inner fences", () => {
+    expect(stripMarkdownFence("# T\n\n- a")).toBe("# T\n\n- a");
+    expect(stripMarkdownFence("```markdown\n# T\n\n- a\n```")).toBe("# T\n\n- a");
+    // an inner ```diagram block must survive (only the OUTER wrapper is stripped)
+    const wrapped = "```markdown\n# T\n\n```diagram\ntype: flowchart\n```\n```";
+    expect(stripMarkdownFence(wrapped)).toBe("# T\n\n```diagram\ntype: flowchart\n```");
+  });
+
+  it("a diagram-only slide round-trips through Markdown (so 'このスライド' can edit it)", () => {
+    const deck = {
+      slides: [{
+        layout: "Content.1Body.Single",
+        placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "システム構成" }] }] }],
+        diagram: { yaml: "type: flowchart\ndirection: LR\nnodes:\n  - id: A\n    label: 入力\nedges: []", placeholderIdx: "1" },
+      }],
+    };
+    const md = serializeMd(deck);
+    expect(md).toContain("```diagram");
+    const back = parseMd(md).slides[0];
+    expect(back.diagram).toBeDefined();
+    expect(back.diagram?.yaml).toContain("flowchart");
+    expect(back.placeholders.find((p) => p.idx === "15")?.paragraphs[0].segments[0].text).toBe("システム構成");
   });
 });
 

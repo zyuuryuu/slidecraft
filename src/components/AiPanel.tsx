@@ -40,11 +40,10 @@ export default function AiPanel({
 
   const canSlide = !!currentSlideMd && !!onApplySlide;
   const canDiagram = !!currentDiagramYaml && !!onApplyDiagram;
-  // Open on a diagram/Mermaid slide → default to the "図表" scope, so a request like
-  // "make it flashier" edits the diagram instead of mangling it as slide text.
-  const [scope, setScope] = useState<"deck" | "slide" | "diagram">(
-    () => (currentDiagramYaml && onApplyDiagram ? "diagram" : "slide"),
-  );
+  // Default to "このスライド": it now edits the WHOLE slide as Markdown (text + any
+  // figure together), so it handles diagram slides coherently. "図表" stays as a
+  // focused diagram-only shortcut the user can pick.
+  const [scope, setScope] = useState<"deck" | "slide" | "diagram">("slide");
   // Fall back to deck if the chosen scope isn't available on this slide.
   const eff = scope === "slide" && !canSlide ? "deck" : scope === "diagram" && !canDiagram ? "deck" : scope;
   const slideScope = eff === "slide";

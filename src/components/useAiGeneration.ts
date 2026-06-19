@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { extractDeckPlan, deckPlanToDeck, extractSlidePlan, slidePlanToSlide } from "../engine/deck-plan";
+import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence } from "../engine/deck-plan";
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -140,13 +140,12 @@ export function useAiGeneration() {
             setError(`Couldn't read the generated plan: ${parsed.error}`);
           }
         } else if (mode === "slide") {
-          // One slide in, one slide out → engine renders just that slide's Markdown.
-          const parsed = extractSlidePlan(raw);
-          if (parsed.ok) {
-            setResult(serializeMd({ slides: [slidePlanToSlide(parsed.slide)] }));
-          } else {
-            setError(`Couldn't read the edited slide: ${parsed.error}`);
-          }
+          // Whole-slide Markdown round-trip: the model returns the edited slide's
+          // Markdown (text + any ```diagram/```mermaid block); parseMd turns it back
+          // into a slide on apply, so one edit can revise text AND figure together.
+          const md = stripMarkdownFence(raw);
+          if (md) setResult(md);
+          else setError("Couldn't read the edited slide (empty response).");
         } else if (mode === "diagram-edit") {
           // AI returns the updated DiagramSpec JSON → validate → back to YAML.
           const r = parseJsonLoose(raw);

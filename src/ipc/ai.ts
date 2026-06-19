@@ -8,7 +8,7 @@
 
 import { generateWithClaude } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
-import { deckPlanSystemPrompt, slidePlanSystemPrompt } from "../engine/deck-plan";
+import { deckPlanSystemPrompt, slideMarkdownEditPrompt } from "../engine/deck-plan";
 import { diagramSystemPrompt, diagramEditSystemPrompt } from "../engine/llm-prompts";
 
 export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "custom";
@@ -56,7 +56,7 @@ export function generateWithAI(req: AiRequest): Promise<string> {
     req.mode === "slides"
       ? deckPlanSystemPrompt(today)
       : req.mode === "slide"
-        ? slidePlanSystemPrompt()
+        ? slideMarkdownEditPrompt()
         : req.mode === "diagram-edit"
           ? diagramEditSystemPrompt()
           : diagramSystemPrompt();
