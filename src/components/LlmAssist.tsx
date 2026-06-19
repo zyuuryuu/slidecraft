@@ -135,14 +135,44 @@ export default function LlmAssist({ isOpen, onClose, onImportResult }: LlmAssist
               />
             )}
 
-            <input
-              type="text"
-              value={ai.cfg.model}
-              onChange={(e) => ai.setField("model", e.target.value)}
-              placeholder={ai.preset.native ? "claude-opus-4-8" : "Model name (e.g. gpt-4o)"}
-              className={`${fieldClass} font-mono text-xs`}
-              autoComplete="off"
-            />
+            <div className="flex gap-2 items-center">
+              {ai.models.length > 0 ? (
+                <select
+                  value={ai.cfg.model}
+                  onChange={(e) => ai.setField("model", e.target.value)}
+                  className={`${fieldClass} font-mono text-xs flex-1`}
+                >
+                  {ai.cfg.model && !ai.models.includes(ai.cfg.model) && (
+                    <option value={ai.cfg.model}>{ai.cfg.model}（未インストール）</option>
+                  )}
+                  {ai.models.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={ai.cfg.model}
+                  onChange={(e) => ai.setField("model", e.target.value)}
+                  placeholder={ai.preset.native ? "claude-opus-4-8" : "Model name (e.g. gpt-4o)"}
+                  className={`${fieldClass} font-mono text-xs flex-1`}
+                  autoComplete="off"
+                />
+              )}
+              <button
+                onClick={ai.refreshModels}
+                type="button"
+                title="インストール済みモデルを取得"
+                className="px-2 py-2 text-xs bg-[#2D3A6E] text-gray-200 rounded shrink-0"
+              >
+                ↻
+              </button>
+            </div>
+            {ai.modelsError && (
+              <span className="text-[10px] text-gray-500">
+                モデル一覧を取得できません（{ai.modelsError}）。手入力できます。
+              </span>
+            )}
 
             <div className="flex gap-2 items-center">
               <input

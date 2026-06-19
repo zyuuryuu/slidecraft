@@ -101,12 +101,35 @@ export default function AiPanel({
               onChange={(e) => ai.setField("baseURL", e.target.value)}
             />
           )}
-          <input
-            className={`${field} w-40`}
-            placeholder="model"
-            value={ai.cfg.model}
-            onChange={(e) => ai.setField("model", e.target.value)}
-          />
+          {ai.models.length > 0 ? (
+            <select
+              className={`${field} w-44`}
+              value={ai.cfg.model}
+              onChange={(e) => ai.setField("model", e.target.value)}
+            >
+              {ai.cfg.model && !ai.models.includes(ai.cfg.model) && (
+                <option value={ai.cfg.model}>{ai.cfg.model}（未インストール）</option>
+              )}
+              {ai.models.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className={`${field} w-40`}
+              placeholder="model"
+              value={ai.cfg.model}
+              onChange={(e) => ai.setField("model", e.target.value)}
+            />
+          )}
+          <button
+            onClick={ai.refreshModels}
+            type="button"
+            title="インストール済みモデルを取得"
+            className={`${field} hover:bg-[#2D3A6E]`}
+          >
+            ↻
+          </button>
           <input
             className={`${field} w-56`}
             type="password"

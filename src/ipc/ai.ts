@@ -80,3 +80,32 @@ export function generateWithAI(req: AiRequest): Promise<string> {
     signal: req.signal,
   });
 }
+
+// Known Claude models (no public list endpoint via the SDK path).
+const CLAUDE_MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"];
+
+/**
+ * List the models the provider actually has available, so the UI can offer a
+ * dropdown of installed models (e.g. local Ollama tags) instead of free text.
+ * Uses the OpenAI-compatible `GET {baseURL}/models` for non-native providers.
+ */
+export async function listProviderModels(
+  provider: ProviderId,
+  baseURL: string,
+  apiKey: string,
+): Promise<string[]> {
+  if (provider === "claude") return CLAUDE_MODELS;
+  const base = baseURL.trim().replace(/\/+$/, "");
+  if (!base) throw new Error("Base URL is required.");
+  const res = await fetch(`${base}/models`, {
+    headers: apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = (await res.json()) as {
+    data?: Array<{ id?: string; name?: string }>;
+    models?: Array<{ id?: string; name?: string }>;
+  };
+  const rows = json.data ?? json.models ?? [];
+  const ids = rows.map((m) => m.id ?? m.name).filter((x): x is string => !!x);
+  return [...new Set(ids)].sort();
+}

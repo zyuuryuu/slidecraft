@@ -10,7 +10,7 @@ import { extractDeckPlan, deckPlanToDeck, extractSlidePlan, slidePlanToSlide } f
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
-import { generateWithAI, PROVIDERS, providerPreset, type ProviderId } from "../ipc/ai";
+import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, type ProviderId } from "../ipc/ai";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
 
@@ -64,6 +64,34 @@ export function useAiGeneration() {
     },
     [provider],
   );
+
+  // Installed/available models → a dropdown instead of free-text model names.
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refreshModels = useCallback(() => setRefreshTick((t) => t + 1), []);
+
+  const curBaseURL = cfg.baseURL;
+  const curApiKey = cfg.apiKey;
+  useEffect(() => {
+    let cancelled = false;
+    listProviderModels(provider, curBaseURL, curApiKey)
+      .then((list) => {
+        if (!cancelled) {
+          setModels(list);
+          setModelsError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setModels([]);
+          setModelsError(e instanceof Error ? e.message : String(e));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider, curBaseURL, curApiKey, refreshTick]);
 
   const canGenerate = useCallback(
     (userRequest: string) =>
@@ -155,5 +183,6 @@ export function useAiGeneration() {
     rememberKey, setRememberKey,
     generating, result, setResult, error,
     canGenerate, generate, cancel, reset,
+    models, modelsError, refreshModels,
   };
 }
