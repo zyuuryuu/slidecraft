@@ -1,0 +1,79 @@
+/**
+ * alien-template.test.ts — GUARDRAIL: the harness must work with ANY slide master,
+ * not just the canonical one. Uses a structurally-different CC0 template (different
+ * layout names, placeholder idxs, two masters) to prove template-independence.
+ */
+import { describe, it, expect, beforeAll } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import JSZip from "jszip";
+import { loadTemplate, autoSelectLayout, type TemplateData } from "../src/engine/template-loader";
+import { buildCatalog, classifyLayout, type LayoutCatalog } from "../src/engine/template-catalog";
+import { generatePptx } from "../src/engine/placeholder-filler";
+import { parseMd } from "../src/engine/md-parser";
+import type { SlideIR } from "../src/engine/slide-schema";
+
+const ALIEN = resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx");
+const mk = (phs: SlideIR["placeholders"]): SlideIR => ({ layout: "auto", placeholders: phs });
+const ph = (idx: string, t = "x") => ({ idx, paragraphs: [{ segments: [{ text: t }] }] });
+
+describe("classifyLayout (name-agnostic: dotted → keywords → structure)", () => {
+  const noPh = { hasTitle: true, hasSubtitle: false, bodyCount: 0 };
+  it("keeps the canonical dotted convention", () => {
+    expect(classifyLayout("Content.1Body.Single", { ...noPh, bodyCount: 1 })).toBe("content");
+    expect(classifyLayout("Column.2Body.Equal", { ...noPh, bodyCount: 2 })).toBe("columns");
+  });
+  it("recognizes plain-language real template names", () => {
+    expect(classifyLayout("Title and Content", { ...noPh, bodyCount: 1 })).toBe("content");
+    expect(classifyLayout("Two Columns", { ...noPh, bodyCount: 2 })).toBe("columns");
+    expect(classifyLayout("Two Content", { ...noPh, bodyCount: 2 })).toBe("columns");
+    expect(classifyLayout("Section Title", noPh)).toBe("section");
+    expect(classifyLayout("Presentation Title", { hasTitle: true, hasSubtitle: true, bodyCount: 0 })).toBe("title");
+    expect(classifyLayout("Comparison", { ...noPh, bodyCount: 2 })).toBe("columns");
+  });
+  it("falls back to placeholder STRUCTURE when the name says nothing", () => {
+    expect(classifyLayout("Layout 7", { hasTitle: true, hasSubtitle: false, bodyCount: 1 })).toBe("content");
+    expect(classifyLayout("Custom", { hasTitle: true, hasSubtitle: false, bodyCount: 3 })).toBe("columns");
+    expect(classifyLayout("Custom", { hasTitle: true, hasSubtitle: true, bodyCount: 0 })).toBe("title");
+    expect(classifyLayout("Custom", { hasTitle: true, hasSubtitle: false, bodyCount: 0 })).toBe("section");
+  });
+});
+
+describe("alien CC0 template flows through the harness", () => {
+  let tpl: TemplateData;
+  let cat: LayoutCatalog;
+  beforeAll(async () => {
+    tpl = await loadTemplate(readFileSync(ALIEN));
+    cat = buildCatalog(tpl);
+  });
+
+  it("loads and classifies layouts (NOT all 'other')", () => {
+    expect(tpl.layouts.length).toBeGreaterThan(5);
+    const roles = new Set(cat.map((e) => e.role));
+    expect(roles.has("content")).toBe(true);
+    expect(roles.has("title")).toBe(true);
+    // the catalog must surface real content/column layouts, not collapse to "other"
+    expect(cat.filter((e) => e.role === "other").length).toBeLessThan(cat.length);
+  });
+
+  it("placeholder roles come from TYPE, robust to the alien idx convention", () => {
+    // some layout must expose a title + a body bound by role despite different idxs
+    expect(cat.some((e) => e.hasTitle)).toBe(true);
+    expect(cat.some((e) => e.bodyCount >= 1)).toBe(true);
+  });
+
+  it("autoSelectLayout picks role-appropriate layouts, not the title fallback", () => {
+    const title = autoSelectLayout(mk([ph("15", "T")]), 0, 5, cat);
+    const content = autoSelectLayout(mk([ph("15", "T"), ph("1", "body")]), 1, 5, cat);
+    expect(content).not.toBe(title); // content must NOT collapse onto the title layout
+    expect(cat.find((e) => e.name === content)?.role).toBe("content");
+  });
+
+  it("generates a valid PPTX on the alien template (end-to-end, no crash)", async () => {
+    const deck = parseMd("# 提案\n## 副題\n\n---\n\n# 背景\n\n- 要点A\n- 要点B\n\n---\n\n# まとめ\n");
+    const buf = await generatePptx(deck, tpl);
+    const zip = await JSZip.loadAsync(buf);
+    const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
+    expect(slides.length).toBe(deck.slides.length);
+  });
+});

@@ -85,6 +85,48 @@ export function layoutRole(name: string): LayoutRole {
   return FAMILY_TO_ROLE[family] ?? "other";
 }
 
+// Real-world templates name layouts in plain language ("Title and Content",
+// "Two Columns", "Section Header") — NOT the canonical "Family.Detail" convention.
+// Recognize those keywords so the harness classifies ANY template, not just ours.
+const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
+  [/\b(?:two|three|four|2|3|4|multi)\b[\s\S]*\b(?:column|content|panel|box|option)\b|compar|versus|\bvs\b/i, "columns"],
+  [/\bcolumn\b/i, "columns"],
+  [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b/i, "section"],
+  [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b/i, "closing"],
+  [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
+  [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b/i, "title"],
+];
+
+function nameKeywordRole(name: string): LayoutRole {
+  for (const [re, role] of NAME_KEYWORDS) if (re.test(name)) return role;
+  return "other";
+}
+
+/** Structure-only role from the placeholder composition (the truly name-agnostic backbone). */
+function structureRole(hasTitle: boolean, hasSubtitle: boolean, bodyCount: number): LayoutRole {
+  if (bodyCount >= 2) return "columns";
+  if (bodyCount === 1) return "content";
+  if (hasSubtitle) return "title"; // a no-body cover usually carries a subtitle
+  if (hasTitle) return "section"; // title-only, no body → a divider
+  return "other";
+}
+
+/**
+ * Classify a layout robustly for ANY template: the canonical dotted convention
+ * first, then plain-language name keywords, then the placeholder STRUCTURE as the
+ * name-agnostic fallback. Canonical layouts keep their exact role (step 1).
+ */
+export function classifyLayout(
+  name: string,
+  info: { hasTitle: boolean; hasSubtitle: boolean; bodyCount: number },
+): LayoutRole {
+  const byName = layoutRole(name);
+  if (byName !== "other") return byName;
+  const byKeyword = nameKeywordRole(name);
+  if (byKeyword !== "other") return byKeyword;
+  return structureRole(info.hasTitle, info.hasSubtitle, info.bodyCount);
+}
+
 /** Placeholder role from its PPTX type, with idx conventions as refinement. */
 export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   const t = ph.type.toLowerCase();
@@ -175,12 +217,15 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     })
     .sort((a, b) => (a.idx.length - b.idx.length) || a.idx.localeCompare(b.idx));
 
+  const bodyCount = placeholders.filter((p) => p.role === "body").length;
+  const hasTitle = placeholders.some((p) => p.role === "title");
+  const hasSubtitle = placeholders.some((p) => p.role === "subtitle");
   return {
     name: layout.name,
-    role: layoutRole(layout.name),
-    bodyCount: placeholders.filter((p) => p.role === "body").length,
-    hasTitle: placeholders.some((p) => p.role === "title"),
-    hasSubtitle: placeholders.some((p) => p.role === "subtitle"),
+    role: classifyLayout(layout.name, { hasTitle, hasSubtitle, bodyCount }),
+    bodyCount,
+    hasTitle,
+    hasSubtitle,
     placeholders,
   };
 }
