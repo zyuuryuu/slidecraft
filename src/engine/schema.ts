@@ -11,8 +11,14 @@ import { z } from "zod/v4";
 
 export const VALID_SHAPES = [
   "rect", "rounded_rect", "diamond", "circle", "oval", "hexagon", "class",
+  // state-diagram pseudo-states (●/◉) + ER entity box (name + attributes)
+  "start", "end", "entity",
 ] as const;
 export type ShapeType = (typeof VALID_SHAPES)[number];
+
+// ER relationship cardinality (crow's-foot) at an edge end.
+export const VALID_CARDINALITIES = ["one", "zero_one", "zero_many", "one_many"] as const;
+export type Cardinality = (typeof VALID_CARDINALITIES)[number];
 
 // UML relationship kinds for class diagrams — drive the edge's line + arrowhead.
 export const VALID_RELATIONS = [
@@ -125,6 +131,9 @@ export const EdgeSchema = z.object({
   // UML relationship for class diagrams (inheritance/composition/…) — selects the
   // line dash + the end arrowheads (hollow triangle, filled/hollow diamond, …).
   relation: z.enum(VALID_RELATIONS).optional(),
+  // ER cardinality (crow's-foot) at the source / target end of a relationship.
+  srcCard: z.enum(VALID_CARDINALITIES).optional(),
+  tgtCard: z.enum(VALID_CARDINALITIES).optional(),
 });
 export type Edge = z.infer<typeof EdgeSchema>;
 

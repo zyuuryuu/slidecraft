@@ -7,7 +7,7 @@
 
 import yaml from "js-yaml";
 import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
-import { parseMermaidClassDiagram, parseMermaidSequence } from "./mermaid-uml-parser";
+import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState } from "./mermaid-uml-parser";
 
 export type DiagramFormat = "yaml" | "json" | "mermaid";
 
@@ -179,6 +179,7 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
 
   if (/^classDiagram\b/i.test(lines[0])) return parseMermaidClassDiagram(lines);
   if (/^sequenceDiagram\b/i.test(lines[0])) return parseMermaidSequence(lines);
+  if (/^stateDiagram(-v2)?\b/i.test(lines[0])) return parseMermaidState(lines);
 
   // Parse direction from first line: graph TD, graph LR, etc.
   const headerMatch = lines[0].match(/^(?:graph|flowchart)\s+(TD|TB|LR|RL|BT)/i);

@@ -69,6 +69,41 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
   return r.success ? r.data : null;
 }
 
+/** Parse a Mermaid `stateDiagram`/`stateDiagram-v2` into a DiagramSpec: states →
+ *  rounded-rect nodes, `[*]` → start/end pseudo-state dots, transitions → edges.
+ *  Composite (nested) states are flattened for now. */
+export function parseMermaidState(lines: string[]): DiagramSpec | null {
+  const nodes = new Map<string, { id: string; label: string; shape: string }>();
+  const edges: Array<{ from: string; to: string; label?: string }> = [];
+  // `[*]` means the initial state as a source, the final state as a target.
+  const ensure = (raw: string, asTarget: boolean): string => {
+    if (raw === "[*]") {
+      const id = asTarget ? "__end" : "__start";
+      if (!nodes.has(id)) nodes.set(id, { id, label: "", shape: asTarget ? "end" : "start" });
+      return id;
+    }
+    if (!nodes.has(raw)) nodes.set(raw, { id: raw, label: raw, shape: "rounded_rect" });
+    return raw;
+  };
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%") || line === "}" || /^direction\s/i.test(line)) continue;
+    // state declaration: `state "Label" as X` (custom label) or `state X`
+    const named = line.match(/^state\s+"([^"]+)"\s+as\s+(\w+)/);
+    if (named) { nodes.set(named[2], { id: named[2], label: named[1], shape: "rounded_rect" }); continue; }
+    const decl = line.match(/^state\s+(\w+)/);
+    if (decl) { if (!nodes.has(decl[1])) nodes.set(decl[1], { id: decl[1], label: decl[1], shape: "rounded_rect" }); continue; }
+    // transition: A --> B [: label]   (A or B may be [*])
+    const t = line.match(/^(\[\*\]|\w+)\s*-->\s*(\[\*\]|\w+)\s*(?::\s*(.+))?$/);
+    if (t) {
+      edges.push({ from: ensure(t[1], false), to: ensure(t[2], true), label: t[3]?.trim() || undefined });
+    }
+  }
+  if (nodes.size === 0) return null;
+  const r = DiagramSpecSchema.safeParse({ type: "flowchart", direction: "TB", nodes: [...nodes.values()], edges });
+  return r.success ? r.data : null;
+}
+
 /** Parse a Mermaid `sequenceDiagram` into a DiagramSpec (type "sequence"):
  *  participants → ordered nodes, messages → ordered edges (dashed for `-->>`). */
 export function parseMermaidSequence(lines: string[]): DiagramSpec | null {

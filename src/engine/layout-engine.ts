@@ -385,11 +385,17 @@ function computeLayoutV1(
   const diamondIds = new Set(
     spec.nodes.filter((n) => n.shape === "diamond").map((n) => n.id),
   );
+  // state-diagram pseudo-states (start/end) render as a small dot, not a full cell.
+  const MARKER_SIZE = 0.34;
+  const markerIds = new Set(
+    spec.nodes.filter((n) => n.shape === "start" || n.shape === "end").map((n) => n.id),
+  );
   const nodeHMap = new Map<string, number>();
   for (const n of spec.nodes) {
     let h = nh;
-    if (diamondIds.has(n.id)) h = nh * 1.6;
-    else if (n.shape === "class") {
+    if (markerIds.has(n.id)) h = MARKER_SIZE;
+    else if (diamondIds.has(n.id)) h = nh * 1.6;
+    else if (n.shape === "class" || n.shape === "entity") {
       // name compartment + one row per attribute/method (so the box fits its members)
       const members = (n.attributes?.length ?? 0) + (n.methods?.length ?? 0);
       h = 0.4 + Math.max(members, 1) * 0.26 + 0.1;
@@ -446,10 +452,17 @@ function computeLayoutV1(
         }
       }
 
+      // A pseudo-state is a small dot: shrink its box and centre it in the cell so
+      // edges connect to the dot, not to an invisible full-width node.
+      const isMarker = markerIds.has(nid);
+      const thisW = isMarker ? MARKER_SIZE : nw;
+      const nodeX = isMarker ? x + (nw - thisW) / 2 : x;
+      const nodeY = isMarker && isHorizontal ? y + (nh - thisH) / 2 : y;
+
       positions.push({
         nodeId: nid,
-        x, y,
-        w: nw, h: thisH,
+        x: nodeX, y: nodeY,
+        w: thisW, h: thisH,
         layer: layerIdx,
         order: i,
         scale: 1.0,
@@ -519,11 +532,17 @@ function computeLayoutV2(
   const diamondIds = new Set(
     spec.nodes.filter((n) => n.shape === "diamond").map((n) => n.id),
   );
+  // state-diagram pseudo-states (start/end) render as a small dot, not a full cell.
+  const MARKER_SIZE = 0.34;
+  const markerIds = new Set(
+    spec.nodes.filter((n) => n.shape === "start" || n.shape === "end").map((n) => n.id),
+  );
   const nodeHMap = new Map<string, number>();
   for (const n of spec.nodes) {
     let h = nh;
-    if (diamondIds.has(n.id)) h = nh * 1.6;
-    else if (n.shape === "class") {
+    if (markerIds.has(n.id)) h = MARKER_SIZE;
+    else if (diamondIds.has(n.id)) h = nh * 1.6;
+    else if (n.shape === "class" || n.shape === "entity") {
       // name compartment + one row per attribute/method (so the box fits its members)
       const members = (n.attributes?.length ?? 0) + (n.methods?.length ?? 0);
       h = 0.4 + Math.max(members, 1) * 0.26 + 0.1;
@@ -1031,11 +1050,17 @@ function computeLayoutSwimlane(
   const diamondIds = new Set(
     spec.nodes.filter((n) => n.shape === "diamond").map((n) => n.id),
   );
+  // state-diagram pseudo-states (start/end) render as a small dot, not a full cell.
+  const MARKER_SIZE = 0.34;
+  const markerIds = new Set(
+    spec.nodes.filter((n) => n.shape === "start" || n.shape === "end").map((n) => n.id),
+  );
   const nodeHMap = new Map<string, number>();
   for (const n of spec.nodes) {
     let h = nh;
-    if (diamondIds.has(n.id)) h = nh * 1.6;
-    else if (n.shape === "class") {
+    if (markerIds.has(n.id)) h = MARKER_SIZE;
+    else if (diamondIds.has(n.id)) h = nh * 1.6;
+    else if (n.shape === "class" || n.shape === "entity") {
       // name compartment + one row per attribute/method (so the box fits its members)
       const members = (n.attributes?.length ?? 0) + (n.methods?.length ?? 0);
       h = 0.4 + Math.max(members, 1) * 0.26 + 0.1;

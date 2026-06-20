@@ -26,6 +26,11 @@ import type { DiagramSpec } from "./schema";
  */
 export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "sequence") return true;
+  // state diagram (has start/end pseudo-states) — faithful (custom labels via
+  // `state "x" as id`); only block when node styles/groups/lanes would be lost.
+  if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
+    return spec.groups.length === 0 && spec.lanes.length === 0 && spec.nodes.every((n) => !n.style);
+  }
   const isClass = spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation);
   if (isClass) {
     return (
@@ -131,10 +136,30 @@ function classSpecToMermaid(spec: DiagramSpec): string {
   return s;
 }
 
+// ── State → Mermaid (stateDiagram-v2) ──
+
+function stateSpecToMermaid(spec: DiagramSpec): string {
+  let s = "stateDiagram-v2\n";
+  // a custom label (≠ id) needs an explicit `state "Label" as id` declaration
+  for (const n of spec.nodes) {
+    if (n.shape === "start" || n.shape === "end") continue; // pseudo-states are implicit ([*])
+    if (n.label && n.label !== n.id) s += `  state "${n.label}" as ${n.id}\n`;
+  }
+  const ref = (id: string): string => {
+    const n = spec.nodes.find((x) => x.id === id);
+    return n && (n.shape === "start" || n.shape === "end") ? "[*]" : id;
+  };
+  for (const e of spec.edges) {
+    s += `  ${ref(e.from)} --> ${ref(e.to)}${e.label ? ` : ${e.label}` : ""}\n`;
+  }
+  return s;
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
-  // Dispatch by diagram kind so sequence/class round-trip faithfully (the parser
-  // already reads sequenceDiagram/classDiagram back).
+  // Dispatch by diagram kind so sequence/state/class round-trip faithfully (the
+  // parser already reads each dialect back).
   if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
+  if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) return stateSpecToMermaid(spec);
   if (spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation)) {
     return classSpecToMermaid(spec);
   }
@@ -202,7 +227,7 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
   yaml += `\nnodes:\n`;
   for (const node of spec.nodes) {
     yaml += `  - id: ${node.id}\n`;
-    yaml += `    label: ${node.label}\n`;
+    yaml += `    label: ${q(node.label)}\n`; // quote: an empty label (start/end dots) would otherwise be YAML null
     if (node.shape && node.shape !== "rect") yaml += `    shape: ${node.shape}\n`;
     if (node.attributes?.length) yaml += `    attributes:\n${node.attributes.map((a) => `      - ${q(a)}`).join("\n")}\n`;
     if (node.methods?.length) yaml += `    methods:\n${node.methods.map((m) => `      - ${q(m)}`).join("\n")}\n`;

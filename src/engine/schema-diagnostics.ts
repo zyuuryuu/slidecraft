@@ -76,7 +76,7 @@ const KNOWN_FIELDS_NODE = new Set([
 const REQUIRED_FIELDS_NODE = new Set(["id", "label"]);
 
 const KNOWN_FIELDS_EDGE = new Set([
-  "from", "to", "label", "style", "bus_group",
+  "from", "to", "label", "style", "bus_group", "relation", "srcCard", "tgtCard",
 ]);
 const REQUIRED_FIELDS_EDGE = new Set(["from", "to"]);
 

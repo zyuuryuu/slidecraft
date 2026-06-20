@@ -67,6 +67,22 @@ function paintClassNode(
   }
 }
 
+/** State-diagram pseudo-states: `start` = a solid dot, `end` = a ring with a
+ *  filled centre. Centred in the (small) node box from the layout. */
+function paintStateMarker(t: DrawTarget, node: Node, pos: NodePosition, theme: ThemeConfig): void {
+  const dot = theme.palette.accent;
+  const d = Math.min(pos.w, pos.h);
+  const cx = pos.x + pos.w / 2;
+  const cy = pos.y + pos.h / 2;
+  const box = (dd: number) => ({ x: cx - dd / 2, y: cy - dd / 2, w: dd, h: dd });
+  if (node.shape === "end") {
+    t.shape("circle", box(d), { fill: null, line: { color: dot, width: 1.5 } });
+    t.shape("circle", box(d * 0.5), { fill: dot, line: { color: dot, width: 0 } });
+  } else {
+    t.shape("circle", box(d), { fill: dot, line: { color: dot, width: 0 } });
+  }
+}
+
 export function paintShape(
   t: DrawTarget,
   node: Node,
@@ -75,8 +91,12 @@ export function paintShape(
   theme: ThemeConfig,
   layoutScale: number,
 ): void {
-  if (node.shape === "class") {
+  if (node.shape === "class" || node.shape === "entity") {
     paintClassNode(t, node, pos, style, theme, layoutScale);
+    return;
+  }
+  if (node.shape === "start" || node.shape === "end") {
+    paintStateMarker(t, node, pos, theme);
     return;
   }
   const fillColor = style.fill ?? theme.palette.navy;

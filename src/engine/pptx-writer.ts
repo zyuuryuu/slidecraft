@@ -31,6 +31,11 @@ const PPTX_SHAPE_MAP: Record<ShapeType, string> = {
   oval: "ellipse",
   hexagon: "hexagon",
   class: "rect", // class boxes are drawn as a rect + compartment dividers/text
+  // drawn specially by paintShape (start/end = circles, entity = box + divider);
+  // these fallbacks only apply if ever passed through the generic shape path.
+  start: "ellipse",
+  end: "ellipse",
+  entity: "rect",
 };
 
 function hexToRgb(hex: string): string {
