@@ -193,6 +193,26 @@ class SvgDrawTarget implements DrawTarget {
     );
   }
 
+  wedge(
+    cx: number, cy: number, r: number, startDeg: number, endDeg: number,
+    opts: { fill: string; line?: LineSpec },
+  ): void {
+    const rad = (d: number) => (d * Math.PI) / 180;
+    const x1 = px(cx + r * Math.cos(rad(startDeg)));
+    const y1 = px(cy + r * Math.sin(rad(startDeg)));
+    const x2 = px(cx + r * Math.cos(rad(endDeg)));
+    const y2 = px(cy + r * Math.sin(rad(endDeg)));
+    const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0; // sweep=1 = clockwise (matches PPTX)
+    let stroke = "";
+    if (opts.line && opts.line.width > 0 && opts.line.color !== undefined) {
+      stroke = ` stroke="${col(opts.line.color)}" stroke-width="${Math.max(opts.line.width * PT, 0.5)}"`;
+    }
+    this.parts.push(
+      `<path d="M ${px(cx)} ${px(cy)} L ${x1} ${y1} A ${px(r)} ${px(r)} 0 ${largeArc} 1 ${x2} ${y2} Z" ` +
+        `fill="${col(opts.fill)}"${stroke}/>`,
+    );
+  }
+
   toSvg(): string {
     const W = px(SLIDE_W);
     const H = px(SLIDE_H);

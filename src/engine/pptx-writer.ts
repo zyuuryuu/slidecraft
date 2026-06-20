@@ -135,6 +135,21 @@ class PptxDrawTarget implements DrawTarget {
     });
   }
 
+  wedge(cx: number, cy: number, r: number, startDeg: number, endDeg: number, opts: { fill: string; line?: LineSpec }): void {
+    this.addLeaf();
+    const shapeOpts: Record<string, unknown> = {
+      x: cx - r, y: cy - r, w: 2 * r, h: 2 * r,
+      angleRange: [startDeg, endDeg],
+      fill: { color: hexToRgb(opts.fill) },
+    };
+    if (opts.line) {
+      const line: Record<string, unknown> = { width: opts.line.width };
+      if (opts.line.color !== undefined) line.color = hexToRgb(opts.line.color);
+      shapeOpts.line = line;
+    }
+    this.slide.addShape("pie" as keyof typeof PptxGenJS.ShapeType, shapeOpts as PptxGenJS.ShapeProps);
+  }
+
   text(lines: TextRun[], box: Box, opts: TextOpts): void {
     this.addLeaf();
     const container: PptxGenJS.TextPropsOptions = { x: box.x, y: box.y, w: box.w, h: box.h };

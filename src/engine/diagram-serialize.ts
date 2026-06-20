@@ -28,6 +28,7 @@ export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "sequence") return true;
   if (spec.type === "timeline") return true; // periods/events/sections/title all round-trip
   if (spec.type === "quadrant") return true; // axis/quadrant labels + points all round-trip
+  if (spec.type === "pie") return true; // slices (label + value) + title round-trip
   // state diagram (has start/end pseudo-states) — faithful (custom labels via
   // `state "x" as id`); only block when node styles/groups/lanes would be lost.
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
@@ -217,9 +218,20 @@ function quadrantSpecToMermaid(spec: DiagramSpec): string {
   return s;
 }
 
+// ── Pie → Mermaid (pie) ──
+
+function pieSpecToMermaid(spec: DiagramSpec): string {
+  let s = "pie";
+  if (spec.title) s += ` title ${spec.title}`;
+  s += "\n";
+  for (const n of spec.nodes) s += `  "${n.label}" : ${n.value ?? 0}\n`;
+  return s;
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
-  // Dispatch by diagram kind so sequence/timeline/quadrant/state/ER/class
+  // Dispatch by diagram kind so sequence/timeline/quadrant/pie/state/ER/class
   // round-trip faithfully (the parser already reads each dialect back).
+  if (spec.type === "pie") return pieSpecToMermaid(spec);
   if (spec.type === "quadrant") return quadrantSpecToMermaid(spec);
   if (spec.type === "timeline") return timelineSpecToMermaid(spec);
   if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
@@ -297,6 +309,7 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `    label: ${q(node.label)}\n`; // quote: an empty label (start/end dots) would otherwise be YAML null
     if (node.shape && node.shape !== "rect") yaml += `    shape: ${node.shape}\n`;
     if (node.group) yaml += `    group: ${q(node.group)}\n`; // timeline sections (+ flowchart subgraph membership)
+    if (node.value !== undefined) yaml += `    value: ${node.value}\n`; // pie slice / chart value
     if (node.attributes?.length) yaml += `    attributes:\n${node.attributes.map((a) => `      - ${q(a)}`).join("\n")}\n`;
     if (node.methods?.length) yaml += `    methods:\n${node.methods.map((m) => `      - ${q(m)}`).join("\n")}\n`;
     if (node.override) {

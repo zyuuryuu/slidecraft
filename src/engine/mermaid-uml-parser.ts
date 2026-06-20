@@ -73,6 +73,33 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
   return r.success ? r.data : null;
 }
 
+/** Parse a Mermaid `pie` chart into a DiagramSpec (type "pie"): each
+ *  `"Label" : value` line → a node (label + numeric value); `pie title X` or a
+ *  `title X` line sets the title. */
+export function parseMermaidPie(lines: string[]): DiagramSpec | null {
+  let title: string | undefined;
+  const tm = lines[0].match(/^pie\b.*?\btitle\s+(.+)$/i);
+  if (tm) title = tm[1].trim();
+  const slices: Array<{ label: string; value: number }> = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%") || /^showData\b/i.test(line)) continue;
+    const t = line.match(/^title\s+(.+)$/i);
+    if (t) { title = t[1].trim(); continue; }
+    const sl = line.match(/^"([^"]+)"\s*:\s*([\d.]+)$/) || line.match(/^(.+?)\s*:\s*([\d.]+)$/);
+    if (sl) slices.push({ label: sl[1].trim(), value: parseFloat(sl[2]) });
+  }
+  if (slices.length === 0) return null;
+  const r = DiagramSpecSchema.safeParse({
+    type: "pie",
+    direction: "TB",
+    title,
+    nodes: slices.map((s, i) => ({ id: `s${i}`, label: s.label, value: s.value })),
+    edges: [],
+  });
+  return r.success ? r.data : null;
+}
+
 /** Parse a Mermaid `quadrantChart` into a DiagramSpec (type "quadrant"): axis
  *  labels (`x-axis L --> H`), four `quadrant-N` labels, and `Name: [x, y]` points. */
 export function parseMermaidQuadrant(lines: string[]): DiagramSpec | null {

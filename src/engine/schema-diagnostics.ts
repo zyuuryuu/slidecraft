@@ -72,6 +72,7 @@ const REQUIRED_FIELDS_TOP = new Set(["type", "nodes"]);
 
 const KNOWN_FIELDS_NODE = new Set([
   "id", "label", "sublabel", "shape", "class", "style", "group", "lane", "icon",
+  "attributes", "methods", "value", "override",
 ]);
 const REQUIRED_FIELDS_NODE = new Set(["id", "label"]);
 

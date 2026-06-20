@@ -69,6 +69,12 @@ export interface DrawTarget {
    */
   beginGroup(): void;
   endGroup(): void;
+  /**
+   * Draw a filled pie wedge: a slice of a circle centred at (cx,cy) with radius r,
+   * sweeping from startDeg to endDeg (degrees, 0 = 3 o'clock, increasing clockwise).
+   * For pie charts. Optional outline separates adjacent slices.
+   */
+  wedge(cx: number, cy: number, r: number, startDeg: number, endDeg: number, opts: { fill: string; line?: LineSpec }): void;
 }
 
 export interface PaintOptions {
@@ -142,6 +148,12 @@ export class TransformedTarget implements DrawTarget {
   }
   endGroup(): void {
     this.t.endGroup();
+  }
+  wedge(cx: number, cy: number, r: number, startDeg: number, endDeg: number, opts: { fill: string; line?: LineSpec }): void {
+    this.t.wedge(cx * this.s + this.ox, cy * this.s + this.oy, r * this.s, startDeg, endDeg, {
+      fill: opts.fill,
+      line: opts.line ? { ...opts.line, width: opts.line.width * this.s } : undefined,
+    });
   }
 }
 

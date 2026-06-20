@@ -342,18 +342,21 @@ graph TD
   });
 
   it("an unsupported ```mermaid type stays as a mermaid image fallback", () => {
-    // pie/gantt/state etc. aren't converted to DiagramSpec yet → image fallback
+    // journey/gantt/mindmap etc. have no native engine yet → mermaid.js image.
+    // (pie/quadrant/timeline/state/ER ARE native now and graduate to .diagram.)
     const md = `# Chart
 
 \`\`\`mermaid
-pie title Pets
-  "Dogs" : 386
-  "Cats" : 85
+journey
+  title My working day
+  section Go to work
+    Make tea: 5: Me
+    Drive: 3: Me
 \`\`\``;
 
     const s = parseMd(md).slides[0];
     expect(s.mermaidBlock).toBeDefined();
-    expect(s.mermaidBlock!.mermaid).toContain("pie");
+    expect(s.mermaidBlock!.mermaid).toContain("journey");
     expect(s.diagram).toBeUndefined();
   });
 

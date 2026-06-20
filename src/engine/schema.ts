@@ -29,7 +29,7 @@ export type RelationType = (typeof VALID_RELATIONS)[number];
 export const VALID_DIRECTIONS = ["TB", "LR", "BT", "RL"] as const;
 export type Direction = (typeof VALID_DIRECTIONS)[number];
 
-export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant"] as const;
+export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant", "pie"] as const;
 export type DiagramType = (typeof VALID_TYPES)[number];
 
 export const BUILTIN_ICONS = new Set([
@@ -114,6 +114,8 @@ export const NodeSchema = z.object({
   attributes: z.array(z.string()).optional(),
   methods: z.array(z.string()).optional(),
   class: z.string().optional(),
+  // Numeric value for chart-type diagrams (pie slice magnitude; reusable for bar/gantt).
+  value: z.number().optional(),
   style: NodeStyleSchema.optional(),
   group: z.string().optional(),
   lane: z.string().optional(),

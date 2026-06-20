@@ -40,6 +40,7 @@ import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, pa
 import { computeSequenceLayout, paintSequence } from "./diagram-sequence";
 import { computeTimelineLayout, paintTimeline } from "./diagram-timeline";
 import { computeQuadrantLayout, paintQuadrant } from "./diagram-quadrant";
+import { computePieLayout, paintPie } from "./diagram-pie";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -133,6 +134,23 @@ export function paintDiagram(
     qdt.beginGroup();
     paintQuadrant(qdt, ql, theme, spec.quadrant);
     qdt.endGroup();
+    return;
+  }
+
+  // Pie charts: wedges + legend (a chart engine).
+  if (spec.type === "pie") {
+    const pl = computePieLayout(spec, contentTop);
+    let pdt: DrawTarget = t;
+    if (options.transform) {
+      const { scale, offsetX, offsetY } = options.transform;
+      pdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    } else if (options.region) {
+      const { scale, offsetX, offsetY } = fitTransform(pl.bbox, options.region);
+      pdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    }
+    pdt.beginGroup();
+    paintPie(pdt, pl, theme);
+    pdt.endGroup();
     return;
   }
 
