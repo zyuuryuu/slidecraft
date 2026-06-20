@@ -1319,14 +1319,17 @@ export function planEdgeRoute(
   }
 
   if (routeType === "l_route") {
-    // L-route: via elbow point
+    // Manhattan route with the bend at the MIDPOINT between the nodes, so the final
+    // segment approaches the target PERPENDICULAR and straight (the arrowhead has
+    // room). The old single elbow landed on the target's edge, so the last segment
+    // ran ALONG that edge and crushed the arrowhead right at the node.
     const isVertical = direction === "TB" || direction === "BT";
     if (isVertical) {
-      // Go vertically first, then horizontally
-      return [src, { x: src.x, y: tgt.y }, tgt];
+      const midY = (src.y + tgt.y) / 2;
+      return [src, { x: src.x, y: midY }, { x: tgt.x, y: midY }, tgt];
     } else {
-      // Go horizontally first, then vertically
-      return [src, { x: tgt.x, y: src.y }, tgt];
+      const midX = (src.x + tgt.x) / 2;
+      return [src, { x: midX, y: src.y }, { x: midX, y: tgt.y }, tgt];
     }
   }
 

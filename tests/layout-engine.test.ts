@@ -484,10 +484,15 @@ describe("planEdgeRoute", () => {
     expect(points).toHaveLength(2);
   });
 
-  it("returns 3 points for L-route", () => {
+  it("L-route bends at the midpoint so the arrow enters the node perpendicular", () => {
     const offset: NodePosition = { ...to, x: 8 };
     const points = planEdgeRoute(from, offset, "rect", "rect", "TB", "l_route");
-    expect(points).toHaveLength(3);
+    expect(points).toHaveLength(4); // Manhattan: src → midbend → midbend → tgt
+    const midY = (points[0].y + points[3].y) / 2;
+    expect(points[1].y).toBeCloseTo(midY);
+    expect(points[2].y).toBeCloseTo(midY);
+    // final segment is straight into the target (same x) — arrowhead not crushed at the edge
+    expect(points[2].x).toBeCloseTo(points[3].x);
   });
 
   it("returns 4 points for back-edge route", () => {
