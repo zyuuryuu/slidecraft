@@ -9,8 +9,8 @@ import { useMemo, useRef, useState } from "react";
 import yaml from "js-yaml";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
-import { DiagramSpecSchema } from "../engine/schema";
-import { computeLayout, SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H } from "../engine/layout-engine";
+import { DiagramSpecSchema, EdgeStyleSchema } from "../engine/schema";
+import { computeLayout, detectCp, cpCoords, SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H, type NodePosition } from "../engine/layout-engine";
 import { fitTransform } from "../engine/draw-target";
 
 // ── Diagram (```diagram) renderer — shares the PPTX painter for true WYSIWYG ──
@@ -34,7 +34,9 @@ export default function DiagramSvgOverlay({
   const moveRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
   const resizeRef = useRef<{ id: string; x: number; y: number } | null>(null);
   const movedRef = useRef(false);
+  const edgePortRef = useRef<{ idx: number; side: number; node: NodePosition } | null>(null);
   const [draft, setDraft] = useState<{ id: string; ov: Override } | null>(null);
+  const [edgeDraft, setEdgeDraft] = useState<{ idx: number; srcPort: number } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
   const spec = useMemo(() => {
@@ -46,17 +48,31 @@ export default function DiagramSvgOverlay({
     }
   }, [diagramYaml]);
 
-  // Spec with the live draft override applied (preview follows the drag).
+  // Spec with the live draft applied (preview follows the drag) — node override
+  // AND an edge's start-port while it is being dragged.
   const draftSpec = useMemo(() => {
     if (!spec) return null;
-    if (!draft) return spec;
-    return {
-      ...spec,
-      nodes: spec.nodes.map((n) =>
-        n.id === draft.id ? { ...n, override: { ...n.override, ...draft.ov } } : n,
-      ),
-    };
-  }, [spec, draft]);
+    let s = spec;
+    if (draft) {
+      s = {
+        ...s,
+        nodes: s.nodes.map((n) =>
+          n.id === draft.id ? { ...n, override: { ...n.override, ...draft.ov } } : n,
+        ),
+      };
+    }
+    if (edgeDraft) {
+      s = {
+        ...s,
+        edges: s.edges.map((e, i) =>
+          i === edgeDraft.idx
+            ? { ...e, style: EdgeStyleSchema.parse({ ...e.style, srcPort: edgeDraft.srcPort }) }
+            : e,
+        ),
+      };
+    }
+    return s;
+  }, [spec, draft, edgeDraft]);
 
   // Region→pixels transform, computed from the COMMITTED spec so it stays fixed
   // while a node is dragged (no rescale jank). Identity when there's no region.
@@ -89,6 +105,28 @@ export default function DiagramSvgOverlay({
   const positions = useMemo(() => (draftSpec ? computeLayout(draftSpec) : []), [draftSpec]);
   const selectedPos = selected ? positions.find((p) => p.nodeId === selected) : undefined;
   const selectedHasOverride = !!selected && !!spec?.nodes.find((n) => n.id === selected)?.override;
+
+  // A drag handle at the START of each edge leaving the selected node. Dragging it
+  // along the node's edge sets that edge's srcPort (move where the arrow attaches).
+  const edgeHandles = useMemo(() => {
+    if (!spec || !selected) return [];
+    const selNode = spec.nodes.find((n) => n.id === selected);
+    if (!selNode || selNode.shape === "diamond") return []; // diamonds ignore the port offset
+    const posMap = new Map(positions.map((p) => [p.nodeId, p]));
+    const srcPos = posMap.get(selected);
+    if (!srcPos) return [];
+    const out: Array<{ idx: number; side: number; x: number; y: number; node: NodePosition }> = [];
+    spec.edges.forEach((e, i) => {
+      if (e.from !== selected) return;
+      const tgtPos = posMap.get(e.to);
+      if (!tgtPos) return;
+      const side = detectCp(srcPos, tgtPos, spec.direction)[0];
+      const port = edgeDraft?.idx === i ? edgeDraft.srcPort : e.style?.srcPort ?? 0;
+      const cp = cpCoords(srcPos, side, selNode.shape ?? "rect", port);
+      out.push({ idx: i, side, x: cp.x, y: cp.y, node: srcPos });
+    });
+    return out;
+  }, [spec, selected, positions, edgeDraft]);
 
   // Cursor → diagram LAYOUT inches (inverse of the region transform), so drag math
   // and overrides stay in the diagram's own coordinate space (region or full-slide).
@@ -128,6 +166,29 @@ export default function DiagramSvgOverlay({
     }
   }
 
+  function writeEdgePort(idx: number, srcPort: number) {
+    try {
+      const raw = yaml.load(diagramYaml) as { edges?: Array<Record<string, unknown>> };
+      const edge = raw.edges?.[idx];
+      if (!edge) return;
+      const style = { ...((edge.style as Record<string, unknown>) ?? {}) };
+      if (Math.abs(srcPort) < 0.03) delete style.srcPort; // snap-to-centre clears it
+      else style.srcPort = Math.round(srcPort * 100) / 100;
+      edge.style = style;
+      onChange?.(dumpDiagramLikeSource(raw, diagramYaml));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onEdgePortDown(e: React.PointerEvent, idx: number, side: number, node: NodePosition) {
+    e.stopPropagation();
+    e.preventDefault();
+    edgePortRef.current = { idx, side, node };
+    movedRef.current = false;
+    ref.current!.setPointerCapture(e.pointerId);
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if (!spec) return;
     const c = toInches(e);
@@ -156,6 +217,16 @@ export default function DiagramSvgOverlay({
 
   function onPointerMove(e: React.PointerEvent) {
     const c = toInches(e);
+    if (edgePortRef.current) {
+      movedRef.current = true;
+      const ep = edgePortRef.current;
+      const cx = ep.node.x + ep.node.w / 2;
+      const cy = ep.node.y + ep.node.h / 2;
+      const horizontal = ep.side === 0 || ep.side === 2; // top/bottom edge → slide along x
+      const frac = horizontal ? (c.x - cx) / ep.node.w : (c.y - cy) / ep.node.h;
+      setEdgeDraft({ idx: ep.idx, srcPort: Math.max(-0.45, Math.min(0.45, frac)) });
+      return;
+    }
     if (resizeRef.current) {
       movedRef.current = true;
       const r = resizeRef.current;
@@ -168,6 +239,13 @@ export default function DiagramSvgOverlay({
   }
 
   function onPointerUp() {
+    if (edgePortRef.current) {
+      const cur = edgeDraft;
+      edgePortRef.current = null;
+      setEdgeDraft(null);
+      if (movedRef.current && cur) writeEdgePort(cur.idx, cur.srcPort);
+      return;
+    }
     const id = resizeRef.current?.id ?? moveRef.current?.id;
     const cur = draft;
     resizeRef.current = null;
@@ -266,6 +344,29 @@ export default function DiagramSvgOverlay({
           )}
         </>
       )}
+
+      {/* edge start-port handles: drag to move where each outgoing arrow attaches */}
+      {editable &&
+        edgeHandles.map((h) => (
+          <div
+            key={`ep-${h.idx}`}
+            onPointerDown={(e) => onEdgePortDown(e, h.idx, h.side, h.node)}
+            title="ドラッグで矢印の始点を移動"
+            style={{
+              position: "absolute",
+              left: `${((h.x * baseTf.scale + baseTf.offsetX) / DIAGRAM_W) * 100}%`,
+              top: `${((h.y * baseTf.scale + baseTf.offsetY) / DIAGRAM_H) * 100}%`,
+              width: 9,
+              height: 9,
+              transform: "translate(-50%, -50%)",
+              background: "#06B6D4",
+              border: "1.5px solid #fff",
+              borderRadius: "50%",
+              cursor: "grab",
+              pointerEvents: "auto",
+            }}
+          />
+        ))}
     </div>
   );
 }
