@@ -27,6 +27,7 @@ import type { DiagramSpec } from "./schema";
 export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "sequence") return true;
   if (spec.type === "timeline") return true; // periods/events/sections/title all round-trip
+  if (spec.type === "quadrant") return true; // axis/quadrant labels + points all round-trip
   // state diagram (has start/end pseudo-states) — faithful (custom labels via
   // `state "x" as id`); only block when node styles/groups/lanes would be lost.
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
@@ -200,9 +201,26 @@ function timelineSpecToMermaid(spec: DiagramSpec): string {
   return s;
 }
 
+// ── Quadrant → Mermaid (quadrantChart) ──
+
+function quadrantSpecToMermaid(spec: DiagramSpec): string {
+  const q = spec.quadrant;
+  let s = "quadrantChart\n";
+  if (spec.title) s += `  title ${spec.title}\n`;
+  if (q?.xLow || q?.xHigh) s += `  x-axis ${q.xLow} --> ${q.xHigh}\n`;
+  if (q?.yLow || q?.yHigh) s += `  y-axis ${q.yLow} --> ${q.yHigh}\n`;
+  if (q?.q1) s += `  quadrant-1 ${q.q1}\n`;
+  if (q?.q2) s += `  quadrant-2 ${q.q2}\n`;
+  if (q?.q3) s += `  quadrant-3 ${q.q3}\n`;
+  if (q?.q4) s += `  quadrant-4 ${q.q4}\n`;
+  for (const p of q?.points ?? []) s += `  ${p.label}: [${p.x}, ${p.y}]\n`;
+  return s;
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
-  // Dispatch by diagram kind so sequence/timeline/state/ER/class round-trip
-  // faithfully (the parser already reads each dialect back).
+  // Dispatch by diagram kind so sequence/timeline/quadrant/state/ER/class
+  // round-trip faithfully (the parser already reads each dialect back).
+  if (spec.type === "quadrant") return quadrantSpecToMermaid(spec);
   if (spec.type === "timeline") return timelineSpecToMermaid(spec);
   if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) return stateSpecToMermaid(spec);
@@ -273,7 +291,7 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
   let yaml = `type: ${spec.type}\n`;
   yaml += `direction: ${spec.direction}\n`;
   if (spec.title) yaml += `title: ${spec.title}\n`;
-  yaml += `\nnodes:\n`;
+  yaml += spec.nodes.length ? `\nnodes:\n` : `\nnodes: []\n`; // empty block would parse as YAML null
   for (const node of spec.nodes) {
     yaml += `  - id: ${node.id}\n`;
     yaml += `    label: ${q(node.label)}\n`; // quote: an empty label (start/end dots) would otherwise be YAML null
@@ -320,6 +338,14 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     for (const a of spec.activations) {
       yaml += `  - participant: ${a.participant}\n    from: ${a.from}\n    to: ${a.to}\n`;
     }
+  }
+  if (spec.quadrant) {
+    const qd = spec.quadrant;
+    yaml += `\nquadrant:\n`;
+    yaml += `  xLow: ${q(qd.xLow)}\n  xHigh: ${q(qd.xHigh)}\n  yLow: ${q(qd.yLow)}\n  yHigh: ${q(qd.yHigh)}\n`;
+    yaml += `  q1: ${q(qd.q1)}\n  q2: ${q(qd.q2)}\n  q3: ${q(qd.q3)}\n  q4: ${q(qd.q4)}\n`;
+    yaml += qd.points.length ? `  points:\n` : `  points: []\n`;
+    for (const p of qd.points) yaml += `    - label: ${q(p.label)}\n      x: ${p.x}\n      y: ${p.y}\n`;
   }
   return yaml;
 }

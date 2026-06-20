@@ -39,6 +39,7 @@ import {
 import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, paintUmlMarker, paintCrowFoot } from "./diagram-draw";
 import { computeSequenceLayout, paintSequence } from "./diagram-sequence";
 import { computeTimelineLayout, paintTimeline } from "./diagram-timeline";
+import { computeQuadrantLayout, paintQuadrant } from "./diagram-quadrant";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -115,6 +116,23 @@ export function paintDiagram(
     tdt.beginGroup();
     paintTimeline(tdt, tl, theme);
     tdt.endGroup();
+    return;
+  }
+
+  // Quadrant charts (2x2 matrix) are a non-graph engine too.
+  if (spec.type === "quadrant") {
+    const ql = computeQuadrantLayout(spec, contentTop);
+    let qdt: DrawTarget = t;
+    if (options.transform) {
+      const { scale, offsetX, offsetY } = options.transform;
+      qdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    } else if (options.region) {
+      const { scale, offsetX, offsetY } = fitTransform(ql.bbox, options.region);
+      qdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    }
+    qdt.beginGroup();
+    paintQuadrant(qdt, ql, theme, spec.quadrant);
+    qdt.endGroup();
     return;
   }
 

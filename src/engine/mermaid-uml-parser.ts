@@ -73,6 +73,34 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
   return r.success ? r.data : null;
 }
 
+/** Parse a Mermaid `quadrantChart` into a DiagramSpec (type "quadrant"): axis
+ *  labels (`x-axis L --> H`), four `quadrant-N` labels, and `Name: [x, y]` points. */
+export function parseMermaidQuadrant(lines: string[]): DiagramSpec | null {
+  let title: string | undefined;
+  const q = {
+    xLow: "", xHigh: "", yLow: "", yHigh: "",
+    q1: "", q2: "", q3: "", q4: "",
+    points: [] as Array<{ label: string; x: number; y: number }>,
+  };
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%")) continue;
+    const t = line.match(/^title\s+(.+)$/i);
+    if (t) { title = t[1].trim(); continue; }
+    const xa = line.match(/^x-axis\s+(.+?)\s*-->\s*(.+)$/i);
+    if (xa) { q.xLow = xa[1].trim(); q.xHigh = xa[2].trim(); continue; }
+    const ya = line.match(/^y-axis\s+(.+?)\s*-->\s*(.+)$/i);
+    if (ya) { q.yLow = ya[1].trim(); q.yHigh = ya[2].trim(); continue; }
+    const qm = line.match(/^quadrant-([1-4])\s+(.+)$/i);
+    if (qm) { (q as Record<string, unknown>)["q" + qm[1]] = qm[2].trim(); continue; }
+    const pt = line.match(/^(.+?)\s*:\s*\[\s*([\d.]+)\s*,\s*([\d.]+)\s*\]$/);
+    if (pt) { q.points.push({ label: pt[1].trim(), x: parseFloat(pt[2]), y: parseFloat(pt[3]) }); continue; }
+  }
+  if (q.points.length === 0 && !(q.q1 || q.q2 || q.q3 || q.q4)) return null;
+  const r = DiagramSpecSchema.safeParse({ type: "quadrant", direction: "TB", title, nodes: [], edges: [], quadrant: q });
+  return r.success ? r.data : null;
+}
+
 /** Parse a Mermaid `timeline` into a DiagramSpec (type "timeline"): each
  *  `period : event : event` line → a node (label=period, attributes=events),
  *  `section X` groups periods, `title X` sets the diagram title. */
