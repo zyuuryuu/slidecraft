@@ -17,6 +17,7 @@ import type { SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec, type NodeOverride } from "./schema";
 import { computeLayout, SLIDE_W, SLIDE_H, type NodePosition } from "./layout-engine";
 import { diagramSpecToYaml, mermaidToDiagramSpec } from "./mermaid-to-diagram";
+import { parseJsonLoose } from "./json-salvage";
 
 // ── DesignIntent: the small structure the model emits (a list of ops) ──
 
@@ -32,6 +33,18 @@ export const DesignIntentSchema = z.array(
 );
 export type DesignIntent = z.infer<typeof DesignIntentSchema>;
 export type DesignOp = DesignIntent[number];
+
+/**
+ * Detect a DesignIntent in raw model output. Per-slide AI replies with EITHER slide
+ * Markdown (content edit) OR a DesignIntent JSON array (design edit); this returns
+ * the intent when the output is the latter, else null (→ treat as Markdown).
+ */
+export function parseDesignIntent(raw: string): DesignIntent | null {
+  const r = parseJsonLoose(raw);
+  if (!r.ok || !Array.isArray(r.value) || r.value.length === 0) return null;
+  const d = DesignIntentSchema.safeParse(r.value);
+  return d.success ? d.data : null;
+}
 
 // ── Helpers ──
 

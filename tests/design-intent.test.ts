@@ -6,7 +6,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import yaml from "js-yaml";
 import JSZip from "jszip";
-import { DesignIntentSchema, applyDesignIntent } from "../src/engine/design-intent";
+import { DesignIntentSchema, applyDesignIntent, parseDesignIntent } from "../src/engine/design-intent";
 import { DiagramSpecSchema, type DiagramSpec } from "../src/engine/schema";
 import { SLIDE_W } from "../src/engine/layout-engine";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
@@ -53,6 +53,21 @@ describe("DesignIntentSchema", () => {
   });
   it("rejects an unknown op", () => {
     expect(DesignIntentSchema.safeParse([{ op: "wat" }]).success).toBe(false);
+  });
+});
+
+describe("parseDesignIntent (auto-detect design vs content output)", () => {
+  it("detects a DesignIntent JSON array (incl. ```json fence)", () => {
+    expect(parseDesignIntent('[{"op":"emphasize","nodeId":"B"}]')).toMatchObject([{ op: "emphasize", nodeId: "B" }]);
+    expect(parseDesignIntent('```json\n[{"op":"relayout","direction":"LR"}]\n```')).toMatchObject([{ op: "relayout" }]);
+  });
+  it("returns null for slide Markdown (content edit)", () => {
+    expect(parseDesignIntent("# 見出し\n\n- 要点A\n- 要点B")).toBeNull();
+    expect(parseDesignIntent("# T\n\n- リンクは [ここ](http://x) です")).toBeNull(); // a [ in a bullet is not an intent
+  });
+  it("returns null for a JSON array that isn't valid ops", () => {
+    expect(parseDesignIntent('[{"foo":1}]')).toBeNull();
+    expect(parseDesignIntent("[]")).toBeNull();
   });
 });
 

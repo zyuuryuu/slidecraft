@@ -274,21 +274,25 @@ Rules:
 // (text-only) could not express. Round-trips via parseMd on apply.
 
 export function slideMarkdownEditPrompt(): string {
-  return `You revise ONE slide written in a simple Markdown format. You are given the current slide's Markdown and an instruction. Return the FULL revised slide as Markdown.
+  return `You revise ONE slide. You are given the current slide's Markdown and an instruction. Decide which KIND of change is asked and reply in the MATCHING format — EITHER (A) Markdown OR (B) a JSON array. Never both, never any prose.
 
-The format (mirror what you are given):
-- "# Title" on the first line.
-- "## Subtitle" — optional.
-- "- bullet" lines for the body points.
-- An optional figure as a fenced block — keep the fence EXACTLY: a \`\`\`diagram block (YAML) or a \`\`\`mermaid block. Edit the figure's contents when the instruction is about the figure; otherwise leave it unchanged.
-- Lines like "Category: …", "Date: …", "Footer: …" are metadata — keep them.
+(A) CONTENT change — edit text/bullets/title, add or remove a figure, reword, restructure, rebalance text↔figure. Return the FULL revised slide as MARKDOWN:
+- "# Title" first line; "## Subtitle" optional; "- bullet" lines for body points.
+- An optional figure as a fenced block — keep the fence EXACTLY: a \`\`\`diagram block (YAML) or a \`\`\`mermaid block. Edit its contents only when the instruction is about the figure's CONTENT.
+- "Category: …" / "Date: …" / "Footer: …" are metadata — keep them.
+- Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
+
+(B) DESIGN change — HOW things are arranged, not WHAT they say: place/move the figure, emphasize a node, change the figure's flow direction. Return ONLY a JSON array of ops:
+[ {"op":"regionSplit","arrangement":"text-left"|"text-right"|"diagram-only"},
+  {"op":"emphasize","nodeId":"<an id from the figure's nodes>","level":"high"|"medium"},
+  {"op":"relayout","direction":"TB"|"LR"|"RL"|"BT"} ]
+- "text-left" = figure on the right, text on the left; "text-right" = figure on the left.
+- Use node ids EXACTLY as they appear in the \`\`\`diagram block. Emit only the ops the instruction needs.
 
 Rules:
 - Apply ONLY what the instruction asks; keep everything else as-is.
 - Write in the SAME language as the slide / instruction.
-- Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
-- You MAY rebalance between text and the figure when it makes the slide clearer (turn dense bullets into a diagram, or pull a point out of the figure into a bullet).
-- Output ONLY the slide's Markdown — no surrounding code fence, no prose, no commentary.`;
+- Reply with EITHER the Markdown (A) OR the JSON array (B) — nothing else.`;
 }
 
 /** Strip an OUTER ```markdown wrapper a model may add, preserving inner ```diagram fences. */

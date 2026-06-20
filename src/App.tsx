@@ -3,6 +3,7 @@ import { useHistoryState, type HistoryMode } from "./components/useHistoryState"
 import { buildCatalog, deckCapabilities } from "./engine/template-catalog";
 import { distillDeck } from "./engine/distill";
 import { validateDiagramSource } from "./engine/mermaid-to-diagram";
+import { parseDesignIntent, applyDesignIntent } from "./engine/design-intent";
 import Editor from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -455,11 +456,19 @@ export default function App() {
   // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
   // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
   const handleApplySlide = useCallback(
-    (md: string) => {
+    (raw: string) => {
       if (!deck) return;
-      const newSlide = parseMd(md).slides[0];
-      if (!newSlide) return;
       const old = deck.slides[activeSlide];
+      // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
+      // The engine maps it to clamped geometry on the current slide.
+      const intent = parseDesignIntent(raw);
+      if (intent && old) {
+        handleSlideUpdate(activeSlide, applyDesignIntent(old, intent), "commit");
+        return;
+      }
+      // ① Content edit (Markdown).
+      const newSlide = parseMd(raw).slides[0];
+      if (!newSlide) return;
       // Validate an edited figure (DiagramSpec YAML). If the model returned broken
       // YAML, keep the previous valid diagram + warn instead of rendering a broken one.
       let diagram = newSlide.diagram ?? old?.diagram;
