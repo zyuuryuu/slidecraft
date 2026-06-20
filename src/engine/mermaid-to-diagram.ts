@@ -296,4 +296,4 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
 }
 
 // ── Serializers (DiagramSpec → text): split out for R1, re-exported here ──
-export { diagramSpecToMermaid, dumpDiagramLikeSource, diagramSpecToYaml } from "./diagram-serialize";
+export { diagramSpecToMermaid, dumpDiagramLikeSource, diagramSpecToYaml, canSerializeToMermaid } from "./diagram-serialize";

@@ -5,11 +5,11 @@
  * For diagram slides, shows the YAML editor inline.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
-import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource } from "../engine/mermaid-to-diagram";
+import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource, canSerializeToMermaid } from "../engine/mermaid-to-diagram";
 import EdgeStyleControls from "./EdgeStyleControls";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
@@ -229,10 +229,25 @@ function DiagramEditor({
   const currentMode: DiagramMode = slide.mermaidBlock ? "mermaid" : "yaml";
   const [mode, setMode] = useState<DiagramMode>(currentMode);
 
+  // Mermaid graph syntax can't represent sequence / UML class diagrams, so the
+  // YAML→Mermaid serializer would flatten them to a flowchart (lossy + type-
+  // breaking). Disable the MERMAID toggle for those — edit them in YAML/JSON.
+  const mermaidIncompatible = useMemo(() => {
+    if (!slide.diagram?.yaml) return false;
+    try {
+      const result = DiagramSpecSchema.safeParse(yaml.load(slide.diagram.yaml));
+      return result.success ? !canSerializeToMermaid(result.data) : false;
+    } catch {
+      return false;
+    }
+  }, [slide.diagram?.yaml]);
+
   // ── Convert between modes ──
   const switchMode = useCallback(
     (newMode: DiagramMode) => {
       if (newMode === mode) return;
+      // Never convert a sequence/class diagram to Mermaid (would corrupt its type).
+      if (newMode === "mermaid" && mermaidIncompatible) return;
 
       if (mode === "mermaid" && (newMode === "yaml" || newMode === "json")) {
         // Mermaid → DiagramSpec
@@ -290,7 +305,7 @@ function DiagramEditor({
 
       setMode(newMode);
     },
-    [mode, slide, onChange, onUpdateDiagramYaml],
+    [mode, slide, onChange, onUpdateDiagramYaml, mermaidIncompatible],
   );
 
   const textValue = mode === "mermaid"
@@ -323,19 +338,26 @@ function DiagramEditor({
           {label}
         </label>
         <div className="flex rounded overflow-hidden border border-[#2D3A6E] text-[10px]">
-          {(["mermaid", "yaml", "json"] as DiagramMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              className={`px-2 py-0.5 transition-colors ${
-                mode === m
-                  ? "bg-[#3B82F6] text-white"
-                  : "bg-[#1a1f3a] text-gray-400 hover:text-white"
-              }`}
-            >
-              {m.toUpperCase()}
-            </button>
-          ))}
+          {(["mermaid", "yaml", "json"] as DiagramMode[]).map((m) => {
+            const disabled = m === "mermaid" && mermaidIncompatible && mode !== "mermaid";
+            return (
+              <button
+                key={m}
+                onClick={() => switchMode(m)}
+                disabled={disabled}
+                title={disabled ? "シーケンス図/クラス図は Mermaid に変換できません（YAML/JSON で編集してください）" : undefined}
+                className={`px-2 py-0.5 transition-colors ${
+                  mode === m
+                    ? "bg-[#3B82F6] text-white"
+                    : disabled
+                      ? "bg-[#1a1f3a] text-gray-600 opacity-50 cursor-not-allowed"
+                      : "bg-[#1a1f3a] text-gray-400 hover:text-white"
+                }`}
+              >
+                {m.toUpperCase()}
+              </button>
+            );
+          })}
         </div>
       </div>
       <textarea

@@ -13,6 +13,20 @@ import type { DiagramSpec } from "./schema";
 
 // ── DiagramSpec → Mermaid (reverse) ──
 
+/**
+ * Whether diagramSpecToMermaid can FAITHFULLY represent this spec. Mermaid graph
+ * syntax can't express sequence diagrams or UML class diagrams, so serializing
+ * them yields a plain flowchart — and converting back silently flattens
+ * `type: sequence`/class into `type: flowchart`. The editor uses this to disable
+ * its MERMAID toggle for those (Mermaid is input-only; YAML/JSON is canonical).
+ */
+export function canSerializeToMermaid(spec: DiagramSpec): boolean {
+  if (spec.type === "sequence") return false;
+  if (spec.nodes.some((n) => n.shape === "class")) return false;
+  if (spec.edges.some((e) => !!e.relation)) return false;
+  return true;
+}
+
 function nodeToMermaid(id: string, label: string, shape?: string): string {
   const safeLabel = label.replace(/"/g, "'").replace(/\n/g, "<br>");
   switch (shape) {
