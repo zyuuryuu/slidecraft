@@ -26,6 +26,7 @@ import type { DiagramSpec } from "./schema";
  */
 export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "sequence") return true;
+  if (spec.type === "timeline") return true; // periods/events/sections/title all round-trip
   // state diagram (has start/end pseudo-states) — faithful (custom labels via
   // `state "x" as id`); only block when node styles/groups/lanes would be lost.
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
@@ -183,9 +184,26 @@ function erSpecToMermaid(spec: DiagramSpec): string {
   return s;
 }
 
+// ── Timeline → Mermaid (timeline) ──
+
+function timelineSpecToMermaid(spec: DiagramSpec): string {
+  let s = "timeline\n";
+  if (spec.title) s += `  title ${spec.title}\n`;
+  let section: string | undefined;
+  for (const n of spec.nodes) {
+    if (n.group !== section) {
+      section = n.group;
+      if (section) s += `  section ${section}\n`;
+    }
+    s += `  ${n.label} : ${(n.attributes ?? []).join(" : ")}\n`;
+  }
+  return s;
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
-  // Dispatch by diagram kind so sequence/state/ER/class round-trip faithfully
-  // (the parser already reads each dialect back).
+  // Dispatch by diagram kind so sequence/timeline/state/ER/class round-trip
+  // faithfully (the parser already reads each dialect back).
+  if (spec.type === "timeline") return timelineSpecToMermaid(spec);
   if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) return stateSpecToMermaid(spec);
   if (spec.nodes.some((n) => n.shape === "entity") || spec.edges.some((e) => e.srcCard || e.tgtCard)) {
@@ -260,6 +278,7 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `  - id: ${node.id}\n`;
     yaml += `    label: ${q(node.label)}\n`; // quote: an empty label (start/end dots) would otherwise be YAML null
     if (node.shape && node.shape !== "rect") yaml += `    shape: ${node.shape}\n`;
+    if (node.group) yaml += `    group: ${q(node.group)}\n`; // timeline sections (+ flowchart subgraph membership)
     if (node.attributes?.length) yaml += `    attributes:\n${node.attributes.map((a) => `      - ${q(a)}`).join("\n")}\n`;
     if (node.methods?.length) yaml += `    methods:\n${node.methods.map((m) => `      - ${q(m)}`).join("\n")}\n`;
     if (node.override) {
@@ -267,7 +286,7 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
       if (ov.length) yaml += `    override:\n${ov.map((k) => `      ${k}: ${node.override![k]}`).join("\n")}\n`;
     }
   }
-  yaml += `\nedges:\n`;
+  yaml += spec.edges.length ? `\nedges:\n` : `\nedges: []\n`; // empty block would parse as YAML null
   for (const edge of spec.edges) {
     yaml += `  - from: ${edge.from}\n`;
     yaml += `    to: ${edge.to}\n`;

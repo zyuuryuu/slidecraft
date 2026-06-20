@@ -38,6 +38,7 @@ import {
 } from "./draw-target";
 import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, paintUmlMarker, paintCrowFoot } from "./diagram-draw";
 import { computeSequenceLayout, paintSequence } from "./diagram-sequence";
+import { computeTimelineLayout, paintTimeline } from "./diagram-timeline";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -97,6 +98,23 @@ export function paintDiagram(
     sdt.beginGroup();
     paintSequence(sdt, seq, theme);
     sdt.endGroup();
+    return;
+  }
+
+  // Timelines are also a temporal engine (horizontal axis + period/event cards).
+  if (spec.type === "timeline") {
+    const tl = computeTimelineLayout(spec, contentTop);
+    let tdt: DrawTarget = t;
+    if (options.transform) {
+      const { scale, offsetX, offsetY } = options.transform;
+      tdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    } else if (options.region) {
+      const { scale, offsetX, offsetY } = fitTransform(tl.bbox, options.region);
+      tdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    }
+    tdt.beginGroup();
+    paintTimeline(tdt, tl, theme);
+    tdt.endGroup();
     return;
   }
 

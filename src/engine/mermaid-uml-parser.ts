@@ -73,6 +73,40 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
   return r.success ? r.data : null;
 }
 
+/** Parse a Mermaid `timeline` into a DiagramSpec (type "timeline"): each
+ *  `period : event : event` line → a node (label=period, attributes=events),
+ *  `section X` groups periods, `title X` sets the diagram title. */
+export function parseMermaidTimeline(lines: string[]): DiagramSpec | null {
+  let title: string | undefined;
+  let section: string | undefined;
+  const nodes: Array<{ id: string; label: string; attributes: string[]; group?: string }> = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%")) continue;
+    const t = line.match(/^title\s+(.+)$/i);
+    if (t) { title = t[1].trim(); continue; }
+    const sec = line.match(/^section\s+(.+)$/i);
+    if (sec) { section = sec[1].trim(); continue; }
+    if (!line.includes(":")) continue; // a period needs at least one event
+    const parts = line.split(":").map((s) => s.trim());
+    nodes.push({
+      id: `t${nodes.length}`,
+      label: parts[0],
+      attributes: parts.slice(1).filter(Boolean),
+      ...(section ? { group: section } : {}),
+    });
+  }
+  if (nodes.length === 0) return null;
+  const r = DiagramSpecSchema.safeParse({
+    type: "timeline",
+    direction: "LR",
+    title,
+    nodes: nodes.map((n) => ({ id: n.id, label: n.label, attributes: n.attributes, ...(n.group ? { group: n.group } : {}) })),
+    edges: [],
+  });
+  return r.success ? r.data : null;
+}
+
 /** Parse a Mermaid `erDiagram` into a DiagramSpec: entities → entity boxes
  *  (name + attribute list), relationships → edges with crow's-foot cardinality
  *  at each end (`..` = dashed/non-identifying). */
