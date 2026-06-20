@@ -165,6 +165,22 @@ erDiagram
 
 ---
 
+# タイムラインサンプル
+> プロダクト沿革（section でグルーピング）
+
+\`\`\`mermaid
+timeline
+  title プロダクト沿革
+  section 創業期
+    2020 : 創業 : 最初のPoC
+    2021 : シード調達
+  section 成長期
+    2022 : シリーズA : 国内ローンチ
+    2023 : 海外展開 : 黒字化
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
