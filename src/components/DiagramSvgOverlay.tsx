@@ -12,6 +12,31 @@ import { renderDiagramToSvg } from "../engine/svg-writer";
 import { DiagramSpecSchema, EdgeStyleSchema } from "../engine/schema";
 import { computeLayout, detectCp, cpCoords, SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H, type NodePosition } from "../engine/layout-engine";
 import { fitTransform } from "../engine/draw-target";
+import SequenceDragOverlay from "./SequenceDragOverlay";
+
+type OverlayProps = {
+  diagramYaml: string;
+  editable?: boolean;
+  onChange?: (yaml: string) => void;
+  region?: { x: number; y: number; w: number; h: number };
+};
+
+/**
+ * Dispatch by diagram engine: sequence diagrams are temporal columns (edited by
+ * reordering participants) so they get SequenceDragOverlay; everything else uses
+ * the node-edge FlowDiagramOverlay below. One useMemo here keeps hook order stable.
+ */
+export default function DiagramSvgOverlay(props: OverlayProps) {
+  const type = useMemo(() => {
+    try {
+      return DiagramSpecSchema.safeParse(yaml.load(props.diagramYaml)).data?.type;
+    } catch {
+      return undefined;
+    }
+  }, [props.diagramYaml]);
+  if (type === "sequence") return <SequenceDragOverlay {...props} />;
+  return <FlowDiagramOverlay {...props} />;
+}
 
 // ── Diagram (```diagram) renderer — shares the PPTX painter for true WYSIWYG ──
 // Renders the DiagramSpec via the SAME engine as the exporter (svg-writer →
@@ -19,17 +44,7 @@ import { fitTransform } from "../engine/draw-target";
 // the export embeds them. No more divergent Mermaid layout for diagrams.
 type Override = { x?: number; y?: number; w?: number; h?: number };
 
-export default function DiagramSvgOverlay({
-  diagramYaml,
-  editable = false,
-  onChange,
-  region,
-}: {
-  diagramYaml: string;
-  editable?: boolean;
-  onChange?: (yaml: string) => void;
-  region?: { x: number; y: number; w: number; h: number };
-}) {
+function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }: OverlayProps) {
   const ref = useRef<HTMLDivElement>(null);
   const moveRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
   const resizeRef = useRef<{ id: string; x: number; y: number } | null>(null);
