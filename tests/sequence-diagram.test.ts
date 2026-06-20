@@ -114,3 +114,58 @@ describe("sequence fragments (alt/loop/opt) — milestone 2", () => {
     expect(spec.fragments[0].kind).toBe("loop");
   });
 });
+
+describe("sequence milestone 3 — else dividers / activations / async arrows", () => {
+  const MMD = `sequenceDiagram
+  participant U as User
+  participant A as API
+  U->>+A: login
+  alt valid
+    A-->>U: token
+  else invalid
+    A-->>-U: error
+  end
+  U-)A: fire-and-forget`;
+
+  it("parses the alt `else` as a branch divider on the fragment", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const alt = spec.fragments.find((f) => f.kind === "alt")!;
+    expect(alt.dividers).toHaveLength(1);
+    expect(alt.dividers[0]).toMatchObject({ label: "invalid" });
+    expect(alt.dividers[0].at).toBe(2); // else starts at message index 2
+  });
+
+  it("parses +/- activation into an activation span on A", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const act = spec.activations.find((a) => a.participant === "A")!;
+    expect(act).toBeDefined();
+    expect(act.from).toBe(0); // activated by the +login message
+    expect(act.to).toBe(2); // deactivated by the -error message
+  });
+
+  it("marks an async `-)` message with style.async (open arrowhead)", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const fire = spec.edges.find((e) => e.label === "fire-and-forget")!;
+    expect(fire.style?.async).toBe(true);
+    // sync messages are NOT async
+    expect(spec.edges.find((e) => e.label === "login")?.style?.async).toBeFalsy();
+  });
+
+  it("renders the else divider, an activation bar, and an open arrowhead (native)", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const lay = computeSequenceLayout(spec, 0.8);
+    expect(lay.frags[0].dividers).toHaveLength(1);
+    expect(lay.acts.length).toBeGreaterThan(0);
+    const svg = renderDiagramToSvg(spec, {});
+    expect(svg).toContain("invalid"); // divider label
+    expect(svg).toMatch(/<polyline[^>]*fill="none"/); // open (line) arrowhead, not a filled polygon
+  });
+
+  it("M3 fields survive parse→conversion (not dropped by serialization)", () => {
+    const s = parseMd("# M3\n\n```mermaid\n" + MMD + "\n```\n").slides[0];
+    const spec = DiagramSpecSchema.parse(yaml.load(s.diagram!.yaml));
+    expect(spec.fragments.find((f) => f.kind === "alt")?.dividers?.[0]?.label).toBe("invalid");
+    expect(spec.activations.some((a) => a.participant === "A")).toBe(true);
+    expect(spec.edges.find((e) => e.label === "fire-and-forget")?.style?.async).toBe(true);
+  });
+});

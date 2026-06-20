@@ -4,8 +4,9 @@
  * Unlike the node-edge/layered engine, a sequence diagram is temporal: participants
  * are vertical lifelines across the top, and messages are horizontal arrows ordered
  * top→bottom (by edge order). Rendered via the shared DrawTarget → native PPTX shapes
- * + preview SVG (WYSIWYG), NOT a Mermaid image. Milestone 1: participants, lifelines,
- * sync/return messages (+ self-message loop). Activations/fragments come later.
+ * + preview SVG (WYSIWYG), NOT a Mermaid image. M1: participants, lifelines, sync/
+ * return messages (+ self-loop). M2: alt/loop/opt/par fragments. M3: alt `else`
+ * branch dividers, activation bars, async (open) arrowheads.
  *
  * Pure logic (R2): no DOM / Tauri.
  */
@@ -20,8 +21,9 @@ export interface SeqLayout {
   boxY: number;
   boxH: number;
   lifelineBottom: number;
-  msgs: { fromX: number; toX: number; y: number; label?: string; dash: boolean; self: boolean }[];
-  frags: { x: number; y: number; w: number; h: number; kind: string; label: string }[];
+  msgs: { fromX: number; toX: number; y: number; label?: string; dash: boolean; self: boolean; async: boolean }[];
+  frags: { x: number; y: number; w: number; h: number; kind: string; label: string; dividers: { y: number; label: string }[] }[];
+  acts: { id: string; x: number; y: number; w: number; h: number }[];
   bbox: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
@@ -42,6 +44,7 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
 
   const partLayout = parts.map((p, i) => ({ id: p.id, label: p.label, cx: cx(i), boxX: cx(i) - boxW / 2, boxW }));
   const idx = new Map(parts.map((p, i) => [p.id, i]));
+  const cxById = new Map(partLayout.map((p) => [p.id, p.cx]));
 
   const firstMsgY = boxY + boxH + 0.45;
   const msgs = spec.edges.map((e, k) => {
@@ -54,18 +57,33 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
       label: e.label,
       dash: e.style?.dash ?? false,
       self: e.from === e.to,
+      async: e.style?.async ?? false,
     };
   });
   const lifelineBottom = firstMsgY + spec.edges.length * gap + 0.3;
 
-  // combined-fragment boxes (alt/loop/opt/par) over their message range
+  // combined-fragment boxes (alt/loop/opt/par) over their message range, plus
+  // `else`/`and` branch divider lines at their message positions.
   const leftX = partLayout.length ? partLayout[0].cx : margin;
   const rightX = partLayout.length ? partLayout[partLayout.length - 1].cx : SLIDE_W - margin;
   const padX = 0.35;
   const frags = spec.fragments.map((f) => {
     const top = (msgs[f.from]?.y ?? firstMsgY) - 0.3;
     const bot = (msgs[f.to]?.y ?? firstMsgY) + 0.22;
-    return { x: leftX - padX, y: top, w: rightX - leftX + 2 * padX, h: bot - top, kind: f.kind, label: f.label };
+    const dividers = (f.dividers ?? []).map((d) => ({
+      y: (msgs[d.at]?.y ?? firstMsgY) - gap / 2,
+      label: d.label,
+    }));
+    return { x: leftX - padX, y: top, w: rightX - leftX + 2 * padX, h: bot - top, kind: f.kind, label: f.label, dividers };
+  });
+
+  // activation bars: a thin rect on the participant's lifeline over its msg span.
+  const actW = 0.16;
+  const acts = spec.activations.map((a) => {
+    const cv = cxById.get(a.participant) ?? margin;
+    const top = msgs[a.from]?.y ?? firstMsgY;
+    const bot = msgs[a.to]?.y ?? top;
+    return { id: a.participant, x: cv - actW / 2, y: top, w: actW, h: Math.max(bot - top, 0.18) };
   });
 
   let minX = margin - 0.1;
@@ -78,6 +96,7 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
     lifelineBottom,
     msgs,
     frags,
+    acts,
     bbox: { minX, minY: boxY - 0.1, maxX, maxY: lifelineBottom + 0.1 },
   };
 }
@@ -102,6 +121,11 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
       { x: p.boxX, y: lay.boxY, w: p.boxW, h: lay.boxH },
       { align: "center", valign: "middle", shrink: true },
     );
+    // activation bars on this participant's lifeline (move with the participant)
+    for (const a of lay.acts) {
+      if (a.id !== p.id) continue;
+      dt.shape("rect", { x: a.x, y: a.y, w: a.w, h: a.h }, { fill, line: { color: border, width: 0.75 } });
+    }
     dt.endGroup();
   }
   // Each combined fragment (alt/loop/opt/par) = outline box + labelled corner tab,
@@ -118,6 +142,14 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
       dt.text([{ text: fr.label, fontSize: 9, fontFace: fonts.body, color: lineColor, bold: false }],
         { x: fr.x + tabW + 0.1, y: fr.y, w: fr.w - tabW - 0.2, h: tabH }, { align: "left", valign: "middle", shrink: true });
     }
+    // alt `else` / par `and` branch dividers: a dashed line across + branch label
+    for (const d of fr.dividers) {
+      dt.line({ x: fr.x, y: d.y }, { x: fr.x + fr.w, y: d.y }, { color: border, width: 0.75, dash: true, arrow: false });
+      if (d.label) {
+        dt.text([{ text: d.label, fontSize: 9, fontFace: fonts.body, color: lineColor, bold: false }],
+          { x: fr.x + 0.12, y: d.y, w: fr.w - 0.24, h: 0.22 }, { align: "left", valign: "middle", shrink: true });
+      }
+    }
     dt.endGroup();
   }
 
@@ -129,13 +161,13 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
       const lh = 0.28;
       dt.line({ x: m.fromX, y: m.y }, { x: m.fromX + lw, y: m.y }, { color: lineColor, width: w, dash: m.dash, arrow: false });
       dt.line({ x: m.fromX + lw, y: m.y }, { x: m.fromX + lw, y: m.y + lh }, { color: lineColor, width: w, dash: m.dash, arrow: false });
-      dt.line({ x: m.fromX + lw, y: m.y + lh }, { x: m.fromX, y: m.y + lh }, { color: lineColor, width: w, dash: m.dash, arrow: true });
+      dt.line({ x: m.fromX + lw, y: m.y + lh }, { x: m.fromX, y: m.y + lh }, { color: lineColor, width: w, dash: m.dash, arrow: true, openArrow: m.async });
       if (m.label) {
         dt.text([{ text: m.label, fontSize: ds.edge_label_font_size, fontFace: fonts.body, color: lineColor, bold: false }],
           { x: m.fromX + lw + 0.08, y: m.y, w: 1.8, h: 0.3 }, { align: "left", valign: "middle", shrink: true });
       }
     } else {
-      dt.line({ x: m.fromX, y: m.y }, { x: m.toX, y: m.y }, { color: lineColor, width: w, dash: m.dash, arrow: true });
+      dt.line({ x: m.fromX, y: m.y }, { x: m.toX, y: m.y }, { color: lineColor, width: w, dash: m.dash, arrow: true, openArrow: m.async });
       if (m.label) {
         const x1 = Math.min(m.fromX, m.toX);
         dt.text([{ text: m.label, fontSize: ds.edge_label_font_size, fontFace: fonts.body, color: lineColor, bold: false }],

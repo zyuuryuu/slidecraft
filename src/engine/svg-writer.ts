@@ -146,9 +146,18 @@ class SvgDrawTarget implements DrawTarget {
       const p1y = y2 - dy * s + dx * s * 0.5;
       const p2x = x2 - dx * s + dy * s * 0.5;
       const p2y = y2 - dy * s - dx * s * 0.5;
-      this.parts.push(
-        `<polygon points="${x2},${y2} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${p2x.toFixed(1)},${p2y.toFixed(1)}" fill="${c}"/>`,
-      );
+      if (opts.openArrow) {
+        // Open (line) arrowhead — two strokes forming a ">" (async messages).
+        const sw2 = Math.max(opts.width * PT, 1);
+        this.parts.push(
+          `<polyline points="${p1x.toFixed(1)},${p1y.toFixed(1)} ${x2},${y2} ${p2x.toFixed(1)},${p2y.toFixed(1)}" ` +
+            `fill="none" stroke="${c}" stroke-width="${sw2}" stroke-linecap="round" stroke-linejoin="round"/>`,
+        );
+      } else {
+        this.parts.push(
+          `<polygon points="${x2},${y2} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${p2x.toFixed(1)},${p2y.toFixed(1)}" fill="${c}"/>`,
+        );
+      }
     }
   }
 

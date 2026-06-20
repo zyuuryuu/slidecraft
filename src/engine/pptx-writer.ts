@@ -123,7 +123,7 @@ class PptxDrawTarget implements DrawTarget {
         color: hexToRgb(opts.color),
         width: opts.width,
         dashType: opts.dash ? "dash" : "solid",
-        endArrowType: opts.arrow ? "triangle" : "none",
+        endArrowType: opts.arrow ? (opts.openArrow ? "arrow" : "triangle") : "none",
       },
       flipH: to.x < from.x,
       flipV: to.y < from.y,

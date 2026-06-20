@@ -46,6 +46,8 @@ export interface EdgeLineOpts {
   width: number;
   arrow?: boolean;
   dash?: boolean;
+  /** Open (line) arrowhead instead of a filled triangle — async sequence messages. */
+  openArrow?: boolean;
 }
 
 export interface DrawTarget {

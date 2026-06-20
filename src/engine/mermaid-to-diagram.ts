@@ -243,40 +243,74 @@ function parseMermaidSequence(lines: string[]): DiagramSpec | null {
     if (!labels.has(id)) { labels.set(id, label ?? id); order.push(id); }
     else if (label) labels.set(id, label);
   };
-  const edges: Array<{ from: string; to: string; label?: string; dash: boolean }> = [];
-  const fragments: Array<{ kind: string; label: string; from: number; to: number }> = [];
-  const fragStack: Array<{ kind: string; label: string; from: number }> = [];
+  const edges: Array<{ from: string; to: string; label?: string; dash: boolean; async: boolean }> = [];
+  const fragments: Array<{ kind: string; label: string; from: number; to: number; dividers: Array<{ at: number; label: string }> }> = [];
+  const fragStack: Array<{ kind: string; label: string; from: number; dividers: Array<{ at: number; label: string }> }> = [];
+  // Activation tracking: one open span per participant (start = message index).
+  const activations: Array<{ participant: string; from: number; to: number }> = [];
+  const openAct = new Map<string, number>();
+  const open = (id: string, at: number) => { if (!openAct.has(id)) openAct.set(id, at); };
+  const close = (id: string, at: number) => {
+    const from = openAct.get(id);
+    if (from !== undefined) { activations.push({ participant: id, from, to: Math.max(at, from) }); openAct.delete(id); }
+  };
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (!line || line.startsWith("%%")) continue;
     const p = line.match(/^(?:participant|actor)\s+(\w+)(?:\s+as\s+(.+))?$/);
     if (p) { ensure(p[1], p[2]?.trim()); continue; }
 
-    // combined fragment open / close (else divider is deferred to a later milestone)
+    // explicit activate/deactivate (start at next message, end at last message)
+    const act = line.match(/^(activate|deactivate)\s+(\w+)$/i);
+    if (act) {
+      ensure(act[2]);
+      if (act[1].toLowerCase() === "activate") open(act[2], edges.length);
+      else close(act[2], edges.length - 1);
+      continue;
+    }
+
+    // combined fragment open / close; `else`/`and` records a branch divider
     const fr = line.match(/^(alt|loop|opt|par)\b\s*(.*)$/i);
-    if (fr) { fragStack.push({ kind: fr[1].toLowerCase(), label: fr[2].trim(), from: edges.length }); continue; }
+    if (fr) { fragStack.push({ kind: fr[1].toLowerCase(), label: fr[2].trim(), from: edges.length, dividers: [] }); continue; }
     if (/^end\b/i.test(line)) {
       const f = fragStack.pop();
       if (f && edges.length > f.from) fragments.push({ ...f, to: edges.length - 1 });
       continue;
     }
-    if (/^else\b/i.test(line)) continue;
+    const el = line.match(/^(?:else|and)\b\s*(.*)$/i);
+    if (el) {
+      const top = fragStack[fragStack.length - 1];
+      if (top && edges.length > top.from) top.dividers.push({ at: edges.length, label: el[1].trim() });
+      continue;
+    }
 
-    // A ->> B : message   (arrow run -, >, x, ); a leading "--" = dashed/return)
-    const m = line.match(/^(\w+)\s*(--?(?:>>?|x|\)))\s*(\w+)\s*:\s*(.*)$/);
+    // A ->> B : message — arrow run is -,>,x,); leading "--" = dashed/return, trailing ")" = async
+    // an optional +/- before the target activates the target / deactivates the source.
+    const m = line.match(/^(\w+)\s*(--?(?:>>?|x|\)))\s*([+-]?)\s*(\w+)\s*:\s*(.*)$/);
     if (m) {
-      const [, a, op, b, label] = m;
+      const [, a, op, actMark, b, label] = m;
       ensure(a); ensure(b);
-      edges.push({ from: a, to: b, label: label.trim() || undefined, dash: op.startsWith("--") });
+      edges.push({ from: a, to: b, label: label.trim() || undefined, dash: op.startsWith("--"), async: op.endsWith(")") });
+      const here = edges.length - 1;
+      if (actMark === "+") open(b, here);
+      else if (actMark === "-") close(a, here);
     }
   }
+  // close any activations left open at the final message
+  for (const id of [...openAct.keys()]) close(id, edges.length - 1);
   if (order.length === 0) return null;
   const r = DiagramSpecSchema.safeParse({
     type: "sequence",
     direction: "TB",
     nodes: order.map((id) => ({ id, label: labels.get(id) ?? id })),
-    edges: edges.map((e) => ({ from: e.from, to: e.to, label: e.label, ...(e.dash ? { style: { dash: true } } : {}) })),
+    edges: edges.map((e) => {
+      const style: Record<string, boolean> = {};
+      if (e.dash) style.dash = true;
+      if (e.async) style.async = true;
+      return { from: e.from, to: e.to, label: e.label, ...(Object.keys(style).length ? { style } : {}) };
+    }),
     fragments,
+    activations,
   });
   return r.success ? r.data : null;
 }
@@ -500,12 +534,26 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `    to: ${edge.to}\n`;
     if (edge.label) yaml += `    label: ${q(edge.label)}\n`;
     if (edge.relation) yaml += `    relation: ${edge.relation}\n`;
-    if (edge.style?.dash) yaml += `    style:\n      dash: true\n`;
+    if (edge.style?.dash || edge.style?.async) {
+      yaml += `    style:\n`;
+      if (edge.style.dash) yaml += `      dash: true\n`;
+      if (edge.style.async) yaml += `      async: true\n`;
+    }
   }
   if (spec.fragments?.length) {
     yaml += `\nfragments:\n`;
     for (const f of spec.fragments) {
       yaml += `  - kind: ${f.kind}\n    label: ${q(f.label)}\n    from: ${f.from}\n    to: ${f.to}\n`;
+      if (f.dividers?.length) {
+        yaml += `    dividers:\n`;
+        for (const d of f.dividers) yaml += `      - at: ${d.at}\n        label: ${q(d.label)}\n`;
+      }
+    }
+  }
+  if (spec.activations?.length) {
+    yaml += `\nactivations:\n`;
+    for (const a of spec.activations) {
+      yaml += `  - participant: ${a.participant}\n    from: ${a.from}\n    to: ${a.to}\n`;
     }
   }
   return yaml;

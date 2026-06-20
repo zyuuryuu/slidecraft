@@ -57,6 +57,9 @@ export const EdgeStyleSchema = z.object({
   // fraction (-0.5..0.5, 0 = centre). Overrides the auto port spread when set.
   srcPort: z.number().optional(),
   tgtPort: z.number().optional(),
+  // sequence messages: an async (open) arrowhead instead of the filled triangle
+  // (Mermaid `-)` / `--)`). Flowchart edges ignore it.
+  async: z.boolean().optional(),
 });
 export type EdgeStyle = z.infer<typeof EdgeStyleSchema>;
 
@@ -148,8 +151,19 @@ export const FragmentSchema = z.object({
   label: z.string().default(""),
   from: z.number(),
   to: z.number(),
+  // alt/par branch splits (`else`/`and`): a divider line at message index `at`,
+  // with the branch's label. Empty for opt/loop or a single-branch alt.
+  dividers: z.array(z.object({ at: z.number(), label: z.string().default("") })).default([]),
 });
 export type Fragment = z.infer<typeof FragmentSchema>;
+
+// A participant's lifeline being "active" (processing) over a message-index span.
+export const ActivationSchema = z.object({
+  participant: z.string(),
+  from: z.number(),
+  to: z.number(),
+});
+export type Activation = z.infer<typeof ActivationSchema>;
 
 export const DiagramSpecSchema = z.object({
   type: z.enum(VALID_TYPES),
@@ -161,6 +175,7 @@ export const DiagramSpecSchema = z.object({
   groups: z.array(GroupSchema).default([]),
   lanes: z.array(LaneSchema).default([]),
   fragments: z.array(FragmentSchema).default([]),
+  activations: z.array(ActivationSchema).default([]),
   layout: LayoutConfigSchema.default({ node_width: 2.0, node_height: 0.7, h_gap: 0.5, v_gap: 0.8 }),
 });
 export type DiagramSpec = z.infer<typeof DiagramSpecSchema>;
