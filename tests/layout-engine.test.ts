@@ -412,6 +412,13 @@ describe("cpCoords", () => {
     expect(cp.y).toBeCloseTo(3.35); // y + h/2
   });
 
+  it("a port offset shifts the connection point along the node edge (start-point move)", () => {
+    const base = cpCoords(pos, 1, "rect", 0); // right-centre
+    const shifted = cpCoords(pos, 1, "rect", 0.3); // shifted down the right edge
+    expect(shifted.x).toBeCloseTo(base.x); // same edge (right)
+    expect(shifted.y).toBeCloseTo(base.y + 0.3 * pos.h); // moved by frac*height
+  });
+
   it("returns bottom center for cp 2", () => {
     const cp = cpCoords(pos, 2);
     expect(cp.x).toBeCloseTo(3);

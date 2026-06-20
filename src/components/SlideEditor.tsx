@@ -10,6 +10,7 @@ import yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource } from "../engine/mermaid-to-diagram";
+import EdgeStyleControls from "./EdgeStyleControls";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 
@@ -352,6 +353,9 @@ function DiagramEditor({
         </div>
       ) : textValue.trim() && mode !== "mermaid" ? (
         <div className="mt-1 text-[10px] text-[#06B6D4]">✓ valid</div>
+      ) : null}
+      {mode !== "mermaid" && !validationError && slide.diagram?.yaml ? (
+        <EdgeStyleControls diagramYaml={slide.diagram.yaml} onChange={onUpdateDiagramYaml} />
       ) : null}
     </div>
   );

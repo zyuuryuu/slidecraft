@@ -212,7 +212,10 @@ export function paintDiagram(
       nodeToGroup, groupBboxes, direction, backEdges,
     );
 
-    const [srcPortOff, tgtPortOff] = portOffsets.get(edgeKey) ?? [0, 0];
+    const [autoSrc, autoTgt] = portOffsets.get(edgeKey) ?? [0, 0];
+    // A manual srcPort/tgtPort overrides the auto port spread (move the start/end).
+    const srcPortOff = es.srcPort ?? autoSrc;
+    const tgtPortOff = es.tgtPort ?? autoTgt;
 
     const points = planEdgeRoute(
       fromPos, toPos,

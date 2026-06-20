@@ -47,6 +47,10 @@ export const EdgeStyleSchema = z.object({
   width: z.number().default(2),
   arrow: z.boolean().default(true),
   dash: z.boolean().default(false),
+  // Manual start/end port: shift the connection point along the node edge as a
+  // fraction (-0.5..0.5, 0 = centre). Overrides the auto port spread when set.
+  srcPort: z.number().optional(),
+  tgtPort: z.number().optional(),
 });
 export type EdgeStyle = z.infer<typeof EdgeStyleSchema>;
 
