@@ -13,7 +13,7 @@
 import type { DiagramSpec } from "./schema";
 import type { ThemeConfig } from "./theme";
 import type { DrawTarget } from "./draw-target";
-import { SLIDE_W } from "./layout-engine";
+import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
 export interface SeqLayout {
   parts: { id: string; label: string; cx: number; boxX: number; boxW: number }[];
@@ -32,14 +32,18 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
   const colW = (SLIDE_W - 2 * margin) / n;
   const boxW = Math.min(colW * 0.78, 2.2);
   const boxH = 0.5;
-  const boxY = contentTop;
+  const gap = 0.5;
+  // Centre the block vertically in the available space so it clears the slide's
+  // title/subtitle (top-aligning at contentTop overlapped them).
+  const naturalH = boxH + 0.45 + spec.edges.length * gap + 0.3;
+  const avail = SLIDE_H - contentTop - 0.4;
+  const boxY = naturalH < avail ? contentTop + (avail - naturalH) / 2 : contentTop;
   const cx = (i: number) => margin + colW * i + colW / 2;
 
   const partLayout = parts.map((p, i) => ({ id: p.id, label: p.label, cx: cx(i), boxX: cx(i) - boxW / 2, boxW }));
   const idx = new Map(parts.map((p, i) => [p.id, i]));
 
   const firstMsgY = boxY + boxH + 0.45;
-  const gap = 0.5;
   const msgs = spec.edges.map((e, k) => {
     const fi = idx.get(e.from) ?? 0;
     const ti = idx.get(e.to) ?? 0;
