@@ -6,7 +6,7 @@
  */
 
 import yaml from "js-yaml";
-import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
+import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec, type RelationType } from "./schema";
 
 export type DiagramFormat = "yaml" | "json" | "mermaid";
 
@@ -172,9 +172,73 @@ interface ParsedGroup {
   nodeIds: string[];
 }
 
+/** Map a Mermaid class-relation operator to {from→to, UML relation}. Inheritance/
+ *  realization keep the PARENT as `from` (parent-on-top in the layered layout). */
+function classRelation(a: string, op: string, b: string): { from: string; to: string; relation: RelationType } {
+  if (op === "<|--") return { from: a, to: b, relation: "inheritance" }; // A is the parent
+  if (op === "--|>") return { from: b, to: a, relation: "inheritance" };
+  if (op === "<|.." ) return { from: a, to: b, relation: "realization" };
+  if (op === "..|>") return { from: b, to: a, relation: "realization" };
+  let relation: RelationType = "association";
+  if (op.includes("*")) relation = "composition";
+  else if (op.includes("o")) relation = "aggregation";
+  else if (op.includes("..")) relation = "dependency";
+  return { from: a, to: b, relation };
+}
+
+/** Parse a Mermaid `classDiagram` into a DiagramSpec of class nodes + UML relations. */
+function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
+  const nodes = new Map<string, { id: string; attributes: string[]; methods: string[] }>();
+  const edges: Array<{ from: string; to: string; relation: RelationType; label?: string }> = [];
+  const ensure = (id: string) => {
+    let n = nodes.get(id);
+    if (!n) { n = { id, attributes: [], methods: [] }; nodes.set(id, n); }
+    return n;
+  };
+
+  let current: { id: string; attributes: string[]; methods: string[] } | null = null;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%")) continue;
+
+    if (current) {
+      if (line === "}") { current = null; continue; }
+      (line.includes("(") ? current.methods : current.attributes).push(line);
+      continue;
+    }
+
+    const open = line.match(/^class\s+([A-Za-z_]\w*)\s*\{$/);
+    if (open) { current = ensure(open[1]); continue; }
+    const decl = line.match(/^class\s+([A-Za-z_]\w*)\s*$/);
+    if (decl) { ensure(decl[1]); continue; }
+
+    // A <relation> B  [: label]
+    const rel = line.match(/^([A-Za-z_]\w*)\s*(<\|\.\.|\.\.\|>|<\|--|--\|>|\*--|--\*|o--|--o|<\.\.|\.\.>|-->|<--|--|\.\.)\s*([A-Za-z_]\w*)\s*(?::\s*(.+))?$/);
+    if (rel) {
+      const [, a, op, b, label] = rel;
+      const { from, to, relation } = classRelation(a, op, b);
+      ensure(from); ensure(to);
+      edges.push({ from, to, relation, label: label?.trim() || undefined });
+    }
+  }
+
+  if (nodes.size === 0) return null;
+  const r = DiagramSpecSchema.safeParse({
+    type: "flowchart",
+    direction: "TB",
+    nodes: [...nodes.values()].map((n) => ({
+      id: n.id, label: n.id, shape: "class", attributes: n.attributes, methods: n.methods,
+    })),
+    edges,
+  });
+  return r.success ? r.data : null;
+}
+
 export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null {
   const lines = mermaidSyntax.trim().split("\n").map(l => l.trim());
   if (lines.length === 0) return null;
+
+  if (/^classDiagram\b/i.test(lines[0])) return parseMermaidClassDiagram(lines);
 
   // Parse direction from first line: graph TD, graph LR, etc.
   const headerMatch = lines[0].match(/^(?:graph|flowchart)\s+(TD|TB|LR|RL|BT)/i);

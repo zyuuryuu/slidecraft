@@ -6,6 +6,8 @@ import { describe, it, expect } from "vitest";
 import { DiagramSpecSchema } from "../src/engine/schema";
 import { computeLayout } from "../src/engine/layout-engine";
 import { renderDiagramToSvg } from "../src/engine/svg-writer";
+import { mermaidToDiagramSpec } from "../src/engine/mermaid-to-diagram";
+import { parseMd } from "../src/engine/md-parser";
 
 const SPEC = DiagramSpecSchema.parse({
   type: "flowchart",
@@ -46,5 +48,39 @@ describe("class diagram model + rendering (milestone 1)", () => {
     expect(svg).toContain("makeSound");
     // compartment dividers + the edge → multiple line/path elements
     expect((svg.match(/<line|<path|<polyline/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("Mermaid classDiagram parser (milestone 2)", () => {
+  const MMD = `classDiagram
+  class Animal {
+    +String name
+    +int age
+    +makeSound()
+  }
+  class Dog
+  Animal <|-- Dog
+  Animal *-- Tail : has`;
+
+  it("parses classes with attributes/methods + UML relations", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    expect(spec).not.toBeNull();
+    const animal = spec.nodes.find((n) => n.id === "Animal")!;
+    expect(animal.shape).toBe("class");
+    expect(animal.attributes).toContain("+String name");
+    expect(animal.methods).toContain("+makeSound()");
+    // inheritance keeps the parent as `from` (Animal); composition for *--
+    expect(spec.edges.find((e) => e.to === "Dog")?.relation).toBe("inheritance");
+    expect(spec.edges.find((e) => e.to === "Tail")?.relation).toBe("composition");
+    // referenced-only classes become (empty) class nodes too
+    expect(spec.nodes.some((n) => n.id === "Tail" && n.shape === "class")).toBe(true);
+  });
+
+  it("a ```mermaid classDiagram graduates to an editable .diagram on parse", () => {
+    const md = "# クラス図\n\n```mermaid\n" + MMD + "\n```\n";
+    const s = parseMd(md).slides[0];
+    expect(s.diagram).toBeDefined(); // native, editable — NOT a mermaid image
+    expect(s.mermaidBlock).toBeUndefined();
+    expect(s.diagram!.yaml).toContain("class");
   });
 });
