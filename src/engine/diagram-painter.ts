@@ -298,6 +298,13 @@ export function paintDiagram(
 
     if (edge.label) {
       const labelPos = placeEdgeLabel(points, edge.label);
+      // ER labels sit BESIDE the relationship line (not on top of it) for clarity.
+      if (er && points.length >= 2) {
+        const mi = Math.max(1, Math.floor(points.length / 2));
+        const seg = { dx: points[mi].x - points[mi - 1].x, dy: points[mi].y - points[mi - 1].y };
+        if (Math.abs(seg.dy) >= Math.abs(seg.dx)) labelPos.x += labelPos.w / 2 + 0.14; // vertical line → shift right
+        else labelPos.y -= labelPos.h + 0.05; // horizontal line → shift above
+      }
       const edgeFs = scaledFontSize(ds.edge_label_font_size, layoutScale);
       dt.text(
         [{ text: edge.label, fontSize: edgeFs, fontFace: fonts.body, color, bold: true }],

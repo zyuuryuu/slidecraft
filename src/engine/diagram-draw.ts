@@ -224,15 +224,16 @@ export function paintCrowFoot(
   const len = Math.hypot(dx, dy) || 1;
   dx /= len; dy /= len;          // unit vector pointing INTO the entity at P
   const px = -dy, py = dx;       // perpendicular
+  const mw = Math.max(width, 1.75); // bolder than the line so the cardinality reads clearly
   const at = (d: number) => ({ x: P.x - dx * d, y: P.y - dy * d });
-  const seg = (a: ConnectionPoint, b: ConnectionPoint) => t.line(a, b, { color, width, arrow: false });
+  const seg = (a: ConnectionPoint, b: ConnectionPoint) => t.line(a, b, { color, width: mw, arrow: false });
   const tick = (d: number, h: number) => {
     const c = at(d);
     seg({ x: c.x - px * h, y: c.y - py * h }, { x: c.x + px * h, y: c.y + py * h });
   };
   const ring = (d: number, r: number) => {
     const c = at(d);
-    t.shape("circle", { x: c.x - r, y: c.y - r, w: 2 * r, h: 2 * r }, { fill: null, line: { color, width } });
+    t.shape("circle", { x: c.x - r, y: c.y - r, w: 2 * r, h: 2 * r }, { fill: null, line: { color, width: mw } });
   };
 
   const many = card === "zero_many" || card === "one_many";
@@ -240,13 +241,13 @@ export function paintCrowFoot(
   const one = card === "one" || card === "one_many";
 
   if (many) {
-    const apex = at(0.18), e = at(0.02), s = 0.11;
+    const apex = at(0.26), e = at(0.02), s = 0.15;
     seg(apex, { x: e.x - px * s, y: e.y - py * s });
     seg(apex, { x: e.x + px * s, y: e.y + py * s });
     seg(apex, e);
   }
-  if (one) tick(many ? 0.24 : 0.10, 0.09);
-  if (zero) ring(many ? 0.32 : 0.20, 0.055);
+  if (one) tick(many ? 0.34 : 0.14, 0.13);
+  if (zero) ring(many ? 0.46 : 0.28, 0.075);
 }
 
 export function paintHeaderBar(t: DrawTarget, title: string, theme: ThemeConfig): void {
