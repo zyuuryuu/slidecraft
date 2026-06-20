@@ -25,8 +25,24 @@ import type {
   Paragraph,
   InlineSegment,
 } from "./slide-schema";
+import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 
 // ── Title slide field → placeholder idx mapping ──
+
+/**
+ * A ```mermaid FLOWCHART graduates to the canonical DiagramSpec (editable, native
+ * PPTX shapes, one consistent look). Other Mermaid (sequence/class/…) can't yet be
+ * modelled, so it stays as a mermaid-image fallback. Keeps a single render path for
+ * the common case while nothing breaks for the rest.
+ */
+function mermaidToFigure(
+  mmd: string,
+  placeholderIdx: string,
+): { diagram?: DiagramBlock; mermaidBlock?: MermaidBlock } {
+  const spec = mermaidToDiagramSpec(mmd);
+  if (spec) return { diagram: { yaml: diagramSpecToYaml(spec), placeholderIdx } };
+  return { mermaidBlock: { mermaid: mmd, placeholderIdx } };
+}
 
 const TITLE_FIELD_MAP: Record<string, string> = {
   category: "10",
@@ -185,7 +201,9 @@ function parseSlideBlock(
       if (fig && (fig.lang === "diagram" || fig.lang === "mermaid-shapes")) {
         diagram = { yaml: fig.content, placeholderIdx: colIdx };
       } else if (fig && fig.lang === "mermaid") {
-        mermaidBlock = { mermaid: fig.content, placeholderIdx: colIdx };
+        const f = mermaidToFigure(fig.content, colIdx);
+        if (f.diagram) diagram = f.diagram;
+        else mermaidBlock = f.mermaidBlock;
       } else {
         const paras = linesToParagraphs(sl);
         if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
@@ -228,10 +246,9 @@ function parseSlideBlock(
             placeholderIdx: "1",
           };
         } else if (codeBlockLang === "mermaid") {
-          mermaidBlock = {
-            mermaid: codeBlockLines.join("\n"),
-            placeholderIdx: "1",
-          };
+          const f = mermaidToFigure(codeBlockLines.join("\n"), "1");
+          if (f.diagram) diagram = f.diagram;
+          else mermaidBlock = f.mermaidBlock;
         }
         inCodeBlock = false;
         codeBlockLang = "";

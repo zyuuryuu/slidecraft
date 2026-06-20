@@ -322,7 +322,7 @@ nodes:
     expect(s.diagram).toBeDefined();
   });
 
-  it("parses ```mermaid block into MermaidBlock", () => {
+  it("a ```mermaid FLOWCHART graduates to the canonical DiagramSpec (.diagram)", () => {
     const md = `# Flow
 > Overview
 
@@ -333,9 +333,25 @@ graph TD
 
     const deck = parseMd(md);
     const s = deck.slides[0];
+    // flowchart Mermaid is converted to DiagramSpec on parse (editable, native shapes)
+    expect(s.diagram).toBeDefined();
+    expect(s.diagram!.yaml).toContain("Start");
+    expect(s.diagram!.yaml).toContain("End");
+    expect(s.diagram!.placeholderIdx).toBe("1");
+    expect(s.mermaidBlock).toBeUndefined();
+  });
+
+  it("a NON-flowchart ```mermaid stays as a mermaid image fallback", () => {
+    const md = `# Seq
+
+\`\`\`mermaid
+sequenceDiagram
+  A->>B: hello
+\`\`\``;
+
+    const s = parseMd(md).slides[0];
     expect(s.mermaidBlock).toBeDefined();
-    expect(s.mermaidBlock!.mermaid).toContain("graph TD");
-    expect(s.mermaidBlock!.placeholderIdx).toBe("1");
+    expect(s.mermaidBlock!.mermaid).toContain("sequenceDiagram");
     expect(s.diagram).toBeUndefined();
   });
 
