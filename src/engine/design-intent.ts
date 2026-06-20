@@ -16,7 +16,7 @@ import yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec, type NodeOverride } from "./schema";
 import { computeLayout, SLIDE_W, SLIDE_H, type NodePosition } from "./layout-engine";
-import { diagramSpecToYaml, mermaidToDiagramSpec } from "./mermaid-to-diagram";
+import { diagramSpecToYaml, mermaidToDiagramSpec, dumpDiagramLikeSource } from "./mermaid-to-diagram";
 import { parseJsonLoose } from "./json-salvage";
 
 // ── DesignIntent: the small structure the model emits (a list of ops) ──
@@ -107,7 +107,7 @@ function applyToFigure(slide: SlideIR, mutate: (spec: DiagramSpec, raw: RawDiagr
   const placeholderIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? "1";
   const { mermaidBlock: _drop, ...rest } = slide;
   void _drop;
-  return { ...rest, diagram: { yaml: yaml.dump(raw, { lineWidth: 1000 }), placeholderIdx } };
+  return { ...rest, diagram: { yaml: dumpDiagramLikeSource(raw, baseYaml), placeholderIdx } };
 }
 
 function emphasizeFigure(slide: SlideIR, nodeId: string, level: "high" | "medium"): SlideIR {

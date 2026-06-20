@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import yaml from "js-yaml";
+import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
@@ -121,7 +122,7 @@ function DiagramSvgOverlay({
         if (ov[k] !== undefined) next[k] = round(ov[k]!);
       });
       node.override = next;
-      onChange?.(yaml.dump(raw, { lineWidth: 1000 }));
+      onChange?.(dumpDiagramLikeSource(raw, diagramYaml));
     } catch {
       /* ignore malformed YAML */
     }
@@ -133,7 +134,7 @@ function DiagramSvgOverlay({
       const node = raw.nodes?.find((n) => n.id === id);
       if (!node) return;
       delete node.override;
-      onChange?.(yaml.dump(raw, { lineWidth: 1000 }));
+      onChange?.(dumpDiagramLikeSource(raw, diagramYaml));
     } catch {
       /* ignore */
     }

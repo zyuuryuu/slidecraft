@@ -347,6 +347,24 @@ export function diagramSpecToMermaid(spec: DiagramSpec): string {
 
 // ── DiagramSpec → YAML string ──
 
+/**
+ * Re-serialize a (loaded + modified) diagram object in the SAME format as its
+ * source text — JSON stays JSON, YAML stays YAML. Drag/resize and design edits
+ * must not silently flip a JSON diagram to YAML (which breaks the JSON editor view).
+ */
+export function dumpDiagramLikeSource(obj: unknown, source: string): string {
+  const t = source.trim();
+  if (t.startsWith("{") || t.startsWith("[")) {
+    try {
+      JSON.parse(t);
+      return JSON.stringify(obj, null, 2);
+    } catch {
+      /* not actually JSON → fall through to YAML */
+    }
+  }
+  return yaml.dump(obj, { lineWidth: 1000 });
+}
+
 export function diagramSpecToYaml(spec: DiagramSpec): string {
   let yaml = `type: ${spec.type}\n`;
   yaml += `direction: ${spec.direction}\n`;

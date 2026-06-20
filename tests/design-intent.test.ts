@@ -90,6 +90,29 @@ describe("emphasize → node override (engine computes + clamps geometry)", () =
   });
 });
 
+describe("source format is preserved (drag/design must not flip JSON→YAML)", () => {
+  it("a JSON-format figure stays JSON after a design edit", () => {
+    const jsonDiag = JSON.stringify(
+      { type: "flowchart", direction: "TB", nodes: [{ id: "A", label: "A" }, { id: "B", label: "B" }], edges: [{ from: "A", to: "B" }] },
+      null,
+      2,
+    );
+    const slide: SlideIR = {
+      layout: "Content.1Body.Single",
+      placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "T" }] }] }],
+      diagram: { yaml: jsonDiag, placeholderIdx: "1" },
+    };
+    const out = applyDesignIntent(slide, [{ op: "emphasize", nodeId: "B", level: "high" }]);
+    expect(out.diagram!.yaml.trim().startsWith("{")).toBe(true);
+    expect(() => JSON.parse(out.diagram!.yaml)).not.toThrow();
+    expect(JSON.parse(out.diagram!.yaml).nodes.find((n: { id: string }) => n.id === "B").override).toBeDefined();
+  });
+  it("a YAML-format figure stays YAML", () => {
+    const out = applyDesignIntent(slideWithDiagram(), [{ op: "emphasize", nodeId: "B", level: "high" }]);
+    expect(out.diagram!.yaml.trim().startsWith("{")).toBe(false);
+  });
+});
+
 describe("relayout → diagram direction", () => {
   it("sets the direction", () => {
     const out = applyDesignIntent(slideWithDiagram(), [{ op: "relayout", direction: "LR" }]);
