@@ -478,6 +478,7 @@ export function dumpDiagramLikeSource(obj: unknown, source: string): string {
 }
 
 export function diagramSpecToYaml(spec: DiagramSpec): string {
+  const q = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   let yaml = `type: ${spec.type}\n`;
   yaml += `direction: ${spec.direction}\n`;
   if (spec.title) yaml += `title: ${spec.title}\n`;
@@ -485,15 +486,27 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
   for (const node of spec.nodes) {
     yaml += `  - id: ${node.id}\n`;
     yaml += `    label: ${node.label}\n`;
-    if (node.shape && node.shape !== "rect") {
-      yaml += `    shape: ${node.shape}\n`;
+    if (node.shape && node.shape !== "rect") yaml += `    shape: ${node.shape}\n`;
+    if (node.attributes?.length) yaml += `    attributes:\n${node.attributes.map((a) => `      - ${q(a)}`).join("\n")}\n`;
+    if (node.methods?.length) yaml += `    methods:\n${node.methods.map((m) => `      - ${q(m)}`).join("\n")}\n`;
+    if (node.override) {
+      const ov = (["x", "y", "w", "h"] as const).filter((k) => node.override![k] !== undefined);
+      if (ov.length) yaml += `    override:\n${ov.map((k) => `      ${k}: ${node.override![k]}`).join("\n")}\n`;
     }
   }
   yaml += `\nedges:\n`;
   for (const edge of spec.edges) {
     yaml += `  - from: ${edge.from}\n`;
     yaml += `    to: ${edge.to}\n`;
-    if (edge.label) yaml += `    label: "${edge.label}"\n`;
+    if (edge.label) yaml += `    label: ${q(edge.label)}\n`;
+    if (edge.relation) yaml += `    relation: ${edge.relation}\n`;
+    if (edge.style?.dash) yaml += `    style:\n      dash: true\n`;
+  }
+  if (spec.fragments?.length) {
+    yaml += `\nfragments:\n`;
+    for (const f of spec.fragments) {
+      yaml += `  - kind: ${f.kind}\n    label: ${q(f.label)}\n    from: ${f.from}\n    to: ${f.to}\n`;
+    }
   }
   return yaml;
 }

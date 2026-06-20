@@ -8,6 +8,7 @@ import { computeLayout } from "../src/engine/layout-engine";
 import { renderDiagramToSvg } from "../src/engine/svg-writer";
 import { mermaidToDiagramSpec } from "../src/engine/mermaid-to-diagram";
 import { parseMd } from "../src/engine/md-parser";
+import yaml from "js-yaml";
 
 const SPEC = DiagramSpecSchema.parse({
   type: "flowchart",
@@ -81,7 +82,11 @@ describe("Mermaid classDiagram parser (milestone 2)", () => {
     const s = parseMd(md).slides[0];
     expect(s.diagram).toBeDefined(); // native, editable — NOT a mermaid image
     expect(s.mermaidBlock).toBeUndefined();
-    expect(s.diagram!.yaml).toContain("class");
+    // the attributes/methods/relation must SURVIVE the conversion serialization
+    const spec = DiagramSpecSchema.parse(yaml.load(s.diagram!.yaml));
+    expect(spec.nodes.find((n) => n.id === "Animal")?.attributes).toContain("+String name");
+    expect(spec.nodes.find((n) => n.id === "Animal")?.methods).toContain("+makeSound()");
+    expect(spec.edges.find((e) => e.to === "Dog")?.relation).toBe("inheritance");
   });
 });
 

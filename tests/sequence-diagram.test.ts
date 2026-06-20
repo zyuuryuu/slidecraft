@@ -9,6 +9,7 @@ import { computeSequenceLayout } from "../src/engine/diagram-sequence";
 import { renderDiagramToSvg } from "../src/engine/svg-writer";
 import { mermaidToDiagramSpec } from "../src/engine/mermaid-to-diagram";
 import { parseMd } from "../src/engine/md-parser";
+import yaml from "js-yaml";
 
 const SPEC = DiagramSpecSchema.parse({
   type: "sequence",
@@ -64,7 +65,10 @@ describe("Mermaid sequenceDiagram parser", () => {
     const s = parseMd("# Seq\n\n```mermaid\n" + MMD + "\n```\n").slides[0];
     expect(s.diagram).toBeDefined();
     expect(s.mermaidBlock).toBeUndefined();
-    expect(s.diagram!.yaml).toContain("sequence");
+    const spec = DiagramSpecSchema.parse(yaml.load(s.diagram!.yaml));
+    expect(spec.type).toBe("sequence");
+    expect(spec.edges).toHaveLength(2);
+    expect(spec.edges[1].style?.dash).toBe(true); // dashed return survives conversion
   });
 });
 
@@ -91,6 +95,13 @@ describe("sequence fragments (alt/loop/opt) — milestone 2", () => {
     const svg = renderDiagramToSvg(spec, {});
     expect(svg).toMatch(/>alt</);
     expect(svg).toContain("valid");
+  });
+
+  it("the fragment survives parse→conversion (not dropped by serialization)", () => {
+    const s = parseMd("# F\n\n```mermaid\n" + MMD + "\n```\n").slides[0];
+    const spec = DiagramSpecSchema.parse(yaml.load(s.diagram!.yaml));
+    expect(spec.fragments).toHaveLength(1);
+    expect(spec.fragments[0]).toMatchObject({ kind: "alt", from: 1, to: 2 });
   });
 
   it("loop and opt are recognised too", () => {

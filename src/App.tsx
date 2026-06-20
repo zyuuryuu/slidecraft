@@ -106,6 +106,26 @@ graph LR
 
 ---
 
+# シーケンス図サンプル
+> ログインフロー（alt フラグメント付き）
+
+\`\`\`mermaid
+sequenceDiagram
+  participant U as ユーザー
+  participant A as API
+  participant D as DB
+  U->>A: ログイン要求
+  A->>D: 認証情報を照会
+  D-->>A: ユーザー情報
+  alt 認証成功
+    A-->>U: トークン発行
+  else 認証失敗
+    A-->>U: エラー応答
+  end
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
