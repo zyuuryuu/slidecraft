@@ -14,16 +14,26 @@ import type { DiagramSpec } from "./schema";
 // ── DiagramSpec → Mermaid (reverse) ──
 
 /**
- * Whether diagramSpecToMermaid can FAITHFULLY represent this spec. Mermaid graph
- * syntax can't express sequence diagrams or UML class diagrams, so serializing
- * them yields a plain flowchart — and converting back silently flattens
- * `type: sequence`/class into `type: flowchart`. The editor uses this to disable
- * its MERMAID toggle for those (Mermaid is input-only; YAML/JSON is canonical).
+ * Whether diagramSpecToMermaid can FAITHFULLY round-trip this spec (serialize →
+ * parse with no data loss). The editor uses this to gate its MERMAID toggle so a
+ * round-trip can never silently corrupt the diagram.
+ *   - sequence: faithful (sequenceDiagram covers participants/messages/fragments/
+ *     dividers/activations/async).
+ *   - class diagram (class shapes / UML relations): faithful only when nothing
+ *     would be dropped — classDiagram uses the class name as id+label and carries
+ *     no node styles/groups.
+ *   - plain flowchart: allowed (lossy for styles/lanes, but never type-breaking).
  */
 export function canSerializeToMermaid(spec: DiagramSpec): boolean {
-  if (spec.type === "sequence") return false;
-  if (spec.nodes.some((n) => n.shape === "class")) return false;
-  if (spec.edges.some((e) => !!e.relation)) return false;
+  if (spec.type === "sequence") return true;
+  const isClass = spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation);
+  if (isClass) {
+    return (
+      spec.groups.length === 0 &&
+      spec.lanes.length === 0 &&
+      spec.nodes.every((n) => n.label === n.id && !n.style && !n.sublabel)
+    );
+  }
   return true;
 }
 
@@ -42,7 +52,92 @@ function nodeToMermaid(id: string, label: string, shape?: string): string {
   }
 }
 
+// ── Sequence → Mermaid (sequenceDiagram) ──
+
+/** Mermaid message operator for a message's dash (return) + async flags. */
+function seqArrow(dash: boolean | undefined, async: boolean | undefined): string {
+  if (async) return dash ? "--)" : "-)";
+  return dash ? "-->>" : "->>";
+}
+
+function sequenceSpecToMermaid(spec: DiagramSpec): string {
+  let s = "sequenceDiagram\n";
+  for (const n of spec.nodes) {
+    s += n.label && n.label !== n.id ? `  participant ${n.id} as ${n.label}\n` : `  participant ${n.id}\n`;
+  }
+  // Walk messages in order, interleaving fragment open/divider/close and
+  // activate/deactivate so the parser reconstructs the same indices.
+  let depth = 1;
+  const pad = () => "  ".repeat(depth);
+  for (let i = 0; i < spec.edges.length; i++) {
+    // opens at i (outermost = widest span first)
+    for (const f of spec.fragments.filter((f) => f.from === i).sort((a, b) => (b.to - b.from) - (a.to - a.from))) {
+      s += `${pad()}${f.kind}${f.label ? " " + f.label : ""}\n`;
+      depth++;
+    }
+    // branch dividers at i (`else` for alt/opt/loop, `and` for par)
+    for (const f of spec.fragments) {
+      for (const d of f.dividers ?? []) {
+        if (d.at === i) {
+          const kw = f.kind === "par" ? "and" : "else";
+          s += `${"  ".repeat(Math.max(1, depth - 1))}${kw}${d.label ? " " + d.label : ""}\n`;
+        }
+      }
+    }
+    for (const a of spec.activations) if (a.from === i) s += `${pad()}activate ${a.participant}\n`;
+    const e = spec.edges[i];
+    s += `${pad()}${e.from}${seqArrow(e.style?.dash, e.style?.async)}${e.to}: ${e.label ?? ""}\n`;
+    for (const a of spec.activations) if (a.to === i) s += `${pad()}deactivate ${a.participant}\n`;
+    // closes at i — every fragment ending here emits an `end` (all identical, so
+    // only the count matters); each one closes a nesting level.
+    const closes = spec.fragments.filter((f) => f.to === i).length;
+    for (let c = 0; c < closes; c++) {
+      depth = Math.max(1, depth - 1);
+      s += `${pad()}end\n`;
+    }
+  }
+  return s;
+}
+
+// ── Class → Mermaid (classDiagram) ──
+
+/** UML relation → Mermaid class operator (parent/`from` written first). */
+function relationToClassOp(relation: string | undefined): string {
+  switch (relation) {
+    case "inheritance": return "<|--";
+    case "realization": return "<|..";
+    case "composition": return "*--";
+    case "aggregation": return "o--";
+    case "dependency": return "..>";
+    default: return "-->"; // association
+  }
+}
+
+function classSpecToMermaid(spec: DiagramSpec): string {
+  let s = "classDiagram\n";
+  for (const n of spec.nodes) {
+    const members = [...(n.attributes ?? []), ...(n.methods ?? [])];
+    if (members.length) {
+      s += `  class ${n.id} {\n`;
+      for (const m of members) s += `    ${m}\n`;
+      s += `  }\n`;
+    } else {
+      s += `  class ${n.id}\n`;
+    }
+  }
+  for (const e of spec.edges) {
+    s += `  ${e.from} ${relationToClassOp(e.relation)} ${e.to}${e.label ? ` : ${e.label}` : ""}\n`;
+  }
+  return s;
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
+  // Dispatch by diagram kind so sequence/class round-trip faithfully (the parser
+  // already reads sequenceDiagram/classDiagram back).
+  if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
+  if (spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation)) {
+    return classSpecToMermaid(spec);
+  }
   const dir = spec.direction === "LR" || spec.direction === "RL" ? "LR" : "TD";
   let mmd = `graph ${dir}\n`;
 
