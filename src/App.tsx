@@ -181,6 +181,26 @@ timeline
 
 ---
 
+# 2x2マトリクスサンプル
+> 施策の優先度（実現性 × 影響）
+
+\`\`\`mermaid
+quadrantChart
+  title 施策ポートフォリオ
+  x-axis 低い実現性 --> 高い実現性
+  y-axis 小さい影響 --> 大きい影響
+  quadrant-1 最優先
+  quadrant-2 投資領域
+  quadrant-3 見送り
+  quadrant-4 クイックウィン
+  新機能A: [0.78, 0.82]
+  基盤刷新: [0.32, 0.7]
+  UI改善: [0.82, 0.34]
+  レポート: [0.58, 0.55]
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
