@@ -8,6 +8,7 @@
 import yaml from "js-yaml";
 import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
 import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState, parseMermaidER, parseMermaidTimeline, parseMermaidQuadrant, parseMermaidPie } from "./mermaid-uml-parser";
+import { parseMermaidGantt } from "./diagram-gantt";
 
 export type DiagramFormat = "yaml" | "json" | "mermaid";
 
@@ -184,6 +185,7 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
   if (/^timeline\b/i.test(lines[0])) return parseMermaidTimeline(lines);
   if (/^quadrantChart\b/i.test(lines[0])) return parseMermaidQuadrant(lines);
   if (/^pie\b/i.test(lines[0])) return parseMermaidPie(lines);
+  if (/^gantt\b/i.test(lines[0])) return parseMermaidGantt(lines);
 
   // Parse direction from first line: graph TD, graph LR, etc.
   const headerMatch = lines[0].match(/^(?:graph|flowchart)\s+(TD|TB|LR|RL|BT)/i);

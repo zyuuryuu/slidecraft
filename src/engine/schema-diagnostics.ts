@@ -67,6 +67,7 @@ function levenshtein(a: string, b: string): number {
 const KNOWN_FIELDS_TOP = new Set([
   "type", "direction", "title", "classDefs", "nodes", "edges",
   "groups", "lanes", "layout",
+  "fragments", "activations", "quadrant", "gantt", // sequence / quadrant / gantt diagrams
 ]);
 const REQUIRED_FIELDS_TOP = new Set(["type", "nodes"]);
 

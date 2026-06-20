@@ -10,6 +10,7 @@
 
 import yaml from "js-yaml";
 import type { DiagramSpec } from "./schema";
+import { ganttSpecToMermaid } from "./diagram-gantt";
 
 // ── DiagramSpec → Mermaid (reverse) ──
 
@@ -29,6 +30,7 @@ export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "timeline") return true; // periods/events/sections/title all round-trip
   if (spec.type === "quadrant") return true; // axis/quadrant labels + points all round-trip
   if (spec.type === "pie") return true; // slices (label + value) + title round-trip
+  if (spec.type === "gantt") return true; // tasks (offsets) round-trip via explicit dates
   // state diagram (has start/end pseudo-states) — faithful (custom labels via
   // `state "x" as id`); only block when node styles/groups/lanes would be lost.
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
@@ -229,8 +231,9 @@ function pieSpecToMermaid(spec: DiagramSpec): string {
 }
 
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
-  // Dispatch by diagram kind so sequence/timeline/quadrant/pie/state/ER/class
-  // round-trip faithfully (the parser already reads each dialect back).
+  // Dispatch by diagram kind so sequence/timeline/quadrant/pie/gantt/state/ER/
+  // class round-trip faithfully (the parser already reads each dialect back).
+  if (spec.type === "gantt") return ganttSpecToMermaid(spec);
   if (spec.type === "pie") return pieSpecToMermaid(spec);
   if (spec.type === "quadrant") return quadrantSpecToMermaid(spec);
   if (spec.type === "timeline") return timelineSpecToMermaid(spec);
@@ -359,6 +362,14 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `  q1: ${q(qd.q1)}\n  q2: ${q(qd.q2)}\n  q3: ${q(qd.q3)}\n  q4: ${q(qd.q4)}\n`;
     yaml += qd.points.length ? `  points:\n` : `  points: []\n`;
     for (const p of qd.points) yaml += `    - label: ${q(p.label)}\n      x: ${p.x}\n      y: ${p.y}\n`;
+  }
+  if (spec.gantt) {
+    const gt = spec.gantt;
+    yaml += `\ngantt:\n  startDate: ${q(gt.startDate)}\n`;
+    yaml += gt.tasks.length ? `  tasks:\n` : `  tasks: []\n`;
+    for (const t of gt.tasks) {
+      yaml += `    - name: ${q(t.name)}\n      section: ${q(t.section)}\n      start: ${t.start}\n      end: ${t.end}\n      status: ${q(t.status)}\n`;
+    }
   }
   return yaml;
 }

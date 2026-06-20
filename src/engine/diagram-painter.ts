@@ -41,6 +41,7 @@ import { computeSequenceLayout, paintSequence } from "./diagram-sequence";
 import { computeTimelineLayout, paintTimeline } from "./diagram-timeline";
 import { computeQuadrantLayout, paintQuadrant } from "./diagram-quadrant";
 import { computePieLayout, paintPie } from "./diagram-pie";
+import { computeGanttLayout, paintGantt } from "./diagram-gantt";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -151,6 +152,23 @@ export function paintDiagram(
     pdt.beginGroup();
     paintPie(pdt, pl, theme);
     pdt.endGroup();
+    return;
+  }
+
+  // Gantt charts: date axis + section bands + task bars (a chart engine).
+  if (spec.type === "gantt") {
+    const gl = computeGanttLayout(spec, contentTop);
+    let gdt: DrawTarget = t;
+    if (options.transform) {
+      const { scale, offsetX, offsetY } = options.transform;
+      gdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    } else if (options.region) {
+      const { scale, offsetX, offsetY } = fitTransform(gl.bbox, options.region);
+      gdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    }
+    gdt.beginGroup();
+    paintGantt(gdt, gl, theme);
+    gdt.endGroup();
     return;
   }
 

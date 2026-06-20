@@ -29,7 +29,7 @@ export type RelationType = (typeof VALID_RELATIONS)[number];
 export const VALID_DIRECTIONS = ["TB", "LR", "BT", "RL"] as const;
 export type Direction = (typeof VALID_DIRECTIONS)[number];
 
-export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant", "pie"] as const;
+export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant", "pie", "gantt"] as const;
 export type DiagramType = (typeof VALID_TYPES)[number];
 
 export const BUILTIN_ICONS = new Set([
@@ -191,6 +191,20 @@ export const QuadrantSchema = z.object({
 });
 export type Quadrant = z.infer<typeof QuadrantSchema>;
 
+// Gantt chart: tasks with start/end as DAY OFFSETS from `startDate` (the parser
+// resolves dates/durations/`after` deps into offsets); status ∈ done/active/crit/milestone.
+export const GanttSchema = z.object({
+  startDate: z.string().default(""),
+  tasks: z.array(z.object({
+    name: z.string(),
+    section: z.string().default(""),
+    start: z.number(),
+    end: z.number(),
+    status: z.string().default(""),
+  })).default([]),
+});
+export type Gantt = z.infer<typeof GanttSchema>;
+
 export const DiagramSpecSchema = z.object({
   type: z.enum(VALID_TYPES),
   direction: z.enum(VALID_DIRECTIONS).default("TB"),
@@ -203,6 +217,7 @@ export const DiagramSpecSchema = z.object({
   fragments: z.array(FragmentSchema).default([]),
   activations: z.array(ActivationSchema).default([]),
   quadrant: QuadrantSchema.optional(),
+  gantt: GanttSchema.optional(),
   layout: LayoutConfigSchema.default({ node_width: 2.0, node_height: 0.7, h_gap: 0.5, v_gap: 0.8 }),
 });
 export type DiagramSpec = z.infer<typeof DiagramSpecSchema>;
