@@ -21,6 +21,7 @@ export interface SeqLayout {
   boxH: number;
   lifelineBottom: number;
   msgs: { fromX: number; toX: number; y: number; label?: string; dash: boolean; self: boolean }[];
+  frags: { x: number; y: number; w: number; h: number; kind: string; label: string }[];
   bbox: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
@@ -52,13 +53,28 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
     };
   });
   const lifelineBottom = firstMsgY + spec.edges.length * gap + 0.3;
+
+  // combined-fragment boxes (alt/loop/opt/par) over their message range
+  const leftX = partLayout.length ? partLayout[0].cx : margin;
+  const rightX = partLayout.length ? partLayout[partLayout.length - 1].cx : SLIDE_W - margin;
+  const padX = 0.35;
+  const frags = spec.fragments.map((f) => {
+    const top = (msgs[f.from]?.y ?? firstMsgY) - 0.3;
+    const bot = (msgs[f.to]?.y ?? firstMsgY) + 0.22;
+    return { x: leftX - padX, y: top, w: rightX - leftX + 2 * padX, h: bot - top, kind: f.kind, label: f.label };
+  });
+
+  let minX = margin - 0.1;
+  let maxX = SLIDE_W - margin + 0.1;
+  for (const f of frags) { minX = Math.min(minX, f.x); maxX = Math.max(maxX, f.x + f.w); }
   return {
     parts: partLayout,
     boxY,
     boxH,
     lifelineBottom,
     msgs,
-    bbox: { minX: margin - 0.1, minY: boxY - 0.1, maxX: SLIDE_W - margin + 0.1, maxY: lifelineBottom + 0.1 },
+    frags,
+    bbox: { minX, minY: boxY - 0.1, maxX, maxY: lifelineBottom + 0.1 },
   };
 }
 
@@ -84,6 +100,20 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
       { align: "center", valign: "middle", shrink: true },
     );
   }
+  // combined fragments (alt/loop/opt/par): an outline box with a labelled corner tab
+  for (const fr of lay.frags) {
+    dt.shape("rect", { x: fr.x, y: fr.y, w: fr.w, h: fr.h }, { fill: null, line: { color: border, width: 1 } });
+    const tabW = 0.9;
+    const tabH = 0.26;
+    dt.shape("rect", { x: fr.x, y: fr.y, w: tabW, h: tabH }, { fill, line: { color: border, width: 1 } });
+    dt.text([{ text: fr.kind, fontSize: 9, fontFace: fonts.heading, color: textColor, bold: true }],
+      { x: fr.x + 0.05, y: fr.y, w: tabW - 0.1, h: tabH }, { align: "left", valign: "middle", shrink: true });
+    if (fr.label) {
+      dt.text([{ text: fr.label, fontSize: 9, fontFace: fonts.body, color: lineColor, bold: false }],
+        { x: fr.x + tabW + 0.1, y: fr.y, w: fr.w - tabW - 0.2, h: tabH }, { align: "left", valign: "middle", shrink: true });
+    }
+  }
+
   // messages (ordered top→bottom)
   for (const m of lay.msgs) {
     if (m.self) {

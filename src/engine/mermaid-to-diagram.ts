@@ -244,11 +244,24 @@ function parseMermaidSequence(lines: string[]): DiagramSpec | null {
     else if (label) labels.set(id, label);
   };
   const edges: Array<{ from: string; to: string; label?: string; dash: boolean }> = [];
+  const fragments: Array<{ kind: string; label: string; from: number; to: number }> = [];
+  const fragStack: Array<{ kind: string; label: string; from: number }> = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (!line || line.startsWith("%%")) continue;
     const p = line.match(/^(?:participant|actor)\s+(\w+)(?:\s+as\s+(.+))?$/);
     if (p) { ensure(p[1], p[2]?.trim()); continue; }
+
+    // combined fragment open / close (else divider is deferred to a later milestone)
+    const fr = line.match(/^(alt|loop|opt|par)\b\s*(.*)$/i);
+    if (fr) { fragStack.push({ kind: fr[1].toLowerCase(), label: fr[2].trim(), from: edges.length }); continue; }
+    if (/^end\b/i.test(line)) {
+      const f = fragStack.pop();
+      if (f && edges.length > f.from) fragments.push({ ...f, to: edges.length - 1 });
+      continue;
+    }
+    if (/^else\b/i.test(line)) continue;
+
     // A ->> B : message   (arrow run -, >, x, ); a leading "--" = dashed/return)
     const m = line.match(/^(\w+)\s*(--?(?:>>?|x|\)))\s*(\w+)\s*:\s*(.*)$/);
     if (m) {
@@ -263,6 +276,7 @@ function parseMermaidSequence(lines: string[]): DiagramSpec | null {
     direction: "TB",
     nodes: order.map((id) => ({ id, label: labels.get(id) ?? id })),
     edges: edges.map((e) => ({ from: e.from, to: e.to, label: e.label, ...(e.dash ? { style: { dash: true } } : {}) })),
+    fragments,
   });
   return r.success ? r.data : null;
 }

@@ -67,3 +67,39 @@ describe("Mermaid sequenceDiagram parser", () => {
     expect(s.diagram!.yaml).toContain("sequence");
   });
 });
+
+describe("sequence fragments (alt/loop/opt) — milestone 2", () => {
+  const MMD = `sequenceDiagram
+  participant A as User
+  participant B as API
+  A->>B: login
+  alt valid
+    B-->>A: token
+  else invalid
+    B-->>A: error
+  end`;
+
+  it("parses an alt block into a fragment over its message range", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    expect(spec.fragments).toHaveLength(1);
+    expect(spec.fragments[0]).toMatchObject({ kind: "alt", label: "valid", from: 1, to: 2 });
+  });
+
+  it("renders the fragment box + kind/label tab", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    expect(computeSequenceLayout(spec, 0.8).frags).toHaveLength(1);
+    const svg = renderDiagramToSvg(spec, {});
+    expect(svg).toMatch(/>alt</);
+    expect(svg).toContain("valid");
+  });
+
+  it("loop and opt are recognised too", () => {
+    const spec = mermaidToDiagramSpec(`sequenceDiagram
+  participant A
+  participant B
+  loop every minute
+    A->>B: poll
+  end`)!;
+    expect(spec.fragments[0].kind).toBe("loop");
+  });
+});

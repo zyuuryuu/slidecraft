@@ -141,6 +141,16 @@ export const LayoutConfigSchema = z.object({
 });
 export type LayoutConfig = z.infer<typeof LayoutConfigSchema>;
 
+// Sequence-diagram combined fragment (alt/loop/opt/par) — a labelled box drawn over
+// a contiguous range of messages [from, to] (message indices, inclusive).
+export const FragmentSchema = z.object({
+  kind: z.enum(["alt", "loop", "opt", "par"]),
+  label: z.string().default(""),
+  from: z.number(),
+  to: z.number(),
+});
+export type Fragment = z.infer<typeof FragmentSchema>;
+
 export const DiagramSpecSchema = z.object({
   type: z.enum(VALID_TYPES),
   direction: z.enum(VALID_DIRECTIONS).default("TB"),
@@ -150,6 +160,7 @@ export const DiagramSpecSchema = z.object({
   edges: z.array(EdgeSchema).default([]),
   groups: z.array(GroupSchema).default([]),
   lanes: z.array(LaneSchema).default([]),
+  fragments: z.array(FragmentSchema).default([]),
   layout: LayoutConfigSchema.default({ node_width: 2.0, node_height: 0.7, h_gap: 0.5, v_gap: 0.8 }),
 });
 export type DiagramSpec = z.infer<typeof DiagramSpecSchema>;
