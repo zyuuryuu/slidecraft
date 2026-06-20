@@ -201,6 +201,19 @@ quadrantChart
 
 ---
 
+# 円グラフサンプル
+> 売上構成比（ネイティブ扇形）
+
+\`\`\`mermaid
+pie title 売上構成比
+  "国内" : 52
+  "北米" : 28
+  "欧州" : 14
+  "その他" : 6
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
