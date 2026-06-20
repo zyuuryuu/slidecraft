@@ -234,11 +234,45 @@ function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
   return r.success ? r.data : null;
 }
 
+/** Parse a Mermaid `sequenceDiagram` into a DiagramSpec (type "sequence"):
+ *  participants → ordered nodes, messages → ordered edges (dashed for `-->>`). */
+function parseMermaidSequence(lines: string[]): DiagramSpec | null {
+  const labels = new Map<string, string>();
+  const order: string[] = [];
+  const ensure = (id: string, label?: string) => {
+    if (!labels.has(id)) { labels.set(id, label ?? id); order.push(id); }
+    else if (label) labels.set(id, label);
+  };
+  const edges: Array<{ from: string; to: string; label?: string; dash: boolean }> = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%")) continue;
+    const p = line.match(/^(?:participant|actor)\s+(\w+)(?:\s+as\s+(.+))?$/);
+    if (p) { ensure(p[1], p[2]?.trim()); continue; }
+    // A ->> B : message   (arrow run -, >, x, ); a leading "--" = dashed/return)
+    const m = line.match(/^(\w+)\s*(--?(?:>>?|x|\)))\s*(\w+)\s*:\s*(.*)$/);
+    if (m) {
+      const [, a, op, b, label] = m;
+      ensure(a); ensure(b);
+      edges.push({ from: a, to: b, label: label.trim() || undefined, dash: op.startsWith("--") });
+    }
+  }
+  if (order.length === 0) return null;
+  const r = DiagramSpecSchema.safeParse({
+    type: "sequence",
+    direction: "TB",
+    nodes: order.map((id) => ({ id, label: labels.get(id) ?? id })),
+    edges: edges.map((e) => ({ from: e.from, to: e.to, label: e.label, ...(e.dash ? { style: { dash: true } } : {}) })),
+  });
+  return r.success ? r.data : null;
+}
+
 export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null {
   const lines = mermaidSyntax.trim().split("\n").map(l => l.trim());
   if (lines.length === 0) return null;
 
   if (/^classDiagram\b/i.test(lines[0])) return parseMermaidClassDiagram(lines);
+  if (/^sequenceDiagram\b/i.test(lines[0])) return parseMermaidSequence(lines);
 
   // Parse direction from first line: graph TD, graph LR, etc.
   const headerMatch = lines[0].match(/^(?:graph|flowchart)\s+(TD|TB|LR|RL|BT)/i);

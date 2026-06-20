@@ -23,7 +23,7 @@ export type RelationType = (typeof VALID_RELATIONS)[number];
 export const VALID_DIRECTIONS = ["TB", "LR", "BT", "RL"] as const;
 export type Direction = (typeof VALID_DIRECTIONS)[number];
 
-export const VALID_TYPES = ["flowchart", "network", "orgchart"] as const;
+export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence"] as const;
 export type DiagramType = (typeof VALID_TYPES)[number];
 
 export const BUILTIN_ICONS = new Set([

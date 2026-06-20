@@ -341,17 +341,19 @@ graph TD
     expect(s.mermaidBlock).toBeUndefined();
   });
 
-  it("a NON-flowchart ```mermaid stays as a mermaid image fallback", () => {
-    const md = `# Seq
+  it("an unsupported ```mermaid type stays as a mermaid image fallback", () => {
+    // pie/gantt/state etc. aren't converted to DiagramSpec yet → image fallback
+    const md = `# Chart
 
 \`\`\`mermaid
-sequenceDiagram
-  A->>B: hello
+pie title Pets
+  "Dogs" : 386
+  "Cats" : 85
 \`\`\``;
 
     const s = parseMd(md).slides[0];
     expect(s.mermaidBlock).toBeDefined();
-    expect(s.mermaidBlock!.mermaid).toContain("sequenceDiagram");
+    expect(s.mermaidBlock!.mermaid).toContain("pie");
     expect(s.diagram).toBeUndefined();
   });
 

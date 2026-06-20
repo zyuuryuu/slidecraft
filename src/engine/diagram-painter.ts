@@ -37,6 +37,7 @@ import {
   type ResolvedStyle,
 } from "./draw-target";
 import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, paintUmlMarker } from "./diagram-draw";
+import { computeSequenceLayout, paintSequence } from "./diagram-sequence";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -77,6 +78,22 @@ export function paintDiagram(
       { x: 0.5, y: 0.15, w: 10, h: 0.45 },
       {},
     );
+  }
+
+  // Sequence diagrams are a separate engine (temporal lifelines + ordered messages),
+  // not the node-edge/layered layout below.
+  if (spec.type === "sequence") {
+    const seq = computeSequenceLayout(spec, contentTop);
+    let sdt: DrawTarget = t;
+    if (options.transform) {
+      const { scale, offsetX, offsetY } = options.transform;
+      sdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    } else if (options.region) {
+      const { scale, offsetX, offsetY } = fitTransform(seq.bbox, options.region);
+      sdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    }
+    paintSequence(sdt, seq, theme);
+    return;
   }
 
   let positions: NodePosition[];
