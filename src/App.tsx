@@ -214,6 +214,23 @@ pie title 売上構成比
 
 ---
 
+# ガントチャートサンプル
+> 開発ロードマップ（依存・ステータス・マイルストーン）
+
+\`\`\`mermaid
+gantt
+  title 開発計画
+  dateFormat YYYY-MM-DD
+  section 設計
+    要件定義 :a1, 2024-01-01, 10d
+    基本設計 :after a1, 14d
+  section 開発
+    実装 :crit, active, 2024-01-25, 25d
+    リリース :milestone, 2024-02-25, 0d
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
