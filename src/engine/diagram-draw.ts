@@ -5,7 +5,7 @@
  * (see draw-target.ts). Container/bus drawing lives in diagram-zones.ts.
  */
 
-import type { Node } from "./schema";
+import type { Node, RelationType } from "./schema";
 import type { ThemeConfig } from "./theme";
 import { SLIDE_W, type NodePosition, type ConnectionPoint } from "./layout-engine";
 import {
@@ -125,6 +125,66 @@ export function paintPath(
     t.line(points[i], points[i + 1], { ...opts, arrow: false });
   }
   t.line(points[points.length - 2], points[points.length - 1], opts);
+}
+
+// ── UML class-diagram relationship rendering ──
+
+export interface UmlEdgeStyle {
+  marker: "triangle" | "diamond" | null; // end decoration (else a plain arrow)
+  end: "from" | "to"; // which end the marker / arrow sits on
+  filled: boolean; // filled (composition) vs hollow
+  dash: boolean; // realization / dependency are dashed
+  endArrow: boolean; // association / dependency keep an open arrow at `to`
+}
+
+/** How a UML relation draws: hollow triangle = inheritance/realization (dashed),
+ *  filled/hollow diamond = composition/aggregation, open arrow = dependency/association. */
+export function umlEdgeStyle(relation: RelationType): UmlEdgeStyle {
+  switch (relation) {
+    case "inheritance": return { marker: "triangle", end: "from", filled: false, dash: false, endArrow: false };
+    case "realization": return { marker: "triangle", end: "from", filled: false, dash: true, endArrow: false };
+    case "composition": return { marker: "diamond", end: "from", filled: true, dash: false, endArrow: false };
+    case "aggregation": return { marker: "diamond", end: "from", filled: false, dash: false, endArrow: false };
+    case "dependency": return { marker: null, end: "to", filled: false, dash: true, endArrow: true };
+    default: return { marker: null, end: "to", filled: false, dash: false, endArrow: true }; // association
+  }
+}
+
+/** Draw the UML end-marker (triangle/diamond) at the chosen end of the routed path. */
+export function paintUmlMarker(
+  t: DrawTarget,
+  points: ConnectionPoint[],
+  end: "from" | "to",
+  kind: "triangle" | "diamond",
+  filled: boolean,
+  color: string,
+  width: number,
+): void {
+  if (points.length < 2) return;
+  const P = end === "to" ? points[points.length - 1] : points[0];
+  const prev = end === "to" ? points[points.length - 2] : points[1];
+  const len = Math.hypot(P.x - prev.x, P.y - prev.y) || 1;
+  const ux = (P.x - prev.x) / len; // unit vector pointing INTO the node at P
+  const uy = (P.y - prev.y) / len;
+  const size = 0.16;
+  const half = 0.1;
+  const px = -uy; // perpendicular
+  const py = ux;
+  const bx = P.x - ux * size; // base centre (one marker back from P)
+  const by = P.y - uy * size;
+  const a = { x: bx + px * half, y: by + py * half };
+  const b = { x: bx - px * half, y: by - py * half };
+  const ln = (p1: ConnectionPoint, p2: ConnectionPoint) => t.line(p1, p2, { color, width, arrow: false });
+
+  if (kind === "triangle") {
+    ln(P, a); ln(a, b); ln(b, P); // hollow triangle, apex at the node
+  } else if (filled) {
+    // a small filled diamond (composition) centred just outside the node edge
+    t.shape("diamond", { x: bx - half, y: by - half, w: half * 2, h: half * 2 }, { fill: color, line: { color, width } });
+  } else {
+    const back = { x: P.x - ux * size * 2, y: P.y - uy * size * 2 };
+    ln(P, a); ln(a, back); ln(back, b); ln(b, P); // hollow diamond (aggregation)
+  }
 }
 
 export function paintHeaderBar(t: DrawTarget, title: string, theme: ThemeConfig): void {

@@ -84,3 +84,27 @@ describe("Mermaid classDiagram parser (milestone 2)", () => {
     expect(s.diagram!.yaml).toContain("class");
   });
 });
+
+describe("UML relationship rendering (milestone 3)", () => {
+  const mk = (relation: string) =>
+    DiagramSpecSchema.parse({
+      type: "flowchart",
+      direction: "TB",
+      nodes: [{ id: "A", label: "A", shape: "class" }, { id: "B", label: "B", shape: "class" }],
+      edges: [{ from: "A", to: "B", relation }],
+    });
+  const segs = (s: string) => (s.match(/<line|<polyline|<path|<polygon/g) ?? []).length;
+
+  it("inheritance adds a triangle marker (more outline segments than a plain association)", () => {
+    expect(segs(renderDiagramToSvg(mk("inheritance"), {}))).toBeGreaterThan(
+      segs(renderDiagramToSvg(mk("association"), {})),
+    );
+  });
+  it("realization and dependency draw a dashed line", () => {
+    expect(renderDiagramToSvg(mk("realization"), {})).toMatch(/dasharray/i);
+    expect(renderDiagramToSvg(mk("dependency"), {})).toMatch(/dasharray/i);
+  });
+  it("composition draws a filled diamond marker", () => {
+    expect(renderDiagramToSvg(mk("composition"), {})).toMatch(/<polygon|<path/);
+  });
+});

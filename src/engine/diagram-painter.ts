@@ -36,7 +36,7 @@ import {
   type PaintOptions,
   type ResolvedStyle,
 } from "./draw-target";
-import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel } from "./diagram-draw";
+import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, paintUmlMarker } from "./diagram-draw";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -224,7 +224,18 @@ export function paintDiagram(
       direction, routeType, srcPortOff, tgtPortOff,
     );
 
-    paintPath(dt, points, { color, width, arrow, dash: routeType === "back_edge" ? true : dash });
+    // A UML relation (class diagrams) swaps the plain arrow for a triangle/diamond
+    // end-marker and may dash the line; otherwise a normal flowchart arrow.
+    const uml = edge.relation ? umlEdgeStyle(edge.relation) : null;
+    const edgeArrow = uml ? uml.endArrow : arrow;
+    const edgeDash = (uml?.dash ?? false) || dash;
+    paintPath(dt, points, {
+      color,
+      width,
+      arrow: routeType === "back_edge" ? true : edgeArrow,
+      dash: routeType === "back_edge" ? true : edgeDash,
+    });
+    if (uml?.marker) paintUmlMarker(dt, points, uml.end, uml.marker, uml.filled, color, width);
 
     if (edge.label) {
       const labelPos = placeEdgeLabel(points, edge.label);
