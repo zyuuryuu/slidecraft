@@ -12,6 +12,7 @@ import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { MERMAID_CONFIG } from "./mermaid";
+import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
@@ -168,8 +169,22 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
           );
         }
 
-        // Mermaid (```mermaid): an image confined to the placeholder box.
+        // Mermaid (```mermaid): if it's a NATIVE diagram type, render it natively
+        // (same engine as .diagram / the export) — never a blank mermaid.js image.
+        // Only genuinely non-native Mermaid (pie/gantt/…) falls back to an image.
         if (isMermaidPh) {
+          const nativeSpec = mermaidToDiagramSpec(slide.mermaidBlock!.mermaid);
+          if (nativeSpec) {
+            const isSolo = slide.mermaidBlock!.placeholderIdx === "1";
+            return (
+              <DiagramSvgOverlay
+                key={`mmd-native-${ph.idx}`}
+                diagramYaml={diagramSpecToYaml(nativeSpec)}
+                region={isSolo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
+                editable={false}
+              />
+            );
+          }
           return (
             <div
               key={`visual-${ph.idx}`}

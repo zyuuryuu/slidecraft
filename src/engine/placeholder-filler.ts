@@ -15,6 +15,7 @@ import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, placeholderRole, slideIdxRole, type PlaceholderRole } from "./template-catalog";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
+import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { midnightExecutive } from "./theme";
 
 /**
@@ -105,6 +106,18 @@ async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
 ): Promise<{ xml: string; mermaidImageRId: string | undefined }> {
+  // A Mermaid block whose content is a NATIVE diagram type exports as native,
+  // editable shapes (not a rasterised mermaid.js image) — matching the preview.
+  if (slide.mermaidBlock && !slide.diagram) {
+    const nativeSpec = mermaidToDiagramSpec(slide.mermaidBlock.mermaid);
+    if (nativeSpec) {
+      slide = {
+        ...slide,
+        diagram: { yaml: diagramSpecToYaml(nativeSpec), placeholderIdx: slide.mermaidBlock.placeholderIdx },
+        mermaidBlock: undefined,
+      };
+    }
+  }
   // Bind content to placeholders BY ROLE (not idx), so any template's layout —
   // whatever idxs it uses — gets the right content. For the canonical template
   // (idx convention == roles) this is identical to the old idx matching.
