@@ -126,6 +126,45 @@ sequenceDiagram
 
 ---
 
+# 状態遷移サンプル
+> 注文ステートマシン（● = 開始 / ◉ = 終了）
+
+\`\`\`mermaid
+stateDiagram-v2
+  state "受付" as Received
+  state "処理中" as Processing
+  state "出荷済" as Shipped
+  state "取消" as Cancelled
+  [*] --> Received
+  Received --> Processing : 確定
+  Processing --> Shipped : 出荷
+  Processing --> Cancelled : キャンセル
+  Shipped --> [*]
+  Cancelled --> [*]
+\`\`\`
+
+---
+
+# ER図サンプル
+> 受注ドメイン（crow's-foot 記法）
+
+\`\`\`mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : 発注
+  ORDER ||--|{ LINE_ITEM : 含む
+  PRODUCT ||--o{ LINE_ITEM : 対象
+  CUSTOMER {
+    string name
+    string email
+  }
+  ORDER {
+    int order_no
+    date ordered_at
+  }
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
