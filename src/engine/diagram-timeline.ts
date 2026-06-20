@@ -33,15 +33,21 @@ export function computeTimelineLayout(spec: DiagramSpec, contentTop: number): Ti
 
   const hasSections = periods.some((p) => p.group);
   const sectionBandH = hasSections ? 0.42 : 0;
-  const axisY = contentTop + sectionBandH + 0.45;
-  const labelY = axisY + 0.14;
   const labelH = 0.36;
-  const eventsTop = labelY + labelH + 0.12;
+  const headH = sectionBandH + 0.45 + 0.14 + labelH + 0.12; // band + axis gap + period-label band
   const maxEvents = Math.max(1, ...periods.map((p) => p.attributes?.length ?? 0));
   const cardGap = 0.1;
-  const avail = SLIDE_H - eventsTop - 0.3;
-  const cardH = Math.max(0.3, Math.min(0.6, (avail - (maxEvents - 1) * cardGap) / maxEvents));
+  const cardH = Math.max(0.3, Math.min(0.6, (SLIDE_H - contentTop - headH - 0.4 - (maxEvents - 1) * cardGap) / maxEvents));
   const cardW = Math.min(colW * 0.86, 2.4);
+
+  // Centre the whole block vertically in the available space so it clears the
+  // slide's title/subtitle (top-aligning at contentTop overlapped them).
+  const naturalH = headH + maxEvents * (cardH + cardGap);
+  const avail = SLIDE_H - contentTop - 0.4;
+  const top = naturalH < avail ? contentTop + (avail - naturalH) / 2 : contentTop;
+  const axisY = top + sectionBandH + 0.45;
+  const labelY = axisY + 0.14;
+  const eventsTop = labelY + labelH + 0.12;
 
   const periodsL = periods.map((p, i) => {
     const c = cx(i);
@@ -68,7 +74,7 @@ export function computeTimelineLayout(spec: DiagramSpec, contentTop: number): Ti
       if (g) {
         const x1 = cx(i) - colW / 2 + 0.05;
         const x2 = cx(j - 1) + colW / 2 - 0.05;
-        sections.push({ x: x1, w: x2 - x1, y: contentTop, h: sectionBandH - 0.08, label: g });
+        sections.push({ x: x1, w: x2 - x1, y: top, h: sectionBandH - 0.08, label: g });
       }
       i = j;
     }
@@ -81,7 +87,7 @@ export function computeTimelineLayout(spec: DiagramSpec, contentTop: number): Ti
     axisX2: cx(n - 1),
     periods: periodsL,
     sections,
-    bbox: { minX: margin - 0.1, minY: contentTop - 0.1, maxX: SLIDE_W - margin + 0.1, maxY: lastY + 0.1 },
+    bbox: { minX: margin - 0.1, minY: top - 0.1, maxX: SLIDE_W - margin + 0.1, maxY: lastY + 0.1 },
   };
 }
 

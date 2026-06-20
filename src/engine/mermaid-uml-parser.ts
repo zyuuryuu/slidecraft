@@ -97,11 +97,14 @@ export function parseMermaidTimeline(lines: string[]): DiagramSpec | null {
     });
   }
   if (nodes.length === 0) return null;
+  // Declare each section as a group so node.group references resolve (validation).
+  const sectionNames = [...new Set(nodes.map((n) => n.group).filter((g): g is string => !!g))];
   const r = DiagramSpecSchema.safeParse({
     type: "timeline",
     direction: "LR",
     title,
     nodes: nodes.map((n) => ({ id: n.id, label: n.label, attributes: n.attributes, ...(n.group ? { group: n.group } : {}) })),
+    groups: sectionNames.map((s) => ({ id: s, label: s })),
     edges: [],
   });
   return r.success ? r.data : null;

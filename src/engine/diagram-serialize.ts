@@ -286,6 +286,11 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
       if (ov.length) yaml += `    override:\n${ov.map((k) => `      ${k}: ${node.override![k]}`).join("\n")}\n`;
     }
   }
+  if (spec.groups.length) {
+    // declared so node.group references resolve (timeline sections / subgraphs)
+    yaml += `\ngroups:\n`;
+    for (const g of spec.groups) yaml += `  - id: ${q(g.id)}\n    label: ${q(g.label)}\n`;
+  }
   yaml += spec.edges.length ? `\nedges:\n` : `\nedges: []\n`; // empty block would parse as YAML null
   for (const edge of spec.edges) {
     yaml += `  - from: ${edge.from}\n`;
