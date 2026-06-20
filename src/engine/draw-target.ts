@@ -59,6 +59,14 @@ export interface DrawTarget {
   line(from: ConnectionPoint, to: ConnectionPoint, opts: EdgeLineOpts): void;
   /** Each TextRun is one stacked line/paragraph inside the box. */
   text(lines: TextRun[], box: Box, opts: TextOpts): void;
+  /**
+   * Begin / end a logical sub-group. Every shape drawn between begin and end
+   * forms one group (PPTX: a `<p:grpSp>`; SVG: a `<g>`). Nestable. This lets a
+   * diagram export as ONE object whose nodes/edges/participants are individually
+   * grabbable sub-groups, instead of dozens of disconnected loose shapes.
+   */
+  beginGroup(): void;
+  endGroup(): void;
 }
 
 export interface PaintOptions {
@@ -124,6 +132,14 @@ export class TransformedTarget implements DrawTarget {
   }
   text(lines: TextRun[], box: Box, opts: TextOpts): void {
     this.t.text(lines.map((l) => ({ ...l, fontSize: l.fontSize * this.s })), this.box(box), opts);
+  }
+  // Group boundaries pass straight through — the wrapped target records them and
+  // the shapes land grouped in whatever (scaled) coordinates they end up at.
+  beginGroup(): void {
+    this.t.beginGroup();
+  }
+  endGroup(): void {
+    this.t.endGroup();
   }
 }
 

@@ -45,6 +45,8 @@ class SvgDrawTarget implements DrawTarget {
   private parts: string[] = [];
   private bg = "#0A0E27";
   private drawBg: boolean;
+  // Stack of part-array indices marking where each open group started.
+  private groupStarts: number[] = [];
 
   constructor(transparent = false) {
     this.drawBg = !transparent;
@@ -52,6 +54,16 @@ class SvgDrawTarget implements DrawTarget {
 
   background(color: string): void {
     this.bg = col(color);
+  }
+
+  beginGroup(): void {
+    this.groupStarts.push(this.parts.length);
+  }
+  endGroup(): void {
+    const start = this.groupStarts.pop();
+    if (start === undefined) return;
+    const kids = this.parts.splice(start);
+    if (kids.length) this.parts.push(`<g>${kids.join("")}</g>`);
   }
 
   shape(

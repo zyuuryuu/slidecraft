@@ -92,7 +92,11 @@ export function paintDiagram(
       const { scale, offsetX, offsetY } = fitTransform(seq.bbox, options.region);
       sdt = new TransformedTarget(t, scale, offsetX, offsetY);
     }
+    // One top-level group for the whole sequence (participants/messages/fragments
+    // become sub-groups inside paintSequence) → exports as a single PPTX object.
+    sdt.beginGroup();
     paintSequence(sdt, seq, theme);
+    sdt.endGroup();
     return;
   }
 
@@ -131,6 +135,10 @@ export function paintDiagram(
   const nodeShapeMap = new Map<string, string>();
   for (const n of spec.nodes) nodeShapeMap.set(n.id, n.shape);
 
+  // Wrap the whole node-edge diagram in ONE top-level group so it exports as a
+  // single PowerPoint object; each node/edge/bus below is a grabbable sub-group.
+  dt.beginGroup();
+
   if (laneInfos.length > 0) {
     paintSwimlanes(dt, laneInfos, spec.direction, contentTop, theme);
   }
@@ -163,7 +171,10 @@ export function paintDiagram(
       Object.assign(baseStyle, node.style);
     }
 
+    // A node = its box + label (+ class compartments) as one sub-group.
+    dt.beginGroup();
     paintShape(dt, node, pos, baseStyle, theme, layoutScale);
+    dt.endGroup();
   }
 
   // Connectors
@@ -197,14 +208,18 @@ export function paintDiagram(
   for (const [srcId, edges] of fanoutCandidates) {
     if (!isAutoMergeable(edges)) continue;
     if (edges.some((e) => busHandled.has(`${e.from}->${e.to}`))) continue;
+    dt.beginGroup();
     const h = paintFanOutBus(dt, srcId, edges, posMap, nodeShapeMap, direction, isFlowchart, theme);
+    dt.endGroup();
     for (const k of h) busHandled.add(k);
   }
 
   for (const [tgtId, edges] of faninCandidates) {
     const remaining = edges.filter((e) => !busHandled.has(`${e.from}->${e.to}`));
     if (!isAutoMergeable(remaining)) continue;
+    dt.beginGroup();
     const h = paintFanInBus(dt, tgtId, remaining, posMap, nodeShapeMap, direction, isFlowchart, theme);
+    dt.endGroup();
     for (const k of h) busHandled.add(k);
   }
 
@@ -246,6 +261,8 @@ export function paintDiagram(
     const uml = edge.relation ? umlEdgeStyle(edge.relation) : null;
     const edgeArrow = uml ? uml.endArrow : arrow;
     const edgeDash = (uml?.dash ?? false) || dash;
+    // An edge = its line + arrow/UML-marker + label as one sub-group.
+    dt.beginGroup();
     paintPath(dt, points, {
       color,
       width,
@@ -263,5 +280,8 @@ export function paintDiagram(
         {},
       );
     }
+    dt.endGroup();
   }
+
+  dt.endGroup(); // close the top-level diagram group
 }

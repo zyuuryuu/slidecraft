@@ -91,21 +91,23 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
   const textColor = "#FFFFFF";
   const w = ds.edge_width;
 
-  // dashed lifelines under each participant
+  // Each participant = its dashed lifeline + header box + label, as ONE sub-group
+  // (so dragging a participant in PowerPoint moves the lifeline with it).
   for (const p of lay.parts) {
+    dt.beginGroup();
     dt.line({ x: p.cx, y: lay.boxY + lay.boxH }, { x: p.cx, y: lay.lifelineBottom }, { color: lineColor, width: 1, dash: true, arrow: false });
-  }
-  // participant header boxes
-  for (const p of lay.parts) {
     dt.shape("rect", { x: p.boxX, y: lay.boxY, w: p.boxW, h: lay.boxH }, { fill, line: { color: border, width: 1.25 } });
     dt.text(
       [{ text: p.label, fontSize: 11, fontFace: fonts.heading, color: textColor, bold: true }],
       { x: p.boxX, y: lay.boxY, w: p.boxW, h: lay.boxH },
       { align: "center", valign: "middle", shrink: true },
     );
+    dt.endGroup();
   }
-  // combined fragments (alt/loop/opt/par): an outline box with a labelled corner tab
+  // Each combined fragment (alt/loop/opt/par) = outline box + labelled corner tab,
+  // grouped together.
   for (const fr of lay.frags) {
+    dt.beginGroup();
     dt.shape("rect", { x: fr.x, y: fr.y, w: fr.w, h: fr.h }, { fill: null, line: { color: border, width: 1 } });
     const tabW = 0.9;
     const tabH = 0.26;
@@ -116,10 +118,12 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
       dt.text([{ text: fr.label, fontSize: 9, fontFace: fonts.body, color: lineColor, bold: false }],
         { x: fr.x + tabW + 0.1, y: fr.y, w: fr.w - tabW - 0.2, h: tabH }, { align: "left", valign: "middle", shrink: true });
     }
+    dt.endGroup();
   }
 
-  // messages (ordered top→bottom)
+  // Each message (ordered top→bottom) = its arrow line(s) + label, as ONE sub-group.
   for (const m of lay.msgs) {
+    dt.beginGroup();
     if (m.self) {
       const lw = 0.45;
       const lh = 0.28;
@@ -138,5 +142,6 @@ export function paintSequence(dt: DrawTarget, lay: SeqLayout, theme: ThemeConfig
           { x: x1, y: m.y - 0.28, w: Math.abs(m.toX - m.fromX), h: 0.25 }, { align: "center", valign: "middle", shrink: true });
       }
     }
+    dt.endGroup();
   }
 }

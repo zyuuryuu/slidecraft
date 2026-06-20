@@ -14,7 +14,7 @@ import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, placeholderRole, slideIdxRole, type PlaceholderRole } from "./template-catalog";
 import { paragraphsToOoxml } from "./md-to-ooxml";
-import { renderToBuffer } from "./pptx-writer";
+import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { midnightExecutive } from "./theme";
 
 /**
@@ -84,17 +84,19 @@ async function extractDiagramShapes(
   // Embedded in a titled slide → the diagram omits its own title bar so it
   // doesn't duplicate / overlap the slide's title placeholder. When `region` is
   // given (diagram beside body text), confine the shapes to that placeholder box.
-  const pptxBuf = await renderToBuffer(spec, { theme, omitTitle: true, region });
+  const { buffer, groups } = await renderToBufferWithGroups(spec, {
+    theme,
+    omitTitle: true,
+    region,
+  });
 
-  // Open the PptxGenJS-generated PPTX and extract shapes from slide1
-  const diagZip = await JSZip.loadAsync(pptxBuf);
+  // Open the PptxGenJS-generated PPTX and pull slide1's shapes, then nest them
+  // into PowerPoint sub-groups (figure = one object; node/edge = grabbable parts)
+  // per the painter's group tree.
+  const diagZip = await JSZip.loadAsync(buffer);
   const slideXml = await diagZip.file("ppt/slides/slide1.xml")?.async("string");
   if (!slideXml) return "";
-
-  // Extract all shapes except the group wrapper
-  const shapesMatch = slideXml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
-  const cxnMatches = slideXml.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || [];
-  return [...shapesMatch, ...cxnMatches].join("");
+  return nestShapeXml(slideXml, groups);
 }
 
 // ── Build slide XML from layout placeholders + content ──
