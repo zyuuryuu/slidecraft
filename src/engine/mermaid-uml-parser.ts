@@ -5,7 +5,11 @@
  * (R1). Pure logic (R2): no DOM / Tauri. Used by mermaidToDiagramSpec's dispatch.
  */
 
-import { DiagramSpecSchema, type DiagramSpec, type RelationType } from "./schema";
+import { DiagramSpecSchema, type DiagramSpec, type RelationType, type Cardinality } from "./schema";
+
+// ER crow's-foot cardinality: the left token reads mirrored, the right token normal.
+const ER_LEFT_CARD: Record<string, Cardinality> = { "||": "one", "|o": "zero_one", "}o": "zero_many", "}|": "one_many" };
+const ER_RIGHT_CARD: Record<string, Cardinality> = { "||": "one", "o|": "zero_one", "o{": "zero_many", "|{": "one_many" };
 
 /** Map a Mermaid class-relation operator to {from→to, UML relation}. Inheritance/
  *  realization keep the PARENT as `from` (parent-on-top in the layered layout). */
@@ -65,6 +69,54 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
       id: n.id, label: n.id, shape: "class", attributes: n.attributes, methods: n.methods,
     })),
     edges,
+  });
+  return r.success ? r.data : null;
+}
+
+/** Parse a Mermaid `erDiagram` into a DiagramSpec: entities → entity boxes
+ *  (name + attribute list), relationships → edges with crow's-foot cardinality
+ *  at each end (`..` = dashed/non-identifying). */
+export function parseMermaidER(lines: string[]): DiagramSpec | null {
+  const nodes = new Map<string, { id: string; attributes: string[] }>();
+  const edges: Array<{ from: string; to: string; label?: string; srcCard: Cardinality; tgtCard: Cardinality; dash: boolean }> = [];
+  const ensure = (id: string) => {
+    let n = nodes.get(id);
+    if (!n) { n = { id, attributes: [] }; nodes.set(id, n); }
+    return n;
+  };
+  let current: { id: string; attributes: string[] } | null = null;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.startsWith("%%")) continue;
+    if (current) {
+      if (line === "}") { current = null; continue; }
+      current.attributes.push(line); // "type name" (+ optional PK/FK/comment)
+      continue;
+    }
+    // entity attribute block: `CUSTOMER {`
+    const open = line.match(/^([\w-]+)\s*\{$/);
+    if (open) { current = ensure(open[1]); continue; }
+    // relationship: ENTITY1 <leftCard><--|..><rightCard> ENTITY2 [: label]
+    const rel = line.match(/^([\w-]+)\s+([|}o]{2})(--|\.\.)([|o{]{2})\s+([\w-]+)\s*(?::\s*(.+))?$/);
+    if (rel) {
+      const [, e1, lc, conn, rc, e2, label] = rel;
+      ensure(e1); ensure(e2);
+      edges.push({
+        from: e1, to: e2, label: label?.trim() || undefined,
+        srcCard: ER_LEFT_CARD[lc] ?? "one", tgtCard: ER_RIGHT_CARD[rc] ?? "one",
+        dash: conn === "..",
+      });
+    }
+  }
+  if (nodes.size === 0) return null;
+  const r = DiagramSpecSchema.safeParse({
+    type: "flowchart",
+    direction: "TB",
+    nodes: [...nodes.values()].map((n) => ({ id: n.id, label: n.id, shape: "entity", attributes: n.attributes })),
+    edges: edges.map((e) => ({
+      from: e.from, to: e.to, label: e.label, srcCard: e.srcCard, tgtCard: e.tgtCard,
+      ...(e.dash ? { style: { dash: true } } : {}),
+    })),
   });
   return r.success ? r.data : null;
 }

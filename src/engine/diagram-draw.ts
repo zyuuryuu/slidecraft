@@ -5,7 +5,7 @@
  * (see draw-target.ts). Container/bus drawing lives in diagram-zones.ts.
  */
 
-import type { Node, RelationType } from "./schema";
+import type { Node, RelationType, Cardinality } from "./schema";
 import type { ThemeConfig } from "./theme";
 import { SLIDE_W, type NodePosition, type ConnectionPoint } from "./layout-engine";
 import {
@@ -205,6 +205,48 @@ export function paintUmlMarker(
     const back = { x: P.x - ux * size * 2, y: P.y - uy * size * 2 };
     ln(P, a); ln(a, back); ln(back, b); ln(b, P); // hollow diamond (aggregation)
   }
+}
+
+/** ER crow's-foot cardinality marker at one end of a relationship line.
+ *  `one`=a bar, `many`=a crow's foot, `zero_*`=a small open circle (combined). */
+export function paintCrowFoot(
+  t: DrawTarget,
+  points: ConnectionPoint[],
+  atEnd: boolean,
+  card: Cardinality,
+  color: string,
+  width: number,
+): void {
+  if (points.length < 2) return;
+  const P = atEnd ? points[points.length - 1] : points[0];
+  const prev = atEnd ? points[points.length - 2] : points[1];
+  let dx = P.x - prev.x, dy = P.y - prev.y;
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len; dy /= len;          // unit vector pointing INTO the entity at P
+  const px = -dy, py = dx;       // perpendicular
+  const at = (d: number) => ({ x: P.x - dx * d, y: P.y - dy * d });
+  const seg = (a: ConnectionPoint, b: ConnectionPoint) => t.line(a, b, { color, width, arrow: false });
+  const tick = (d: number, h: number) => {
+    const c = at(d);
+    seg({ x: c.x - px * h, y: c.y - py * h }, { x: c.x + px * h, y: c.y + py * h });
+  };
+  const ring = (d: number, r: number) => {
+    const c = at(d);
+    t.shape("circle", { x: c.x - r, y: c.y - r, w: 2 * r, h: 2 * r }, { fill: null, line: { color, width } });
+  };
+
+  const many = card === "zero_many" || card === "one_many";
+  const zero = card === "zero_one" || card === "zero_many";
+  const one = card === "one" || card === "one_many";
+
+  if (many) {
+    const apex = at(0.18), e = at(0.02), s = 0.11;
+    seg(apex, { x: e.x - px * s, y: e.y - py * s });
+    seg(apex, { x: e.x + px * s, y: e.y + py * s });
+    seg(apex, e);
+  }
+  if (one) tick(many ? 0.24 : 0.10, 0.09);
+  if (zero) ring(many ? 0.32 : 0.20, 0.055);
 }
 
 export function paintHeaderBar(t: DrawTarget, title: string, theme: ThemeConfig): void {

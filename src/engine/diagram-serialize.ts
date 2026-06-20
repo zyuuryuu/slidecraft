@@ -31,6 +31,10 @@ export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
     return spec.groups.length === 0 && spec.lanes.length === 0 && spec.nodes.every((n) => !n.style);
   }
+  // ER diagram (entity boxes / crow's-foot cardinality) — faithful.
+  if (spec.nodes.some((n) => n.shape === "entity") || spec.edges.some((e) => e.srcCard || e.tgtCard)) {
+    return spec.groups.length === 0 && spec.lanes.length === 0;
+  }
   const isClass = spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation);
   if (isClass) {
     return (
@@ -155,11 +159,38 @@ function stateSpecToMermaid(spec: DiagramSpec): string {
   return s;
 }
 
+// ── ER → Mermaid (erDiagram) ──
+
+// Cardinality → crow's-foot symbol (left token mirrored, right token normal).
+const ER_LEFT_SYM: Record<string, string> = { one: "||", zero_one: "|o", zero_many: "}o", one_many: "}|" };
+const ER_RIGHT_SYM: Record<string, string> = { one: "||", zero_one: "o|", zero_many: "o{", one_many: "|{" };
+
+function erSpecToMermaid(spec: DiagramSpec): string {
+  let s = "erDiagram\n";
+  for (const e of spec.edges) {
+    const lc = ER_LEFT_SYM[e.srcCard ?? "one"];
+    const rc = ER_RIGHT_SYM[e.tgtCard ?? "one"];
+    const conn = e.style?.dash ? ".." : "--";
+    s += `  ${e.from} ${lc}${conn}${rc} ${e.to}${e.label ? ` : ${e.label}` : ""}\n`;
+  }
+  for (const n of spec.nodes) {
+    if (n.attributes?.length) {
+      s += `  ${n.id} {\n`;
+      for (const a of n.attributes) s += `    ${a}\n`;
+      s += `  }\n`;
+    }
+  }
+  return s;
+}
+
 export function diagramSpecToMermaid(spec: DiagramSpec): string {
-  // Dispatch by diagram kind so sequence/state/class round-trip faithfully (the
-  // parser already reads each dialect back).
+  // Dispatch by diagram kind so sequence/state/ER/class round-trip faithfully
+  // (the parser already reads each dialect back).
   if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) return stateSpecToMermaid(spec);
+  if (spec.nodes.some((n) => n.shape === "entity") || spec.edges.some((e) => e.srcCard || e.tgtCard)) {
+    return erSpecToMermaid(spec);
+  }
   if (spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation)) {
     return classSpecToMermaid(spec);
   }
@@ -242,6 +273,8 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `    to: ${edge.to}\n`;
     if (edge.label) yaml += `    label: ${q(edge.label)}\n`;
     if (edge.relation) yaml += `    relation: ${edge.relation}\n`;
+    if (edge.srcCard) yaml += `    srcCard: ${edge.srcCard}\n`;
+    if (edge.tgtCard) yaml += `    tgtCard: ${edge.tgtCard}\n`;
     if (edge.style?.dash || edge.style?.async) {
       yaml += `    style:\n`;
       if (edge.style.dash) yaml += `      dash: true\n`;

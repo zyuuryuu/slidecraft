@@ -36,7 +36,7 @@ import {
   type PaintOptions,
   type ResolvedStyle,
 } from "./draw-target";
-import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, paintUmlMarker } from "./diagram-draw";
+import { paintShape, paintPath, paintHeaderBar, placeEdgeLabel, umlEdgeStyle, paintUmlMarker, paintCrowFoot } from "./diagram-draw";
 import { computeSequenceLayout, paintSequence } from "./diagram-sequence";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
@@ -257,11 +257,13 @@ export function paintDiagram(
     );
 
     // A UML relation (class diagrams) swaps the plain arrow for a triangle/diamond
-    // end-marker and may dash the line; otherwise a normal flowchart arrow.
+    // end-marker; an ER relation (srcCard/tgtCard) draws crow's-foot ends and no
+    // arrow; otherwise a normal flowchart arrow.
+    const er = edge.srcCard !== undefined || edge.tgtCard !== undefined;
     const uml = edge.relation ? umlEdgeStyle(edge.relation) : null;
-    const edgeArrow = uml ? uml.endArrow : arrow;
+    const edgeArrow = er ? false : uml ? uml.endArrow : arrow;
     const edgeDash = (uml?.dash ?? false) || dash;
-    // An edge = its line + arrow/UML-marker + label as one sub-group.
+    // An edge = its line + end markers + label as one sub-group.
     dt.beginGroup();
     paintPath(dt, points, {
       color,
@@ -269,7 +271,12 @@ export function paintDiagram(
       arrow: routeType === "back_edge" ? true : edgeArrow,
       dash: routeType === "back_edge" ? true : edgeDash,
     });
-    if (uml?.marker) paintUmlMarker(dt, points, uml.end, uml.marker, uml.filled, color, width);
+    if (er) {
+      if (edge.srcCard) paintCrowFoot(dt, points, false, edge.srcCard, color, width);
+      if (edge.tgtCard) paintCrowFoot(dt, points, true, edge.tgtCard, color, width);
+    } else if (uml?.marker) {
+      paintUmlMarker(dt, points, uml.end, uml.marker, uml.filled, color, width);
+    }
 
     if (edge.label) {
       const labelPos = placeEdgeLabel(points, edge.label);
