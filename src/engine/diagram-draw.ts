@@ -17,6 +17,56 @@ import {
   type ResolvedStyle,
 } from "./draw-target";
 
+/** A UML class node: a box split into name / attributes / methods compartments. */
+function paintClassNode(
+  t: DrawTarget,
+  node: Node,
+  pos: NodePosition,
+  style: ResolvedStyle,
+  theme: ThemeConfig,
+  layoutScale: number,
+): void {
+  const fill = style.fill ?? theme.palette.navy;
+  const lineColor = style.border ?? style.font_color;
+  const fonts = theme.fonts;
+  const fc = style.font_color;
+  const nameFs = scaledFontSize(style.font_size, layoutScale);
+  const memFs = scaledFontSize(Math.max(style.font_size - 2, 7), layoutScale);
+  const attrs = node.attributes ?? [];
+  const methods = node.methods ?? [];
+  const total = attrs.length + methods.length;
+
+  t.shape("rect", { x: pos.x, y: pos.y, w: pos.w, h: pos.h }, { fill, line: { color: lineColor, width: style.border_width || 1 } });
+
+  const nameH = total > 0 ? Math.min(0.4, pos.h * 0.4) : pos.h;
+  t.text(
+    [{ text: node.label, fontSize: nameFs, fontFace: fonts.heading, color: fc, bold: true }],
+    { x: pos.x, y: pos.y, w: pos.w, h: nameH },
+    { align: "center", valign: "middle", shrink: true },
+  );
+  if (total === 0) return;
+
+  const rest = pos.h - nameH;
+  const attrH = rest * (attrs.length / total);
+  const pad = 0.08;
+  const div = (y: number) => t.line({ x: pos.x, y }, { x: pos.x + pos.w, y }, { color: lineColor, width: 0.75, arrow: false });
+  const members = (items: string[], y: number, h: number) =>
+    t.text(
+      items.map((s) => ({ text: s, fontSize: memFs, fontFace: fonts.body, color: fc, bold: false })),
+      { x: pos.x + pad, y: y + 0.04, w: pos.w - 2 * pad, h: h - 0.08 },
+      { align: "left", valign: "top", shrink: true },
+    );
+
+  const y1 = pos.y + nameH;
+  div(y1);
+  if (attrs.length) members(attrs, y1, attrH);
+  if (methods.length) {
+    const y2 = y1 + (attrs.length ? attrH : 0);
+    if (attrs.length) div(y2);
+    members(methods, y2, pos.y + pos.h - y2);
+  }
+}
+
 export function paintShape(
   t: DrawTarget,
   node: Node,
@@ -25,6 +75,10 @@ export function paintShape(
   theme: ThemeConfig,
   layoutScale: number,
 ): void {
+  if (node.shape === "class") {
+    paintClassNode(t, node, pos, style, theme, layoutScale);
+    return;
+  }
   const fillColor = style.fill ?? theme.palette.navy;
   const fonts = theme.fonts;
   const fontSize = scaledFontSize(style.font_size, layoutScale);

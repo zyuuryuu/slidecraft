@@ -30,6 +30,7 @@ const PPTX_SHAPE_MAP: Record<ShapeType, string> = {
   circle: "ellipse",
   oval: "ellipse",
   hexagon: "hexagon",
+  class: "rect", // class boxes are drawn as a rect + compartment dividers/text
 };
 
 function hexToRgb(hex: string): string {

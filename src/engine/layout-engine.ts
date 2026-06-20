@@ -387,7 +387,14 @@ function computeLayoutV1(
   );
   const nodeHMap = new Map<string, number>();
   for (const n of spec.nodes) {
-    nodeHMap.set(n.id, diamondIds.has(n.id) ? nh * 1.6 : nh);
+    let h = nh;
+    if (diamondIds.has(n.id)) h = nh * 1.6;
+    else if (n.shape === "class") {
+      // name compartment + one row per attribute/method (so the box fits its members)
+      const members = (n.attributes?.length ?? 0) + (n.methods?.length ?? 0);
+      h = 0.4 + Math.max(members, 1) * 0.26 + 0.1;
+    }
+    nodeHMap.set(n.id, h);
   }
 
   const marginX = 0.8;
@@ -514,7 +521,14 @@ function computeLayoutV2(
   );
   const nodeHMap = new Map<string, number>();
   for (const n of spec.nodes) {
-    nodeHMap.set(n.id, diamondIds.has(n.id) ? nh * 1.6 : nh);
+    let h = nh;
+    if (diamondIds.has(n.id)) h = nh * 1.6;
+    else if (n.shape === "class") {
+      // name compartment + one row per attribute/method (so the box fits its members)
+      const members = (n.attributes?.length ?? 0) + (n.methods?.length ?? 0);
+      h = 0.4 + Math.max(members, 1) * 0.26 + 0.1;
+    }
+    nodeHMap.set(n.id, h);
   }
 
   const numLayers = Math.max(0, ...layers.values()) + 1;
@@ -1019,7 +1033,14 @@ function computeLayoutSwimlane(
   );
   const nodeHMap = new Map<string, number>();
   for (const n of spec.nodes) {
-    nodeHMap.set(n.id, diamondIds.has(n.id) ? nh * 1.6 : nh);
+    let h = nh;
+    if (diamondIds.has(n.id)) h = nh * 1.6;
+    else if (n.shape === "class") {
+      // name compartment + one row per attribute/method (so the box fits its members)
+      const members = (n.attributes?.length ?? 0) + (n.methods?.length ?? 0);
+      h = 0.4 + Math.max(members, 1) * 0.26 + 0.1;
+    }
+    nodeHMap.set(n.id, h);
   }
 
   const numLayers = Math.max(0, ...layers.values()) + 1;

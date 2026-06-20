@@ -10,9 +10,15 @@ import { z } from "zod/v4";
 // ── Constants ──
 
 export const VALID_SHAPES = [
-  "rect", "rounded_rect", "diamond", "circle", "oval", "hexagon",
+  "rect", "rounded_rect", "diamond", "circle", "oval", "hexagon", "class",
 ] as const;
 export type ShapeType = (typeof VALID_SHAPES)[number];
+
+// UML relationship kinds for class diagrams — drive the edge's line + arrowhead.
+export const VALID_RELATIONS = [
+  "association", "inheritance", "composition", "aggregation", "dependency", "realization",
+] as const;
+export type RelationType = (typeof VALID_RELATIONS)[number];
 
 export const VALID_DIRECTIONS = ["TB", "LR", "BT", "RL"] as const;
 export type Direction = (typeof VALID_DIRECTIONS)[number];
@@ -95,6 +101,9 @@ export const NodeSchema = z.object({
   label: z.string(),
   sublabel: z.string().optional(),
   shape: z.enum(VALID_SHAPES).default("rect"),
+  // Class-diagram compartments (rendered as a 3-section box when present / shape "class").
+  attributes: z.array(z.string()).optional(),
+  methods: z.array(z.string()).optional(),
   class: z.string().optional(),
   style: NodeStyleSchema.optional(),
   group: z.string().optional(),
@@ -110,6 +119,9 @@ export const EdgeSchema = z.object({
   label: z.string().optional(),
   style: EdgeStyleSchema.optional(),
   bus_group: z.string().optional(),
+  // UML relationship for class diagrams (inheritance/composition/…) — selects the
+  // line dash + the end arrowheads (hollow triangle, filled/hollow diamond, …).
+  relation: z.enum(VALID_RELATIONS).optional(),
 });
 export type Edge = z.infer<typeof EdgeSchema>;
 
