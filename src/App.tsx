@@ -18,7 +18,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -86,6 +86,24 @@ export default function App() {
 
       {/* ── Markdown editor + live preview ── */}
       {subMode === "import" && (
+        <>
+          {/* Non-destructive review: flags slide-design issues + the levers that fix each */}
+          {diagnostics.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] overflow-x-auto shrink-0">
+              <span className="text-amber-400 shrink-0 font-medium">⚠ 整形レビュー {diagnostics.length}件</span>
+              {diagnostics.map((d, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSlideClick(d.slideIndex)}
+                  title={`スライド ${d.slideIndex + 1}: ${d.message}（推奨レバー: ${d.levers.join(" / ")}）`}
+                  className="shrink-0 px-2 py-0.5 rounded bg-[#1a1f3a] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+                >
+                  <span className={d.level === "warn" ? "text-amber-300" : "text-[#93C5FD]"}>S{d.slideIndex + 1}</span>
+                  <span className="text-gray-300"> {d.message}</span>
+                </button>
+              ))}
+            </div>
+          )}
         <ResizableSplit
           storageKey="slidecraft_split_import"
           left={
@@ -121,6 +139,7 @@ export default function App() {
             </>
           }
         />
+        </>
       )}
 
       {/* ── Markdown Edit mode (3-pane) ── */}

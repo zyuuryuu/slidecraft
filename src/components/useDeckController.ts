@@ -17,6 +17,7 @@ import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
 import { structureManuscript } from "../engine/manuscript";
+import { diagnoseDeck } from "../engine/deck-diagnostics";
 import { SAMPLE_MD } from "../sample-deck";
 
 export type MarkdownSubMode = "import" | "edit";
@@ -299,6 +300,9 @@ export function useDeckController() {
   // Template capability summary handed to the deck-generation AI (kinds/columns/capacity).
   const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
 
+  // Non-destructive deck review (overflow / long bullets / key-value / missing title).
+  const diagnostics = useMemo(() => (deck && catalog ? diagnoseDeck(deck, catalog) : []), [deck, catalog]);
+
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
     if (!s) return undefined;
@@ -365,7 +369,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };
 }
