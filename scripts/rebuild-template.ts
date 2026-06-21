@@ -346,7 +346,7 @@ function buildPhShapeXml(ph: PhDef, shapeId: number): string {
 }
 
 async function rebuild() {
-  const basePath = resolve("templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+  const basePath = resolve("public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
   const zip = await JSZip.loadAsync(readFileSync(basePath));
 
   for (let i = 0; i < LAYOUTS.length; i++) {
@@ -410,16 +410,11 @@ async function rebuild() {
     console.log(`  Layout ${layoutIndex}: ${layout.name} (${decoShapes.length} decos + ${layout.placeholders.length} phs)`);
   }
 
-  // Save to all locations
+  // Save the rebuilt template back to public/ (the single source the app fetches).
   const buf = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
-  const targets = [
-    "templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
-    "public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
-  ];
-  for (const t of targets) {
-    writeFileSync(resolve(t), buf);
-    console.log(`  Saved: ${t}`);
-  }
+  const out = "public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx";
+  writeFileSync(resolve(out), buf);
+  console.log(`  Saved: ${out}`);
 
   // Verify
   const verify = await JSZip.loadAsync(buf);
