@@ -1,5 +1,6 @@
 /**
- * deck-export.ts — Render a deck to a downloadable .pptx.
+ * deck-export.ts — Render a deck to .pptx BYTES (the caller saves them via the
+ * native Save dialog or a browser download — see ipc/commands saveBinaryFile).
  *
  * Each ```mermaid block is pre-rendered to SVG with the SAME config as the
  * on-screen preview, then rasterised by the browser's own canvas so the embedded
@@ -9,10 +10,9 @@
 import { generatePptx } from "../engine/placeholder-filler";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
-import { downloadBlob } from "../ipc/commands";
 import { MERMAID_CONFIG, rasterizeSvgToPng } from "./mermaid";
 
-export async function exportDeckToPptx(deck: DeckIR, templateData: TemplateData): Promise<void> {
+export async function renderDeckToPptxBytes(deck: DeckIR, templateData: TemplateData): Promise<Uint8Array> {
   const { default: mermaidLib } = await import("mermaid");
   mermaidLib.initialize(MERMAID_CONFIG);
   const deckWithSvg: DeckIR = {
@@ -28,5 +28,5 @@ export async function exportDeckToPptx(deck: DeckIR, templateData: TemplateData)
     })),
   };
   const buffer = await generatePptx(deckWithSvg, templateData, rasterizeSvgToPng);
-  downloadBlob(buffer as unknown as Uint8Array, "slides_output.pptx");
+  return buffer as unknown as Uint8Array;
 }

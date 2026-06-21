@@ -14,9 +14,9 @@ export default function App() {
   const {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
-    filePath, activeSlide, setActiveSlide, gotoLine, templateName, fileInputRef, templateInputRef,
+    filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
-    handleTemplateSelected, handleOpen, handleFileSelected, handleSave, handleGenerate, hasContent,
+    handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
@@ -24,21 +24,6 @@ export default function App() {
 
   return (
     <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".md,.markdown,.txt"
-        className="hidden"
-        onChange={handleFileSelected}
-      />
-      <input
-        ref={templateInputRef}
-        type="file"
-        accept=".pptx"
-        className="hidden"
-        onChange={handleTemplateSelected}
-      />
-
       <div className="flex items-center">
         <Toolbar
           onOpen={handleOpen}

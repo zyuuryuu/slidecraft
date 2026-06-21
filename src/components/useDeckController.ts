@@ -14,8 +14,8 @@ import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from "../engine/template-loader";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
-import { readFileFromInput } from "../ipc/commands";
-import { exportDeckToPptx } from "./deck-export";
+import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
+import { renderDeckToPptxBytes } from "./deck-export";
 import { SAMPLE_MD } from "../sample-deck";
 
 export type MarkdownSubMode = "import" | "edit";
@@ -46,8 +46,6 @@ export function useDeckController() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [gotoLine, setGotoLine] = useState<{ line: number; ts: number } | undefined>(undefined);
   const [templateName, setTemplateName] = useState("Midnight Executive");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const templateInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Markdown mode: parse MD ──
@@ -133,64 +131,40 @@ export function useDeckController() {
     }
   }, [catalog, setDeck]);
 
-  // Load custom template
-  const handleLoadTemplate = useCallback(() => {
-    templateInputRef.current?.click();
+  // Load a custom template (.pptx) — native Open dialog on desktop, file picker in browser
+  const handleLoadTemplate = useCallback(async () => {
+    const picked = await pickBinaryFile(["pptx"], "PowerPoint");
+    if (!picked) return;
+    try {
+      const tpl = await loadTemplate(picked.bytes.buffer as ArrayBuffer);
+      setTemplateData(tpl);
+      setTemplateName(picked.name.replace(/\.pptx$/i, ""));
+    } catch (err) {
+      setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }, []);
 
-  const handleTemplateSelected = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const buf = await file.arrayBuffer();
-        const tpl = await loadTemplate(buf);
-        setTemplateData(tpl);
-        setTemplateName(file.name.replace(/\.pptx$/i, ""));
-      } catch (err) {
-        setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      e.target.value = "";
-    },
-    [],
-  );
+  // Open a Markdown file
+  const handleOpen = useCallback(async () => {
+    const picked = await pickTextFile();
+    if (!picked) return;
+    setMdText(picked.content);
+    parseMdText(picked.content, "reset");
+    setFilePath(picked.name);
+  }, [parseMdText]);
 
-  // Open file
-  const handleOpen = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileSelected = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const text = await readFileFromInput(file);
-      setMdText(text);
-      parseMdText(text, "reset");
-      setFilePath(file.name);
-      e.target.value = "";
-    },
-    [parseMdText],
-  );
-
-  // Save
+  // Save the Markdown source
   const handleSave = useCallback(() => {
-    const blob = new Blob([mdText], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filePath ?? "slidecraft.md";
-    a.click();
-    URL.revokeObjectURL(url);
+    void saveTextFile(mdText, filePath ?? "slidecraft.md");
   }, [mdText, filePath]);
 
-  // Generate PPTX (mermaid pre-render + WYSIWYG rasterise lives in deck-export.ts)
+  // Generate + save the .pptx (mermaid pre-render + WYSIWYG rasterise in deck-export.ts)
   const handleGenerate = useCallback(async () => {
     if (!deck || !templateData) return;
     setGenerating(true);
     try {
-      await exportDeckToPptx(deck, templateData);
+      const bytes = await renderDeckToPptxBytes(deck, templateData);
+      await saveBinaryFile(bytes, "slides_output.pptx", ["pptx"], "PowerPoint");
     } catch (e) {
       setParseError(`PPTX generation failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -377,9 +351,9 @@ export function useDeckController() {
   return {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
-    filePath, activeSlide, setActiveSlide, gotoLine, templateName, fileInputRef, templateInputRef,
+    filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
-    handleTemplateSelected, handleOpen, handleFileSelected, handleSave, handleGenerate, hasContent,
+    handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
