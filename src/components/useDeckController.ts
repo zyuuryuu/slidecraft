@@ -16,6 +16,7 @@ import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from ".
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
+import { structureManuscript } from "../engine/manuscript";
 import { SAMPLE_MD } from "../sample-deck";
 
 export type MarkdownSubMode = "import" | "edit";
@@ -196,6 +197,15 @@ export function useDeckController() {
     [parseMdText],
   );
 
+  // ── Manuscript → slides (deterministic structuring of a raw prose manuscript) ──
+  const handleStructureManuscript = useCallback(() => {
+    const structured = structureManuscript(mdText);
+    if (structured && structured !== mdText.trim()) {
+      setMdText(structured);
+      parseMdText(structured, "commit");
+    }
+  }, [mdText, parseMdText]);
+
   // ── Import → Edit transition ──
   const handleStartEditing = useCallback(() => {
     if (deck) setSubMode("edit");
@@ -354,7 +364,7 @@ export function useDeckController() {
     filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleSlideUpdate,
+    handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };

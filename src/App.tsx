@@ -17,7 +17,7 @@ export default function App() {
     filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleSlideUpdate,
+    handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
@@ -72,6 +72,15 @@ export default function App() {
               </button>
             )}
           </div>
+          {subMode === "import" && (
+            <button
+              onClick={handleStructureManuscript}
+              title="生原稿（見出し＋文章）を、見出しごとのスライド（箇条書き化）に自動整形"
+              className="px-2.5 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40"
+            >
+              ✨ 原稿を整形
+            </button>
+          )}
         </div>
       </div>
 
