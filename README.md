@@ -40,7 +40,7 @@ npm run tauri dev    # Tauri + Vite 同時起動
 ## テスト
 
 ```bash
-npm test             # ユニットテスト (Vitest, 118 tests)
+npm test             # ユニットテスト (Vitest, 402 tests)
 npm run test:e2e     # E2E テスト (Playwright, 6 tests)
 npm run lint         # ESLint
 ```
@@ -60,8 +60,9 @@ src/
     schema.ts        # Zod スキーマ定義
     theme.ts         # テーマ設定・YAML パーサー
     layout-engine.ts # ダイアグラムレイアウト計算
-    pptx-writer.ts   # PPTX 生成
-    icons.ts         # SVG アイコン処理
+    diagram-painter.ts # 共有 painter (プレビュー SVG ＝ PPTX ネイティブ図形)
+    diagram-icons.ts # ノードアイコン (ネイティブグリフ)
+    placeholder-filler.ts # Markdown→PPTX テンプレ流し込み
     theme-extractor.ts # PPTX からテーマ抽出
   components/        # React UI コンポーネント
   ipc/               # Tauri IPC ブリッジ
@@ -79,7 +80,7 @@ icons/               # ダイアグラム用 SVG アイコン
 - **フロントエンド**: React 19 + TypeScript 5.9
 - **ビルド**: Vite 8
 - **エディタ**: CodeMirror 6
-- **プレビュー**: Mermaid.js
+- **プレビュー**: 共有 painter (ネイティブ図形 SVG)／Mermaid.js (一部フォールバック)
 - **PPTX 生成**: PptxGenJS
 - **スキーマ検証**: Zod
 - **スタイリング**: Tailwind CSS 4

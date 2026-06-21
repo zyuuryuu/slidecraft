@@ -79,6 +79,46 @@
 
 ---
 
+## v4 完了: ネイティブ図・グラフの大幅拡充 (2026-06)
+
+すべて **共有 painter（DrawTarget）→ プレビュー SVG ＝ PPTX ネイティブ図形**（WYSIWYG・編集可能・画像ゼロ）。
+
+| 区分 | 内容 | 状態 |
+|------|------|------|
+| ネイティブ図 14 種 | flowchart / class / sequence / state / ER / timeline / quadrant / pie / gantt / journey / mindmap ＋ 報告グラフ xychart(棒+折れ線) / radar / kpi | 完了 |
+| Mermaid 入力 | 上記の該当構文を parse 時に DiagramSpec へ自動 graduate、MERMAID↔YAML↔JSON 無損失往復 | 完了 |
+| ノードアイコン | `node.icon` を 15 種のネイティブグリフで描画（router/server/db/cloud…）。単一カタログ `icon-catalog.ts` から名前・プロンプト・検証・エイリアスを導出 | 完了 |
+| AI 連携(図) | `diagramSystemPrompt()` にアイコン一覧を注入、不正アイコンは検証警告＋エイリアス正規化 | 完了 |
+| 残 Mermaid | gitGraph / sankey / C4 / requirement は画像フォールバック | 保留 |
+
+詳細設計: 開発メモリ `diagram_format_architecture` 参照。残 Mermaid 型は報告用途での頻度が低いため後回し。
+
+### 技術負債 R1（400 行ルール）
+
+- App.tsx 1145 → 236（`sample-deck.ts` ＋ `useDeckController.ts` ＋ `deck-export.ts` へ分割）— 完了
+- md-parser.ts 518 → 113（`md-slide-parser.ts` ＋ `md-separators.ts` へ分割）— 完了
+- schema.ts → `schema-constants.ts` ＋ `schema-charts.ts` へ分離 — 完了
+- `layout-engine.ts`（1601 行）は座標計算の公認例外。`sample-deck.ts`（〜540 行）は単一データ文字列
+
+---
+
+## 次の主要テーマ (2026-06 時点・優先順)
+
+ユーザー指定。詳細は開発メモリ `next_themes_post_r1` 参照。
+
+| # | テーマ | 内容 | サイズ |
+|---|--------|------|-------|
+| 1 | **AI の一体化** | コピペ運用 → アプリ内蔵の統合 AI 体験へ。AiPanel/LlmAssist/llm-prompts を土台に、リクエスト履歴・実行中一覧・並列実行（[[backlog-ai-request-mgmt]]） | L |
+| 2 | **ユーザ利用ガイド** | 図 14 種・二段階編集・テンプレ流し込み等を網羅したエンドユーザ向けガイド/オンボーディング | M |
+| 3 | **原稿 Markdown → マスター整形の補助** | 製品の北極星。原稿レベルの Markdown を **入力スライドマスターに応じた**フォーマットへ（分割/要約/可視化/整形、テンプレ尊重、フォント縮小禁止）。`engine/distill.ts` ＋ template-catalog を土台に | L |
+
+### 旧ロードマップの陳腐化メモ
+
+- バンドル識別子 `com.slidecraft.desktop` — **対応済み**
+- v3 スライド単位エディタ（下記）E1〜E5 は実装済み（md-serializer / SlideList / SlideEditor / SlideMarkdownEditor 実在）。E6「V1 旧モード廃止」のみ要確認
+
+---
+
 ## v3 スライド単位エディタ (統合 UI)
 
 V1 ダイアグラム機能を V2 Markdown パイプラインに完全統合し、スライド単位の編集 UI を提供する。
