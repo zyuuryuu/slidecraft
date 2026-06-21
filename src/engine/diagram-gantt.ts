@@ -148,16 +148,30 @@ export function computeGanttLayout(spec: DiagramSpec, contentTop: number): Gantt
   const chartMaxDay = Math.ceil(maxDay / interval) * interval; // round up so the last tick aligns with the edge
   const dayToX = (d: number) => chartX0 + (d / chartMaxDay) * chartW;
 
-  const axisY = contentTop + 0.15;
-  const ticks: GanttLayout["ticks"] = [];
-  for (let d = 0; d <= chartMaxDay; d += interval) ticks.push({ x: dayToX(d), label: offsetToMD(g?.startDate ?? "", d) });
-
-  // count rows (a section header row precedes each section's tasks)
+  // count rows (a section header row precedes each section's tasks) + row height
   let nRows = 0;
   let lastSec: string | null = null;
   for (const t of tasks) { if (t.section !== lastSec) { nRows++; lastSec = t.section; } nRows++; }
+  const rowH = Math.max(0.26, Math.min(0.42, (SLIDE_H - contentTop - 1.2) / Math.max(nRows, 1)));
+
+  // status legend — only the statuses actually used (computed early for block height)
+  const used = new Set<string>();
+  for (const t of tasks) {
+    if (t.status.includes("milestone")) continue;
+    used.add(t.status.includes("crit") ? "crit" : t.status.includes("active") ? "active" : t.status.includes("done") ? "done" : "");
+  }
+  const legend = STATUS_LEGEND.filter((l) => used.has(l.key));
+
+  // Centre the whole block vertically so the date axis at the TOP clears the
+  // slide's title/subtitle (top-aligning put the date labels over the header).
+  const blockH = 0.6 + nRows * rowH + (legend.length ? 0.5 : 0.15);
+  const avail = SLIDE_H - contentTop - 0.3;
+  const top = blockH < avail ? contentTop + (avail - blockH) / 2 : contentTop;
+  const axisY = top + 0.15;
   const rowsTop = axisY + 0.45;
-  const rowH = Math.max(0.26, Math.min(0.42, (SLIDE_H - rowsTop - 0.3) / Math.max(nRows, 1)));
+
+  const ticks: GanttLayout["ticks"] = [];
+  for (let d = 0; d <= chartMaxDay; d += interval) ticks.push({ x: dayToX(d), label: offsetToMD(g?.startDate ?? "", d) });
 
   const sections: GanttLayout["sections"] = [];
   const bars: GanttLayout["bars"] = [];
@@ -179,18 +193,11 @@ export function computeGanttLayout(spec: DiagramSpec, contentTop: number): Gantt
     row++;
   }
 
-  // status legend — only the statuses actually used
-  const used = new Set<string>();
-  for (const t of tasks) {
-    if (t.status.includes("milestone")) continue;
-    used.add(t.status.includes("crit") ? "crit" : t.status.includes("active") ? "active" : t.status.includes("done") ? "done" : "");
-  }
-  const legend = STATUS_LEGEND.filter((l) => used.has(l.key));
   const legendY = rowsTop + nRows * rowH + 0.14;
 
   return {
     axisY, axisX0: chartX0, axisX1: chartX1, ticks, sections, bars, legend, legendY, labelColW,
-    bbox: { minX: 0.1, minY: contentTop - 0.1, maxX: SLIDE_W - 0.2, maxY: legendY + (legend.length ? 0.4 : 0.1) },
+    bbox: { minX: 0.1, minY: top - 0.05, maxX: SLIDE_W - 0.2, maxY: legendY + (legend.length ? 0.4 : 0.1) },
   };
 }
 
