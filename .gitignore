@@ -25,3 +25,7 @@ dist-ssr
 
 # Python reference code (not part of TS build)
 reference/
+
+# Generated SBOMs (use the SBOM workflow / npm run sbom)
+sbom-npm.cdx.json
+src-tauri/*.cdx.json
