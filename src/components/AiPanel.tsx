@@ -85,6 +85,40 @@ export default function AiPanel({
         </button>
       </div>
 
+      {/* Connection status + local-Ollama auto-detect (setup assist) */}
+      <div className="flex items-center gap-2 px-3 py-1 border-b border-[#2D3A6E] text-[11px]">
+        <span
+          className={
+            ai.connection.tone === "ok"
+              ? "text-green-400"
+              : ai.connection.tone === "err"
+                ? "text-red-400"
+                : ai.connection.tone === "checking"
+                  ? "text-gray-400"
+                  : "text-amber-400"
+          }
+        >
+          ●
+        </span>
+        <span className="text-gray-300">{ai.connection.label}</span>
+        {ai.connection.hint && <span className="text-gray-500 truncate">— {ai.connection.hint}</span>}
+        <div className="flex-1" />
+        {!ai.connection.ok && (
+          <button onClick={() => setShowSettings(true)} className="text-[#93C5FD] hover:underline shrink-0">
+            設定を開く
+          </button>
+        )}
+        {ai.ollamaModels && ai.ollamaModels.length > 0 && ai.provider !== "ollama" && (
+          <button
+            onClick={ai.switchToOllama}
+            className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E] shrink-0"
+            title="ローカルの Ollama に切り替え"
+          >
+            🦙 Ollama検出（{ai.ollamaModels.length}）→ 使う
+          </button>
+        )}
+      </div>
+
       {/* Settings */}
       {showSettings && (
         <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-[#2D3A6E] bg-[#0f1117]">

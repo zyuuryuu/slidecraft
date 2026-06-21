@@ -130,6 +130,35 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               ))}
             </select>
 
+            {/* Connection status + local-Ollama auto-detect (setup assist) */}
+            <div className="flex items-center gap-2 text-[11px]">
+              <span
+                className={
+                  ai.connection.tone === "ok"
+                    ? "text-green-400"
+                    : ai.connection.tone === "err"
+                      ? "text-red-400"
+                      : ai.connection.tone === "checking"
+                        ? "text-gray-400"
+                        : "text-amber-400"
+                }
+              >
+                ●
+              </span>
+              <span className="text-gray-300">{ai.connection.label}</span>
+              {ai.connection.hint && <span className="text-gray-500 truncate">— {ai.connection.hint}</span>}
+              <div className="flex-1" />
+              {ai.ollamaModels && ai.ollamaModels.length > 0 && ai.provider !== "ollama" && (
+                <button
+                  onClick={ai.switchToOllama}
+                  className="px-2 py-0.5 rounded bg-[#2D3A6E] text-[#93C5FD] hover:bg-[#3B4A7E] shrink-0"
+                  title="ローカルの Ollama に切り替え"
+                >
+                  🦙 Ollama検出（{ai.ollamaModels.length}）→ 使う
+                </button>
+              )}
+            </div>
+
             {!ai.preset.native && (
               <input
                 type="text"

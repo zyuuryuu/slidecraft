@@ -39,12 +39,18 @@ export function useAiGeneration() {
   const [result, setResult] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Setup-assist state: local Ollama probe (null = not yet checked) + once-flags.
+  const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const hadSavedConfig = useRef(false);
+  const didAutoSelect = useRef(false);
 
   // Load saved provider + configs once.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(AI_CONFIG_STORAGE);
       if (!raw) return;
+      hadSavedConfig.current = true; // user has configured before → don't auto-pick a provider
       const saved = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<AiConfigMap> };
       if (saved.provider) setProvider(saved.provider);
       if (saved.configs) {
@@ -54,6 +60,31 @@ export function useAiGeneration() {
     } catch {
       /* ignore corrupt config */
     }
+  }, []);
+
+  // Probe local Ollama once, so the UI can surface it — and, on a fresh install
+  // (no saved config), auto-select it so a local-AI user can generate immediately.
+  useEffect(() => {
+    let cancelled = false;
+    listProviderModels("ollama", providerPreset("ollama").baseURL, "")
+      .then((list) => {
+        if (cancelled) return;
+        setOllamaModels(list);
+        if (!hadSavedConfig.current && !didAutoSelect.current && list.length > 0) {
+          didAutoSelect.current = true;
+          setProvider("ollama");
+          setConfigs((c) => ({
+            ...c,
+            ollama: { ...c.ollama, model: list.includes(c.ollama.model) ? c.ollama.model : list[0] },
+          }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setOllamaModels([]); // Ollama not reachable
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const preset = providerPreset(provider);
@@ -76,6 +107,7 @@ export function useAiGeneration() {
   const curApiKey = cfg.apiKey;
   useEffect(() => {
     let cancelled = false;
+    setModelsLoading(true);
     listProviderModels(provider, curBaseURL, curApiKey)
       .then((list) => {
         if (!cancelled) {
@@ -88,6 +120,9 @@ export function useAiGeneration() {
           setModels([]);
           setModelsError(e instanceof Error ? e.message : String(e));
         }
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -173,12 +208,49 @@ export function useAiGeneration() {
     setError(null);
   }, []);
 
+  // One-click: switch to local Ollama, picking a valid installed model.
+  const switchToOllama = useCallback(() => {
+    setProvider("ollama");
+    setConfigs((c) => ({
+      ...c,
+      ollama: {
+        ...c.ollama,
+        model: ollamaModels && ollamaModels.length && !ollamaModels.includes(c.ollama.model) ? ollamaModels[0] : c.ollama.model,
+      },
+    }));
+  }, [ollamaModels]);
+
+  // A human-readable connection status for the CURRENT provider + an actionable
+  // hint when it isn't ready — so the user knows exactly what to fix.
+  const connection: { ok: boolean; tone: "ok" | "warn" | "err" | "checking"; label: string; hint?: string } = (() => {
+    const isOllama = provider === "ollama";
+    if (preset.native) {
+      if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: "APIキー未設定", hint: "下の設定に Anthropic の API キーを入力" };
+      if (!cfg.model.trim()) return { ok: false, tone: "warn", label: "モデル未選択" };
+      return { ok: true, tone: "ok", label: `${cfg.model} を使用` };
+    }
+    if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "Base URL 未設定" };
+    if (modelsLoading) return { ok: false, tone: "checking", label: "接続を確認中…" };
+    if (modelsError) {
+      return isOllama
+        ? { ok: false, tone: "err", label: "Ollama に接続できません", hint: "`ollama serve` で起動（既定 localhost:11434）" }
+        : { ok: false, tone: "err", label: "接続できません", hint: `エンドポイントを確認（${modelsError}）` };
+    }
+    if (models.length === 0) {
+      return { ok: false, tone: "warn", label: "利用可能なモデルがありません", hint: isOllama ? "`ollama pull qwen2.5` 等でモデルを取得" : "モデル名を確認" };
+    }
+    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: "APIキー未設定" };
+    if (!cfg.model.trim() || !models.includes(cfg.model)) return { ok: false, tone: "warn", label: "モデルを選択", hint: `${models.length} 個のモデルが利用可` };
+    return { ok: true, tone: "ok", label: `${cfg.model}（接続OK・${models.length} モデル）` };
+  })();
+
   return {
     provider, setProvider,
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error,
     canGenerate, generate, cancel, reset,
-    models, modelsError, refreshModels,
+    models, modelsError, modelsLoading, refreshModels,
+    ollamaModels, switchToOllama, connection,
   };
 }
