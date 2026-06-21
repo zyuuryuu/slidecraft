@@ -415,6 +415,70 @@ mindmap
 
 ---
 
+# 四半期売上
+> 棒グラフ＋折れ線（xychart）
+
+\`\`\`mermaid
+xychart-beta
+  title "四半期売上（百万円）"
+  x-axis [Q1, Q2, Q3, Q4]
+  y-axis "売上" 0 --> 1000
+  bar [450, 620, 710, 880]
+  line [400, 580, 690, 850]
+\`\`\`
+
+---
+
+# 製品スキル評価
+> レーダーチャート（多軸比較）
+
+\`\`\`diagram
+type: radar
+title: 製品スキル評価
+radar:
+  max: 5
+  axes: ["技術力", "コスト", "品質", "スピード", "保守性", "拡張性"]
+  series:
+    - name: 自社製品
+      values: [5, 3, 4, 4, 5, 3]
+    - name: 競合A
+      values: [4, 5, 3, 3, 2, 4]
+nodes: []
+edges: []
+\`\`\`
+
+---
+
+# 業績サマリ
+> KPIカード（大きな数字タイル）
+
+\`\`\`diagram
+type: kpi
+title: 2026年度 業績
+kpi:
+  cards:
+    - value: "12.4億"
+      label: 年間売上
+      delta: "+15%"
+      trend: up
+    - value: "98%"
+      label: 目標達成率
+      delta: "+3pt"
+      trend: up
+    - value: "2.1日"
+      label: 平均リードタイム
+      delta: "-0.4日"
+      trend: down
+    - value: "4.6"
+      label: 顧客満足度
+      delta: "+0.2"
+      trend: up
+nodes: []
+edges: []
+\`\`\`
+
+---
+
 <!-- slide: Column.2Body.Equal -->
 # スコープ定義
 > In Scope / Out of Scope
