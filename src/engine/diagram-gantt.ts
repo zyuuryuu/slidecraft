@@ -10,7 +10,7 @@
  */
 
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
-import type { ThemeConfig } from "./theme";
+import { type ThemeConfig, bareTextColor } from "./theme";
 import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
@@ -205,7 +205,7 @@ export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig)
   const fonts = theme.fonts;
   const accent = theme.palette.accent;
   const grid = theme.diagram_style.edge_color;
-  const ink = theme.palette.dark_text; // bare text on the (light) slide background
+  const ink = bareTextColor(theme); // bare text on the slide bg (contrast-derived)
 
   // date axis: a solid baseline + tick marks + dark labels; faint gridlines down
   const baseY = lay.axisY + 0.3;

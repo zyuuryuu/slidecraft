@@ -8,7 +8,7 @@
  */
 
 import type { DiagramSpec } from "./schema";
-import type { ThemeConfig } from "./theme";
+import { type ThemeConfig, bareTextColor } from "./theme";
 import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
@@ -64,7 +64,7 @@ export function paintPie(dt: DrawTarget, lay: PieLayout, theme: ThemeConfig): vo
   const fonts = theme.fonts;
   const sep = theme.diagram_style.slide_bg ?? "#0A0E27"; // thin separator between slices
   const onSlice = "#FFFFFF"; // text drawn ON a coloured slice
-  const ink = theme.palette.dark_text; // bare text on the (light) slide background
+  const ink = bareTextColor(theme); // bare text on the slide bg (contrast-derived)
   const { cx, cy, r } = lay;
 
   // slices: each wedge + its % label, grouped

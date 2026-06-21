@@ -9,7 +9,7 @@
  */
 
 import type { DiagramSpec } from "./schema";
-import type { ThemeConfig } from "./theme";
+import { type ThemeConfig, bareTextColor } from "./theme";
 import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
@@ -96,7 +96,7 @@ export function paintTimeline(dt: DrawTarget, lay: TimelineLayout, theme: ThemeC
   const accent = theme.palette.accent;
   const navy = theme.palette.navy;
   const textColor = "#FFFFFF"; // text ON the navy event cards / section bands
-  const ink = theme.palette.dark_text; // bare period labels on the (light) slide bg
+  const ink = bareTextColor(theme); // bare period labels on the slide bg (contrast-derived)
 
   // section bands (drawn first, behind the axis)
   for (const s of lay.sections) {

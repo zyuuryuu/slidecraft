@@ -155,6 +155,28 @@ export function paletteHex(palette: Palette, name: keyof Palette): string {
   return `#${palette[name]}`;
 }
 
+/** Perceived luminance (0=black … 255=white) of a hex colour. */
+export function hexLuminance(hex: string): number {
+  const h = hex.replace(/^#/, "");
+  if (h.length < 6) return 255;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/**
+ * Colour for "bare" text drawn DIRECTLY on the slide background (chart legends,
+ * axis labels, task names, …). Derived for contrast against the theme's slide
+ * background — dark ink on a light slide, white on a dark slide — so it never
+ * vanishes (white-on-white / dark-on-dark) when the theme/background changes.
+ * Text drawn ON a coloured shape should instead contrast with THAT shape's fill.
+ */
+export function bareTextColor(theme: ThemeConfig): string {
+  const bg = theme.diagram_style.slide_bg ?? "#FFFFFF";
+  return hexLuminance(bg) > 140 ? theme.palette.dark_text : "#FFFFFF";
+}
+
 // ── Merge utilities ──
 
 function mergeObject<T extends object>(base: T, overrides: Partial<T>): T {

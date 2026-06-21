@@ -9,7 +9,7 @@
  */
 
 import type { DiagramSpec } from "./schema";
-import type { ThemeConfig } from "./theme";
+import { type ThemeConfig, bareTextColor } from "./theme";
 import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
@@ -47,7 +47,7 @@ export function paintQuadrant(dt: DrawTarget, lay: QuadrantLayout, theme: ThemeC
   const accent = theme.palette.accent;
   const navy = theme.palette.navy;
   const textColor = "#FFFFFF"; // point labels ON the navy cells
-  const ink = theme.palette.dark_text; // axis labels on the bare (light) slide bg
+  const ink = bareTextColor(theme); // axis labels on the bare slide bg (contrast-derived)
   const { x0, y0, size } = lay;
   const half = size / 2;
 
