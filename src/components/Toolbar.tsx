@@ -28,7 +28,7 @@ export default function Toolbar({
   canRedo,
 }: ToolbarProps) {
   return (
-    <div className="flex items-center gap-2 px-4 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
+    <div className="flex flex-1 items-center gap-2 px-4 py-2">
       <div className="flex items-center gap-1 mr-4">
         <div className="w-1 h-6 bg-[#3B82F6] rounded-full" />
         <h1 className="text-white font-semibold text-lg tracking-tight">

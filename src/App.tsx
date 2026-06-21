@@ -24,7 +24,7 @@ export default function App() {
 
   return (
     <>
-      <div className="flex items-center">
+      <div className="flex items-stretch bg-[#1E2761] border-b border-[#3B82F6]/30">
         <Toolbar
           onOpen={handleOpen}
           onSave={handleSave}
@@ -41,7 +41,7 @@ export default function App() {
           canUndo={canUndo}
           canRedo={canRedo}
         />
-        <div className="flex items-center gap-2 px-3 py-2 bg-[#1E2761] border-b border-[#3B82F6]/30">
+        <div className="flex items-center gap-2 px-3 py-2">
           <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">
             <button
               onClick={() => setSubMode("import")}
