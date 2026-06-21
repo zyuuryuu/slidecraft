@@ -29,3 +29,14 @@ reference/
 # Generated SBOMs (use the SBOM workflow / npm run sbom)
 sbom-npm.cdx.json
 src-tauri/*.cdx.json
+
+# Rust/Tauri build artifacts + generated schemas
+/src-tauri/target/
+/src-tauri/gen/
+
+# IDE workspace
+*.code-workspace
+
+# Test outputs
+/test-results/
+/playwright-report/

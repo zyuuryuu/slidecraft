@@ -1,5 +1,10 @@
 # Diagram Pipeline Desktop App — 開発設計書
 
+> ⚠️ **歴史的記録（v1 当時の設計書・2026-03）。** プロジェクトはその後 **SlideCraft**
+> に改称し、デスクトップ確定・14種ネイティブ図/表・AI(Ollama含む)連携など大きく前進。
+> **現状とロードマップは [ROADMAP.md](ROADMAP.md) を正**とする。本書は当時の設計判断の
+> 記録として残置（旧称 "Diagram Pipeline"・旧 identifier 等は当時のまま）。
+>
 > **Tauri + TypeScript + PptxGenJS｜Python 完全排除・方式 B アーキテクチャ**
 >
 > Date: 2026-03-29 &nbsp; Version: 1.0

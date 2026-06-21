@@ -71,7 +71,7 @@ tests/               # ユニットテスト
 tests/e2e/           # Playwright E2E テスト
 docs/                # 設計ドキュメント
 themes/              # テーマ YAML ファイル
-icons/               # ダイアグラム用 SVG アイコン
+public/templates/    # スライドマスター (.pptx)
 ```
 
 ## 技術スタック

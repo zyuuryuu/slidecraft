@@ -1,5 +1,8 @@
 # Markdown → PPTX 設計書
 
+> ⚠️ **歴史的記録（v2 当時の設計書）。** その後 AI(DeckPlan/Ollama)・ネイティブ表/14図種・
+> デスクトップ化など大きく前進。**現状とロードマップは [ROADMAP.md](ROADMAP.md) を正**とする。
+>
 > SlideCraft v2: LLM が書いた Markdown をテンプレート PPTX に流し込む
 
 ---
