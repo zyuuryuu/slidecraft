@@ -5,7 +5,8 @@
  * (see draw-target.ts). Container/bus drawing lives in diagram-zones.ts.
  */
 
-import type { Node, RelationType, Cardinality } from "./schema";
+import { type Node, type RelationType, type Cardinality, BUILTIN_ICONS } from "./schema";
+import { paintIcon } from "./diagram-icons";
 import type { ThemeConfig } from "./theme";
 import { SLIDE_W, type NodePosition, type ConnectionPoint } from "./layout-engine";
 import {
@@ -110,6 +111,17 @@ export function paintShape(
 
   t.shape(node.shape, { x: pos.x, y: pos.y, w: pos.w, h: pos.h }, { fill: fillColor, line });
 
+  // A built-in icon sits at the LEFT of the node; the label shifts right beside it.
+  let labelBox = { x: pos.x, y: pos.y, w: pos.w, h: pos.h };
+  let labelAlign: "center" | "left" = "center";
+  if (node.icon && BUILTIN_ICONS.has(node.icon)) {
+    const iconS = Math.min(pos.h - 0.16, 0.55);
+    const iconX = pos.x + 0.12;
+    paintIcon(t, node.icon, iconX, pos.y + (pos.h - iconS) / 2, iconS, fontColor);
+    labelBox = { x: iconX + iconS + 0.1, y: pos.y, w: Math.max(0.3, pos.w - (iconS + 0.34)), h: pos.h };
+    labelAlign = "left";
+  }
+
   if (node.sublabel) {
     const subFs = scaledFontSize(Math.max(style.font_size - 3, 7), layoutScale);
     t.text(
@@ -117,8 +129,8 @@ export function paintShape(
         { text: node.sublabel, fontSize: subFs, fontFace: fonts.body, color: fontColor, bold: false },
         { text: node.label, fontSize, fontFace: fonts.heading, color: fontColor, bold: style.font_bold },
       ],
-      { x: pos.x, y: pos.y, w: pos.w, h: pos.h },
-      { align: "center", valign: "middle", shrink: true },
+      labelBox,
+      { align: labelAlign, valign: "middle", shrink: true },
     );
   } else {
     const fontName =
@@ -129,8 +141,8 @@ export function paintShape(
         : fonts.body;
     t.text(
       [{ text: node.label, fontSize, fontFace: fontName, color: fontColor, bold: style.font_bold }],
-      { x: pos.x, y: pos.y, w: pos.w, h: pos.h },
-      { align: "center", valign: "middle", shrink: true },
+      labelBox,
+      { align: labelAlign, valign: "middle", shrink: true },
     );
   }
 }

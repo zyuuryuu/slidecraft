@@ -69,15 +69,20 @@ nodes:
   - id: client
     label: ブラウザ
     shape: rounded_rect
+    icon: client
   - id: api
     label: API Gateway
+    icon: load_balancer
   - id: crm
     label: CRM Service
+    icon: server
   - id: db
     label: Database
     shape: rounded_rect
+    icon: database
   - id: ai
     label: AI Engine
+    icon: cloud
 
 edges:
   - from: client
