@@ -73,6 +73,39 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
   return r.success ? r.data : null;
 }
 
+/** Extract a mindmap node's label + shape from its bracket syntax. */
+function parseMindmapNode(text: string): { label: string; shape: string } {
+  let m: RegExpMatchArray | null;
+  if ((m = text.match(/^[\w-]*\(\((.+)\)\)$/))) return { label: m[1].trim(), shape: "circle" };
+  if ((m = text.match(/^[\w-]*\{\{(.+)\}\}$/))) return { label: m[1].trim(), shape: "hexagon" };
+  if ((m = text.match(/^[\w-]*\[(.+)\]$/))) return { label: m[1].trim(), shape: "rect" };
+  if ((m = text.match(/^[\w-]*\((.+)\)$/))) return { label: m[1].trim(), shape: "rounded_rect" };
+  return { label: text, shape: "rounded_rect" };
+}
+
+/** Parse a Mermaid `mindmap` (INDENTATION = hierarchy → needs RAW lines) into a
+ *  flowchart-typed tree: nodes + parent→child edges, laid out left-to-right. */
+export function parseMermaidMindmap(rawLines: string[]): DiagramSpec | null {
+  const nodes: Array<{ id: string; label: string; shape: string }> = [];
+  const edges: Array<{ from: string; to: string }> = [];
+  const stack: Array<{ id: string; indent: number }> = [];
+  for (let i = 1; i < rawLines.length; i++) {
+    const raw = rawLines[i];
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("%%")) continue;
+    const indent = raw.length - raw.trimStart().length;
+    const { label, shape } = parseMindmapNode(trimmed);
+    const id = `m${nodes.length}`;
+    nodes.push({ id, label, shape });
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    if (stack.length) edges.push({ from: stack[stack.length - 1].id, to: id });
+    stack.push({ id, indent });
+  }
+  if (nodes.length === 0) return null;
+  const r = DiagramSpecSchema.safeParse({ type: "flowchart", direction: "LR", nodes, edges });
+  return r.success ? r.data : null;
+}
+
 /** Parse a Mermaid `pie` chart into a DiagramSpec (type "pie"): each
  *  `"Label" : value` line → a node (label + numeric value); `pie title X` or a
  *  `title X` line sets the title. */

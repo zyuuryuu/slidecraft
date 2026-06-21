@@ -342,21 +342,20 @@ graph TD
   });
 
   it("an unsupported ```mermaid type stays as a mermaid image fallback", () => {
-    // journey/gantt/mindmap etc. have no native engine yet → mermaid.js image.
-    // (pie/quadrant/timeline/state/ER ARE native now and graduate to .diagram.)
+    // gitGraph/sankey/C4 etc. have no native engine → mermaid.js image. (flowchart/
+    // class/sequence/state/ER/timeline/quadrant/pie/gantt/journey/mindmap ARE native.)
     const md = `# Chart
 
 \`\`\`mermaid
-journey
-  title My working day
-  section Go to work
-    Make tea: 5: Me
-    Drive: 3: Me
+gitGraph
+  commit
+  branch develop
+  commit
 \`\`\``;
 
     const s = parseMd(md).slides[0];
     expect(s.mermaidBlock).toBeDefined();
-    expect(s.mermaidBlock!.mermaid).toContain("journey");
+    expect(s.mermaidBlock!.mermaid).toContain("gitGraph");
     expect(s.diagram).toBeUndefined();
   });
 

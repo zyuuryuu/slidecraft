@@ -42,6 +42,7 @@ import { computeTimelineLayout, paintTimeline } from "./diagram-timeline";
 import { computeQuadrantLayout, paintQuadrant } from "./diagram-quadrant";
 import { computePieLayout, paintPie } from "./diagram-pie";
 import { computeGanttLayout, paintGantt } from "./diagram-gantt";
+import { computeJourneyLayout, paintJourney } from "./diagram-journey";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -169,6 +170,23 @@ export function paintDiagram(
     gdt.beginGroup();
     paintGantt(gdt, gl, theme);
     gdt.endGroup();
+    return;
+  }
+
+  // User journeys: satisfaction curve over steps (a chart engine).
+  if (spec.type === "journey") {
+    const jl = computeJourneyLayout(spec, contentTop);
+    let jdt: DrawTarget = t;
+    if (options.transform) {
+      const { scale, offsetX, offsetY } = options.transform;
+      jdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    } else if (options.region) {
+      const { scale, offsetX, offsetY } = fitTransform(jl.bbox, options.region);
+      jdt = new TransformedTarget(t, scale, offsetX, offsetY);
+    }
+    jdt.beginGroup();
+    paintJourney(jdt, jl, theme);
+    jdt.endGroup();
     return;
   }
 

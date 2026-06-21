@@ -7,8 +7,9 @@
 
 import yaml from "js-yaml";
 import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
-import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState, parseMermaidER, parseMermaidTimeline, parseMermaidQuadrant, parseMermaidPie } from "./mermaid-uml-parser";
+import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState, parseMermaidER, parseMermaidTimeline, parseMermaidQuadrant, parseMermaidPie, parseMermaidMindmap } from "./mermaid-uml-parser";
 import { parseMermaidGantt } from "./diagram-gantt";
+import { parseMermaidJourney } from "./diagram-journey";
 
 export type DiagramFormat = "yaml" | "json" | "mermaid";
 
@@ -186,6 +187,8 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
   if (/^quadrantChart\b/i.test(lines[0])) return parseMermaidQuadrant(lines);
   if (/^pie\b/i.test(lines[0])) return parseMermaidPie(lines);
   if (/^gantt\b/i.test(lines[0])) return parseMermaidGantt(lines);
+  if (/^journey\b/i.test(lines[0])) return parseMermaidJourney(lines);
+  if (/^mindmap\b/i.test(lines[0])) return parseMermaidMindmap(mermaidSyntax.split("\n")); // RAW lines (indentation = hierarchy)
 
   // Parse direction from first line: graph TD, graph LR, etc.
   const headerMatch = lines[0].match(/^(?:graph|flowchart)\s+(TD|TB|LR|RL|BT)/i);

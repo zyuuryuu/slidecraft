@@ -11,6 +11,7 @@
 import yaml from "js-yaml";
 import type { DiagramSpec } from "./schema";
 import { ganttSpecToMermaid } from "./diagram-gantt";
+import { journeySpecToMermaid } from "./diagram-journey";
 
 // ── DiagramSpec → Mermaid (reverse) ──
 
@@ -31,6 +32,7 @@ export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "quadrant") return true; // axis/quadrant labels + points all round-trip
   if (spec.type === "pie") return true; // slices (label + value) + title round-trip
   if (spec.type === "gantt") return true; // tasks (offsets) round-trip via explicit dates
+  if (spec.type === "journey") return true; // steps (name/score/actors/section) round-trip
   // state diagram (has start/end pseudo-states) — faithful (custom labels via
   // `state "x" as id`); only block when node styles/groups/lanes would be lost.
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
@@ -234,6 +236,7 @@ export function diagramSpecToMermaid(spec: DiagramSpec): string {
   // Dispatch by diagram kind so sequence/timeline/quadrant/pie/gantt/state/ER/
   // class round-trip faithfully (the parser already reads each dialect back).
   if (spec.type === "gantt") return ganttSpecToMermaid(spec);
+  if (spec.type === "journey") return journeySpecToMermaid(spec);
   if (spec.type === "pie") return pieSpecToMermaid(spec);
   if (spec.type === "quadrant") return quadrantSpecToMermaid(spec);
   if (spec.type === "timeline") return timelineSpecToMermaid(spec);
