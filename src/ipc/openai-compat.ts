@@ -10,6 +10,7 @@
  */
 
 import OpenAI from "openai";
+import { appFetch } from "./app-fetch";
 
 export interface OpenAICompatOptions {
   apiKey: string;
@@ -30,6 +31,7 @@ export async function generateWithOpenAICompat(opts: OpenAICompatOptions): Promi
     apiKey: opts.apiKey.trim() || "not-needed",
     baseURL: opts.baseURL.trim(),
     dangerouslyAllowBrowser: true,
+    fetch: appFetch, // route via Rust on desktop (no webview CORS); native fetch in browser
   });
 
   try {

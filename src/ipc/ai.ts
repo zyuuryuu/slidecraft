@@ -8,6 +8,7 @@
 
 import { generateWithClaude } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
+import { appFetch } from "./app-fetch";
 import { deckPlanSystemPrompt, slideMarkdownEditPrompt } from "../engine/deck-plan";
 import { diagramSystemPrompt, diagramEditSystemPrompt } from "../engine/llm-prompts";
 
@@ -98,7 +99,7 @@ export async function listProviderModels(
   if (provider === "claude") return CLAUDE_MODELS;
   const base = baseURL.trim().replace(/\/+$/, "");
   if (!base) throw new Error("Base URL is required.");
-  const res = await fetch(`${base}/models`, {
+  const res = await appFetch(`${base}/models`, {
     headers: apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

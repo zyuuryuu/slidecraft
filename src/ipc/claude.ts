@@ -8,6 +8,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { appFetch } from "./app-fetch";
 
 export const DEFAULT_MODEL = "claude-opus-4-8";
 
@@ -33,6 +34,7 @@ export async function generateWithClaude(opts: GenerateOptions): Promise<string>
   const client = new Anthropic({
     apiKey: opts.apiKey.trim(),
     dangerouslyAllowBrowser: true,
+    fetch: appFetch, // route via Rust on desktop (no webview CORS); native fetch in browser
   });
 
   try {
