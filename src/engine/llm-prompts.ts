@@ -7,6 +7,7 @@
  */
 
 import { LAYOUT_NAMES } from "./slide-schema";
+import { iconCatalogPromptList } from "./icon-catalog";
 
 // ── Slide deck prompt ──
 
@@ -131,6 +132,7 @@ Return a single JSON object with this schema:
       "id": "unique_id",     // lowercase, no spaces
       "label": "Display Name",
       "shape": "rect",       // "rect", "rounded_rect", "diamond", "circle", "oval", "hexagon"
+      "icon": "server",      // optional, a built-in icon name (see "Available Icons")
       "class": "className",  // references classDefs
       "group": "groupId"     // optional, references groups
     }
@@ -171,6 +173,13 @@ Use these colors for a professional look:
 - Mid Gray: #94A3B8
 - Dark Text: #1E293B
 
+## Available Icons
+
+Set a node's "icon" to one of these built-in names to draw a small native glyph
+inside the node (ideal for network / system / infrastructure diagrams):
+
+${iconCatalogPromptList()}
+
 ## Rules
 
 - Use meaningful, short IDs (lowercase, underscores OK)
@@ -179,6 +188,8 @@ Use these colors for a professional look:
 - Use groups to visually organize related nodes
 - For network diagrams, use type "network"
 - For org charts, use type "orgchart"
+- For network/system diagrams, add an "icon" to each node from the list above
+- Use ONLY icon names from "Available Icons"; omit "icon" if none fits
 - Keep the diagram focused — typically 5-20 nodes
 - Return ONLY the JSON object, no explanation`;
 }

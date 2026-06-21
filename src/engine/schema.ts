@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod/v4";
+import { ICON_NAMES } from "./icon-catalog";
 
 // ── Constants ──
 
@@ -32,12 +33,9 @@ export type Direction = (typeof VALID_DIRECTIONS)[number];
 export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant", "pie", "gantt", "journey"] as const;
 export type DiagramType = (typeof VALID_TYPES)[number];
 
-export const BUILTIN_ICONS = new Set([
-  "router", "switch", "server", "database", "cloud",
-  "firewall", "client", "internet",
-  "load_balancer", "wireless_ap", "storage", "printer",
-  "phone", "vpn", "monitor",
-]);
+// Canonical built-in icon names — derived from the single ICON_CATALOG so the
+// name set, the glyphs, the prompt and the validator can never drift apart.
+export const BUILTIN_ICONS = new Set(ICON_NAMES);
 
 export const MAX_NEST_DEPTH = 3;
 

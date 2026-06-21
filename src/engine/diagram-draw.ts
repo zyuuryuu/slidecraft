@@ -5,8 +5,9 @@
  * (see draw-target.ts). Container/bus drawing lives in diagram-zones.ts.
  */
 
-import { type Node, type RelationType, type Cardinality, BUILTIN_ICONS } from "./schema";
+import { type Node, type RelationType, type Cardinality } from "./schema";
 import { paintIcon } from "./diagram-icons";
+import { normalizeIconName } from "./icon-catalog";
 import type { ThemeConfig } from "./theme";
 import { SLIDE_W, type NodePosition, type ConnectionPoint } from "./layout-engine";
 import {
@@ -112,12 +113,14 @@ export function paintShape(
   t.shape(node.shape, { x: pos.x, y: pos.y, w: pos.w, h: pos.h }, { fill: fillColor, line });
 
   // A built-in icon sits at the LEFT of the node; the label shifts right beside it.
+  // Resolve aliases / loose casing ("db" → "database") so upstream output is forgiven.
   let labelBox = { x: pos.x, y: pos.y, w: pos.w, h: pos.h };
   let labelAlign: "center" | "left" = "center";
-  if (node.icon && BUILTIN_ICONS.has(node.icon)) {
+  const iconName = normalizeIconName(node.icon);
+  if (iconName) {
     const iconS = Math.min(pos.h - 0.16, 0.55);
     const iconX = pos.x + 0.12;
-    paintIcon(t, node.icon, iconX, pos.y + (pos.h - iconS) / 2, iconS, fontColor);
+    paintIcon(t, iconName, iconX, pos.y + (pos.h - iconS) / 2, iconS, fontColor);
     labelBox = { x: iconX + iconS + 0.1, y: pos.y, w: Math.max(0.3, pos.w - (iconS + 0.34)), h: pos.h };
     labelAlign = "left";
   }

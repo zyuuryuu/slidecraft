@@ -15,6 +15,9 @@ import {
   validateDiagramSpec,
   type DiagramSpec,
 } from "./schema";
+import { ICON_NAMES, normalizeIconName } from "./icon-catalog";
+
+const ICON_NAME_SET = new Set(ICON_NAMES);
 
 // ── Diagnostic system ──
 
@@ -212,6 +215,13 @@ export function diagnoseJson(jsonStr: string): DiagnosticIssue[] {
           path: `nodes[${i}].shape`,
           message: `Invalid shape '${n.shape}'. Must be one of ${JSON.stringify([...VALID_SHAPES])}.`,
         });
+      }
+      // Unknown icon = WARNING (it simply won't be drawn), with a nearest-name hint.
+      if (typeof n.icon === "string" && n.icon.trim() && !normalizeIconName(n.icon)) {
+        const similar = findSimilar(n.icon, ICON_NAME_SET, 0.5);
+        let msg = `Unknown icon '${n.icon}'. It will not be drawn. Valid icons: ${ICON_NAMES.join(", ")}.`;
+        if (similar) msg = `Unknown icon '${n.icon}'. Did you mean '${similar}'?`;
+        issues.push({ level: "warning", path: `nodes[${i}].icon`, message: msg, suggestion: similar });
       }
       if ("style" in n && typeof n.style === "object" && n.style !== null) {
         checkStyleFields(n.style as Record<string, unknown>, KNOWN_FIELDS_NODE_STYLE, `nodes[${i}].style`, issues);
