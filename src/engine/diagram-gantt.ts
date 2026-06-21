@@ -172,7 +172,6 @@ export function computeGanttLayout(spec: DiagramSpec, contentTop: number): Gantt
 export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig): void {
   const fonts = theme.fonts;
   const accent = theme.palette.accent;
-  const navy = theme.palette.navy;
   const grid = theme.diagram_style.edge_color;
   const ink = theme.palette.dark_text; // bare text on the (light) slide background
 
@@ -183,12 +182,12 @@ export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig)
       { x: tk.x - 0.35, y: lay.axisY, w: 0.7, h: 0.22 }, { align: "center", valign: "middle", shrink: true });
   }
 
-  // section header bands
+  // section headers: a dark bold name + a thin accent underline (light, not a heavy band)
   for (const s of lay.sections) {
     dt.beginGroup();
-    dt.shape("rect", { x: 0.2, y: s.y + 0.02, w: SLIDE_W - 0.55, h: s.h - 0.04 }, { fill: navy, line: { color: accent, width: 0.5 } });
-    dt.text([{ text: s.label, fontSize: 10, fontFace: fonts.heading, color: accent, bold: true }],
-      { x: 0.32, y: s.y, w: 4, h: s.h }, { align: "left", valign: "middle", shrink: true });
+    dt.text([{ text: s.label, fontSize: 11, fontFace: fonts.heading, color: ink, bold: true }],
+      { x: 0.3, y: s.y, w: 4, h: s.h }, { align: "left", valign: "middle", shrink: true });
+    dt.line({ x: 0.3, y: s.y + s.h - 0.05 }, { x: SLIDE_W - 0.4, y: s.y + s.h - 0.05 }, { color: accent, width: 1.25, arrow: false });
     dt.endGroup();
   }
 
