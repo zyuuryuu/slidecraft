@@ -1,0 +1,40 @@
+name: Security audit
+
+# Surfaces known-vulnerable dependencies. INFORMATIONAL (continue-on-error) so it
+# never blocks the build — Dependabot alerts/updates do the enforcing side. Make a
+# step "required" later once the current advisories are triaged.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: npm audit (high and above)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9 # v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit (src-tauri)
+        run: cargo audit --file src-tauri/Cargo.lock
+        continue-on-error: true

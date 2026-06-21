@@ -1,0 +1,26 @@
+# Dependabot — automated dependency update PRs (free on all repos incl. private).
+# Covers the JS app, the Rust/Tauri backend, and the GitHub Actions used in CI.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # one PR for the low-risk minor/patch bumps; majors stay separate for review
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # keeps the SHA-pinned actions (below) current
+    open-pull-requests-limit: 5
