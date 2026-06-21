@@ -4,7 +4,6 @@
 
 import { describe, it, expect } from "vitest";
 import { parseMd } from "../src/engine/md-parser";
-import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
 
 describe("parseMd", () => {
   // ── Basic structure ──

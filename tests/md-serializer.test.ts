@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import { serializeMd } from "../src/engine/md-serializer";
 import { parseMd } from "../src/engine/md-parser";
 import { autoSelectLayout } from "../src/engine/template-loader";
-import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
+import type { DeckIR } from "../src/engine/slide-schema";
 
 describe("text + figure COEXISTENCE round-trips (stage ①)", () => {
   const bullets = (txts: string[]) => txts.map((t) => ({ segments: [{ text: t }], bullet: true }));

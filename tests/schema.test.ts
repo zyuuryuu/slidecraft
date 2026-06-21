@@ -10,7 +10,6 @@ import {
   topLevelGroups,
   groupAllNodes,
   mergeNodeStyle,
-  DiagramSpecSchema,
   type NodeStyle,
 } from "../src/engine/schema";
 

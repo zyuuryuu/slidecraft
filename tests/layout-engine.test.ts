@@ -9,7 +9,6 @@ import {
   computeLayoutWithLanes,
   cpCoords,
   detectCp,
-  classifyEdgeRoute,
   planEdgeRoute,
   computePortOffsets,
   computeGroupBboxes,
