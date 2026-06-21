@@ -63,7 +63,8 @@ export function computePieLayout(spec: DiagramSpec, contentTop: number): PieLayo
 export function paintPie(dt: DrawTarget, lay: PieLayout, theme: ThemeConfig): void {
   const fonts = theme.fonts;
   const sep = theme.diagram_style.slide_bg ?? "#0A0E27"; // thin separator between slices
-  const textColor = "#FFFFFF";
+  const onSlice = "#FFFFFF"; // text drawn ON a coloured slice
+  const ink = theme.palette.dark_text; // bare text on the (light) slide background
   const { cx, cy, r } = lay;
 
   // slices: each wedge + its % label, grouped
@@ -75,7 +76,7 @@ export function paintPie(dt: DrawTarget, lay: PieLayout, theme: ThemeConfig): vo
       const lx = cx + r * 0.62 * Math.cos(rad);
       const ly = cy + r * 0.62 * Math.sin(rad);
       dt.text(
-        [{ text: `${Math.round(s.pct)}%`, fontSize: 10, fontFace: fonts.body, color: textColor, bold: true }],
+        [{ text: `${Math.round(s.pct)}%`, fontSize: 10, fontFace: fonts.body, color: onSlice, bold: true }],
         { x: lx - 0.4, y: ly - 0.14, w: 0.8, h: 0.28 },
         { align: "center", valign: "middle", shrink: true },
       );
@@ -89,7 +90,7 @@ export function paintPie(dt: DrawTarget, lay: PieLayout, theme: ThemeConfig): vo
     dt.beginGroup();
     dt.shape("rect", { x: lay.legendX, y: y + lay.legendStep / 2 - 0.09, w: 0.18, h: 0.18 }, { fill: s.color, line: { color: s.color, width: 0 } });
     dt.text(
-      [{ text: `${s.label}  ${s.value}`, fontSize: 10, fontFace: fonts.body, color: textColor, bold: false }],
+      [{ text: `${s.label}  ${s.value}`, fontSize: 10, fontFace: fonts.body, color: ink, bold: false }],
       { x: lay.legendX + 0.28, y, w: SLIDE_W - lay.legendX - 0.5, h: lay.legendStep },
       { align: "left", valign: "middle", shrink: true },
     );

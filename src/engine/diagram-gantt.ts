@@ -174,12 +174,12 @@ export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig)
   const accent = theme.palette.accent;
   const navy = theme.palette.navy;
   const grid = theme.diagram_style.edge_color;
-  const textColor = "#FFFFFF";
+  const ink = theme.palette.dark_text; // bare text on the (light) slide background
 
   // date axis: dashed gridlines + labels
   for (const tk of lay.ticks) {
     dt.line({ x: tk.x, y: lay.axisY + 0.24 }, { x: tk.x, y: lay.bbox.maxY - 0.05 }, { color: grid, width: 0.5, dash: true, arrow: false });
-    dt.text([{ text: tk.label, fontSize: 8, fontFace: fonts.body, color: grid, bold: false }],
+    dt.text([{ text: tk.label, fontSize: 8, fontFace: fonts.body, color: ink, bold: false }],
       { x: tk.x - 0.35, y: lay.axisY, w: 0.7, h: 0.22 }, { align: "center", valign: "middle", shrink: true });
   }
 
@@ -195,7 +195,7 @@ export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig)
   // task name + bar (or milestone diamond), grouped per task
   for (const b of lay.bars) {
     dt.beginGroup();
-    dt.text([{ text: b.label, fontSize: 9, fontFace: fonts.body, color: textColor, bold: false }],
+    dt.text([{ text: b.label, fontSize: 9, fontFace: fonts.body, color: ink, bold: false }],
       { x: 0.3, y: b.rowY, w: lay.labelColW, h: b.rowH }, { align: "left", valign: "middle", shrink: true });
     if (b.milestone) {
       const m = Math.min(b.rowH * 0.7, 0.24);

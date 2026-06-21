@@ -46,7 +46,8 @@ export function paintQuadrant(dt: DrawTarget, lay: QuadrantLayout, theme: ThemeC
   const fonts = theme.fonts;
   const accent = theme.palette.accent;
   const navy = theme.palette.navy;
-  const textColor = "#FFFFFF";
+  const textColor = "#FFFFFF"; // point labels ON the navy cells
+  const ink = theme.palette.dark_text; // axis labels on the bare (light) slide bg
   const { x0, y0, size } = lay;
   const half = size / 2;
 
@@ -76,7 +77,7 @@ export function paintQuadrant(dt: DrawTarget, lay: QuadrantLayout, theme: ThemeC
 
   // axis labels (x: low-left / high-right below; y: high-top / low-bottom on the left)
   const axisT = (text: string, box: { x: number; y: number; w: number; h: number }, align: "left" | "right") =>
-    dt.text([{ text, fontSize: 10, fontFace: fonts.body, color: textColor, bold: false }], box, { align, valign: "middle", shrink: true });
+    dt.text([{ text, fontSize: 10, fontFace: fonts.body, color: ink, bold: false }], box, { align, valign: "middle", shrink: true });
   if (q?.xLow) axisT(q.xLow, { x: x0, y: y0 + size + 0.06, w: half, h: 0.34 }, "left");
   if (q?.xHigh) axisT(q.xHigh, { x: x0 + half, y: y0 + size + 0.06, w: half, h: 0.34 }, "right");
   if (q?.yHigh) axisT(q.yHigh, { x: x0 - 0.74, y: y0 + 0.04, w: 0.68, h: 0.34 }, "right");

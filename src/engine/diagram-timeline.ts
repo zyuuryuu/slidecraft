@@ -95,7 +95,8 @@ export function paintTimeline(dt: DrawTarget, lay: TimelineLayout, theme: ThemeC
   const fonts = theme.fonts;
   const accent = theme.palette.accent;
   const navy = theme.palette.navy;
-  const textColor = "#FFFFFF";
+  const textColor = "#FFFFFF"; // text ON the navy event cards / section bands
+  const ink = theme.palette.dark_text; // bare period labels on the (light) slide bg
 
   // section bands (drawn first, behind the axis)
   for (const s of lay.sections) {
@@ -118,7 +119,7 @@ export function paintTimeline(dt: DrawTarget, lay: TimelineLayout, theme: ThemeC
     const r = 0.08;
     dt.shape("circle", { x: p.cx - r, y: lay.axisY - r, w: 2 * r, h: 2 * r }, { fill: accent, line: { color: accent, width: 0 } });
     dt.text(
-      [{ text: p.label, fontSize: 12, fontFace: fonts.heading, color: textColor, bold: true }],
+      [{ text: p.label, fontSize: 12, fontFace: fonts.heading, color: ink, bold: true }],
       p.labelBox,
       { align: "center", valign: "middle", shrink: true },
     );
