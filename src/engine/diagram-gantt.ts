@@ -112,12 +112,29 @@ function statusColor(status: string): string {
 
 export interface GanttLayout {
   axisY: number;
+  axisX0: number;
+  axisX1: number;
   ticks: { x: number; label: string }[];
   sections: { y: number; h: number; label: string }[];
-  bars: { x: number; y: number; w: number; h: number; rowY: number; rowH: number; label: string; color: string; milestone: boolean }[];
+  bars: { x: number; y: number; w: number; h: number; rowY: number; rowH: number; label: string; color: string; milestone: boolean; days: number }[];
+  legend: { color: string; label: string }[];
+  legendY: number;
   labelColW: number;
   bbox: { minX: number; minY: number; maxX: number; maxY: number };
 }
+
+// Pick a "nice" tick interval (days) giving ≤8 ticks across the span.
+function niceInterval(maxDay: number): number {
+  for (const c of [1, 2, 3, 7, 14, 30, 60, 90, 180]) if (maxDay / c <= 8) return c;
+  return 365;
+}
+
+const STATUS_LEGEND: { key: string; label: string; color: string }[] = [
+  { key: "", label: "予定", color: "#3B82F6" },
+  { key: "active", label: "進行中", color: "#06B6D4" },
+  { key: "done", label: "完了", color: "#64748B" },
+  { key: "crit", label: "重要", color: "#EF4444" },
+];
 
 export function computeGanttLayout(spec: DiagramSpec, contentTop: number): GanttLayout {
   const g = spec.gantt;
@@ -127,14 +144,13 @@ export function computeGanttLayout(spec: DiagramSpec, contentTop: number): Gantt
   const chartX1 = SLIDE_W - 0.4;
   const chartW = chartX1 - chartX0;
   const maxDay = Math.max(1, ...tasks.map((t) => t.end));
-  const dayToX = (d: number) => chartX0 + (d / maxDay) * chartW;
+  const interval = niceInterval(maxDay);
+  const chartMaxDay = Math.ceil(maxDay / interval) * interval; // round up so the last tick aligns with the edge
+  const dayToX = (d: number) => chartX0 + (d / chartMaxDay) * chartW;
 
   const axisY = contentTop + 0.15;
   const ticks: GanttLayout["ticks"] = [];
-  for (let i = 0; i <= 5; i++) {
-    const day = Math.round((maxDay * i) / 5);
-    ticks.push({ x: dayToX(day), label: offsetToMD(g?.startDate ?? "", day) });
-  }
+  for (let d = 0; d <= chartMaxDay; d += interval) ticks.push({ x: dayToX(d), label: offsetToMD(g?.startDate ?? "", d) });
 
   // count rows (a section header row precedes each section's tasks)
   let nRows = 0;
@@ -158,14 +174,23 @@ export function computeGanttLayout(spec: DiagramSpec, contentTop: number): Gantt
     const w = Math.max(0.08, dayToX(t.end) - x);
     bars.push({
       x, y: rowY + rowH * 0.18, w, h: rowH * 0.64, rowY, rowH,
-      label: t.name, color: statusColor(t.status), milestone: t.status.includes("milestone"),
+      label: t.name, color: statusColor(t.status), milestone: t.status.includes("milestone"), days: t.end - t.start,
     });
     row++;
   }
 
+  // status legend — only the statuses actually used
+  const used = new Set<string>();
+  for (const t of tasks) {
+    if (t.status.includes("milestone")) continue;
+    used.add(t.status.includes("crit") ? "crit" : t.status.includes("active") ? "active" : t.status.includes("done") ? "done" : "");
+  }
+  const legend = STATUS_LEGEND.filter((l) => used.has(l.key));
+  const legendY = rowsTop + nRows * rowH + 0.14;
+
   return {
-    axisY, ticks, sections, bars, labelColW,
-    bbox: { minX: 0.1, minY: contentTop - 0.1, maxX: SLIDE_W - 0.2, maxY: rowsTop + nRows * rowH + 0.1 },
+    axisY, axisX0: chartX0, axisX1: chartX1, ticks, sections, bars, legend, legendY, labelColW,
+    bbox: { minX: 0.1, minY: contentTop - 0.1, maxX: SLIDE_W - 0.2, maxY: legendY + (legend.length ? 0.4 : 0.1) },
   };
 }
 
@@ -175,11 +200,14 @@ export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig)
   const grid = theme.diagram_style.edge_color;
   const ink = theme.palette.dark_text; // bare text on the (light) slide background
 
-  // date axis: dashed gridlines + labels
+  // date axis: a solid baseline + tick marks + dark labels; faint gridlines down
+  const baseY = lay.axisY + 0.3;
+  dt.line({ x: lay.axisX0, y: baseY }, { x: lay.axisX1, y: baseY }, { color: ink, width: 1, arrow: false });
   for (const tk of lay.ticks) {
-    dt.line({ x: tk.x, y: lay.axisY + 0.24 }, { x: tk.x, y: lay.bbox.maxY - 0.05 }, { color: grid, width: 0.5, dash: true, arrow: false });
-    dt.text([{ text: tk.label, fontSize: 8, fontFace: fonts.body, color: ink, bold: false }],
-      { x: tk.x - 0.35, y: lay.axisY, w: 0.7, h: 0.22 }, { align: "center", valign: "middle", shrink: true });
+    dt.line({ x: tk.x, y: baseY }, { x: tk.x, y: lay.bbox.maxY - 0.05 }, { color: grid, width: 0.5, dash: true, arrow: false });
+    dt.line({ x: tk.x, y: baseY }, { x: tk.x, y: baseY + 0.06 }, { color: ink, width: 1, arrow: false });
+    dt.text([{ text: tk.label, fontSize: 9, fontFace: fonts.body, color: ink, bold: false }],
+      { x: tk.x - 0.4, y: lay.axisY - 0.02, w: 0.8, h: 0.24 }, { align: "center", valign: "middle", shrink: true });
   }
 
   // section headers: a dark bold name + a thin accent underline (light, not a heavy band)
@@ -201,7 +229,20 @@ export function paintGantt(dt: DrawTarget, lay: GanttLayout, theme: ThemeConfig)
       dt.shape("diamond", { x: b.x - m / 2, y: b.rowY + b.rowH / 2 - m / 2, w: m, h: m }, { fill: b.color, line: { color: b.color, width: 0 } });
     } else {
       dt.shape("rounded_rect", { x: b.x, y: b.y, w: b.w, h: b.h }, { fill: b.color, line: { color: b.color, width: 0 }, rectRadius: Math.min(b.h / 2, 0.08) });
+      // duration label just to the right of the bar
+      dt.text([{ text: `${b.days}d`, fontSize: 8, fontFace: fonts.body, color: ink, bold: false }],
+        { x: b.x + b.w + 0.06, y: b.rowY, w: 0.7, h: b.rowH }, { align: "left", valign: "middle", shrink: true });
     }
     dt.endGroup();
   }
+
+  // status legend (only the statuses used)
+  lay.legend.forEach((lg, i) => {
+    const lx = 0.3 + i * 1.5;
+    dt.beginGroup();
+    dt.shape("rect", { x: lx, y: lay.legendY + 0.05, w: 0.18, h: 0.18 }, { fill: lg.color, line: { color: lg.color, width: 0 } });
+    dt.text([{ text: lg.label, fontSize: 9, fontFace: fonts.body, color: ink, bold: false }],
+      { x: lx + 0.26, y: lay.legendY, w: 1.2, h: 0.28 }, { align: "left", valign: "middle", shrink: true });
+    dt.endGroup();
+  });
 }
