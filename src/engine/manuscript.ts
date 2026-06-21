@@ -75,6 +75,26 @@ function sectionBody(lines: string[]): string {
 }
 
 /**
+ * VISUALIZE (low-interference): if a section's body is ENTIRELY "ラベル: 値" bullets
+ * (a spec / key-value list), present it as a 2-column GFM table (→ native table)
+ * instead of bullets. Returns null unless every bullet is a clean key-value pair.
+ * Words are never reworded — only the form changes.
+ */
+function keyValueTable(bodyMd: string): string | null {
+  const lines = bodyMd.split("\n").filter((l) => l.trim());
+  if (lines.length < 2) return null;
+  const pairs: Array<[string, string]> = [];
+  for (const l of lines) {
+    const m = l.match(/^-\s+([^:：]+?)\s*[:：]\s*(.+)$/); // "- ラベル: 値"
+    if (!m) return null; // not all key-value → keep bullets
+    pairs.push([m[1].trim(), m[2].trim()]);
+  }
+  const esc = (c: string) => c.replace(/\|/g, "\\|");
+  const rows = pairs.map(([k, v]) => `| ${esc(k)} | ${esc(v)} |`);
+  return ["| 項目 | 内容 |", "| --- | --- |", ...rows].join("\n");
+}
+
+/**
  * Structure a raw manuscript into slide Markdown. The first H1 becomes a Title
  * slide; every other heading becomes a content slide. Returns the input unchanged
  * when it's already slide-structured or has no headings (nothing to structure).
@@ -102,7 +122,8 @@ export function structureManuscript(md: string): string {
       continue;
     }
     const body = sectionBody(sec.lines);
-    slides.push(`# ${sec.heading}${body ? `\n\n${body}` : ""}`);
+    const visual = keyValueTable(body); // key-value list → native table (form only)
+    slides.push(`# ${sec.heading}${body ? `\n\n${visual ?? body}` : ""}`);
   }
   return slides.join("\n\n---\n\n") + "\n";
 }

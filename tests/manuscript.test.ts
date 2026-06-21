@@ -39,6 +39,35 @@ describe("structureManuscript", () => {
     expect(cmp?.table?.rows[0]).toEqual(["項目", "現行", "新"]); // GFM table preserved → native table
   });
 
+  it("VISUALIZE: key-value bullets → native table; non-pair bullets stay bullets", () => {
+    const ms = `# 製品X
+
+## 仕様
+- 速度: 0.8秒
+- 対応: モバイル完全対応
+- 料金: ¥1,200/月
+
+## 比較
+- 現行は遅い
+- 新は速い`;
+    const deck = parseMd(structureManuscript(ms));
+    const spec = deck.slides.find((s) => s.table);
+    expect(spec?.table?.rows).toEqual([
+      ["項目", "内容"], ["速度", "0.8秒"], ["対応", "モバイル完全対応"], ["料金", "¥1,200/月"],
+    ]);
+    const cmp = deck.slides.find((s) => titleOf(s) === "比較");
+    expect(cmp?.table).toBeUndefined(); // not key-value → kept as bullets
+    expect(cmp?.placeholders.find((p) => p.idx === "1")?.paragraphs.length).toBe(2);
+  });
+
+  it("a heading with no body becomes a section divider (autoSelect)", async () => {
+    const { autoSelectLayout } = await import("../src/engine/template-loader");
+    const deck = parseMd(structureManuscript("# T\n\n## 第1部\n\n## 内容\n- a"));
+    const divider = deck.slides.find((s) => titleOf(s) === "第1部");
+    // title-only content slide → autoSelect resolves to a Section layout
+    expect(autoSelectLayout(divider!, 1, deck.slides.length)).toMatch(/Section/i);
+  });
+
   it("leaves already slide-structured Markdown unchanged", () => {
     const slideMd = "<!-- slide: Title.1Title.Single -->\n# T\n\n---\n\n# A\n\n- x";
     expect(isSlideStructured(slideMd)).toBe(true);
