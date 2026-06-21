@@ -16,6 +16,7 @@ import { buildCatalog, placeholderRole, slideIdxRole, type PlaceholderRole } fro
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
+import { tableGraphicFrameXml } from "./table-ooxml";
 import { midnightExecutive } from "./theme";
 
 /**
@@ -146,12 +147,13 @@ async function buildSlideXml(
   const visualBody = (pi?: string) => (pi ? bodyPhs[Math.max(1, parseInt(pi) || 1) - 1] : undefined);
   const diagBodyIdx = slide.diagram ? visualBody(slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
+  const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
 
   let shapes = "";
   let id = 2;
 
   for (const ph of layout.placeholders) {
-    if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx) continue; // replaced by the visual
+    if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx) continue; // replaced by the visual
     const meta = layoutMeta.get(ph.idx);
     if (!meta) continue;
     const content = contentByRole.get(meta.role)?.[meta.order - 1];
@@ -207,6 +209,15 @@ async function buildSlideXml(
       id++;
     }
     shapes += reNumbered;
+  }
+
+  // Add a native table if present (fills its body region; editable in PowerPoint).
+  if (slide.table) {
+    const tablePh = visualBody(slide.table.placeholderIdx);
+    if (tablePh) {
+      shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id);
+      id++;
+    }
   }
 
   const xml =

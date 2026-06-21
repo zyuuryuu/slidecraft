@@ -4,9 +4,21 @@
  * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
+import { isTableRow, parseMarkdownTable } from "./md-table";
+
+/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line). */
+function findTableInLines(lines: string[]): string[][] | null {
+  for (let i = 0; i + 1 < lines.length; i++) {
+    if (isTableRow(lines[i])) {
+      const parsed = parseMarkdownTable(lines.slice(i));
+      if (parsed) return parsed.rows;
+    }
+  }
+  return null;
+}
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -322,16 +334,21 @@ export function parseSlideBlock(
     }
   }
 
-  // Body text → idx 1
+  // Body: a GFM table becomes a NATIVE table block (fills body region 1); otherwise
+  // the body lines become bullet/text paragraphs (idx 1).
   const trimmedBody = trimBodyLines(bodyLines);
-  if (trimmedBody.length > 0) {
+  let table: TableBlock | undefined;
+  const tableRows = findTableInLines(trimmedBody);
+  if (tableRows) {
+    table = { rows: tableRows, header: true, placeholderIdx: "1" };
+  } else if (trimmedBody.length > 0) {
     placeholders.push({
       idx: "1",
       paragraphs: linesToParagraphs(trimmedBody),
     });
   }
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
@@ -347,6 +364,7 @@ export function parseSlideBlock(
     placeholders,
     diagram,
     mermaidBlock,
+    ...(table ? { table } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + lines.length - 1,
   };

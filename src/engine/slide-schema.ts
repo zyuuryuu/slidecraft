@@ -90,6 +90,16 @@ export const MermaidBlockSchema = z.object({
 
 export type MermaidBlock = z.infer<typeof MermaidBlockSchema>;
 
+// ── Table block (embedded in a slide) ──
+
+export const TableBlockSchema = z.object({
+  rows: z.array(z.array(z.string())), // [ [h1,h2], [a,b], ... ] — first row is the header when `header`
+  header: z.boolean().default(true),
+  placeholderIdx: z.string().default("1"), // which BODY region the table fills
+});
+
+export type TableBlock = z.infer<typeof TableBlockSchema>;
+
 // ── Single slide IR ──
 
 export const SlideIRSchema = z.object({
@@ -97,6 +107,7 @@ export const SlideIRSchema = z.object({
   placeholders: z.array(PlaceholderContentSchema),
   diagram: DiagramBlockSchema.optional(), // embedded diagram (DiagramSpec YAML → PptxGenJS shapes)
   mermaidBlock: MermaidBlockSchema.optional(), // embedded mermaid (raw syntax → SVG image in PPTX)
+  table: TableBlockSchema.optional(), // embedded table (GFM Markdown → native OOXML table)
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });

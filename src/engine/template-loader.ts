@@ -313,7 +313,7 @@ export function autoSelectLayout(
   // A diagram/mermaid occupies a body placeholder even though it isn't in
   // `placeholders`. It lands at idx 1 (solo → Content) or idx 2 (beside body
   // bullets → 2-column), so count it toward whichever region it targets.
-  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
+  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? slide.table?.placeholderIdx;
   const hasBody = idxs.has("1") || visualIdx === "1";
   const hasIdx2 = idxs.has("2") || visualIdx === "2";
   const hasIdx3 = idxs.has("3") || visualIdx === "3";
@@ -333,7 +333,9 @@ export function autoSelectLayout(
   let role: LayoutRole;
   let regions: number | undefined;
   let fallback: string;
-  if (slideIndex === 0) {
+  if (slideIndex === 0 && !visualIdx) {
+    // A first slide that's a pure title → Title. But a first slide carrying a
+    // body VISUAL (diagram/table/mermaid) is content — a title layout can't hold it.
     role = "title"; regions = undefined; fallback = LAYOUT_NAMES[0];
   } else if (isClosing && slideIndex === totalSlides - 1) {
     role = "closing"; regions = undefined; fallback = LAYOUT_NAMES[28];

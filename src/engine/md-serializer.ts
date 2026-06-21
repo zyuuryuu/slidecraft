@@ -14,6 +14,7 @@ import type {
   InlineSegment,
 } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
+import { tableToMarkdown } from "./md-table";
 
 // ── Title layout detection ──
 
@@ -170,7 +171,9 @@ function serializeSlide(
       }
     } else {
       // Single body: idx 1
-      if (slide.diagram) {
+      if (slide.table) {
+        lines.push(tableToMarkdown(slide.table.rows));
+      } else if (slide.diagram) {
         lines.push("```diagram");
         lines.push(slide.diagram.yaml);
         lines.push("```");

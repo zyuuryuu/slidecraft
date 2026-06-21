@@ -207,6 +207,53 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
           );
         }
 
+        // Native table → an HTML <table> at the placeholder box (matches the export).
+        if (slide.table && ph.idx === slide.table.placeholderIdx) {
+          const t = slide.table;
+          return (
+            <div
+              key={`table-${ph.idx}`}
+              style={{
+                position: "absolute",
+                left: `${(s.x / SLIDE_W) * 100}%`,
+                top: `${(s.y / SLIDE_H) * 100}%`,
+                width: `${(s.w / SLIDE_W) * 100}%`,
+                height: `${(s.h / SLIDE_H) * 100}%`,
+                overflow: "hidden",
+              }}
+            >
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 * (scale / 72), tableLayout: "fixed" }}>
+                <tbody>
+                  {t.rows.map((row, ri) => {
+                    const isHeader = t.header && ri === 0;
+                    const band = !isHeader && ri % 2 === 0;
+                    return (
+                      <tr key={ri}>
+                        {row.map((cell, ci) => (
+                          <td
+                            key={ci}
+                            style={{
+                              border: "1px solid #C8D0DC",
+                              padding: "1px 6px",
+                              background: isHeader ? "#1E2761" : band ? "#F1F4F9" : "#FFFFFF",
+                              color: isHeader ? "#FFFFFF" : "#1E293B",
+                              fontWeight: isHeader ? 700 : 400,
+                              overflow: "hidden",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
         const content = contentMap.get(ph.idx);
         if (!content) return null;
 
