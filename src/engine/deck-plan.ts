@@ -12,6 +12,14 @@
 import { z } from "zod";
 import type { DeckIR, SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { parseJsonLoose } from "./json-salvage";
+import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
+
+/** A Mermaid string → a native diagram block (if it parses) or an image fallback. */
+function mermaidToFigure(mmd: string): Pick<SlideIR, "diagram" | "mermaidBlock"> {
+  const spec = mermaidToDiagramSpec(mmd);
+  if (spec) return { diagram: { yaml: diagramSpecToYaml(spec), placeholderIdx: "1" } };
+  return { mermaidBlock: { mermaid: mmd, placeholderIdx: "1" } };
+}
 
 // ── DeckPlan schema (what the model returns) ──
 
@@ -44,6 +52,19 @@ export const SlidePlanSchema = z.discriminatedUnion("kind", [
     title: z.string(),
     subtitle: z.string().optional(),
     columns: z.array(ColumnSchema).min(2).max(3),
+  }),
+  z.object({
+    kind: z.literal("table"),
+    title: z.string(),
+    subtitle: z.string().optional(),
+    headers: z.array(z.string()),
+    rows: z.array(z.array(z.string())).default([]),
+  }),
+  z.object({
+    kind: z.literal("diagram"),
+    title: z.string(),
+    subtitle: z.string().optional(),
+    mermaid: z.string(), // a Mermaid diagram (flowchart / sequence / timeline / pie / gantt / …)
   }),
   z.object({
     kind: z.literal("closing"),
@@ -104,6 +125,20 @@ export function slidePlanToSlide(s: SlidePlan): SlideIR {
       });
       const layout = s.columns.length >= 3 ? "Column.3Body.Equal" : "Column.2Body.Equal";
       return { layout, placeholders: ph };
+    }
+    case "table": {
+      const ph: PlaceholderContent[] = [textPh("15", s.title)];
+      if (s.subtitle) ph.push(textPh("16", s.subtitle));
+      return {
+        layout: "Content.1Body.Single",
+        placeholders: ph,
+        table: { rows: [s.headers, ...s.rows], header: true, placeholderIdx: "1" },
+      };
+    }
+    case "diagram": {
+      const ph: PlaceholderContent[] = [textPh("15", s.title)];
+      if (s.subtitle) ph.push(textPh("16", s.subtitle));
+      return { layout: "Content.1Body.Single", placeholders: ph, ...mermaidToFigure(s.mermaid) };
     }
     case "closing":
       return { layout: "Closing.1Message.Single", placeholders: [textPh("0", s.title)] };
@@ -173,6 +208,9 @@ const KIND_SYNONYMS: Record<string, string> = {
   point: "content", points: "content", bullet: "content", list: "content",
   columns: "columns", column: "columns", compare: "columns", comparison: "columns",
   versus: "columns", twocolumn: "columns", twocolumns: "columns", threecolumn: "columns", threecolumns: "columns",
+  table: "table", grid: "table", matrix: "table", datatable: "table", spreadsheet: "table",
+  diagram: "diagram", figure: "diagram", flow: "diagram", flowchart: "diagram", graph: "diagram",
+  chart: "diagram", mermaid: "diagram", process: "diagram", timeline: "diagram", architecture: "diagram",
   closing: "closing", close: "closing", end: "closing", ending: "closing", thanks: "closing", thankyou: "closing",
 };
 
@@ -201,7 +239,9 @@ function coerceSlide(raw: unknown): unknown {
   const rawKind = typeof s.kind === "string" ? s.kind.toLowerCase().replace(/[^a-z]/g, "") : "";
   let kind = KIND_SYNONYMS[rawKind];
   if (!kind) {
-    if (Array.isArray(s.columns)) kind = "columns";
+    if (Array.isArray(s.headers) || (Array.isArray(s.rows) && Array.isArray((s.rows as unknown[])[0]))) kind = "table";
+    else if (typeof s.mermaid === "string") kind = "diagram";
+    else if (Array.isArray(s.columns)) kind = "columns";
     else if (s.bullets != null) kind = "content";
     else if (s.subtitle != null || s.category != null || s.footer != null) kind = "title";
     else kind = "content";
@@ -210,6 +250,18 @@ function coerceSlide(raw: unknown): unknown {
 
   if (s.title != null) out.title = String(s.title);
   if (kind === "content") out.bullets = toStringArray(s.bullets);
+  if (kind === "table") {
+    const rows2d = Array.isArray(s.rows) ? (s.rows as unknown[]).map(toStringArray) : [];
+    if (Array.isArray(s.headers) && s.headers.length) {
+      out.headers = toStringArray(s.headers);
+      out.rows = rows2d;
+    } else {
+      // model put everything in `rows` — first row is the header
+      out.headers = rows2d[0] ?? [];
+      out.rows = rows2d.slice(1);
+    }
+  }
+  if (kind === "diagram") out.mermaid = String(s.mermaid ?? s.diagram ?? s.figure ?? "");
   if (kind === "columns") {
     out.columns = Array.isArray(s.columns)
       ? s.columns.map((c) => {
@@ -248,11 +300,16 @@ Each Slide is exactly one of:
 - {"kind":"section","title":"..."}                                                                // a section divider
 - {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}                       // a normal slide; subtitle optional
 - {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
+- {"kind":"table","title":"...","subtitle":"...","headers":["列A","列B"],"rows":[["a1","b1"],["a2","b2"]]}  // a DATA TABLE: pricing, metric comparisons, schedules
+- {"kind":"diagram","title":"...","subtitle":"...","mermaid":"flowchart LR\\n  A[開始] --> B[次] --> C[完了]"}  // a FIGURE: emit a small Mermaid diagram
 - {"kind":"closing","title":"..."}                                                                // closing message
 
 Rules:
 - Write in the SAME language as the user's request.
 - Typically 6-10 slides. Start with a "title" slide and end with a "closing" slide.
+- PREFER a "table" over bullets for structured data (prices, metric comparisons, schedules), and a "diagram" for a PROCESS / flow / architecture / roadmap / sequence. Include at least one "table" or "diagram" when the topic warrants it — don't make every slide bullets.
+- A "diagram"'s "mermaid" is a SMALL Mermaid diagram (≤ ~8 nodes), using a real newline (JSON \\n) between lines. Pick the fitting type: \`flowchart LR\`/\`flowchart TD\` (process/architecture), \`sequenceDiagram\` (interactions), \`timeline\` (history/roadmap), \`gantt\` (schedule), \`pie\` (proportions). Keep node labels short.
+- A "table" has a short "headers" row + concise cells (a few words each); 2-5 columns, 2-6 rows.
 - Each bullet is a SHORT key phrase, not a full sentence: aim for ≤ ~20 full-width
   characters (~6-8 words). Drop filler words and any trailing "。"/".". 3-5 bullets per slide.
   Bad: "情報共有の遅れによるプロジェクトの遅延が発生しています。"  Good: "情報共有の遅れ→遅延"
