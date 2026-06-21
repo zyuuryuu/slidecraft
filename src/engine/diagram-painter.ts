@@ -43,6 +43,9 @@ import { computeQuadrantLayout, paintQuadrant } from "./diagram-quadrant";
 import { computePieLayout, paintPie } from "./diagram-pie";
 import { computeGanttLayout, paintGantt } from "./diagram-gantt";
 import { computeJourneyLayout, paintJourney } from "./diagram-journey";
+import { computeXychartLayout, paintXychart } from "./diagram-xychart";
+import { computeRadarLayout, paintRadar } from "./diagram-radar";
+import { computeKpiLayout, paintKpi } from "./diagram-kpi";
 import { paintGroupZones, paintSwimlanes, paintFanInBus, paintFanOutBus } from "./diagram-zones";
 
 // Re-export the draw abstraction so backends import everything from one place.
@@ -55,6 +58,27 @@ export type {
   EdgeLineOpts,
   PaintOptions,
 } from "./draw-target";
+
+/** Wrap a "second engine" paint in the region/transform fit + one top-level group
+ *  (so it exports as a single PPTX object). Shared by all non-node-edge engines. */
+function paintFitted(
+  t: DrawTarget,
+  options: PaintOptions,
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  paint: (dt: DrawTarget) => void,
+): void {
+  let dt: DrawTarget = t;
+  if (options.transform) {
+    const { scale, offsetX, offsetY } = options.transform;
+    dt = new TransformedTarget(t, scale, offsetX, offsetY);
+  } else if (options.region) {
+    const { scale, offsetX, offsetY } = fitTransform(bbox, options.region);
+    dt = new TransformedTarget(t, scale, offsetX, offsetY);
+  }
+  dt.beginGroup();
+  paint(dt);
+  dt.endGroup();
+}
 
 export function paintDiagram(
   t: DrawTarget,
@@ -85,108 +109,51 @@ export function paintDiagram(
     );
   }
 
-  // Sequence diagrams are a separate engine (temporal lifelines + ordered messages),
-  // not the node-edge/layered layout below.
+  // "Second engines": non node-edge layouts (temporal / chart / matrix). Each
+  // computes its own layout + bbox, then paints inside a single fitted group.
   if (spec.type === "sequence") {
     const seq = computeSequenceLayout(spec, contentTop);
-    let sdt: DrawTarget = t;
-    if (options.transform) {
-      const { scale, offsetX, offsetY } = options.transform;
-      sdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    } else if (options.region) {
-      const { scale, offsetX, offsetY } = fitTransform(seq.bbox, options.region);
-      sdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    }
-    // One top-level group for the whole sequence (participants/messages/fragments
-    // become sub-groups inside paintSequence) → exports as a single PPTX object.
-    sdt.beginGroup();
-    paintSequence(sdt, seq, theme);
-    sdt.endGroup();
+    paintFitted(t, options, seq.bbox, (dt) => paintSequence(dt, seq, theme));
     return;
   }
-
-  // Timelines are also a temporal engine (horizontal axis + period/event cards).
   if (spec.type === "timeline") {
     const tl = computeTimelineLayout(spec, contentTop);
-    let tdt: DrawTarget = t;
-    if (options.transform) {
-      const { scale, offsetX, offsetY } = options.transform;
-      tdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    } else if (options.region) {
-      const { scale, offsetX, offsetY } = fitTransform(tl.bbox, options.region);
-      tdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    }
-    tdt.beginGroup();
-    paintTimeline(tdt, tl, theme);
-    tdt.endGroup();
+    paintFitted(t, options, tl.bbox, (dt) => paintTimeline(dt, tl, theme));
     return;
   }
-
-  // Quadrant charts (2x2 matrix) are a non-graph engine too.
   if (spec.type === "quadrant") {
     const ql = computeQuadrantLayout(spec, contentTop);
-    let qdt: DrawTarget = t;
-    if (options.transform) {
-      const { scale, offsetX, offsetY } = options.transform;
-      qdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    } else if (options.region) {
-      const { scale, offsetX, offsetY } = fitTransform(ql.bbox, options.region);
-      qdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    }
-    qdt.beginGroup();
-    paintQuadrant(qdt, ql, theme, spec.quadrant);
-    qdt.endGroup();
+    paintFitted(t, options, ql.bbox, (dt) => paintQuadrant(dt, ql, theme, spec.quadrant));
     return;
   }
-
-  // Pie charts: wedges + legend (a chart engine).
   if (spec.type === "pie") {
     const pl = computePieLayout(spec, contentTop);
-    let pdt: DrawTarget = t;
-    if (options.transform) {
-      const { scale, offsetX, offsetY } = options.transform;
-      pdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    } else if (options.region) {
-      const { scale, offsetX, offsetY } = fitTransform(pl.bbox, options.region);
-      pdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    }
-    pdt.beginGroup();
-    paintPie(pdt, pl, theme);
-    pdt.endGroup();
+    paintFitted(t, options, pl.bbox, (dt) => paintPie(dt, pl, theme));
     return;
   }
-
-  // Gantt charts: date axis + section bands + task bars (a chart engine).
   if (spec.type === "gantt") {
     const gl = computeGanttLayout(spec, contentTop);
-    let gdt: DrawTarget = t;
-    if (options.transform) {
-      const { scale, offsetX, offsetY } = options.transform;
-      gdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    } else if (options.region) {
-      const { scale, offsetX, offsetY } = fitTransform(gl.bbox, options.region);
-      gdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    }
-    gdt.beginGroup();
-    paintGantt(gdt, gl, theme);
-    gdt.endGroup();
+    paintFitted(t, options, gl.bbox, (dt) => paintGantt(dt, gl, theme));
     return;
   }
-
-  // User journeys: satisfaction curve over steps (a chart engine).
   if (spec.type === "journey") {
     const jl = computeJourneyLayout(spec, contentTop);
-    let jdt: DrawTarget = t;
-    if (options.transform) {
-      const { scale, offsetX, offsetY } = options.transform;
-      jdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    } else if (options.region) {
-      const { scale, offsetX, offsetY } = fitTransform(jl.bbox, options.region);
-      jdt = new TransformedTarget(t, scale, offsetX, offsetY);
-    }
-    jdt.beginGroup();
-    paintJourney(jdt, jl, theme);
-    jdt.endGroup();
+    paintFitted(t, options, jl.bbox, (dt) => paintJourney(dt, jl, theme));
+    return;
+  }
+  if (spec.type === "xychart") {
+    const xl = computeXychartLayout(spec, contentTop);
+    paintFitted(t, options, xl.bbox, (dt) => paintXychart(dt, xl, theme));
+    return;
+  }
+  if (spec.type === "radar") {
+    const rl = computeRadarLayout(spec, contentTop);
+    paintFitted(t, options, rl.bbox, (dt) => paintRadar(dt, rl, theme));
+    return;
+  }
+  if (spec.type === "kpi") {
+    const kl = computeKpiLayout(spec, contentTop, theme);
+    paintFitted(t, options, kl.bbox, (dt) => paintKpi(dt, kl, theme));
     return;
   }
 

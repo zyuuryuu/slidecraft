@@ -27,7 +27,7 @@ export type RelationType = (typeof VALID_RELATIONS)[number];
 export const VALID_DIRECTIONS = ["TB", "LR", "BT", "RL"] as const;
 export type Direction = (typeof VALID_DIRECTIONS)[number];
 
-export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant", "pie", "gantt", "journey"] as const;
+export const VALID_TYPES = ["flowchart", "network", "orgchart", "sequence", "timeline", "quadrant", "pie", "gantt", "journey", "xychart", "radar", "kpi"] as const;
 export type DiagramType = (typeof VALID_TYPES)[number];
 
 // Canonical built-in icon names — derived from the single ICON_CATALOG so the

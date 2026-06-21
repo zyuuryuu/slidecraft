@@ -12,6 +12,7 @@ import yaml from "js-yaml";
 import type { DiagramSpec } from "./schema";
 import { ganttSpecToMermaid } from "./diagram-gantt";
 import { journeySpecToMermaid } from "./diagram-journey";
+import { xychartSpecToMermaid } from "./diagram-xychart";
 
 // ── DiagramSpec → Mermaid (reverse) ──
 
@@ -33,6 +34,7 @@ export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   if (spec.type === "pie") return true; // slices (label + value) + title round-trip
   if (spec.type === "gantt") return true; // tasks (offsets) round-trip via explicit dates
   if (spec.type === "journey") return true; // steps (name/score/actors/section) round-trip
+  if (spec.type === "xychart") return true; // categories + series (bar/line) round-trip
   // state diagram (has start/end pseudo-states) — faithful (custom labels via
   // `state "x" as id`); only block when node styles/groups/lanes would be lost.
   if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) {
@@ -237,6 +239,7 @@ export function diagramSpecToMermaid(spec: DiagramSpec): string {
   // class round-trip faithfully (the parser already reads each dialect back).
   if (spec.type === "gantt") return ganttSpecToMermaid(spec);
   if (spec.type === "journey") return journeySpecToMermaid(spec);
+  if (spec.type === "xychart") return xychartSpecToMermaid(spec);
   if (spec.type === "pie") return pieSpecToMermaid(spec);
   if (spec.type === "quadrant") return quadrantSpecToMermaid(spec);
   if (spec.type === "timeline") return timelineSpecToMermaid(spec);
@@ -373,6 +376,24 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     for (const t of gt.tasks) {
       yaml += `    - name: ${q(t.name)}\n      section: ${q(t.section)}\n      start: ${t.start}\n      end: ${t.end}\n      status: ${q(t.status)}\n`;
     }
+  }
+  if (spec.xychart) {
+    const xc = spec.xychart;
+    yaml += `\nxychart:\n  xlabel: ${q(xc.xlabel)}\n  ylabel: ${q(xc.ylabel)}\n  ymin: ${xc.ymin}\n`;
+    if (xc.ymax !== undefined) yaml += `  ymax: ${xc.ymax}\n`;
+    yaml += `  categories: ${JSON.stringify(xc.categories)}\n`;
+    yaml += xc.series.length ? `  series:\n` : `  series: []\n`;
+    for (const s of xc.series) yaml += `    - kind: ${s.kind}\n      name: ${q(s.name)}\n      values: ${JSON.stringify(s.values)}\n`;
+  }
+  if (spec.radar) {
+    const rd = spec.radar;
+    yaml += `\nradar:\n  max: ${rd.max}\n  axes: ${JSON.stringify(rd.axes)}\n`;
+    yaml += rd.series.length ? `  series:\n` : `  series: []\n`;
+    for (const s of rd.series) yaml += `    - name: ${q(s.name)}\n      values: ${JSON.stringify(s.values)}\n`;
+  }
+  if (spec.kpi) {
+    yaml += spec.kpi.cards.length ? `\nkpi:\n  cards:\n` : `\nkpi:\n  cards: []\n`;
+    for (const c of spec.kpi.cards) yaml += `    - value: ${q(c.value)}\n      label: ${q(c.label)}\n      delta: ${q(c.delta)}\n      trend: ${q(c.trend)}\n`;
   }
   return yaml;
 }

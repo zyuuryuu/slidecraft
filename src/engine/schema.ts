@@ -154,34 +154,16 @@ export const ActivationSchema = z.object({
 });
 export type Activation = z.infer<typeof ActivationSchema>;
 
-// Quadrant chart (2x2 matrix): axis labels, 4 quadrant labels, plotted points.
-// q1=top-right, q2=top-left, q3=bottom-left, q4=bottom-right; point x/y in [0,1].
-export const QuadrantSchema = z.object({
-  xLow: z.string().default(""),
-  xHigh: z.string().default(""),
-  yLow: z.string().default(""),
-  yHigh: z.string().default(""),
-  q1: z.string().default(""),
-  q2: z.string().default(""),
-  q3: z.string().default(""),
-  q4: z.string().default(""),
-  points: z.array(z.object({ label: z.string(), x: z.number(), y: z.number() })).default([]),
-});
-export type Quadrant = z.infer<typeof QuadrantSchema>;
-
-// Gantt chart: tasks with start/end as DAY OFFSETS from `startDate` (the parser
-// resolves dates/durations/`after` deps into offsets); status ∈ done/active/crit/milestone.
-export const GanttSchema = z.object({
-  startDate: z.string().default(""),
-  tasks: z.array(z.object({
-    name: z.string(),
-    section: z.string().default(""),
-    start: z.number(),
-    end: z.number(),
-    status: z.string().default(""),
-  })).default([]),
-});
-export type Gantt = z.infer<typeof GanttSchema>;
+// Data-viz sub-object schemas (quadrant/gantt/xychart/radar/kpi) live in
+// schema-charts.ts (R1); re-export + import them for DiagramSpecSchema below.
+export * from "./schema-charts";
+import {
+  QuadrantSchema,
+  GanttSchema,
+  XyChartSchema,
+  RadarSchema,
+  KpiSchema,
+} from "./schema-charts";
 
 export const DiagramSpecSchema = z.object({
   type: z.enum(VALID_TYPES),
@@ -196,6 +178,9 @@ export const DiagramSpecSchema = z.object({
   activations: z.array(ActivationSchema).default([]),
   quadrant: QuadrantSchema.optional(),
   gantt: GanttSchema.optional(),
+  xychart: XyChartSchema.optional(),
+  radar: RadarSchema.optional(),
+  kpi: KpiSchema.optional(),
   layout: LayoutConfigSchema.default({ node_width: 2.0, node_height: 0.7, h_gap: 0.5, v_gap: 0.8 }),
 });
 export type DiagramSpec = z.infer<typeof DiagramSpecSchema>;

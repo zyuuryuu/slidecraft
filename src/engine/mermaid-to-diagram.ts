@@ -10,6 +10,7 @@ import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./sche
 import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState, parseMermaidER, parseMermaidTimeline, parseMermaidQuadrant, parseMermaidPie, parseMermaidMindmap } from "./mermaid-uml-parser";
 import { parseMermaidGantt } from "./diagram-gantt";
 import { parseMermaidJourney } from "./diagram-journey";
+import { parseMermaidXychart } from "./diagram-xychart";
 
 export type DiagramFormat = "yaml" | "json" | "mermaid";
 
@@ -188,6 +189,7 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
   if (/^pie\b/i.test(lines[0])) return parseMermaidPie(lines);
   if (/^gantt\b/i.test(lines[0])) return parseMermaidGantt(lines);
   if (/^journey\b/i.test(lines[0])) return parseMermaidJourney(lines);
+  if (/^xychart(-beta)?\b/i.test(lines[0])) return parseMermaidXychart(lines);
   if (/^mindmap\b/i.test(lines[0])) return parseMermaidMindmap(mermaidSyntax.split("\n")); // RAW lines (indentation = hierarchy)
 
   // Parse direction from first line: graph TD, graph LR, etc.
