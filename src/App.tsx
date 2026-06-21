@@ -97,6 +97,149 @@ edges:
 
 ---
 
+# 社内ネットワーク構成
+> ネットワークトポロジー（アイコン）
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: 社内ネットワーク構成
+nodes:
+  - id: net
+    label: インターネット
+    shape: rounded_rect
+    icon: internet
+  - id: fw
+    label: ファイアウォール
+    icon: firewall
+  - id: rt
+    label: ルーター
+    icon: router
+  - id: sw
+    label: スイッチ
+    icon: switch
+  - id: web
+    label: Webサーバ
+    icon: server
+  - id: db
+    label: DBサーバ
+    icon: database
+  - id: pc
+    label: クライアント
+    shape: rounded_rect
+    icon: client
+edges:
+  - from: net
+    to: fw
+  - from: fw
+    to: rt
+  - from: rt
+    to: sw
+  - from: sw
+    to: web
+  - from: sw
+    to: db
+  - from: sw
+    to: pc
+\`\`\`
+
+---
+
+# クラウドインフラ構成
+> 多層アーキテクチャ（アイコン）
+
+\`\`\`diagram
+type: flowchart
+direction: LR
+title: クラウドインフラ構成
+nodes:
+  - id: user
+    label: ユーザー
+    shape: rounded_rect
+    icon: client
+  - id: cloud
+    label: CDN / Cloud
+    shape: rounded_rect
+    icon: cloud
+  - id: lb
+    label: ロードバランサ
+    icon: load_balancer
+  - id: app1
+    label: Appサーバ1
+    icon: server
+  - id: app2
+    label: Appサーバ2
+    icon: server
+  - id: db
+    label: データベース
+    icon: database
+  - id: store
+    label: ストレージ
+    icon: storage
+edges:
+  - from: user
+    to: cloud
+  - from: cloud
+    to: lb
+  - from: lb
+    to: app1
+  - from: lb
+    to: app2
+  - from: app1
+    to: db
+  - from: app2
+    to: db
+  - from: app1
+    to: store
+\`\`\`
+
+---
+
+# オフィスLAN
+> 拠点ネットワーク（アイコン）
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: オフィスLAN
+nodes:
+  - id: net
+    label: インターネット
+    shape: rounded_rect
+    icon: internet
+  - id: fw
+    label: UTM / FW
+    icon: firewall
+  - id: ap
+    label: 無線AP
+    icon: wireless_ap
+  - id: pc
+    label: PC
+    shape: rounded_rect
+    icon: monitor
+  - id: phone
+    label: IP電話
+    shape: rounded_rect
+    icon: phone
+  - id: print
+    label: プリンタ
+    shape: rounded_rect
+    icon: printer
+edges:
+  - from: net
+    to: fw
+  - from: fw
+    to: ap
+  - from: ap
+    to: pc
+  - from: ap
+    to: phone
+  - from: fw
+    to: print
+\`\`\`
+
+---
+
 # データフロー
 > Mermaid 記法サンプル
 
