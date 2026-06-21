@@ -64,6 +64,40 @@ export function removeTrailingCommas(s: string): string {
   return mapOutsideStrings(s, (c) => c.replace(/,(\s*[}\]])/g, "$1"));
 }
 
+/**
+ * Insert MISSING commas between adjacent values (a frequent small-model fault:
+ * `"a": "x" "b": "y"` or `} {`). String-aware: a comma is inserted only when a
+ * complete value just ended (closing `"`, `}`, `]`, number, true/false/null) and a
+ * NEW value/key/container begins with no separator. Valid JSON is left untouched
+ * (after a value the only legal next tokens are `,` / `}` / `]`, none of which trigger it).
+ */
+export function insertMissingCommas(s: string): string {
+  let out = "";
+  let inStr = false;
+  let esc = false;
+  let afterValue = false; // a complete value just ended → a following value/key needs a comma
+  let i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (inStr) {
+      out += ch;
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') { inStr = false; afterValue = true; }
+      i++; continue;
+    }
+    if (ch === '"') { if (afterValue) out += ","; out += ch; inStr = true; afterValue = false; i++; continue; }
+    if (ch === "{" || ch === "[") { if (afterValue) out += ","; out += ch; afterValue = false; i++; continue; }
+    if (ch === "}" || ch === "]") { out += ch; afterValue = true; i++; continue; }
+    if (ch === "," || ch === ":") { out += ch; afterValue = false; i++; continue; }
+    if (/\s/.test(ch)) { out += ch; i++; continue; }
+    const lit = s.slice(i).match(/^(-?\d[\d.eE+-]*|true|false|null)/);
+    if (lit) { if (afterValue) out += ","; out += lit[0]; i += lit[0].length; afterValue = true; continue; }
+    out += ch; afterValue = false; i++;
+  }
+  return out;
+}
+
 // Unicode whitespace a model may leak between tokens — NBSP, ZWSP, the Japanese
 // IME full-width space U+3000, line/para separators, BOM. JSON.parse rejects all
 // of these between tokens, so normalize them to ASCII space OUTSIDE strings only
@@ -156,6 +190,7 @@ const REPAIRS: Array<(s: string) => string> = [
   pythonLiterals,
   stripComments,
   removeTrailingCommas,
+  insertMissingCommas,
   escapeControlChars,
 ];
 
