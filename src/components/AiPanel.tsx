@@ -9,6 +9,9 @@
 import { useState } from "react";
 import { PROVIDERS } from "../ipc/ai";
 import { useAiGeneration } from "./useAiGeneration";
+import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
+import type { DeckIssue } from "../engine/deck-diagnostics";
+import type { FitBox } from "../engine/distill";
 
 interface AiPanelProps {
   onApply: (markdown: string) => void;
@@ -19,6 +22,10 @@ interface AiPanelProps {
   onApplySlide?: (markdown: string) => void;
   /** Template capability summary prepended to whole-deck generation. */
   templateHint?: string;
+  /** Diagnostics for the active slide → one-click "AIで整える" fix (the loop). */
+  issues?: DeckIssue[];
+  /** Template content-body capacity → the budget half of the slide-fix contract. */
+  contentBox?: FitBox;
 }
 
 export default function AiPanel({
@@ -27,6 +34,8 @@ export default function AiPanel({
   currentSlideMd,
   onApplySlide,
   templateHint,
+  issues,
+  contentBox,
 }: AiPanelProps) {
   const ai = useAiGeneration();
   const [userRequest, setUserRequest] = useState("");
@@ -51,6 +60,18 @@ export default function AiPanel({
       // Whole-deck generation gets the template's capabilities (kinds/columns/capacity).
       ai.generate(templateHint ? `${templateHint}\n\n${userRequest}` : userRequest, "slides");
     }
+  };
+
+  // Stage C closed-loop: feed THIS slide's diagnostics + the template budget to the
+  // AI as the slide-fix contract (deterministic levers were already applied upstream;
+  // the AI handles the residue — condense/restructure). Result flows through the same
+  // "slide" apply path. The non-destruction guard lives in the composed instruction.
+  const slideIssues = issues ?? [];
+  const canFix = slideScope && !!currentSlideMd && slideIssues.length > 0;
+  const doFix = () => {
+    if (!currentSlideMd) return;
+    setScope("slide");
+    ai.generate(slideFixRequest(buildSlideFix(currentSlideMd, slideIssues, contentBox)), "slide");
   };
 
   const doApply = () => {
@@ -197,6 +218,19 @@ export default function AiPanel({
             {slideScope && (
               <span className="text-gray-500 ml-1">— このスライドだけ送って編集（トークン節約）</span>
             )}
+          </div>
+        )}
+        {canFix && (
+          <div className="flex items-center gap-2 text-[11px]">
+            <button
+              onClick={doFix}
+              disabled={ai.generating || !ai.connection.ok}
+              title={slideIssues.map((i) => `${i.message}（${i.levers.join("/")}）`).join("\n")}
+              className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 border border-amber-500/40 disabled:opacity-40 shrink-0"
+            >
+              ⚠ AIで整える（{slideIssues.length}件）
+            </button>
+            <span className="text-gray-500 truncate">{slideIssues.map((i) => i.message).join(" / ")}</span>
           </div>
         )}
         <div className="flex gap-2">

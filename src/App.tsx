@@ -18,7 +18,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -231,6 +231,8 @@ export default function App() {
               currentSlideMd={currentSlideMd}
               onApplySlide={handleApplySlide}
               templateHint={deckHint}
+              issues={activeSlideIssues}
+              contentBox={contentBox}
             />
           )}
         </div>

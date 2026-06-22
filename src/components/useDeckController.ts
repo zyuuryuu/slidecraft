@@ -7,7 +7,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./useHistoryState";
 import { buildCatalog, deckCapabilities } from "../engine/template-catalog";
-import { distillDeck } from "../engine/distill";
+import { distillDeck, contentBodyBox } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { parseMd } from "../engine/md-parser";
@@ -302,6 +302,10 @@ export function useDeckController() {
 
   // Non-destructive deck review (overflow / long bullets / key-value / missing title).
   const diagnostics = useMemo(() => (deck && catalog ? diagnoseDeck(deck, catalog) : []), [deck, catalog]);
+  // The template's content-body capacity → the budget half of the slide-fix contract.
+  const contentBox = useMemo(() => (catalog ? contentBodyBox(catalog) : undefined), [catalog]);
+  // Issues for the slide currently being edited → "AIで整える" in the Edit AI dock.
+  const activeSlideIssues = useMemo(() => diagnostics.filter((d) => d.slideIndex === activeSlide), [diagnostics, activeSlide]);
 
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
@@ -369,7 +373,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };
 }
