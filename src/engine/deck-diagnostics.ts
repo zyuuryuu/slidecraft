@@ -32,6 +32,16 @@ function textOf(p: Paragraph | undefined): string {
   return p ? p.segments.map((s) => s.text).join("") : "";
 }
 
+// A bullet is "table-worthy key-value" only when the value is short and free of
+// parenthetical context: "比率: 73%" yes, "比率: 73%（目標 90%）" no — the latter
+// carries explanation and reads better as a bullet, so we don't nudge it to a table.
+function isCleanKeyValue(text: string): boolean {
+  const m = text.match(/^[^:：\n]{1,24}[:：]\s*(.+)$/);
+  if (!m) return false;
+  const value = m[1].trim();
+  return !/[（(]/.test(value) && [...value].length <= 16;
+}
+
 function rolePlaceholder(slide: SlideIR, role: "title" | "body") {
   const hasCtr = slide.placeholders.some((p) => p.idx === "0");
   return slide.placeholders.find((p) => slideIdxRole(p.idx, hasCtr) === role);
@@ -65,8 +75,9 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog): DeckIssue[]
     const longs = bullets.filter((p) => [...textOf(p)].length > SENTENCE_BULLET).length;
     if (longs > 0) add("info", `長い箇条書き ${longs}件（文章のまま）`, ["condense"]);
 
-    const kv = bullets.filter((p) => /^[^:：\n]{1,24}[:：]\s*\S/.test(textOf(p))).length;
-    if (bullets.length >= 2 && kv === bullets.length) add("info", "key-value形式 → 表にできます", ["visualize"]);
+    // Suggest a table only for a real spec list: 3+ bullets, all clean short pairs.
+    const cleanKv = bullets.filter((p) => isCleanKeyValue(textOf(p))).length;
+    if (bullets.length >= 3 && cleanKv === bullets.length) add("info", "key-value形式 → 表にできます", ["visualize"]);
   });
 
   return issues;

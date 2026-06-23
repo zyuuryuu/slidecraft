@@ -11,13 +11,21 @@ import { loadTemplate } from "../src/engine/template-loader";
 import { buildCatalog } from "../src/engine/template-catalog";
 
 describe("diagnoseDeck", () => {
-  it("flags long sentence-bullets (condense) and key-value lists (visualize)", () => {
+  it("flags long sentence-bullets (condense) and clean key-value lists (visualize)", () => {
     const deck = parseMd(
-      "# 長文\n\n- これは非常に長い文章のままの箇条書きで、キーフレーズになっておらず読みにくい悪い例です\n\n---\n\n# 仕様\n\n- 速度: 0.8秒\n- 料金: 1200円",
+      "# 長文\n\n- これは非常に長い文章のままの箇条書きで、キーフレーズになっておらず読みにくい悪い例です\n\n---\n\n# 仕様\n\n- 速度: 0.8秒\n- 重量: 1.2kg\n- 料金: 1200円",
     );
     const issues = diagnoseDeck(deck); // no catalog → box-independent checks only
     expect(issues.some((x) => x.slideIndex === 0 && x.levers.includes("condense"))).toBe(true);
     expect(issues.some((x) => x.slideIndex === 1 && x.levers.includes("visualize"))).toBe(true);
+  });
+
+  it("does NOT nudge a table when key-value values carry parenthetical context", () => {
+    // The curated sample's metrics ("利用率: 73%（目標 90%）") read fine as bullets.
+    const deck = parseMd(
+      "# 指標\n\n- 利用率: 73%（目標 90%）\n- 速度: 3.2秒（業界平均の3倍）\n- 満足度: 5段階中 3.2（前年比 -0.3pt）",
+    );
+    expect(diagnoseDeck(deck).some((x) => x.levers.includes("visualize"))).toBe(false);
   });
 
   it("flags a slide that has a body but no title", () => {

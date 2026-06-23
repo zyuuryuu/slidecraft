@@ -22,6 +22,11 @@ export default function App() {
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
+  // Triage the review: 課題 (warn = overflow / no title, should fix) vs 提案
+  // (info = condense / table-able, optional) so the skippable ones read as skippable.
+  const warnIssues = diagnostics.filter((d) => d.level === "warn");
+  const tipIssues = diagnostics.filter((d) => d.level === "info");
+
   return (
     <>
       <div className="flex items-stretch bg-[#1E2761] border-b border-[#3B82F6]/30">
@@ -87,19 +92,35 @@ export default function App() {
       {/* ── Markdown editor + live preview ── */}
       {subMode === "import" && (
         <>
-          {/* Non-destructive review: flags slide-design issues + the levers that fix each */}
+          {/* Non-destructive review — 課題 (should fix) prominent, 提案 (optional) muted */}
           {diagnostics.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] overflow-x-auto shrink-0">
-              <span className="text-amber-400 shrink-0 font-medium">⚠ 整形レビュー {diagnostics.length}件</span>
-              {diagnostics.map((d, i) => (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] overflow-x-auto shrink-0">
+              {warnIssues.length > 0 && (
+                <span className="text-amber-400 shrink-0 font-medium">⚠ 課題 {warnIssues.length}</span>
+              )}
+              {warnIssues.map((d, i) => (
                 <button
-                  key={i}
+                  key={`w${i}`}
                   onClick={() => handleSlideClick(d.slideIndex)}
-                  title={`スライド ${d.slideIndex + 1}: ${d.message}（推奨レバー: ${d.levers.join(" / ")}）`}
-                  className="shrink-0 px-2 py-0.5 rounded bg-[#1a1f3a] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+                  title={`スライド ${d.slideIndex + 1}: ${d.message}（推奨: ${d.levers.join(" / ")}）`}
+                  className="shrink-0 px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40"
                 >
-                  <span className={d.level === "warn" ? "text-amber-300" : "text-[#93C5FD]"}>S{d.slideIndex + 1}</span>
-                  <span className="text-gray-300"> {d.message}</span>
+                  <span className="text-amber-200">S{d.slideIndex + 1}</span>
+                  <span className="text-gray-200"> {d.message}</span>
+                </button>
+              ))}
+              {tipIssues.length > 0 && (
+                <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>
+              )}
+              {tipIssues.map((d, i) => (
+                <button
+                  key={`t${i}`}
+                  onClick={() => handleSlideClick(d.slideIndex)}
+                  title={`スライド ${d.slideIndex + 1}: ${d.message}（任意 / 推奨: ${d.levers.join(" / ")}）`}
+                  className="shrink-0 px-2 py-0.5 rounded bg-[#161a2b] hover:bg-[#2D3A6E] border border-[#252b45] opacity-75"
+                >
+                  <span className="text-[#6b86a8]">S{d.slideIndex + 1}</span>
+                  <span className="text-gray-400"> {d.message}</span>
                 </button>
               ))}
             </div>
