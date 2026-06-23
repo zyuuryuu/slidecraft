@@ -7,7 +7,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useHistoryState, type HistoryMode } from "./useHistoryState";
 import { buildCatalog, deckCapabilities } from "../engine/template-catalog";
-import { distillDeck, contentBodyBox } from "../engine/distill";
+import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { parseMd } from "../engine/md-parser";
@@ -16,9 +16,7 @@ import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from ".
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
-import { structureManuscript } from "../engine/manuscript";
-import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
-import { visualizeKeyValueMd } from "../engine/slide-rewrite";
+import { useDeckRevise } from "./useDeckRevise";
 import { SAMPLE_MD } from "../sample-deck";
 
 export type MarkdownSubMode = "import" | "edit";
@@ -199,35 +197,6 @@ export function useDeckController() {
     [parseMdText],
   );
 
-  // ── Manuscript → slides (deterministic structuring of a raw prose manuscript) ──
-  const handleStructureManuscript = useCallback(() => {
-    const structured = structureManuscript(mdText);
-    if (structured && structured !== mdText.trim()) {
-      setMdText(structured); // editor records this as one undoable step (Import undo)
-      parseMdText(structured, "silent");
-    }
-  }, [mdText, parseMdText]);
-
-  // ── Fix ONE diagnostic, mechanically (per-issue granularity) ──
-  // Rewrites just that slide's Markdown span; deterministic levers only (visualize).
-  // Condense/title need the AI contract (handled in the Edit AI dock). Undoable.
-  const handleFixIssue = useCallback(
-    (issue: DeckIssue) => {
-      const slide = deckRef.current?.slides[issue.slideIndex];
-      if (!slide?.sourceLineStart || !slide.sourceLineEnd) return; // split slide → no span
-      if (!issue.levers.includes("visualize")) return; // only the deterministic lever here
-      const lines = mdText.split("\n");
-      const start = slide.sourceLineStart - 1;
-      const end = slide.sourceLineEnd - 1;
-      const fixed = visualizeKeyValueMd(lines.slice(start, end + 1).join("\n"));
-      if (!fixed) return;
-      const next = [...lines.slice(0, start), ...fixed.split("\n"), ...lines.slice(end + 1)].join("\n");
-      setMdText(next); // editor records this as one undoable step (Import undo)
-      parseMdText(next, "silent");
-    },
-    [mdText, parseMdText],
-  );
-
   // ── Import → Edit transition ──
   const handleStartEditing = useCallback(() => {
     if (deck) setSubMode("edit");
@@ -321,12 +290,10 @@ export function useDeckController() {
   // Template capability summary handed to the deck-generation AI (kinds/columns/capacity).
   const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
 
-  // Non-destructive deck review (overflow / long bullets / key-value / missing title).
-  const diagnostics = useMemo(() => (deck && catalog ? diagnoseDeck(deck, catalog) : []), [deck, catalog]);
-  // The template's content-body capacity → the budget half of the slide-fix contract.
-  const contentBox = useMemo(() => (catalog ? contentBodyBox(catalog) : undefined), [catalog]);
-  // Issues for the slide currently being edited → "AIで整える" in the Edit AI dock.
-  const activeSlideIssues = useMemo(() => diagnostics.filter((d) => d.slideIndex === activeSlide), [diagnostics, activeSlide]);
+  // The 整形 (distill) cluster: review + manuscript structuring + per-issue fixes.
+  const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue } = useDeckRevise({
+    mdText, setMdText, parseMdText, deck, catalog, activeSlide,
+  });
 
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
