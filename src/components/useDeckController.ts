@@ -22,7 +22,9 @@ import { SAMPLE_MD } from "../sample-deck";
 export type MarkdownSubMode = "import" | "edit";
 
 export function useDeckController() {
-  const [subMode, setSubMode] = useState<MarkdownSubMode>("import");
+  // Edit (visual) is the home/main surface; Import is the one-time "Initialize"
+  // phase (bring content → fix slide division + rough content → 確定 → Edit).
+  const [subMode, setSubMode] = useState<MarkdownSubMode>("edit");
   const [showLlmAssist, setShowLlmAssist] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   // Edit-mode center pane: structured form vs raw per-slide Markdown.
@@ -197,18 +199,19 @@ export function useDeckController() {
     [parseMdText],
   );
 
-  // ── Import → Edit transition ──
+  // ── Initialize (Import) ⇄ Edit ──
+  // 確定 → Edit: commit the structured deck and work visually (deck = source of truth).
   const handleStartEditing = useCallback(() => {
     if (deck) setSubMode("edit");
   }, [deck]);
 
-  // ── Export: Edit → Markdown ──
-  const handleExportMd = useCallback(() => {
-    if (!deck) return;
-    const md = serializeMd(deck);
-    setMdText(md);
+  // Enter the Initialize phase from Edit: serialize the CURRENT deck back to Markdown
+  // first, so Import always reflects the live deck (deck = truth; no stale text).
+  // Guarded to Edit→Import so re-clicking Import mid-edit doesn't reformat the draft.
+  const handleEnterImport = useCallback(() => {
+    if (subMode === "edit" && deck) setMdText(serializeMd(deck));
     setSubMode("import");
-  }, [deck]);
+  }, [subMode, deck]);
 
   // ── Slide editing: update a single slide in the deck ──
   const handleSlideUpdate = useCallback(
@@ -360,7 +363,7 @@ export function useDeckController() {
     filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
+    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };

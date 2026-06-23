@@ -14,12 +14,12 @@ import { useDeckController } from "./components/useDeckController";
 
 export default function App() {
   const {
-    subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
+    subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
+    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
@@ -57,17 +57,8 @@ export default function App() {
         <div className="flex items-center gap-2 px-3 py-2">
           <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">
             <button
-              onClick={() => setSubMode("import")}
-              className={`px-3 py-1 transition-colors ${
-                subMode === "import"
-                  ? "bg-[#3B82F6] text-white"
-                  : "bg-[#1E2761] text-gray-400 hover:text-white"
-              }`}
-            >
-              Import
-            </button>
-            <button
               onClick={handleStartEditing}
+              title="スライドを視覚的に編集（メイン）"
               className={`px-3 py-1 transition-colors ${
                 subMode === "edit"
                   ? "bg-[#3B82F6] text-white"
@@ -76,14 +67,17 @@ export default function App() {
             >
               Edit
             </button>
-            {subMode === "edit" && (
-              <button
-                onClick={handleExportMd}
-                className="px-3 py-1 transition-colors bg-[#1E2761] text-gray-400 hover:text-white border-l border-[#3B82F6]/40"
-              >
-                Export MD
-              </button>
-            )}
+            <button
+              onClick={handleEnterImport}
+              title="原稿/Markdownから取り込み直す（現在のスライドを反映）"
+              className={`px-3 py-1 transition-colors border-l border-[#3B82F6]/40 ${
+                subMode === "import"
+                  ? "bg-[#3B82F6] text-white"
+                  : "bg-[#1E2761] text-gray-400 hover:text-white"
+              }`}
+            >
+              Import
+            </button>
           </div>
           {subMode === "import" && (
             <button
