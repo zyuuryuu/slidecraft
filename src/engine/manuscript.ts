@@ -80,7 +80,7 @@ function sectionBody(lines: string[]): string {
  * instead of bullets. Returns null unless every bullet is a clean key-value pair.
  * Words are never reworded — only the form changes.
  */
-function keyValueTable(bodyMd: string): string | null {
+export function keyValueTable(bodyMd: string): string | null {
   const lines = bodyMd.split("\n").filter((l) => l.trim());
   if (lines.length < 2) return null;
   const pairs: Array<[string, string]> = [];

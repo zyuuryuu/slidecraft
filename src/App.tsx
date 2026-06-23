@@ -18,7 +18,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -113,15 +113,29 @@ export default function App() {
                 <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>
               )}
               {tipIssues.map((d, i) => (
-                <button
+                <span
                   key={`t${i}`}
-                  onClick={() => handleSlideClick(d.slideIndex)}
-                  title={`スライド ${d.slideIndex + 1}: ${d.message}（任意 / 推奨: ${d.levers.join(" / ")}）`}
-                  className="shrink-0 px-2 py-0.5 rounded bg-[#161a2b] hover:bg-[#2D3A6E] border border-[#252b45] opacity-75"
+                  className="shrink-0 flex items-center rounded bg-[#161a2b] border border-[#252b45] opacity-90"
                 >
-                  <span className="text-[#6b86a8]">S{d.slideIndex + 1}</span>
-                  <span className="text-gray-400"> {d.message}</span>
-                </button>
+                  <button
+                    onClick={() => handleSlideClick(d.slideIndex)}
+                    title={`スライド ${d.slideIndex + 1}: ${d.message}（任意 / 推奨: ${d.levers.join(" / ")}）`}
+                    className="px-2 py-0.5 rounded-l hover:bg-[#2D3A6E]"
+                  >
+                    <span className="text-[#6b86a8]">S{d.slideIndex + 1}</span>
+                    <span className="text-gray-400"> {d.message}</span>
+                  </button>
+                  {/* visualize is deterministic → fix it in place, instantly, undoable */}
+                  {d.levers.includes("visualize") && (
+                    <button
+                      onClick={() => handleFixIssue(d)}
+                      title="表に変換（決定論・元に戻せます）"
+                      className="px-1.5 py-0.5 rounded-r border-l border-[#252b45] text-[#5eead4] hover:bg-[#2D3A6E]"
+                    >
+                      →表
+                    </button>
+                  )}
+                </span>
               ))}
             </div>
           )}

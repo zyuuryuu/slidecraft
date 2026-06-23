@@ -17,7 +17,8 @@ import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
 import { structureManuscript } from "../engine/manuscript";
-import { diagnoseDeck } from "../engine/deck-diagnostics";
+import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
+import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { SAMPLE_MD } from "../sample-deck";
 
 export type MarkdownSubMode = "import" | "edit";
@@ -207,6 +208,26 @@ export function useDeckController() {
     }
   }, [mdText, parseMdText]);
 
+  // ── Fix ONE diagnostic, mechanically (per-issue granularity) ──
+  // Rewrites just that slide's Markdown span; deterministic levers only (visualize).
+  // Condense/title need the AI contract (handled in the Edit AI dock). Undoable.
+  const handleFixIssue = useCallback(
+    (issue: DeckIssue) => {
+      const slide = deckRef.current?.slides[issue.slideIndex];
+      if (!slide?.sourceLineStart || !slide.sourceLineEnd) return; // split slide → no span
+      if (!issue.levers.includes("visualize")) return; // only the deterministic lever here
+      const lines = mdText.split("\n");
+      const start = slide.sourceLineStart - 1;
+      const end = slide.sourceLineEnd - 1;
+      const fixed = visualizeKeyValueMd(lines.slice(start, end + 1).join("\n"));
+      if (!fixed) return;
+      const next = [...lines.slice(0, start), ...fixed.split("\n"), ...lines.slice(end + 1)].join("\n");
+      setMdText(next);
+      parseMdText(next, "commit");
+    },
+    [mdText, parseMdText],
+  );
+
   // ── Import → Edit transition ──
   const handleStartEditing = useCallback(() => {
     if (deck) setSubMode("edit");
@@ -373,7 +394,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };
 }
