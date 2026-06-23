@@ -208,6 +208,18 @@ export function useAiGeneration() {
     setError(null);
   }, []);
 
+  // One-shot generate that RETURNS the result — for programmatic per-issue fixes
+  // (the review bar's "AIで直す") — without touching the panel's streaming/preview state.
+  const generateOnce = useCallback(
+    async (userRequest: string, mode: AiMode): Promise<string> => {
+      const raw = await generateWithAI({
+        provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL, model: cfg.model, mode, userRequest,
+      });
+      return mode === "slide" ? stripMarkdownFence(raw) : raw;
+    },
+    [provider, cfg],
+  );
+
   // One-click: switch to local Ollama, picking a valid installed model.
   const switchToOllama = useCallback(() => {
     setProvider("ollama");
@@ -249,7 +261,7 @@ export function useAiGeneration() {
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error,
-    canGenerate, generate, cancel, reset,
+    canGenerate, generate, generateOnce, cancel, reset,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
   };

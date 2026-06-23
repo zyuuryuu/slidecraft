@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import Editor, { type EditorHandle } from "./components/Editor";
+import ReviewBar from "./components/ReviewBar";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
 import SlideEditor from "./components/SlideEditor";
@@ -19,7 +20,8 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue,
+    handleAiFixIssue, aiFixingKey, aiFixError, aiConnected, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -99,53 +101,17 @@ export default function App() {
       {/* ── Markdown editor + live preview ── */}
       {subMode === "import" && (
         <>
-          {/* Non-destructive review — 課題 (should fix) prominent, 提案 (optional) muted */}
-          {diagnostics.length > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] overflow-x-auto shrink-0">
-              {warnIssues.length > 0 && (
-                <span className="text-amber-400 shrink-0 font-medium">⚠ 課題 {warnIssues.length}</span>
-              )}
-              {warnIssues.map((d, i) => (
-                <button
-                  key={`w${i}`}
-                  onClick={() => handleSlideClick(d.slideIndex)}
-                  title={`スライド ${d.slideIndex + 1}: ${d.message}（推奨: ${d.levers.join(" / ")}）`}
-                  className="shrink-0 px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40"
-                >
-                  <span className="text-amber-200">S{d.slideIndex + 1}</span>
-                  <span className="text-gray-200"> {d.message}</span>
-                </button>
-              ))}
-              {tipIssues.length > 0 && (
-                <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>
-              )}
-              {tipIssues.map((d, i) => (
-                <span
-                  key={`t${i}`}
-                  className="shrink-0 flex items-center rounded bg-[#161a2b] border border-[#252b45] opacity-90"
-                >
-                  <button
-                    onClick={() => handleSlideClick(d.slideIndex)}
-                    title={`スライド ${d.slideIndex + 1}: ${d.message}（任意 / 推奨: ${d.levers.join(" / ")}）`}
-                    className="px-2 py-0.5 rounded-l hover:bg-[#2D3A6E]"
-                  >
-                    <span className="text-[#6b86a8]">S{d.slideIndex + 1}</span>
-                    <span className="text-gray-400"> {d.message}</span>
-                  </button>
-                  {/* visualize is deterministic → fix it in place, instantly, undoable */}
-                  {d.levers.includes("visualize") && (
-                    <button
-                      onClick={() => handleFixIssue(d)}
-                      title="表に変換（決定論・元に戻せます）"
-                      className="px-1.5 py-0.5 rounded-r border-l border-[#252b45] text-[#5eead4] hover:bg-[#2D3A6E]"
-                    >
-                      →表
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Non-destructive review — 課題 (should fix) vs 提案 (optional), per-issue fixes */}
+          <ReviewBar
+            warnIssues={warnIssues}
+            tipIssues={tipIssues}
+            onJump={handleSlideClick}
+            onFixDeterministic={handleFixIssue}
+            onFixAI={handleAiFixIssue}
+            aiConnected={aiConnected}
+            aiFixingKey={aiFixingKey}
+            aiFixError={aiFixError}
+          />
         <ResizableSplit
           storageKey="slidecraft_split_import"
           left={

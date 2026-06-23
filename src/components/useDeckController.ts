@@ -291,9 +291,10 @@ export function useDeckController() {
   const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
 
   // The 整形 (distill) cluster: review + manuscript structuring + per-issue fixes.
-  const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue } = useDeckRevise({
-    mdText, setMdText, parseMdText, deck, catalog, activeSlide,
-  });
+  const {
+    diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue,
+    handleAiFixIssue, aiFixingKey, aiFixError, aiConnected,
+  } = useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, activeSlide });
 
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
@@ -361,7 +362,8 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue,
+    handleAiFixIssue, aiFixingKey, aiFixError, aiConnected, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };
 }
