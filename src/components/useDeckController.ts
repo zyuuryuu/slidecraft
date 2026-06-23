@@ -17,6 +17,7 @@ import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
 import { useDeckRevise } from "./useDeckRevise";
+import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { SAMPLE_MD } from "../sample-deck";
 
 export type MarkdownSubMode = "import" | "edit";
@@ -224,6 +225,23 @@ export function useDeckController() {
     [deck, setDeck],
   );
 
+  // Deterministic "→表" in Edit (deck = source of truth): serialize the slide →
+  // visualize key-value bullets → parse back → replace the slide (deck-op, undoable).
+  // Reuses the same markdown lever as Import, so Initialize/Edit stay consistent.
+  const handleVisualizeSlide = useCallback(
+    (slideIndex: number) => {
+      const cur = deckRef.current;
+      const slide = cur?.slides[slideIndex];
+      if (!slide) return;
+      const resolved = slide.layout === "auto" ? autoSelectLayout(slide, slideIndex, cur!.slides.length, catalog) : slide.layout;
+      const fixed = visualizeKeyValueMd(serializeMd({ slides: [{ ...slide, layout: resolved }] }));
+      if (!fixed) return;
+      const newSlide = parseMd(fixed).slides[0];
+      if (newSlide) handleSlideUpdate(slideIndex, newSlide, "commit");
+    },
+    [catalog, handleSlideUpdate],
+  );
+
   // Drag-to-move in the preview, or an AI diagram edit, writes the new diagram YAML
   // back. A Mermaid slide GRADUATES to the canonical DiagramSpec on its first edit:
   // we replace the mermaidBlock with a diagram so every diagram tool (NL edit, node
@@ -364,7 +382,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };
 }

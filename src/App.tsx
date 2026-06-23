@@ -20,7 +20,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -141,9 +141,16 @@ export default function App() {
         </>
       )}
 
-      {/* ── Markdown Edit mode (3-pane) ── */}
+      {/* ── Edit mode (home): slide list + editor + preview ── */}
       {subMode === "edit" && (
         <div className="flex-1 flex flex-col min-h-0">
+          {/* The same non-destructive review, now where you work — fix in deck (undoable) */}
+          <ReviewBar
+            warnIssues={warnIssues}
+            tipIssues={tipIssues}
+            onJump={setActiveSlide}
+            onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
+          />
           <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
           <div className="w-[220px] border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0a0e1a]">
