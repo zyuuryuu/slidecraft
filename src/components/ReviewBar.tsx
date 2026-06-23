@@ -1,10 +1,10 @@
 /**
  * ReviewBar — the Import-mode "整形レビュー" strip.
  *
- * Triaged into ⚠ 課題 (should fix) and 💡 提案 (optional), each chip jumps to its
- * slide and, where a lever fits, fixes that ONE issue in place: "→表" (deterministic
- * visualize) or "AIで直す" (condense/title via the slide-fix contract). Per-issue
- * granularity — fix exactly what you choose, all undoable.
+ * Triaged into ⚠ 課題 (should fix) and 💡 提案 (optional). Each chip jumps to its
+ * slide; a pure key-value list also offers "→表" (deterministic, instant, undoable).
+ * AI fixes are NOT here — they live in the Edit AI dock with a before→after diff +
+ * 採用/却下, so no edit is ever applied blind.
  */
 
 import type { DeckIssue } from "../engine/deck-diagnostics";
@@ -14,22 +14,14 @@ interface ReviewBarProps {
   tipIssues: DeckIssue[];
   onJump: (slideIndex: number) => void;
   onFixDeterministic: (issue: DeckIssue) => void;
-  onFixAI: (issue: DeckIssue, key: string) => void;
-  aiConnected: boolean;
-  aiFixingKey: string | null;
-  aiFixError: string | null;
 }
 
-export default function ReviewBar({
-  warnIssues, tipIssues, onJump, onFixDeterministic, onFixAI, aiConnected, aiFixingKey, aiFixError,
-}: ReviewBarProps) {
+export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic }: ReviewBarProps) {
   if (warnIssues.length === 0 && tipIssues.length === 0) return null;
 
   const chip = (d: DeckIssue, key: string, warn: boolean) => {
     // Pure key-value list → deterministic table. Overflow (split+...) is not key-value.
     const canTable = d.levers.includes("visualize") && !d.levers.includes("split");
-    const canAI = d.levers.includes("condense") || d.levers.includes("title");
-    const fixing = aiFixingKey === key;
     return (
       <span
         key={key}
@@ -52,16 +44,6 @@ export default function ReviewBar({
             →表
           </button>
         )}
-        {canAI && (
-          <button
-            onClick={() => onFixAI(d, key)}
-            disabled={!aiConnected || !!aiFixingKey}
-            title={aiConnected ? "AIでこの課題だけ直す（元に戻せます）" : "AI未接続（AI Assist で設定）"}
-            className="px-1.5 py-0.5 rounded-r border-l border-[#252b45] text-[#93C5FD] hover:bg-[#2D3A6E] disabled:opacity-40"
-          >
-            {fixing ? "…直し中" : "AIで直す"}
-          </button>
-        )}
       </span>
     );
   };
@@ -72,7 +54,6 @@ export default function ReviewBar({
       {warnIssues.map((d, i) => chip(d, `w${i}`, true))}
       {tipIssues.length > 0 && <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>}
       {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
-      {aiFixError && <span className="shrink-0 text-red-300 ml-2">AI失敗: {aiFixError}</span>}
     </div>
   );
 }

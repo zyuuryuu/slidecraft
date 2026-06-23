@@ -12,6 +12,7 @@ import { useAiGeneration } from "./useAiGeneration";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import type { FitBox } from "../engine/distill";
+import DiffView from "./DiffView";
 
 interface AiPanelProps {
   onApply: (markdown: string) => void;
@@ -271,24 +272,40 @@ export default function AiPanel({
         </div>
       )}
 
-      {/* Result + apply */}
+      {/* Result — for a slide edit show before→after diff so it's never applied
+          blind (you see what changed/was dropped) → 採用/却下. Deck gen keeps raw. */}
       {ai.result && (
         <div className="flex flex-col min-h-0 border-t border-[#2D3A6E]">
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-gray-400">
-              {ai.generating ? "生成中…" : "プレビュー（Markdown）"}
+              {ai.generating ? "生成中…" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
             </span>
-            <button
-              onClick={doApply}
-              disabled={ai.generating || !ai.result.trim()}
-              className="px-3 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
-            >
-              {slideScope ? "適用 → このスライド" : "適用 → 編集へ"}
-            </button>
+            <div className="flex items-center gap-1">
+              {slideScope && currentSlideMd && (
+                <button
+                  onClick={ai.reset}
+                  disabled={ai.generating}
+                  className="px-2.5 py-1 text-xs bg-[#1a1f3a] hover:bg-[#2D3A6E] disabled:opacity-40 text-gray-300 rounded"
+                >
+                  却下
+                </button>
+              )}
+              <button
+                onClick={doApply}
+                disabled={ai.generating || !ai.result.trim()}
+                className="px-3 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
+              >
+                {slideScope ? "採用 → このスライド" : "適用 → 編集へ"}
+              </button>
+            </div>
           </div>
-          <pre className="overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap" style={{ maxHeight: 150 }}>
-            {ai.result}
-          </pre>
+          {slideScope && currentSlideMd && !ai.generating ? (
+            <DiffView before={currentSlideMd} after={ai.result} />
+          ) : (
+            <pre className="overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap" style={{ maxHeight: 150 }}>
+              {ai.result}
+            </pre>
+          )}
         </div>
       )}
     </div>

@@ -20,8 +20,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleExportMd, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue,
-    handleAiFixIssue, aiFixingKey, aiFixError, aiConnected, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -107,10 +106,6 @@ export default function App() {
             tipIssues={tipIssues}
             onJump={handleSlideClick}
             onFixDeterministic={handleFixIssue}
-            onFixAI={handleAiFixIssue}
-            aiConnected={aiConnected}
-            aiFixingKey={aiFixingKey}
-            aiFixError={aiFixError}
           />
         <ResizableSplit
           storageKey="slidecraft_split_import"
