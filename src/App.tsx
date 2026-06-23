@@ -1,4 +1,5 @@
-import Editor from "./components/Editor";
+import { useRef, useState } from "react";
+import Editor, { type EditorHandle } from "./components/Editor";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
 import SlideEditor from "./components/SlideEditor";
@@ -27,6 +28,12 @@ export default function App() {
   const warnIssues = diagnostics.filter((d) => d.level === "warn");
   const tipIssues = diagnostics.filter((d) => d.level === "info");
 
+  // In Import mode the Markdown editor owns undo (incl. programmatic 整形 / →表 edits),
+  // so route the toolbar's Undo/Redo to the editor's history there; deck history in Edit.
+  const editorRef = useRef<EditorHandle>(null);
+  const [editorHist, setEditorHist] = useState({ canUndo: false, canRedo: false });
+  const importMode = subMode === "import";
+
   return (
     <>
       <div className="flex items-stretch bg-[#1E2761] border-b border-[#3B82F6]/30">
@@ -41,10 +48,10 @@ export default function App() {
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
-          onUndo={undoDeck}
-          onRedo={redoDeck}
-          canUndo={canUndo}
-          canRedo={canRedo}
+          onUndo={importMode ? () => editorRef.current?.undo() : undoDeck}
+          onRedo={importMode ? () => editorRef.current?.redo() : redoDeck}
+          canUndo={importMode ? editorHist.canUndo : canUndo}
+          canRedo={importMode ? editorHist.canRedo : canRedo}
         />
         <div className="flex items-center gap-2 px-3 py-2">
           <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">
@@ -148,11 +155,13 @@ export default function App() {
               </div>
               <div className="flex-1 min-h-0">
                 <Editor
+                  ref={editorRef}
                   value={mdText}
                   onChange={handleEditorChange}
                   language="markdown"
                   onCursorLine={handleCursorLine}
                   gotoLine={gotoLine}
+                  onHistory={(canUndo, canRedo) => setEditorHist({ canUndo, canRedo })}
                 />
               </div>
             </>

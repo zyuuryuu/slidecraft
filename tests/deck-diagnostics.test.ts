@@ -20,6 +20,13 @@ describe("diagnoseDeck", () => {
     expect(issues.some((x) => x.slideIndex === 1 && x.levers.includes("visualize"))).toBe(true);
   });
 
+  it("does NOT nudge a table inside a 2-column comparison (a table won't render there)", () => {
+    const deck = parseMd(
+      "<!-- slide: Column.2Body.Equal -->\n# 比較\n\n- 速度: 3.2秒\n- 対応: 非対応\n- 料金: 850円\n\n<!-- col -->\n\n- 速度: 0.8秒\n- 対応: 完全対応\n- 料金: 1200円",
+    );
+    expect(diagnoseDeck(deck).some((x) => x.levers.includes("visualize"))).toBe(false);
+  });
+
   it("does NOT nudge a table when key-value values carry parenthetical context", () => {
     // The curated sample's metrics ("利用率: 73%（目標 90%）") read fine as bullets.
     const deck = parseMd(

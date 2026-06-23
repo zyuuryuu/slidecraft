@@ -203,8 +203,8 @@ export function useDeckController() {
   const handleStructureManuscript = useCallback(() => {
     const structured = structureManuscript(mdText);
     if (structured && structured !== mdText.trim()) {
-      setMdText(structured);
-      parseMdText(structured, "commit");
+      setMdText(structured); // editor records this as one undoable step (Import undo)
+      parseMdText(structured, "silent");
     }
   }, [mdText, parseMdText]);
 
@@ -222,8 +222,8 @@ export function useDeckController() {
       const fixed = visualizeKeyValueMd(lines.slice(start, end + 1).join("\n"));
       if (!fixed) return;
       const next = [...lines.slice(0, start), ...fixed.split("\n"), ...lines.slice(end + 1)].join("\n");
-      setMdText(next);
-      parseMdText(next, "commit");
+      setMdText(next); // editor records this as one undoable step (Import undo)
+      parseMdText(next, "silent");
     },
     [mdText, parseMdText],
   );

@@ -75,9 +75,15 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog): DeckIssue[]
     const longs = bullets.filter((p) => [...textOf(p)].length > SENTENCE_BULLET).length;
     if (longs > 0) add("info", `長い箇条書き ${longs}件（文章のまま）`, ["condense"]);
 
-    // Suggest a table only for a real spec list: 3+ bullets, all clean short pairs.
+    // Suggest a table only for a real spec list on a SINGLE-body slide: 3+ bullets,
+    // all clean short pairs. Skip multi-region layouts (columns / comparison / KPI /
+    // process) — a table doesn't render inside a column, and a comparison reads fine
+    // as bullets. Detect via extra body placeholders OR the layout directive's name.
+    const multiRegion =
+      slide.placeholders.some((p) => p.idx === "2" || p.idx === "3" || p.idx === "4") ||
+      /column|comparison|process|kpi/i.test(slide.layout);
     const cleanKv = bullets.filter((p) => isCleanKeyValue(textOf(p))).length;
-    if (bullets.length >= 3 && cleanKv === bullets.length) add("info", "key-value形式 → 表にできます", ["visualize"]);
+    if (!multiRegion && bullets.length >= 3 && cleanKv === bullets.length) add("info", "key-value形式 → 表にできます", ["visualize"]);
   });
 
   return issues;
