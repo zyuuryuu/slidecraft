@@ -31,13 +31,15 @@ export interface SlideFix {
 function composeInstruction(levers: Set<Lever>, budget?: SlideFix["budget"]): string {
   const parts: string[] = [];
   if (levers.has("title")) parts.push("内容を表す簡潔なタイトルを付ける。");
-  if (levers.has("split")) parts.push("情報量が多すぎます。最重要点に絞り、枝葉は落とす。");
+  if (levers.has("split")) parts.push("情報量が多めです。最重要点は保ったまま各項目を簡潔に言い換える（文や項目は消さない）。");
   if (levers.has("condense"))
-    parts.push(`各箇条書きは文章でなく短いキーフレーズに（語尾・助詞を削る${budget ? `・各${budget.charsPerBullet}字以内` : ""}）。`);
+    parts.push(`各箇条書きは文章でなく短いキーフレーズに（語尾・助詞・冗長表現を削る${budget ? `・各${budget.charsPerBullet}字以内` : ""}）。固有名詞・数値・要点は残す。`);
   if (levers.has("visualize"))
     parts.push("「ラベル: 値」が並ぶ箇所は表（| 項目 | 内容 |）に、手順やフローは ```diagram の flowchart にしてもよい。");
   if (budget) parts.push(`本文は最大${budget.maxBullets}項目に収める。`);
-  parts.push("ただし要点は削らず、言い換えは最小限に保ち、元の意味を変えないこと。Markdown のみ返す。");
+  // Hard guard against the model deleting content (the "丸ごとOmit" the user hit):
+  // shorten wording, never drop whole lines/facts.
+  parts.push("重要：文や箇条書きを丸ごと削除しないこと。要点・事実・数値は保持し、言い換えは最小限。元の意味を変えない。Markdown のみ返す。");
   return parts.join(" ");
 }
 
