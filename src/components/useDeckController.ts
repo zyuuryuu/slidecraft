@@ -14,9 +14,9 @@ import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from "../engine/template-loader";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
-import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
-import { renderDeckToPptxBytes } from "./deck-export";
+import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
+import { useDeckIO } from "./useDeckIO";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { SAMPLE_MD } from "../sample-deck";
 
@@ -45,8 +45,6 @@ export function useDeckController() {
   // Catalog → layout selection + capacity adapt to the loaded template (canonical = unchanged).
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [filePath, setFilePath] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [gotoLine, setGotoLine] = useState<{ line: number; ts: number } | undefined>(undefined);
   const [templateName, setTemplateName] = useState("Midnight Executive");
@@ -148,33 +146,10 @@ export function useDeckController() {
     }
   }, []);
 
-  // Open a Markdown file
-  const handleOpen = useCallback(async () => {
-    const picked = await pickTextFile();
-    if (!picked) return;
-    setMdText(picked.content);
-    parseMdText(picked.content, "reset");
-    setFilePath(picked.name);
-  }, [parseMdText]);
-
-  // Save the Markdown source
-  const handleSave = useCallback(() => {
-    void saveTextFile(mdText, filePath ?? "slidecraft.md");
-  }, [mdText, filePath]);
-
-  // Generate + save the .pptx (mermaid pre-render + WYSIWYG rasterise in deck-export.ts)
-  const handleGenerate = useCallback(async () => {
-    if (!deck || !templateData) return;
-    setGenerating(true);
-    try {
-      const bytes = await renderDeckToPptxBytes(deck, templateData);
-      await saveBinaryFile(bytes, "slides_output.pptx", ["pptx"], "PowerPoint");
-    } catch (e) {
-      setParseError(`PPTX generation failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setGenerating(false);
-    }
-  }, [deck, templateData]);
+  // File & PPTX I/O (open / save / generate) — split out to keep this file ≤400 (R1).
+  const { filePath, generating, handleOpen, handleSave, handleGenerate } = useDeckIO({
+    mdText, deck, templateData, parseMdText, setMdText, setParseError,
+  });
 
   const hasContent = deck !== null && templateData !== null;
 
