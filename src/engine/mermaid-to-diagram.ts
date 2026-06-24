@@ -178,7 +178,24 @@ interface ParsedGroup {
   nodeIds: string[];
 }
 
+/** Public entry: strip optional Mermaid frontmatter (`---\ntitle: …\n---`), capture the
+ *  title, parse the body, then inject the title (graph-family diagrams have no native
+ *  title slot, so it's carried in frontmatter — see diagramSpecToMermaid). */
 export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null {
+  const trimmed = mermaidSyntax.trim();
+  const fm = trimmed.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  if (!fm) return mermaidBodyToSpec(trimmed);
+  const tm = fm[1].match(/^\s*title:\s*(.+?)\s*$/m);
+  let title: string | undefined;
+  if (tm) {
+    try { title = JSON.parse(tm[1].trim()); } catch { title = tm[1].trim().replace(/^["']|["']$/g, ""); }
+  }
+  const spec = mermaidBodyToSpec(trimmed.slice(fm[0].length));
+  if (spec && title && !spec.title) spec.title = title;
+  return spec;
+}
+
+function mermaidBodyToSpec(mermaidSyntax: string): DiagramSpec | null {
   const lines = mermaidSyntax.trim().split("\n").map(l => l.trim());
   if (lines.length === 0) return null;
 

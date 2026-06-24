@@ -80,6 +80,26 @@ describe("flowchart dashed edges round-trip through Mermaid", () => {
   });
 });
 
+describe("graph-family title survives the Mermaid round-trip (frontmatter)", () => {
+  it("flowchart + sequence carry spec.title via Mermaid frontmatter", () => {
+    for (const spec of [
+      { type: "flowchart", direction: "TB", title: "CRM 構成", nodes: [{ id: "a", label: "A" }], edges: [] },
+      { type: "sequence", direction: "TB", title: "決済フロー", nodes: [{ id: "u", label: "U" }, { id: "s", label: "S" }], edges: [{ from: "u", to: "s", label: "req" }] },
+    ]) {
+      const s = DiagramSpecSchema.parse(spec);
+      const mmd = diagramSpecToMermaid(s);
+      expect(mmd.startsWith("---")).toBe(true); // frontmatter present
+      expect(mermaidToDiagramSpec(mmd)!.title).toBe(spec.title);
+    }
+  });
+  it("a chart type (pie) keeps its NATIVE title — no frontmatter wrapper", () => {
+    const pie = DiagramSpecSchema.parse({ type: "pie", direction: "TB", title: "内訳", nodes: [{ id: "a", label: "A", value: 3 }], edges: [] });
+    const mmd = diagramSpecToMermaid(pie);
+    expect(mmd.startsWith("---")).toBe(false);
+    expect(mermaidToDiagramSpec(mmd)!.title).toBe("内訳");
+  });
+});
+
 describe("sequence diagrams round-trip through Mermaid losslessly", () => {
   it("preserves type/participants/messages/fragments/activations", () => {
     const spec1 = mermaidToDiagramSpec(SEQ_MMD)!;

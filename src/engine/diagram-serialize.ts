@@ -248,13 +248,17 @@ export function diagramSpecToMermaid(spec: DiagramSpec): string {
   if (spec.type === "pie") return pieSpecToMermaid(spec);
   if (spec.type === "quadrant") return quadrantSpecToMermaid(spec);
   if (spec.type === "timeline") return timelineSpecToMermaid(spec);
-  if (spec.type === "sequence") return sequenceSpecToMermaid(spec);
-  if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) return stateSpecToMermaid(spec);
+  // graph-family (flowchart / sequence / state / ER / class) has NO native title slot —
+  // carry spec.title as Mermaid frontmatter so YAML→Mermaid→YAML keeps it (the chart
+  // types above already emit their title natively, so they're not wrapped).
+  const fm = (s: string) => (spec.title ? `---\ntitle: ${JSON.stringify(spec.title)}\n---\n${s}` : s);
+  if (spec.type === "sequence") return fm(sequenceSpecToMermaid(spec));
+  if (spec.nodes.some((n) => n.shape === "start" || n.shape === "end")) return fm(stateSpecToMermaid(spec));
   if (spec.nodes.some((n) => n.shape === "entity") || spec.edges.some((e) => e.srcCard || e.tgtCard)) {
-    return erSpecToMermaid(spec);
+    return fm(erSpecToMermaid(spec));
   }
   if (spec.nodes.some((n) => n.shape === "class") || spec.edges.some((e) => !!e.relation)) {
-    return classSpecToMermaid(spec);
+    return fm(classSpecToMermaid(spec));
   }
   const dir = spec.direction === "LR" || spec.direction === "RL" ? "LR" : "TD";
   let mmd = `graph ${dir}\n`;
@@ -289,7 +293,7 @@ export function diagramSpecToMermaid(spec: DiagramSpec): string {
     mmd += `  ${edge.from} ${arrow}${label} ${edge.to}\n`;
   }
 
-  return mmd;
+  return fm(mmd);
 }
 
 // ── DiagramSpec → YAML string ──
