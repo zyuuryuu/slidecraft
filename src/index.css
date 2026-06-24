@@ -3,6 +3,10 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
+  /* Render native form controls (select / option / input / scrollbars) in dark mode so
+     a <select>'s selected value AND its dropdown options are light-on-dark and readable.
+     Without this they default to light-mode and look faint against the dark theme. */
+  color-scheme: dark;
 }
 
 #root {
