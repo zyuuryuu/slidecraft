@@ -55,8 +55,9 @@ test.describe("SlideCraft", () => {
   });
 
   test("✨直す: hands an AI issue off to AI Assist with a pre-filled prompt", async ({ page }) => {
-    // The sample deck's long-bullet (condense) chips offer ✨直す → opens AI Assist
-    // pre-filled (select slide + prompt), never a silent auto-AI.
+    // The review summary expands to the list; an AI-needing issue offers ✨直す → opens
+    // AI Assist pre-filled (select slide + prompt), never a silent auto-AI.
+    await page.getByRole("button", { name: /詳細を見る/ }).click(); // expand the review list
     await page.getByRole("button", { name: "✨直す" }).first().click();
     await expect(page.getByText(/編集対象:/)).toBeVisible({ timeout: 8000 });
     await expect(page.getByPlaceholder(/このスライドへの指示/)).toHaveValue(/要約|キーフレーズ|タイトル|簡潔/);
