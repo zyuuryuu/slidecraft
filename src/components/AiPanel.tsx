@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { PROVIDERS } from "../ipc/ai";
-import { useAiGeneration } from "./useAiGeneration";
+import type { AiGeneration } from "./useAiGeneration";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import type { FitBox } from "../engine/distill";
@@ -27,6 +27,8 @@ interface AiPanelProps {
   issues?: DeckIssue[];
   /** Template content-body capacity → the budget half of the slide-fix contract. */
   contentBox?: FitBox;
+  /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
+  ai: AiGeneration;
 }
 
 export default function AiPanel({
@@ -37,8 +39,8 @@ export default function AiPanel({
   templateHint,
   issues,
   contentBox,
+  ai,
 }: AiPanelProps) {
-  const ai = useAiGeneration();
   const [userRequest, setUserRequest] = useState("");
   const [showSettings, setShowSettings] = useState(false);
 

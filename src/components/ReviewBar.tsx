@@ -9,17 +9,28 @@
  * ever applied blind.
  */
 
+import { useState } from "react";
 import type { DeckIssue } from "../engine/deck-diagnostics";
+import type { RefineLevel } from "../engine/refine";
 
 interface ReviewBarProps {
   warnIssues: DeckIssue[];
   tipIssues: DeckIssue[];
   onJump: (slideIndex: number) => void;
   onFixDeterministic: (issue: DeckIssue) => void;
+  /** Run the whole-deck closed loop at the chosen intensity (stage C). Absent in the
+   *  Initialize modal, where fixes are Markdown-span rewrites. */
+  onRefine?: (level: RefineLevel) => void;
+  refining?: boolean;
+  aiReady?: boolean;
 }
 
-export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic }: ReviewBarProps) {
+export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onRefine, refining, aiReady }: ReviewBarProps) {
+  // Intensity: 2 = deterministic only (safe), 3 = + AI for the residue (condense/title).
+  // Default to AI when a provider is ready, else deterministic.
+  const [level, setLevel] = useState<2 | 3>(aiReady ? 3 : 2);
   if (warnIssues.length === 0 && tipIssues.length === 0) return null;
+  const effLevel: RefineLevel = !aiReady && level === 3 ? 2 : level;
 
   const chip = (d: DeckIssue, key: string, warn: boolean) => {
     // Pure key-value list → deterministic table. Overflow (split+...) is not key-value.
@@ -51,11 +62,34 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] overflow-x-auto shrink-0">
-      {warnIssues.length > 0 && <span className="text-amber-400 shrink-0 font-medium">⚠ 課題 {warnIssues.length}</span>}
-      {warnIssues.map((d, i) => chip(d, `w${i}`, true))}
-      {tipIssues.length > 0 && <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>}
-      {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
+    <div className="flex items-center gap-2 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] shrink-0">
+      <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0">
+        {warnIssues.length > 0 && <span className="text-amber-400 shrink-0 font-medium">⚠ 課題 {warnIssues.length}</span>}
+        {warnIssues.map((d, i) => chip(d, `w${i}`, true))}
+        {tipIssues.length > 0 && <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>}
+        {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
+      </div>
+      {onRefine && (
+        <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-[#2D3A6E]">
+          <select
+            value={level}
+            onChange={(e) => setLevel(Number(e.target.value) as 2 | 3)}
+            title="整形の強度：決定論レバーを先に当て、AI は残った課題だけに使います"
+            className="bg-[#1a1f3a] border border-[#2D3A6E] rounded text-white px-1 py-0.5"
+          >
+            <option value={2}>決定論のみ</option>
+            <option value={3} disabled={!aiReady}>{aiReady ? "AIも使う" : "AIも使う（未接続）"}</option>
+          </select>
+          <button
+            onClick={() => onRefine(effLevel)}
+            disabled={refining}
+            title="課題のあるスライドを一括で整える（決定論先行→残りだけAI）。結果はレビューしてから採用"
+            className="px-2 py-0.5 rounded bg-[#3B82F6] text-white hover:bg-[#2563EB] disabled:opacity-50"
+          >
+            {refining ? "整形中…" : "✨ まとめて整える"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@
 import { useState, useCallback } from "react";
 import { generateCombinedPrompt } from "../engine/llm-prompts";
 import { PROVIDERS, type ProviderId } from "../ipc/ai";
-import { useAiGeneration } from "./useAiGeneration";
+import type { AiGeneration } from "./useAiGeneration";
 
 interface LlmAssistProps {
   isOpen: boolean;
@@ -21,10 +21,11 @@ interface LlmAssistProps {
   onImportResult: (text: string) => void;
   /** Template capability summary prepended to whole-deck generation. */
   templateHint?: string;
+  /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
+  ai: AiGeneration;
 }
 
-export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint }: LlmAssistProps) {
-  const ai = useAiGeneration();
+export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint, ai }: LlmAssistProps) {
   // The dialog only offers whole-deck or diagram generation (not single-slide).
   const [mode, setMode] = useState<"slides" | "diagram">("slides");
   const [userRequest, setUserRequest] = useState("");

@@ -202,6 +202,19 @@ export function useAiGeneration() {
     [canGenerate, generating, rememberKey, provider, configs, cfg],
   );
 
+  // One-shot promise variant for the closed-loop refiner (refineDeck's injected
+  // aiFix): returns the cleaned result instead of driving the streaming UI state, so
+  // the loop can call it per-slide. Same provider/model/contract as `generate`.
+  const runOnce = useCallback(
+    async (userRequest: string, mode: AiMode, signal?: AbortSignal): Promise<string> => {
+      const raw = await generateWithAI({
+        provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL, model: cfg.model, mode, userRequest, signal,
+      });
+      return mode === "slide" ? stripMarkdownFence(raw) : raw;
+    },
+    [provider, cfg],
+  );
+
   const cancel = useCallback(() => abortRef.current?.abort(), []);
   const reset = useCallback(() => {
     setResult("");
@@ -249,8 +262,12 @@ export function useAiGeneration() {
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error,
-    canGenerate, generate, cancel, reset,
+    canGenerate, generate, runOnce, cancel, reset,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
   };
 }
+
+/** The shared AI generation instance. Lifted to App and passed to every AI surface
+ *  (AiPanel, LlmAssist) + the refine loop so provider/key config never diverges. */
+export type AiGeneration = ReturnType<typeof useAiGeneration>;

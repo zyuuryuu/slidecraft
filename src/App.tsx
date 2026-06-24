@@ -9,7 +9,10 @@ import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
+import RefineProposal from "./components/RefineProposal";
 import { useDeckController } from "./components/useDeckController";
+import { useAiGeneration } from "./components/useAiGeneration";
+import { useDeckRefine } from "./components/useDeckRefine";
 
 export default function App() {
   const {
@@ -22,7 +25,18 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
+    catalog, setDeck,
   } = useDeckController();
+
+  // One shared AI instance for every surface (AiPanel / LlmAssist / refine loop) so
+  // provider + key config can never diverge. The closed-loop refiner (stage C) injects
+  // ai.runOnce as its per-slide aiFix and gates the Lv3 AI pass on a ready connection.
+  const ai = useAiGeneration();
+  const refine = useDeckRefine({
+    deck, catalog, setDeck,
+    aiFix: (req) => ai.runOnce(req, "slide"),
+    aiReady: ai.connection.ok,
+  });
 
   // Triage the review: 課題 (warn = overflow / no title, should fix) vs 提案 (info =
   // condense / table-able, optional) so the skippable ones read as skippable.
@@ -68,6 +82,9 @@ export default function App() {
           tipIssues={tipIssues}
           onJump={setActiveSlide}
           onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
+          onRefine={refine.runRefine}
+          refining={refine.refining}
+          aiReady={ai.connection.ok}
         />
         <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
@@ -137,6 +154,7 @@ export default function App() {
             templateHint={deckHint}
             issues={activeSlideIssues}
             contentBox={contentBox}
+            ai={ai}
           />
         )}
       </div>
@@ -170,7 +188,17 @@ export default function App() {
         onClose={() => setShowLlmAssist(false)}
         onImportResult={handleLlmImport}
         templateHint={deckHint}
+        ai={ai}
       />
+
+      {/* Closed-loop refiner: review the proposed before→after changes, then 採用 (one undo) */}
+      {refine.proposal && (
+        <RefineProposal
+          proposal={refine.proposal}
+          onAccept={refine.acceptProposal}
+          onCancel={refine.cancelProposal}
+        />
+      )}
     </>
   );
 }

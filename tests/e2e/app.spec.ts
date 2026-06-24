@@ -54,6 +54,19 @@ test.describe("SlideCraft", () => {
     expect((await download).suggestedFilename()).toMatch(/\.pptx$/);
   });
 
+  test("まとめて整える: the review bar opens the closed-loop proposal modal", async ({ page }) => {
+    // The sample deck has long-bullet (condense) tips → the review bar shows + offers
+    // the whole-deck refiner. Clicking it runs the loop and opens the review modal.
+    const refineBtn = page.getByRole("button", { name: /まとめて整える/ });
+    await expect(refineBtn).toBeVisible({ timeout: 8000 });
+    await refineBtn.click();
+    await expect(page.getByText(/まとめて整える — 確認/)).toBeVisible({ timeout: 8000 });
+    // No provider configured + only condense issues → the deterministic pass applies
+    // nothing; the modal says so and offers 閉じる (never silently changes the deck).
+    await page.getByRole("button", { name: /閉じる|キャンセル/ }).click();
+    await expect(page.getByText(/まとめて整える — 確認/)).toHaveCount(0);
+  });
+
   test("does not crash on invalid editor input (in the Initialize modal)", async ({ page }) => {
     await page.getByRole("button", { name: /Import/ }).click();
     const editor = page.locator(".cm-editor .cm-content");
