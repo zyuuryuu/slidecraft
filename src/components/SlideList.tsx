@@ -37,7 +37,9 @@ export default function SlideList({
   }
 
   return (
-    <div className="h-full overflow-auto p-2 flex flex-col gap-2 items-center">
+    // select-none: thumbnails aren't selectable text, so Shift/⌘-click multi-select
+    // doesn't drag a blue text-selection highlight along with it.
+    <div className="h-full overflow-auto p-2 flex flex-col gap-2 items-center select-none">
       {deck.slides.map((slide, i) => {
         const layoutName =
           slide.layout === "auto"
