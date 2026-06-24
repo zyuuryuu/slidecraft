@@ -329,80 +329,90 @@ export default function SlidePreview({
   scale: scaleProp,
   onDiagramChange,
 }: SlidePreviewProps) {
-  const scale = scaleProp ?? 72;
   // Catalog → layout selection adapts to the template (canonical = unchanged).
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
 
-  if (error) {
-    return (
-      <div className="h-full flex items-center justify-center p-4">
-        <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 max-w-md">
-          <p className="text-red-400 text-sm font-mono whitespace-pre-wrap">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  // Fit the slide to the available pane by default (the fixed 72-dpi render overflowed
+  // narrow panes); a small zoom control lets the user scale it down/up by %.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
 
-  if (!deck || deck.slides.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-500">
-        <div className="text-center">
-          <p className="text-lg mb-2">スライドプレビュー</p>
-          <p className="text-sm">Markdown を入力すると</p>
-          <p className="text-sm">ここにプレビューが表示されます</p>
-        </div>
-      </div>
-    );
-  }
+  const PAD = 40; // p-4 padding + scrollbar/zoom-control headroom
+  const fitW = Math.max(1, box.w - PAD) / SLIDE_W;
+  const fitH = Math.max(1, box.h - PAD) / SLIDE_H;
+  // single slide → fit BOTH dims (whole slide visible); multi → fit width (scroll vertically)
+  const fitScale = singleSlide ? Math.min(fitW, fitH) : fitW;
+  const base = scaleProp ?? (box.w > 0 ? fitScale : 72);
+  const scale = Math.max(8, base * zoom);
 
-  if (singleSlide) {
-    const idx = activeSlide ?? 0;
-    const slide = deck.slides[idx];
-    if (!slide) return null;
-    const layoutName = slide.layout === "auto"
-      ? autoSelectLayout(slide, idx, deck.slides.length, catalog)
-      : slide.layout;
+  const hasSlides = !!deck && deck.slides.length > 0;
+
+  const slideCard = (slide: SlideIR, i: number, active: boolean) => {
+    const layoutName = slide.layout === "auto" ? autoSelectLayout(slide, i, deck!.slides.length, catalog) : slide.layout;
     const layout = template ? findLayout(template, layoutName) : undefined;
-
     return (
-      <div className="h-full overflow-auto p-4 flex items-start justify-center">
-        <SlideCard
-          slide={slide}
-          slideIndex={idx}
-          totalSlides={deck.slides.length}
-          layout={layout}
-          masterBgColor={template?.masterBgColor ?? "FFFFFF"}
-          scale={scale}
-          isActive={true}
-          onDiagramChange={onDiagramChange}
-        />
-      </div>
+      <SlideCard
+        key={i}
+        slide={slide}
+        slideIndex={i}
+        totalSlides={deck!.slides.length}
+        layout={layout}
+        masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+        scale={scale}
+        isActive={active}
+        onClick={singleSlide ? undefined : () => onSlideClick?.(i)}
+        onDiagramChange={singleSlide ? onDiagramChange : undefined}
+      />
     );
-  }
+  };
 
   return (
-    <div className="h-full overflow-auto p-4 flex flex-col items-center gap-4">
-      {deck.slides.map((slide, i) => {
-        const layoutName =
-          slide.layout === "auto"
-            ? autoSelectLayout(slide, i, deck.slides.length, catalog)
-            : slide.layout;
-        const layout = template ? findLayout(template, layoutName) : undefined;
+    <div ref={containerRef} className="h-full w-full relative overflow-hidden">
+      {error ? (
+        <div className="h-full flex items-center justify-center p-4">
+          <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 max-w-md">
+            <p className="text-red-400 text-sm font-mono whitespace-pre-wrap">{error}</p>
+          </div>
+        </div>
+      ) : !hasSlides ? (
+        <div className="h-full flex items-center justify-center text-gray-500">
+          <div className="text-center">
+            <p className="text-lg mb-2">スライドプレビュー</p>
+            <p className="text-sm">Markdown を入力すると</p>
+            <p className="text-sm">ここにプレビューが表示されます</p>
+          </div>
+        </div>
+      ) : singleSlide ? (
+        <div className="h-full overflow-auto p-4 flex items-start justify-center">
+          {(() => {
+            const idx = activeSlide ?? 0;
+            const slide = deck!.slides[idx];
+            return slide ? slideCard(slide, idx, true) : null;
+          })()}
+        </div>
+      ) : (
+        <div className="h-full overflow-auto p-4 flex flex-col items-center gap-4">
+          {deck!.slides.map((slide, i) => slideCard(slide, i, activeSlide === i))}
+        </div>
+      )}
 
-        return (
-          <SlideCard
-            key={i}
-            slide={slide}
-            slideIndex={i}
-            totalSlides={deck.slides.length}
-            layout={layout}
-            masterBgColor={template?.masterBgColor ?? "FFFFFF"}
-            scale={scale}
-            isActive={activeSlide === i}
-            onClick={() => onSlideClick?.(i)}
-          />
-        );
-      })}
+      {hasSlides && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-[#0a0e1a]/90 border border-[#2D3A6E] rounded text-[11px] text-gray-300 select-none shadow">
+          <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} title="縮小" className="px-1.5 py-0.5 hover:bg-[#2D3A6E] rounded-l">−</button>
+          <button onClick={() => setZoom(1)} title="フィットに戻す" className="px-1.5 py-0.5 hover:bg-[#2D3A6E] tabular-nums text-center" style={{ minWidth: 40 }}>{Math.round(zoom * 100)}%</button>
+          <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} title="拡大" className="px-1.5 py-0.5 hover:bg-[#2D3A6E] rounded-r">＋</button>
+        </div>
+      )}
     </div>
   );
 }
