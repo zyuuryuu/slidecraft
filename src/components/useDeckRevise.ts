@@ -11,11 +11,12 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { contentBodyBox } from "../engine/distill";
+import { contentBodyBox, distillDeck } from "../engine/distill";
 import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { structureManuscript } from "../engine/manuscript";
 import { refineDeck } from "../engine/refine";
+import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import type { DeckIR } from "../engine/slide-schema";
 import type { LayoutCatalog } from "../engine/template-catalog";
@@ -56,14 +57,24 @@ export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, a
     [deck, mdText, setMdText, parseMdText],
   );
 
-  // ── Manuscript → slides (deterministic structuring of a raw prose manuscript) ──
-  const handleStructureManuscript = useCallback(() => {
+  // ── "原稿を整形" — the ONE deterministic tidy button (Draft phase). Folds in the old
+  // "自動で整える": (1) raw prose → slide structure, (2) fit/split overloaded slides +
+  // key-value → table. No AI. Writes back to mdText as one undoable step; the live
+  // preview is the before→after. Routing all auto-formatting through this one button
+  // keeps "what changed" clear.
+  const handleStructureManuscript = useCallback(async () => {
     const structured = structureManuscript(mdText);
-    if (structured && structured !== mdText.trim()) {
-      setMdText(structured); // editor records this as one undoable step (Import undo)
-      parseMdText(structured, "silent");
+    const base = structured && structured !== mdText.trim() ? structured : mdText;
+    let result = base;
+    if (catalog) {
+      const { deck: tidied } = await refineDeck(distillDeck(parseMd(base), catalog), catalog, { level: 2 });
+      result = serializeMd(tidied);
     }
-  }, [mdText, setMdText, parseMdText]);
+    if (result.trim() && result.trim() !== mdText.trim()) {
+      setMdText(result); // editor records this as one undoable step
+      parseMdText(result, "silent");
+    }
+  }, [mdText, catalog, setMdText, parseMdText]);
 
   // ── Fix ONE diagnostic, mechanically (deterministic lever: visualize → table) ──
   const handleFixIssue = useCallback(
@@ -78,17 +89,5 @@ export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, a
     [deck, mdText, replaceSlideSpan],
   );
 
-  // ── "自動で整える" (Initialize only): apply ALL deterministic levers in one pass —
-  // re-fit/split overloaded slides + key-value → table. No AI. Writes back to mdText so
-  // the live preview updates and it's one undoable editor step; the preview IS the review.
-  const handleAutoTidy = useCallback(async () => {
-    if (!deck || !catalog) return;
-    const { deck: tidied, changes } = await refineDeck(deck, catalog, { level: 2 });
-    if (changes.length === 0) return;
-    const md = serializeMd(tidied);
-    setMdText(md);
-    parseMdText(md, "silent");
-  }, [deck, catalog, setMdText, parseMdText]);
-
-  return { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue, handleAutoTidy };
+  return { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue };
 }

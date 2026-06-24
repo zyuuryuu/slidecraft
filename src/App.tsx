@@ -22,7 +22,7 @@ export default function App() {
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
-    diagnostics, handleFixIssue, handleAutoTidy, handleVisualizeSlide, currentSlideMd,
+    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
@@ -182,7 +182,6 @@ export default function App() {
         warnIssues={warn(initIssues)}
         tipIssues={tip(initIssues)}
         onFixDeterministic={handleFixIssue}
-        onAutoTidy={handleAutoTidy}
         onCursorLine={handleCursorLine}
         gotoLine={gotoLine}
       />

@@ -1,14 +1,13 @@
 /**
- * ReviewBar — the "整形レビュー" strip, shown both in the Edit home and in the
- * Initialize modal.
+ * ReviewBar — the "整形レビュー" strip, shown both in the Edit home and the Draft modal.
  *
  * Triaged into ⚠ 課題 (should fix) and 💡 提案 (optional). Each chip jumps to its slide
- * and offers the RIGHT fix:
+ * and offers the RIGHT per-slide fix:
  *  - a pure key-value list → "→表" (deterministic, instant, undoable),
- *  - an AI-needing issue (condense / title / overflow) → "✨直す", which hands off to
- *    the AI dock: it selects the slide and opens AI Assist with a fix prompt pre-filled,
- *    so the human sees + edits the instruction before generating (never a silent auto-AI).
- * The whole-deck button does only the DETERMINISTIC batch ("決定論で整える").
+ *  - an AI-needing issue (condense / title) → "✨直す", which hands off to the AI dock:
+ *    it selects the slide and opens AI Assist with a fix prompt pre-filled, so the human
+ *    sees + edits the instruction before generating (never a silent auto-AI).
+ * Deck-wide deterministic tidy lives in the Draft modal's "✨ 原稿を整形" button, not here.
  */
 
 import type { DeckIssue } from "../engine/deck-diagnostics";
@@ -28,13 +27,9 @@ interface ReviewBarProps {
   onFixDeterministic: (issue: DeckIssue) => void;
   /** Hand off an AI-needing issue to the AI dock (select slide + pre-fill the prompt). */
   onAiFix?: (slideIndex: number, prompt: string) => void;
-  /** Run the whole-deck DETERMINISTIC batch (→表 on every key-value slide). Absent in
-   *  the Initialize modal, where fixes are Markdown-span rewrites. */
-  onRefine?: () => void;
-  refining?: boolean;
 }
 
-export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onAiFix, onRefine, refining }: ReviewBarProps) {
+export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onAiFix }: ReviewBarProps) {
   if (warnIssues.length === 0 && tipIssues.length === 0) return null;
 
   const chip = (d: DeckIssue, key: string, warn: boolean) => {
@@ -85,18 +80,6 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
         {tipIssues.length > 0 && <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>}
         {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
       </div>
-      {onRefine && (
-        <div className="flex items-center shrink-0 pl-2 border-l border-[#2D3A6E]">
-          <button
-            onClick={onRefine}
-            disabled={refining}
-            title="詰め込みすぎを自動分割＋key-value を表に（AIなし・元に戻せます）"
-            className="px-2 py-0.5 rounded bg-[#1f2a4d] text-[#5eead4] hover:bg-[#2D3A6E] border border-[#2D3A6E] disabled:opacity-50"
-          >
-            {refining ? "整形中…" : "自動で整える"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

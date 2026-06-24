@@ -33,8 +33,6 @@ interface InitializeModalProps {
   warnIssues: DeckIssue[];
   tipIssues: DeckIssue[];
   onFixDeterministic: (issue: DeckIssue) => void;
-  /** "✨ 自動で整える" — deterministic batch (split + key-value→表) on the Markdown. */
-  onAutoTidy: () => void;
   onCursorLine: (line: number) => void;
   gotoLine?: { line: number; ts: number };
 }
@@ -44,7 +42,7 @@ const action = "px-2.5 py-1 rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
-  onFixDeterministic, onAutoTidy, onCursorLine, gotoLine,
+  onFixDeterministic, onCursorLine, gotoLine,
 }: InitializeModalProps) {
   if (!isOpen) return null;
   return (
@@ -66,19 +64,19 @@ export default function InitializeModal({
           <span className="text-sm text-[#93C5FD] font-medium mr-1">📝 Draft</span>
           <button onClick={onOpenFile} className={action} title=".md / .yaml ファイルを開く">📄 ファイルを開く</button>
           <button onClick={onGenerateAI} className={action} title="AI でデッキを生成">✨ AIで生成</button>
-          <button onClick={onStructure} className={action} title="生原稿（見出し＋文章）を見出しごとのスライドに自動整形">✨ 原稿を整形</button>
+          <button onClick={onStructure} className={action} title="生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）">✨ 原稿を整形</button>
           <span className="text-gray-500">または直接貼り付け</span>
           <div className="flex-1" />
           <button onClick={onCancel} title="キャンセル" className="text-gray-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
-        {/* Structure review of the resulting split + "✨ 自動で整える" (deterministic). */}
+        {/* Structure review of the resulting split (awareness + per-chip →表). The
+            full deterministic tidy is the "✨ 原稿を整形" button above. */}
         <ReviewBar
           warnIssues={warnIssues}
           tipIssues={tipIssues}
           onJump={onSlideClick}
           onFixDeterministic={onFixDeterministic}
-          onRefine={onAutoTidy}
         />
 
         {/* Markdown source ⇄ live slide-split preview (flex-1 child → fills the middle) */}

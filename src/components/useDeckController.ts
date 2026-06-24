@@ -337,7 +337,7 @@ export function useDeckController() {
   const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
 
   // The 整形 (distill) cluster: review + manuscript structuring + per-issue fixes.
-  const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue, handleAutoTidy } = useDeckRevise({
+  const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue } = useDeckRevise({
     mdText, setMdText, parseMdText, deck, catalog, activeSlide,
   });
 
@@ -433,7 +433,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleAutoTidy, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
   };
