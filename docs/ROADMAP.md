@@ -93,6 +93,23 @@
 
 詳細設計: 開発メモリ `diagram_format_architecture` 参照。残 Mermaid 型は報告用途での頻度が低いため後回し。
 
+---
+
+## v5 完了: UX 統合 — Edit 専一・deck=真実・Initialize モーダル (2026-06)
+
+決定「**出力が PPTX → 視覚 Edit が主、Markdown は入力に過ぎない**」（開発メモリ `primary_surface_deck`）。下記 v3「統合 UI」の設計思想（Markdown＝入出力／SlideIR[]＝唯一のモデル）を**完全実現**。
+
+| 区分 | 内容 | コミット |
+|------|------|---------|
+| Edit ホーム化 | 起動＝視覚編集、deck＝唯一の源、Import＝Initialize 入口（入場時に現 deck を直列化） | c55b56a |
+| Initialize モーダル | Markdown 編集＋分割プレビュー＋レビューをモーダル化。Edit/Import トグル・Open・Export MD を撤去 | aafa58a |
+| 整形レビューを Edit へ | 課題/提案＋「→表」(deck 操作)＋「AI で整える」 | 949e7af |
+| AI 修正の透明化 | before→after 差分＋採用/却下、文章丸ごと Omit 防止 | 2c83a12 / 298832c |
+| プレビュー fit＋ズーム | ペインへ自動フィット＋% ズーム操作 | 7d96e19 |
+| 多エージェント・レビュー | 実装後に敵対的レビューで 13 実バグ検出→全修正→再検証(allGood) | aafa58a |
+
+→ 下記 v3（E1〜E6）は本作業で達成。**E6「V1 旧モード廃止」も完了**（トグル撤去・Markdown は Initialize モーダルのみ）。
+
 ### 技術負債 R1（400 行ルール）
 
 - App.tsx 1145 → 236（`sample-deck.ts` ＋ `useDeckController.ts` ＋ `deck-export.ts` へ分割）— 完了
@@ -120,7 +137,9 @@
 |---|---|---|
 | **A. フィードフォワード** | テンプレ制約（容量/kind/文字・行予算）を**生成前**の AI へ渡し、最初から収まる出力に。`deckHint`/`deckCapabilities` を強化 | △ 粗く実装 |
 | **B. 診断（非破壊レビュー）** | `diagnoseDeck` が課題＋推奨レバーを提示（変形しない＝差し戻し）。「整形レビュー」帯 | ✅ c1d76c0 |
-| **C. 閉ループ（自動修復＝Lv3）** | 生成→診断→**決定論レバー**(split/visualize)で直せる物を直す→**残りだけ AI**(condense/restructure)→再診断→収束 | ⬜ 次 |
+| **C. 閉ループ（自動修復＝Lv3）** | 生成→診断→**決定論レバー**(split/visualize)で直せる物を直す→**残りだけ AI**(condense/restructure)→再診断→収束 | 🔶 構成要素済・本体未 |
+
+**C の進捗**：契約 `slide-fix.ts`（buildSlideFix/slideFixRequest, 9a18535）／個別修正（「→表」決定論＝mdText 版 handleFixIssue・deck 版 handleVisualizeSlide／「AI で整える」差分＋採用/却下, 2c83a12）／CONDENSE プロンプト是正（Omit 防止, 298832c）は実装済み。**未着手＝"全自動ループ本体"**（生成→診断→決定論先行→残り AI→再診断→**反復収束**を回す orchestration）と 3 段階強度トグル。土台は揃っており、あとはループ駆動と収束保証（反復上限・問題スライドのみ）。
 | **D. 外部化（MCP/ツール化）** | 上流エージェントが本アプリのハーネスを"呼ぶ"。C と同じ「制約＋診断 ⇄ AI」契約をそのまま再露出 | ⬜ 将来 |
 
 **設計原則（付け足しにしないため）**
@@ -136,7 +155,9 @@
 ### 旧ロードマップの陳腐化メモ
 
 - バンドル識別子 `com.slidecraft.desktop` — **対応済み**
-- v3 スライド単位エディタ（下記）E1〜E5 は実装済み（md-serializer / SlideList / SlideEditor / SlideMarkdownEditor 実在）。E6「V1 旧モード廃止」のみ要確認
+- v3 スライド単位エディタ（下記）E1〜E6 **全完了**（上記 v5 で Markdown を Initialize モーダルへ閉じ込め、視覚 Edit を専一の編集 UI に。旧 Import/Edit トグル廃止）
+- CI 3-OS ビルド確認 — **完了**（毎 push で test/e2e/win/mac/linux green）
+- CodeMirror Markdown ハイライト — **完了**（`Editor.tsx` が `language==="markdown"` で `markdown()` を適用）
 
 ---
 
