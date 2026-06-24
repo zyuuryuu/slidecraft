@@ -26,10 +26,22 @@ import { autoSelectLayout } from "./template-loader";
 
 export type RefineLevel = 1 | 2 | 3;
 
-/** Inject the AI: a slide-fix request (slideFixRequest) → the fixed slide's Markdown.
- *  `meta.slideIndex` lets the host label the task. Keeps the loop pure/testable; stage
- *  D (MCP) re-uses it with a different backend. */
-export type AiSlideFix = (request: string, meta: { slideIndex: number; signal?: AbortSignal }) => Promise<string>;
+/** Outcome of ONE AI fix attempt. The loop's retry policy reads this: success and
+ *  cancellation stop further attempts; a `retryable` failure is re-attempted up to the
+ *  cap. The host classifies the failure (provider-specific) — the engine just applies
+ *  the generic policy. */
+export type AiFixOutcome =
+  | { ok: true; markdown: string }
+  | { ok: false; cancelled: true } // user cancelled → never retry
+  | { ok: false; cancelled: false; retryable: boolean; message?: string }; // failed → maybe retry
+
+/** Inject the AI: a slide-fix request (slideFixRequest) → an outcome. `meta.attempt`
+ *  (1-based) lets the host label/vary the retry. Keeps the loop pure/testable; stage D
+ *  (MCP) re-uses it with a different backend. */
+export type AiSlideFix = (
+  request: string,
+  meta: { slideIndex: number; signal?: AbortSignal; attempt: number },
+) => Promise<AiFixOutcome>;
 
 export interface RefineChange {
   slideIndex: number;
@@ -73,17 +85,19 @@ function groupBySlide(issues: DeckIssue[]): Map<number, DeckIssue[]> {
 export async function refineDeck(
   deck: DeckIR,
   catalog: LayoutCatalog,
-  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; signal?: AbortSignal },
+  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; maxAiRetries?: number; signal?: AbortSignal },
 ): Promise<RefineResult> {
-  const maxIter = opts.maxIterations ?? 4;
+  const maxIter = opts.maxIterations ?? 6;
+  const maxRetries = opts.maxAiRetries ?? 2; // up to 1 + maxRetries AI attempts per slide
   const box = contentBodyBox(catalog);
   let current = deck;
   const changes: RefineChange[] = [];
   let iterations = 0;
-  // One AI attempt per slide per run: a still-flagged slide (cancelled, failed, or just
-  // not converged) must NOT be re-submitted next pass — that retries the same prompt and
-  // spams the task list. Deterministic levers aren't tracked (they're idempotent).
-  const aiAttempted = new Set<number>();
+  // Per-slide AI attempt accounting. `aiDone` = slides settled for the run (succeeded,
+  // cancelled, non-retryable, or retries exhausted) → never re-submitted (no task spam).
+  // `aiAttempts` counts tries so a retryable FAILURE gets another go, up to the cap.
+  const aiAttempts = new Map<number, number>();
+  const aiDone = new Set<number>();
 
   for (; iterations < maxIter; iterations++) {
     if (opts.signal?.aborted) break; // user cancelled the loop
@@ -92,6 +106,7 @@ export async function refineDeck(
     if (opts.level < 2) break; // Lv1 = diagnose only (flag, don't transform)
 
     let changedThisPass = false;
+    let pendingRetry = false; // a retryable failure wants another pass
     for (const [idx, slideIssues] of groupBySlide(issues)) {
       if (opts.signal?.aborted) break;
       if (!current.slides[idx]) continue;
@@ -113,26 +128,38 @@ export async function refineDeck(
       // ② AI residue (Lv3) — condense long sentence-bullets / add a missing title.
       if (opts.level >= 3 && opts.aiFix) {
         const aiIssue = slideIssues.find((d) => d.levers.includes("condense") || d.levers.includes("title"));
-        if (aiIssue && !aiAttempted.has(idx)) {
-          aiAttempted.add(idx); // mark before awaiting — never retry this slide this run
-          // One slide's AI failure (or cancel) must not abort the whole batch — skip it.
-          let after = "";
+        if (aiIssue && !aiDone.has(idx)) {
+          const attempt = (aiAttempts.get(idx) ?? 0) + 1;
+          aiAttempts.set(idx, attempt);
+          let outcome: AiFixOutcome;
           try {
-            after = (await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)), { slideIndex: idx, signal: opts.signal })).trim();
+            outcome = await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)), { slideIndex: idx, signal: opts.signal, attempt });
           } catch {
+            aiDone.add(idx); // aiFix should resolve an outcome; a throw = unknown → don't retry
             continue;
           }
-          const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
-          if (newSlide) {
-            current = replaceSlide(current, idx, newSlide);
-            changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: after });
-            changedThisPass = true;
+          if (outcome.ok) {
+            aiDone.add(idx); // succeeded → settled (even if it didn't fully converge)
+            const after = outcome.markdown.trim();
+            const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
+            if (newSlide) {
+              current = replaceSlide(current, idx, newSlide);
+              changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: after });
+              changedThisPass = true;
+            }
             continue;
           }
+          if (outcome.cancelled) {
+            aiDone.add(idx); // user cancelled this slide → never retry
+            continue;
+          }
+          // failed: retry only if the host says it's retryable AND the cap isn't reached.
+          if (outcome.retryable && attempt < 1 + maxRetries) pendingRetry = true;
+          else aiDone.add(idx);
         }
       }
     }
-    if (!changedThisPass) break; // no progress → stop (don't spin)
+    if (!changedThisPass && !pendingRetry) break; // no progress and nothing to retry → stop
   }
 
   return { deck: current, changes, converged: diagnoseDeck(current, catalog).length === 0, iterations };

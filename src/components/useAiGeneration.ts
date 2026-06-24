@@ -49,6 +49,17 @@ const MODE_LABEL: Record<AiMode, string> = {
   "diagram-edit": "図の編集",
 };
 
+/** Classify a failed AI call so the refine loop can decide whether to retry: a cancel
+ *  never retries; config/auth errors won't fix themselves; transient failures (network,
+ *  timeout, rate-limit, 5xx, empty/garbled response) are worth another try or two. */
+export function classifyAiFailure(e: unknown, signal?: AbortSignal): { cancelled: boolean; retryable: boolean; message: string } {
+  const message = e instanceof Error ? e.message : String(e);
+  if (message === "cancelled" || signal?.aborted) return { cancelled: true, retryable: false, message };
+  const m = message.toLowerCase();
+  const permanent = /\b(401|403|404)\b|unauthorized|invalid api key|\bapi key\b|model not found|no such model/.test(m);
+  return { cancelled: false, retryable: !permanent, message };
+}
+
 function defaultConfigs(): AiConfigMap {
   const out = {} as AiConfigMap;
   for (const p of PROVIDERS) {

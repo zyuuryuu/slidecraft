@@ -11,7 +11,7 @@ import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
 import { useDeckController } from "./components/useDeckController";
-import { useAiGeneration } from "./components/useAiGeneration";
+import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
 
 export default function App() {
@@ -34,7 +34,17 @@ export default function App() {
   const ai = useAiGeneration();
   const refine = useDeckRefine({
     deck, catalog, setDeck,
-    aiFix: (req, meta) => ai.submitAndWait(req, "slide", `スライド${meta.slideIndex + 1}を整形`, meta.signal),
+    // Maps the task store's promise to a retry-aware outcome: a cancel is never retried,
+    // a transient failure (network/timeout/5xx/empty) is — the loop caps the retries.
+    aiFix: async (req, meta) => {
+      const label = `スライド${meta.slideIndex + 1}を整形${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}`;
+      try {
+        return { ok: true, markdown: await ai.submitAndWait(req, "slide", label, meta.signal) };
+      } catch (e) {
+        const c = classifyAiFailure(e, meta.signal);
+        return c.cancelled ? { ok: false, cancelled: true } : { ok: false, cancelled: false, retryable: c.retryable, message: c.message };
+      }
+    },
     aiReady: ai.connection.ok,
   });
 

@@ -31,7 +31,7 @@ describe("refineDeck", () => {
 
   it("Lv2 = deterministic: key-value slide → native table, no AI called", async () => {
     let aiCalls = 0;
-    const r = await refineDeck(parseMd(KV_DECK), catalog, { level: 2, aiFix: async (x) => { aiCalls++; return x; } });
+    const r = await refineDeck(parseMd(KV_DECK), catalog, { level: 2, aiFix: async () => { aiCalls++; return { ok: true, markdown: "" }; } });
     expect(aiCalls).toBe(0); // deterministic only
     expect(r.changes.some((c) => c.lever === "visualize" && c.kind === "deterministic")).toBe(true);
     expect(r.deck.slides.find((s) => s.table)?.table?.rows[0]).toEqual(["項目", "内容"]);
@@ -42,7 +42,7 @@ describe("refineDeck", () => {
     let seenRequest = "";
     const aiFix = async (request: string) => {
       seenRequest = request;
-      return "# 背景\n\n- 旧CRMは遅くモバイル非対応"; // a short, condensed slide
+      return { ok: true as const, markdown: "# 背景\n\n- 旧CRMは遅くモバイル非対応" }; // a short, condensed slide
     };
     const r = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix });
     expect(seenRequest).toContain("Current slide:"); // the slide-fix contract was sent
@@ -50,29 +50,50 @@ describe("refineDeck", () => {
     expect(r.converged).toBe(true);
   });
 
-  it("attempts each slide's AI at most once per run (no retry spam when it doesn't converge)", async () => {
+  it("success that doesn't converge is settled (one attempt, no retry spam)", async () => {
     let calls = 0;
-    // Returns a result that is STILL too long → the slide stays flagged. Without the
-    // once-per-run guard the loop would re-submit it every pass (the cancel-spam bug).
-    const aiFix = async () => {
-      calls++;
-      return "# 背景\n\n- まだ全く要約されていない非常に長い文章のままの箇条書きが返ってくる悪い例です";
-    };
-    const r = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix, maxIterations: 5 });
-    expect(calls).toBe(1); // one attempt for the one flagged slide — not 5
+    // Returns ok but STILL too long → the slide stays flagged. Must not re-submit (the
+    // cancel/retry-spam bug). Success ≠ failure, so no retry.
+    const r = await refineDeck(parseMd(LONG_DECK), catalog, {
+      level: 3, maxIterations: 8,
+      aiFix: async () => { calls++; return { ok: true, markdown: "# 背景\n\n- まだ全く要約されていない非常に長い文章のままの箇条書きが返る悪い例です" }; },
+    });
+    expect(calls).toBe(1); // one attempt for the one flagged slide
     expect(r.converged).toBe(false);
   });
 
-  it("does not spin: a no-op aiFix stops the loop (no infinite iterations)", async () => {
-    const r = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix: async () => "", maxIterations: 10 });
-    expect(r.changes).toHaveLength(0); // empty AI result → no change applied
-    expect(r.iterations).toBeLessThanOrEqual(2); // bailed early on no-progress
+  it("a retryable failure is retried up to the cap, then settles (bounded)", async () => {
+    let calls = 0;
+    const r = await refineDeck(parseMd(LONG_DECK), catalog, {
+      level: 3, maxIterations: 10, maxAiRetries: 2,
+      aiFix: async () => { calls++; return { ok: false, cancelled: false, retryable: true, message: "timeout" }; },
+    });
+    expect(calls).toBe(3); // 1 try + 2 retries — not infinite
     expect(r.converged).toBe(false);
+  });
+
+  it("a cancelled outcome is never retried", async () => {
+    let calls = 0;
+    const r = await refineDeck(parseMd(LONG_DECK), catalog, {
+      level: 3, maxIterations: 10, maxAiRetries: 2,
+      aiFix: async () => { calls++; return { ok: false, cancelled: true }; },
+    });
+    expect(calls).toBe(1); // cancel → settled immediately
+    expect(r.changes).toHaveLength(0);
+  });
+
+  it("a non-retryable failure is not retried", async () => {
+    let calls = 0;
+    await refineDeck(parseMd(LONG_DECK), catalog, {
+      level: 3, maxIterations: 10, maxAiRetries: 2,
+      aiFix: async () => { calls++; return { ok: false, cancelled: false, retryable: false, message: "invalid api key" }; },
+    });
+    expect(calls).toBe(1); // permanent error → no retry
   });
 
   it("deterministic-first: a key-value slide is fixed without the AI even at Lv3", async () => {
     let aiCalls = 0;
-    const r = await refineDeck(parseMd(KV_DECK), catalog, { level: 3, aiFix: async (x) => { aiCalls++; return x; } });
+    const r = await refineDeck(parseMd(KV_DECK), catalog, { level: 3, aiFix: async () => { aiCalls++; return { ok: true, markdown: "" }; } });
     expect(aiCalls).toBe(0); // visualize handled it deterministically; AI never needed
     expect(diagnoseDeck(r.deck, catalog)).toHaveLength(0);
   });
