@@ -50,6 +50,34 @@ describe("canSerializeToMermaid gates the MERMAID toggle", () => {
     });
     expect(canSerializeToMermaid(labelled)).toBe(false);
   });
+  it("blocks a flowchart with node icons (Mermaid has no icon form → would strip them)", () => {
+    const iconned = DiagramSpecSchema.parse({
+      type: "flowchart", direction: "TB",
+      nodes: [{ id: "a", label: "DB", icon: "database" }, { id: "b", label: "B" }], edges: [{ from: "a", to: "b" }],
+    });
+    expect(canSerializeToMermaid(iconned)).toBe(false);
+  });
+  it("blocks kpi / radar (no Mermaid form)", () => {
+    const kpi = DiagramSpecSchema.parse({ type: "kpi", direction: "TB", nodes: [], edges: [], kpi: { cards: [{ value: "1", label: "x", delta: "", trend: "up" }] } });
+    expect(canSerializeToMermaid(kpi)).toBe(false);
+  });
+});
+
+describe("flowchart dashed edges round-trip through Mermaid", () => {
+  it("parses -.-> as a dashed edge (and --> stays solid)", () => {
+    const spec = mermaidToDiagramSpec("graph TD\n  a --> b\n  b -.-> c")!;
+    expect(spec.edges[0].style?.dash).toBeFalsy();
+    expect(spec.edges[1].style?.dash).toBe(true);
+  });
+  it("YAML→Mermaid→spec keeps a dashed edge dashed", () => {
+    const dashed = DiagramSpecSchema.parse({
+      type: "flowchart", direction: "TB",
+      nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      edges: [{ from: "a", to: "b", style: { dash: true } }],
+    });
+    const back = mermaidToDiagramSpec(diagramSpecToMermaid(dashed))!;
+    expect(back.edges[0].style?.dash).toBe(true);
+  });
 });
 
 describe("sequence diagrams round-trip through Mermaid losslessly", () => {

@@ -31,6 +31,8 @@ export function canSerializeToMermaid(spec: DiagramSpec): boolean {
   // kpi / radar have NO Mermaid form — diagramSpecToMermaid would emit an empty
   // "graph TD" stub and silently destroy the spec (unrecoverable). Block the toggle.
   if (spec.type === "kpi" || spec.type === "radar") return false;
+  // Mermaid has no node-icon concept — a round-trip would silently strip every icon.
+  if (spec.nodes.some((n) => n.icon)) return false;
   if (spec.type === "sequence") return true;
   if (spec.type === "timeline") return true; // periods/events/sections/title all round-trip
   if (spec.type === "quadrant") return true; // axis/quadrant labels + points all round-trip

@@ -57,6 +57,7 @@ interface ParsedEdge {
   from: string;
   to: string;
   label?: string;
+  dash?: boolean;
 }
 
 // ── Node shape detection from Mermaid syntax ──
@@ -123,13 +124,14 @@ function parseEdgeLine(line: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
   const arrowRe = /\s+(-->|-.->|===|---)\s*(?:\|([^|]*)\|\s*)?/g;
 
   // Find all arrows and their positions
-  const arrows: { index: number; end: number; label?: string }[] = [];
+  const arrows: { index: number; end: number; label?: string; dash?: boolean }[] = [];
   let m: RegExpExecArray | null;
   while ((m = arrowRe.exec(line)) !== null) {
     arrows.push({
       index: m.index,
       end: m.index + m[0].length,
       label: m[2] || undefined,
+      dash: m[1].includes("."), // -.-> = a dashed/dotted edge
     });
   }
 
@@ -161,7 +163,7 @@ function parseEdgeLine(line: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
     const from = parsedNodes[i];
     const to = parsedNodes[i + 1];
     if (from && to) {
-      edges.push({ from: from.id, to: to.id, label: edgeLabels[i] });
+      edges.push({ from: from.id, to: to.id, label: edgeLabels[i], dash: arrows[i]?.dash });
     }
   }
 
@@ -296,6 +298,7 @@ export function mermaidToDiagramSpec(mermaidSyntax: string): DiagramSpec | null 
       from: e.from,
       to: e.to,
       ...(e.label ? { label: e.label } : {}),
+      ...(e.dash ? { style: { dash: true } } : {}),
     })),
     groups: groups.map(g => ({
       id: g.id,
