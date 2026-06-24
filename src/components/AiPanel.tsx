@@ -268,8 +268,8 @@ export default function AiPanel({
         <AiTasksPanel tasks={ai.tasks} onCancel={ai.cancelTask} onClear={ai.clearTasks} />
       ) : (
       <>
-      {/* Scope + Prompt */}
-      <div className="px-3 py-2 flex flex-col gap-2">
+      {/* Scope + Prompt — grows with the dock so the instruction box isn't stuck at 2 rows */}
+      <div className="px-3 py-2 flex flex-col gap-2 flex-1 min-h-0">
         {canSlide && (
           <div className="flex items-center gap-1 text-xs flex-wrap">
             <span className="text-gray-500 mr-1">対象:</span>
@@ -303,30 +303,29 @@ export default function AiPanel({
             <span className="text-gray-500 truncate">{slideIssues.map((i) => i.message).join(" / ")}</span>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-1 min-h-0">
           <textarea
             value={userRequest}
             onChange={(e) => setUserRequest(e.target.value)}
-            rows={2}
             placeholder={
               slideScope
                 ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / 図を追加 / DBノードを足す / 英語にする）"
                 : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
             }
-            className="flex-1 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white resize-none"
+            className="flex-1 min-h-[3rem] px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white resize-none"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) doGenerate();
             }}
           />
           {ai.generating ? (
-            <button onClick={ai.cancel} className="px-4 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded shrink-0">
+            <button onClick={ai.cancel} className="self-start px-4 py-2 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded shrink-0">
               停止
             </button>
           ) : (
             <button
               onClick={doGenerate}
               disabled={!ready}
-              className="px-4 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 disabled:text-white/40 text-white font-medium rounded shrink-0"
+              className="self-start px-4 py-2 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 disabled:text-white/40 text-white font-medium rounded shrink-0"
             >
               生成
             </button>
