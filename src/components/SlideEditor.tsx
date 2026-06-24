@@ -347,28 +347,21 @@ function DiagramEditor({
         <label className="text-[10px] text-gray-500 uppercase tracking-wider">
           {label}
         </label>
-        <div className="flex rounded overflow-hidden border border-[#2D3A6E] text-[10px]">
-          {(["mermaid", "yaml", "json"] as DiagramMode[]).map((m) => {
-            const disabled = m === "mermaid" && mermaidIncompatible && mode !== "mermaid";
-            return (
-              <button
-                key={m}
-                onClick={() => switchMode(m)}
-                disabled={disabled}
-                title={disabled ? "シーケンス図/クラス図は Mermaid に変換できません（YAML/JSON で編集してください）" : undefined}
-                className={`px-2 py-0.5 transition-colors ${
-                  mode === m
-                    ? "bg-[#3B82F6] text-white"
-                    : disabled
-                      ? "bg-[#1a1f3a] text-gray-600 opacity-50 cursor-not-allowed"
-                      : "bg-[#1a1f3a] text-gray-400 hover:text-white"
-                }`}
-              >
-                {m.toUpperCase()}
-              </button>
-            );
-          })}
-        </div>
+        {/* Editing-format selector: a dropdown shows only the current choice (less
+            clutter); MERMAID is a disabled option WITH its reason when the figure
+            can't be represented in Mermaid (icons / kpi / radar / custom class, …). */}
+        <select
+          value={mode}
+          onChange={(e) => switchMode(e.target.value as DiagramMode)}
+          title={mermaidIncompatible ? "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。" : "編集フォーマットを選択"}
+          className="px-2 py-0.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-[11px] text-gray-200 hover:border-[#3B82F6]/60"
+        >
+          <option value="yaml">YAML</option>
+          <option value="json">JSON</option>
+          <option value="mermaid" disabled={mermaidIncompatible && mode !== "mermaid"}>
+            {mermaidIncompatible && mode !== "mermaid" ? "MERMAID（変換不可）" : "MERMAID"}
+          </option>
+        </select>
       </div>
       <textarea
         value={textValue}
