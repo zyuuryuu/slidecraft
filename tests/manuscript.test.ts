@@ -63,6 +63,15 @@ describe("structureManuscript", () => {
     expect(sub?.paragraphs.map((x) => x.segments.map((g) => g.text).join("")).join("")).toBe("営業本部 山田太郎");
   });
 
+  it("a subtitle + short metadata (affiliation / name) all sit on the cover", () => {
+    const md = "# 新規事業提案\n\nAI を活用した新サービス構想\n営業本部 山田太郎\n\n## 背景\n\n- A";
+    const cover = parseMd(structureManuscript(md)).slides[0];
+    expect(titleOf(cover)).toBe("新規事業提案");
+    const subText = cover.placeholders.find((p) => p.idx === "1")?.paragraphs.map((x) => x.segments.map((g) => g.text).join("")).join(" ") ?? "";
+    expect(subText).toContain("AI を活用した新サービス構想"); // subtitle
+    expect(subText).toContain("営業本部 山田太郎"); // metadata also on the cover
+  });
+
   it("VISUALIZE: key-value bullets → native table; non-pair bullets stay bullets", () => {
     const ms = `# 製品X
 

@@ -98,6 +98,13 @@ export function keyValueTable(bodyMd: string): string | null {
   return ["| 項目 | 内容 |", "| --- | --- |", ...rows].join("\n");
 }
 
+/** A SHORT, title-like preamble line (subtitle / presenter name / affiliation / date /
+ *  place) — fine on the cover. A long line, or one with 2+ 句読点 (。、！？), reads as
+ *  prose / a messy list, not a title. */
+function isCoverLine(s: string): boolean {
+  return s.length <= 30 && (s.match(/[。．、，！？!?]/g) ?? []).length < 2;
+}
+
 /**
  * Structure a raw manuscript into slide Markdown. The first H1 becomes a Title
  * slide; every other heading becomes a content slide. Returns the input unchanged
@@ -120,18 +127,17 @@ export function structureManuscript(md: string): string {
       continue;
     }
     if (!titleDone && sec.level === 1) {
-      // A SHORT, clean preamble line (presenter name / tagline / short subtitle) belongs
-      // on the cover as the subtitle. A long / punctuated (句読点) / multi-line preamble
-      // (prose, meeting metadata) does NOT — it goes to its own title-less lead slide so
-      // the cover stays clean AND nothing is dropped (the old code kept only line 1).
-      const preamble = sec.lines.map((l) => l.trim()).filter(Boolean);
-      const subtitle =
-        preamble.length === 1 && preamble[0].length <= 28 && !/[。．、，！？!?]/.test(preamble[0])
-          ? preamble[0]
-          : null;
-      slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}${subtitle ? `\n## ${subtitle}` : ""}`);
       titleDone = true;
-      if (!subtitle) {
+      const preamble = sec.lines.map((l) => l.trim()).filter(Boolean);
+      // A cover-worthy preamble = a short subtitle (line 1) + short metadata (name /
+      // affiliation / date / place). It ALL goes on the cover (subtitle region). Anything
+      // that doesn't fit — long prose, an attendee list with many commas, multi-clause
+      // lines — keeps the cover title-only and drops to a title-less lead slide: a target
+      // for AI correction (✨直す / restructure), never silently mangled or lost.
+      if (preamble.length > 0 && preamble.every(isCoverLine)) {
+        slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}\n## ${preamble.join("\n")}`);
+      } else {
+        slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}`);
         const body = sectionBody(sec.lines);
         if (body) slides.push(body);
       }
