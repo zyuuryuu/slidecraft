@@ -1,10 +1,11 @@
 /**
- * InitializeModal — the "Initialize" phase as a modal (not a persistent mode).
+ * InitializeModal — the "Draft" phase as a modal (not a persistent mode). (UI label
+ * "Draft"; the component keeps its original name.)
  *
- * The product's single content entry point: bring Markdown in (paste / open file /
- * 原稿を整形), see how it splits into slides (live preview + review), then 確定 to
- * commit the deck and return to the visual Edit home. Markdown lives ONLY here —
- * after 確定 the deck is the source of truth ([[primary-surface-deck]]).
+ * The product's single content entry point: bring Markdown in (paste / open file / AI /
+ * 原稿を整形), see how it splits into slides (live preview + structure review), then
+ * "スライドにする" to commit the deck and return to the visual Edit home. Markdown lives
+ * ONLY here — after commit the deck is the source of truth ([[primary-surface-deck]]).
  */
 
 import Editor from "./Editor";
@@ -56,25 +57,19 @@ export default function InitializeModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Initialize — 原稿から作成 / 取り込み"
+        aria-label="Draft — 原稿からスライドを作る"
         className="bg-[#0a0e1a] border border-[#3B82F6]/40 rounded-lg shadow-2xl flex flex-col w-full max-w-6xl"
         style={{ height: "86vh" }}
       >
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-[#2D3A6E] shrink-0">
-          <span className="text-sm text-[#93C5FD] font-medium">Initialize — 原稿から作成 / 取り込み</span>
-          <span className="text-[11px] text-gray-500">スライド分割と各スライドの内容を確定して編集へ</span>
-          <div className="flex-1" />
-          <button onClick={onCancel} title="キャンセル" className="text-gray-400 hover:text-white text-lg leading-none">×</button>
-        </div>
-
-        {/* Input methods */}
+        {/* Header + input methods (one tidy row) */}
         <div className="flex items-center gap-2 px-4 py-2 border-b border-[#2D3A6E] text-xs shrink-0">
-          <span className="text-gray-500">入力:</span>
+          <span className="text-sm text-[#93C5FD] font-medium mr-1">📝 Draft</span>
           <button onClick={onOpenFile} className={action} title=".md / .yaml ファイルを開く">📄 ファイルを開く</button>
           <button onClick={onGenerateAI} className={action} title="AI でデッキを生成">✨ AIで生成</button>
           <button onClick={onStructure} className={action} title="生原稿（見出し＋文章）を見出しごとのスライドに自動整形">✨ 原稿を整形</button>
-          <span className="text-gray-500">または下のエディタに直接貼り付け</span>
+          <span className="text-gray-500">または直接貼り付け</span>
+          <div className="flex-1" />
+          <button onClick={onCancel} title="キャンセル" className="text-gray-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
         {/* Structure review of the resulting split + "✨ 自動で整える" (deterministic). */}
@@ -121,7 +116,7 @@ export default function InitializeModal({
             disabled={!deck}
             className="px-4 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
           >
-            ✓ 確定 → 編集
+            ✓ スライドにする
           </button>
         </div>
       </div>

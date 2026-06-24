@@ -1,6 +1,6 @@
 /**
  * E2E tests for SlideCraft. The visual Edit surface is the HOME (deck = source of
- * truth); "Import" opens the one-time "Initialize" modal (Markdown in → 確定 → Edit).
+ * truth); "Draft" opens the one-time modal (Markdown in → スライドにする → Edit).
  * Runs against the Vite dev server (playwright.config webServer).
  */
 import { test, expect } from "@playwright/test";
@@ -21,23 +21,23 @@ test.describe("SlideCraft", () => {
     await expect(page.getByText(/Slide Editor/)).toBeVisible();
   });
 
-  test("Import opens the Initialize modal (Markdown editor + split preview)", async ({ page }) => {
-    await page.getByRole("button", { name: /Import/ }).click();
-    await expect(page.getByText(/Initialize/)).toBeVisible();
+  test("Draft opens the modal (Markdown editor + split preview)", async ({ page }) => {
+    await page.getByRole("button", { name: /Draft/ }).click();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
     await expect(page.getByText(/Slide Preview/)).toBeVisible();
+    await expect(page.getByRole("button", { name: /スライドにする/ })).toBeVisible();
   });
 
-  test("Initialize: 確定 commits and returns to Edit", async ({ page }) => {
-    await page.getByRole("button", { name: /Import/ }).click();
+  test("Draft: スライドにする commits and returns to Edit", async ({ page }) => {
+    await page.getByRole("button", { name: /Draft/ }).click();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
-    await page.getByRole("button", { name: /確定/ }).click();
+    await page.getByRole("button", { name: /スライドにする/ }).click();
     await expect(page.getByText("Markdown Editor")).toHaveCount(0);
     await expect(page.getByText("Slides", { exact: true })).toBeVisible();
   });
 
   test("preview renders slide cards for the sample deck", async ({ page }) => {
-    await page.getByRole("button", { name: /Import/ }).click();
+    await page.getByRole("button", { name: /Draft/ }).click();
     await page.waitForTimeout(1500); // serialize + debounced parse + distill
     const cards = page.locator("[style*='position: relative'][style*='overflow: hidden']");
     await expect(cards.first()).toBeVisible({ timeout: 8000 });
@@ -76,8 +76,8 @@ test.describe("SlideCraft", () => {
     await expect(page.getByRole("button", { name: "このスライド" })).toHaveCount(0);
   });
 
-  test("does not crash on invalid editor input (in the Initialize modal)", async ({ page }) => {
-    await page.getByRole("button", { name: /Import/ }).click();
+  test("does not crash on invalid editor input (in the Draft modal)", async ({ page }) => {
+    await page.getByRole("button", { name: /Draft/ }).click();
     const editor = page.locator(".cm-editor .cm-content");
     await editor.click();
     await page.keyboard.press("Control+a");

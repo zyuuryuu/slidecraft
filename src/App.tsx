@@ -72,10 +72,10 @@ export default function App() {
         <div className="flex items-center gap-2 px-3 py-2">
           <button
             onClick={handleEnterImport}
-            title="原稿 / Markdown から取り込み・作成（Initialize）"
+            title="原稿（テキスト）からスライドを作る・取り込む"
             className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40"
           >
-            📄 Import
+            📝 Draft
           </button>
         </div>
       </div>
