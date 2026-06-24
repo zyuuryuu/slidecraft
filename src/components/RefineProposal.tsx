@@ -45,7 +45,7 @@ export default function RefineProposal({
       <div className="w-full max-w-3xl max-h-[85vh] flex flex-col bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl">
         {/* Header */}
         <div className="px-4 py-3 border-b border-[#2D3A6E]">
-          <div className="text-sm text-[#93C5FD] font-medium">✨ まとめて整える — 確認</div>
+          <div className="text-sm text-[#93C5FD] font-medium">整形の確認</div>
           <div className="text-xs text-gray-400 mt-1">
             {nothing
               ? converged

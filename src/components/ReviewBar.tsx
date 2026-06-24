@@ -2,40 +2,46 @@
  * ReviewBar — the "整形レビュー" strip, shown both in the Edit home and in the
  * Initialize modal.
  *
- * Triaged into ⚠ 課題 (should fix) and 💡 提案 (optional). Each chip jumps to its
- * slide; a pure key-value list also offers "→表" (deterministic, instant, undoable —
- * deck-op in Edit, Markdown-span in the Initialize modal). AI fixes are NOT here —
- * they live in the Edit AI dock with a before→after diff + 採用/却下, so no edit is
- * ever applied blind.
+ * Triaged into ⚠ 課題 (should fix) and 💡 提案 (optional). Each chip jumps to its slide
+ * and offers the RIGHT fix:
+ *  - a pure key-value list → "→表" (deterministic, instant, undoable),
+ *  - an AI-needing issue (condense / title / overflow) → "✨直す", which hands off to
+ *    the AI dock: it selects the slide and opens AI Assist with a fix prompt pre-filled,
+ *    so the human sees + edits the instruction before generating (never a silent auto-AI).
+ * The whole-deck button does only the DETERMINISTIC batch ("決定論で整える").
  */
 
-import { useState } from "react";
 import type { DeckIssue } from "../engine/deck-diagnostics";
-import type { RefineLevel } from "../engine/refine";
+
+/** A human-readable, editable fix instruction derived from the issue's levers. */
+function fixPromptForIssue(d: DeckIssue): string {
+  if (d.levers.includes("title")) return "このスライドに、内容を表す簡潔なタイトルを付けてください。";
+  if (d.levers.includes("split")) return "情報が多すぎて1スライドに収まりません。要点に絞り、各箇条書きを短いキーフレーズ（目安28字以内）にしてください。情報は省かないでください。";
+  if (d.levers.includes("condense")) return "各箇条書きを短いキーフレーズ（目安28字以内）に要約してください。文章ではなく要点に。情報は省かないでください。";
+  return "このスライドを、レイアウトに収まるよう簡潔に整えてください。";
+}
 
 interface ReviewBarProps {
   warnIssues: DeckIssue[];
   tipIssues: DeckIssue[];
   onJump: (slideIndex: number) => void;
   onFixDeterministic: (issue: DeckIssue) => void;
-  /** Run the whole-deck closed loop at the chosen intensity (stage C). Absent in the
-   *  Initialize modal, where fixes are Markdown-span rewrites. */
-  onRefine?: (level: RefineLevel) => void;
-  onCancelRefine?: () => void;
+  /** Hand off an AI-needing issue to the AI dock (select slide + pre-fill the prompt). */
+  onAiFix?: (slideIndex: number, prompt: string) => void;
+  /** Run the whole-deck DETERMINISTIC batch (→表 on every key-value slide). Absent in
+   *  the Initialize modal, where fixes are Markdown-span rewrites. */
+  onRefine?: () => void;
   refining?: boolean;
-  aiReady?: boolean;
 }
 
-export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onRefine, onCancelRefine, refining, aiReady }: ReviewBarProps) {
-  // Intensity: 2 = deterministic only (safe), 3 = + AI for the residue (condense/title).
-  // Default to AI when a provider is ready, else deterministic.
-  const [level, setLevel] = useState<2 | 3>(aiReady ? 3 : 2);
+export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onAiFix, onRefine, refining }: ReviewBarProps) {
   if (warnIssues.length === 0 && tipIssues.length === 0) return null;
-  const effLevel: RefineLevel = !aiReady && level === 3 ? 2 : level;
 
   const chip = (d: DeckIssue, key: string, warn: boolean) => {
     // Pure key-value list → deterministic table. Overflow (split+...) is not key-value.
     const canTable = d.levers.includes("visualize") && !d.levers.includes("split");
+    // condense / title / overflow → needs the AI (assisted handoff).
+    const needsAi = onAiFix && (d.levers.includes("condense") || d.levers.includes("title"));
     return (
       <span
         key={key}
@@ -53,9 +59,18 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
           <button
             onClick={() => onFixDeterministic(d)}
             title="表に変換（決定論・元に戻せます）"
-            className="px-1.5 py-0.5 rounded-r border-l border-[#252b45] text-[#5eead4] hover:bg-[#2D3A6E]"
+            className="px-1.5 py-0.5 border-l border-[#252b45] text-[#5eead4] hover:bg-[#2D3A6E]"
           >
             →表
+          </button>
+        )}
+        {needsAi && (
+          <button
+            onClick={() => onAiFix(d.slideIndex, fixPromptForIssue(d))}
+            title="AI Assist を開いて直す（指示はプリセット・確認/編集してから生成）"
+            className="px-1.5 py-0.5 border-l border-[#252b45] text-[#c4b5fd] hover:bg-[#2D3A6E]"
+          >
+            ✨直す
           </button>
         )}
       </span>
@@ -71,33 +86,15 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
         {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
       </div>
       {onRefine && (
-        <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-[#2D3A6E]">
-          <select
-            value={level}
-            onChange={(e) => setLevel(Number(e.target.value) as 2 | 3)}
-            title="整形の強度：決定論レバーを先に当て、AI は残った課題だけに使います"
-            className="bg-[#1a1f3a] border border-[#2D3A6E] rounded text-white px-1 py-0.5"
+        <div className="flex items-center shrink-0 pl-2 border-l border-[#2D3A6E]">
+          <button
+            onClick={onRefine}
+            disabled={refining}
+            title="表に変換できる課題を一括で整える（決定論・元に戻せます）。AIは使いません"
+            className="px-2 py-0.5 rounded bg-[#1f2a4d] text-[#5eead4] hover:bg-[#2D3A6E] border border-[#2D3A6E] disabled:opacity-50"
           >
-            <option value={2}>決定論のみ</option>
-            <option value={3} disabled={!aiReady}>{aiReady ? "AIも使う" : "AIも使う（未接続）"}</option>
-          </select>
-          {refining ? (
-            <button
-              onClick={onCancelRefine}
-              title="整形を中止（実行中のAIタスクも止めます）"
-              className="px-2 py-0.5 rounded bg-amber-600 text-white hover:bg-amber-700"
-            >
-              ✕ 中止
-            </button>
-          ) : (
-            <button
-              onClick={() => onRefine(effLevel)}
-              title="課題のあるスライドを一括で整える（決定論先行→残りだけAI）。結果はレビューしてから採用"
-              className="px-2 py-0.5 rounded bg-[#3B82F6] text-white hover:bg-[#2563EB]"
-            >
-              ✨ まとめて整える
-            </button>
-          )}
+            {refining ? "整形中…" : "決定論で整える"}
+          </button>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
+import { useState } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
@@ -47,6 +48,16 @@ export default function App() {
     },
     aiReady: ai.connection.ok,
   });
+
+  // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
+  // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
+  // re-seeds even when the same issue is clicked twice.
+  const [aiSeed, setAiSeed] = useState<{ prompt: string; ts: number } | undefined>(undefined);
+  const handleAiFix = (slideIndex: number, prompt: string) => {
+    selectSlide(slideIndex);
+    setShowAiPanel(true);
+    setAiSeed({ prompt, ts: Date.now() });
+  };
 
   // Triage the review: 課題 (warn = overflow / no title, should fix) vs 提案 (info =
   // condense / table-able, optional) so the skippable ones read as skippable.
@@ -93,10 +104,9 @@ export default function App() {
           tipIssues={tipIssues}
           onJump={(i) => selectSlide(i)}
           onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
-          onRefine={refine.runRefine}
-          onCancelRefine={refine.cancelRefine}
+          onAiFix={handleAiFix}
+          onRefine={() => refine.runRefine(2)}
           refining={refine.refining}
-          aiReady={ai.connection.ok}
         />
         <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
@@ -164,6 +174,7 @@ export default function App() {
             onApplySlide={handleApplySlide}
             activeSlideNum={activeSlide + 1}
             selectedCount={selected?.size ?? 1}
+            seed={aiSeed}
             ai={ai}
           />
         )}

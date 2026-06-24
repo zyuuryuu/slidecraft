@@ -23,6 +23,8 @@ interface AiPanelProps {
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
+  /** Pre-fill the instruction box (ReviewBar "✨直す" handoff). `ts` re-seeds on repeat. */
+  seed?: { prompt: string; ts: number };
   /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
   ai: AiGeneration;
 }
@@ -33,12 +35,23 @@ export default function AiPanel({
   onApplySlide,
   activeSlideNum,
   selectedCount = 1,
+  seed,
   ai,
 }: AiPanelProps) {
   const [userRequest, setUserRequest] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<"gen" | "tasks">("gen");
   const runningCount = ai.tasks.filter((t) => t.status === "running").length;
+
+  // Pre-fill the instruction when handed off from the ReviewBar ("✨直す"). Keyed on
+  // seed.ts so re-clicking the same issue re-seeds; switches to the gen tab.
+  useEffect(() => {
+    if (seed) {
+      setUserRequest(seed.prompt);
+      setTab("gen");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed?.ts]);
 
   // Resizable height: drag the top edge to grow the dock upward (persisted). The dock
   // is bottom-anchored, so height = viewport bottom − pointer Y.

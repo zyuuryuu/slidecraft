@@ -54,17 +54,22 @@ test.describe("SlideCraft", () => {
     expect((await download).suggestedFilename()).toMatch(/\.pptx$/);
   });
 
-  test("まとめて整える: the review bar opens the closed-loop proposal modal", async ({ page }) => {
-    // The sample deck has long-bullet (condense) tips → the review bar shows + offers
-    // the whole-deck refiner. Clicking it runs the loop and opens the review modal.
-    const refineBtn = page.getByRole("button", { name: /まとめて整える/ });
+  test("決定論で整える: opens the deterministic-batch proposal modal", async ({ page }) => {
+    // The sample deck has review issues → the bar shows + offers the deterministic batch.
+    const refineBtn = page.getByRole("button", { name: /決定論で整える/ });
     await expect(refineBtn).toBeVisible({ timeout: 8000 });
     await refineBtn.click();
-    await expect(page.getByText(/まとめて整える — 確認/)).toBeVisible({ timeout: 8000 });
-    // No provider configured + only condense issues → the deterministic pass applies
-    // nothing; the modal says so and offers 閉じる (never silently changes the deck).
+    await expect(page.getByText(/整形の確認/)).toBeVisible({ timeout: 8000 });
     await page.getByRole("button", { name: /閉じる|キャンセル/ }).click();
-    await expect(page.getByText(/まとめて整える — 確認/)).toHaveCount(0);
+    await expect(page.getByText(/整形の確認/)).toHaveCount(0);
+  });
+
+  test("✨直す: hands an AI issue off to AI Assist with a pre-filled prompt", async ({ page }) => {
+    // The sample deck's long-bullet (condense) chips offer ✨直す → opens AI Assist
+    // pre-filled (select slide + prompt), never a silent auto-AI.
+    await page.getByRole("button", { name: "✨直す" }).first().click();
+    await expect(page.getByText(/編集対象:/)).toBeVisible({ timeout: 8000 });
+    await expect(page.getByPlaceholder(/このスライドへの指示/)).toHaveValue(/要約|キーフレーズ|タイトル|簡潔/);
   });
 
   test("AI Assist hosts the task list (タスク tab)", async ({ page }) => {
