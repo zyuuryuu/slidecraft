@@ -100,12 +100,14 @@ interface SlideCardProps {
   masterBgColor: string; // hex without #
   scale: number;
   isActive?: boolean;
-  onClick?: () => void;
+  /** In the multi-selection set (highlighted) but not necessarily the focused slide. */
+  selected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
   /** When set, the embedded diagram is drag-editable and reports new YAML. */
   onDiagramChange?: (yaml: string) => void;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, onClick, onDiagramChange }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
   const contentMap = new Map(slide.placeholders.map((p) => [p.idx, p]));
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
@@ -123,7 +125,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         position: "relative",
         overflow: "hidden",
         borderRadius: 4,
-        border: isActive ? "2px solid #3B82F6" : "1px solid #333",
+        border: isActive ? "2px solid #3B82F6" : selected ? "2px solid rgba(59,130,246,0.55)" : "1px solid #333",
+        boxShadow: selected && !isActive ? "0 0 0 2px rgba(59,130,246,0.2)" : undefined,
         cursor: "pointer",
         flexShrink: 0,
       }}

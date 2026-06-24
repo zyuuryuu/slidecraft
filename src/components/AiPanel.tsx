@@ -15,24 +15,24 @@ import AiTasksPanel from "./AiTasksPanel";
 const AIPANEL_HEIGHT_KEY = "slidecraft_aipanel_h";
 
 interface AiPanelProps {
-  onApply: (markdown: string) => void;
   onClose: () => void;
-  /** Markdown of the active slide — enables the token-cheap "this slide" scope. */
+  /** Markdown of the FOCUSED slide — the AI edits this one (scope = slide-list selection). */
   currentSlideMd?: string;
-  /** Apply an edited single slide back to the active slide only. */
+  /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string) => void;
-  /** Template capability summary prepended to whole-deck generation. */
-  templateHint?: string;
+  /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
+  activeSlideNum?: number;
+  selectedCount?: number;
   /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
   ai: AiGeneration;
 }
 
 export default function AiPanel({
-  onApply,
   onClose,
   currentSlideMd,
   onApplySlide,
-  templateHint,
+  activeSlideNum,
+  selectedCount = 1,
   ai,
 }: AiPanelProps) {
   const [userRequest, setUserRequest] = useState("");
@@ -73,33 +73,26 @@ export default function AiPanel({
     };
   }, []);
 
+  // The dock edits the FOCUSED slide (text + any figure together as Markdown). Scope is
+  // the slide-list selection now — no toggle. Whole-deck GENERATION moved to Initialize
+  // (📄 Import → ✨AI生成); this dock is purely "edit the focused slide".
   const canSlide = !!currentSlideMd && !!onApplySlide;
-  // "このスライド" edits the WHOLE slide as Markdown (text + any figure together) —
-  // it covers diagram editing too, so there's no separate "図表" scope. Falls back
-  // to whole-deck when no single slide is active.
-  const [scope, setScope] = useState<"deck" | "slide">("slide");
-  const eff = scope === "slide" && !canSlide ? "deck" : scope;
-  const slideScope = eff === "slide";
+  const slideScope = canSlide;
 
-  const ready = ai.canGenerate(userRequest);
+  const ready = ai.canGenerate(userRequest) && canSlide;
   const field = "px-2 py-1 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-xs text-white";
 
   const doGenerate = () => {
-    if (slideScope && currentSlideMd) {
-      // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
-      ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
-    } else {
-      // Whole-deck generation gets the template's capabilities (kinds/columns/capacity).
-      ai.generate(templateHint ? `${templateHint}\n\n${userRequest}` : userRequest, "slides");
-    }
+    if (!currentSlideMd) return;
+    // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
+    ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
   };
 
   // Diagnostics-driven per-slide fixing lives in the ReviewBar ("まとめて整える") now —
-  // this dock is just freeform generate/edit + the task list, kept simple.
+  // this dock is just freeform edit of the focused slide + the task list, kept simple.
 
   const doApply = () => {
-    if (slideScope && onApplySlide) onApplySlide(ai.result);
-    else onApply(ai.result);
+    if (onApplySlide) onApplySlide(ai.result);
   };
 
   const toneColor =
@@ -241,26 +234,18 @@ export default function AiPanel({
       <>
       {/* Scope + Prompt — grows with the dock so the instruction box isn't stuck at 2 rows */}
       <div className="px-3 py-2 flex flex-col gap-2 flex-1 min-h-0">
-        {canSlide && (
-          <div className="flex items-center gap-1 text-xs flex-wrap">
-            <span className="text-gray-500 mr-1">対象:</span>
-            <button
-              onClick={() => setScope("slide")}
-              className={`px-2 py-0.5 rounded ${eff === "slide" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
-            >
-              このスライド
-            </button>
-            <button
-              onClick={() => setScope("deck")}
-              className={`px-2 py-0.5 rounded ${eff === "deck" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"}`}
-            >
-              デッキ全体
-            </button>
-            {slideScope && (
-              <span className="text-gray-500 ml-1">— このスライドだけ送って編集（トークン節約）</span>
-            )}
-          </div>
-        )}
+        {/* Scope = the slide-list selection (no toggle). Edits the focused slide. */}
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <span>編集対象:</span>
+          {canSlide ? (
+            <span className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD]">スライド {activeSlideNum}</span>
+          ) : (
+            <span className="text-gray-500">スライドを選択してください</span>
+          )}
+          {selectedCount > 1 && (
+            <span className="text-gray-500">— {selectedCount} 枚選択中（一括編集は近日対応）</span>
+          )}
+        </div>
         <div className="flex gap-2 flex-1 min-h-0">
           <textarea
             value={userRequest}

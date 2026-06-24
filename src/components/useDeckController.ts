@@ -46,6 +46,9 @@ export function useDeckController() {
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  // Slide-list selection: `activeSlide` is the FOCUSED slide (editor/AI target);
+  // `selected` is the highlighted set (multi-select → future batch ops / scope).
+  const [selected, setSelected] = useState<Set<number>>(() => new Set([0]));
   const [gotoLine, setGotoLine] = useState<{ line: number; ts: number } | undefined>(undefined);
   const [templateName, setTemplateName] = useState("Midnight Executive");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +187,7 @@ export function useDeckController() {
       setMdText(md);
       parseMdText(md, "commit");
       setActiveSlide(0);
+      setSelected(new Set([0])); // reset selection on a fresh deck
       setSubMode("edit");
     },
     [parseMdText],
@@ -383,10 +387,36 @@ export function useDeckController() {
     [deck],
   );
 
+  // Slide-list selection: plain = single, ⌘/Ctrl = toggle, Shift = range from the focus
+  // anchor. Updates the focused slide + the highlighted set.
+  const selectSlide = useCallback(
+    (index: number, mods?: { shift?: boolean; meta?: boolean }) => {
+      const count = deck?.slides.length ?? 0;
+      if (index < 0 || index >= count) return;
+      setSelected((prev) => {
+        if (mods?.meta) {
+          const next = new Set(prev);
+          if (next.has(index) && next.size > 1) next.delete(index);
+          else next.add(index);
+          return next;
+        }
+        if (mods?.shift) {
+          const next = new Set<number>();
+          for (let i = Math.min(activeSlide, index); i <= Math.max(activeSlide, index); i++) next.add(i);
+          return next;
+        }
+        return new Set([index]);
+      });
+      setActiveSlide(index);
+    },
+    [deck, activeSlide],
+  );
+
   // ── Preview click → editor jump ──
   const handleSlideClick = useCallback(
     (index: number) => {
       setActiveSlide(index);
+      setSelected(new Set([index]));
       if (!deck) return;
       const slide = deck.slides[index];
       if (slide?.sourceLineStart) {
@@ -399,7 +429,7 @@ export function useDeckController() {
   return {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
-    filePath, activeSlide, setActiveSlide, gotoLine, templateName,
+    filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,

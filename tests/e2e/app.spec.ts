@@ -74,6 +74,13 @@ test.describe("SlideCraft", () => {
     await expect(page.getByText("まだ AI タスクはありません")).toBeVisible();
   });
 
+  test("AI Assist scope = the slide-list selection (no 対象 toggle)", async ({ page }) => {
+    await page.getByRole("button", { name: /AI Assist/ }).click();
+    await expect(page.getByText(/編集対象:/)).toBeVisible(); // selection indicator
+    await expect(page.getByRole("button", { name: "デッキ全体" })).toHaveCount(0); // toggle removed
+    await expect(page.getByRole("button", { name: "このスライド" })).toHaveCount(0);
+  });
+
   test("does not crash on invalid editor input (in the Initialize modal)", async ({ page }) => {
     await page.getByRole("button", { name: /Import/ }).click();
     const editor = page.locator(".cm-editor .cm-content");

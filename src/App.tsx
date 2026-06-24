@@ -18,10 +18,10 @@ export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
-    filePath, activeSlide, setActiveSlide, gotoLine, templateName,
+    filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize,
+    handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
@@ -91,7 +91,7 @@ export default function App() {
         <ReviewBar
           warnIssues={warnIssues}
           tipIssues={tipIssues}
-          onJump={setActiveSlide}
+          onJump={(i) => selectSlide(i)}
           onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
           onRefine={refine.runRefine}
           onCancelRefine={refine.cancelRefine}
@@ -105,7 +105,7 @@ export default function App() {
               Slides
             </div>
             <div className="flex-1 min-h-0">
-              <SlideList deck={deck} template={templateData} activeIndex={activeSlide} onSelect={setActiveSlide} />
+              <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide} />
             </div>
           </div>
 
@@ -159,11 +159,11 @@ export default function App() {
         </div>
         {showAiPanel && (
           <AiPanel
-            onApply={handleAiApply}
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
             onApplySlide={handleApplySlide}
-            templateHint={deckHint}
+            activeSlideNum={activeSlide + 1}
+            selectedCount={selected?.size ?? 1}
             ai={ai}
           />
         )}

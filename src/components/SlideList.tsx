@@ -15,13 +15,16 @@ interface SlideListProps {
   deck: DeckIR | null;
   template: TemplateData | null;
   activeIndex: number;
-  onSelect: (index: number) => void;
+  /** Highlighted multi-selection (focused = activeIndex). */
+  selected?: Set<number>;
+  onSelect: (index: number, mods?: { shift?: boolean; meta?: boolean }) => void;
 }
 
 export default function SlideList({
   deck,
   template,
   activeIndex,
+  selected,
   onSelect,
 }: SlideListProps) {
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
@@ -52,7 +55,8 @@ export default function SlideList({
               masterBgColor={template?.masterBgColor ?? "FFFFFF"}
               scale={THUMB_SCALE}
               isActive={activeIndex === i}
-              onClick={() => onSelect(i)}
+              selected={selected?.has(i)}
+              onClick={(e) => onSelect(i, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey })}
             />
             <span className="text-[10px] text-gray-500 mt-0.5">{i + 1}</span>
           </div>
