@@ -6,7 +6,7 @@
  * generation logic with the AI dialog via useAiGeneration (no divergence).
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { PROVIDERS } from "../ipc/ai";
 import type { AiGeneration } from "./useAiGeneration";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
@@ -14,6 +14,8 @@ import type { DeckIssue } from "../engine/deck-diagnostics";
 import type { FitBox } from "../engine/distill";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
+
+const AIPANEL_HEIGHT_KEY = "slidecraft_aipanel_h";
 
 interface AiPanelProps {
   onApply: (markdown: string) => void;
@@ -46,6 +48,39 @@ export default function AiPanel({
   const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<"gen" | "tasks">("gen");
   const runningCount = ai.tasks.filter((t) => t.status === "running").length;
+
+  // Resizable height: drag the top edge to grow the dock upward (persisted). The dock
+  // is bottom-anchored, so height = viewport bottom − pointer Y.
+  const [panelH, setPanelH] = useState(() => {
+    const saved = Number(localStorage.getItem(AIPANEL_HEIGHT_KEY));
+    return Number.isFinite(saved) && saved >= 220 ? saved : 340;
+  });
+  const draggingH = useRef(false);
+  useEffect(() => localStorage.setItem(AIPANEL_HEIGHT_KEY, String(Math.round(panelH))), [panelH]);
+  const onResizeDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingH.current = true;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingH.current) return;
+      setPanelH(Math.min(window.innerHeight - 120, Math.max(220, window.innerHeight - e.clientY)));
+    };
+    const onUp = () => {
+      if (!draggingH.current) return;
+      draggingH.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   const canSlide = !!currentSlideMd && !!onApplySlide;
   // "このスライド" edits the WHOLE slide as Markdown (text + any figure together) —
@@ -86,7 +121,14 @@ export default function AiPanel({
   };
 
   return (
-    <div className="border-t border-[#3B82F6]/40 bg-[#0a0e1a] flex flex-col shrink-0" style={{ maxHeight: 340 }}>
+    <div className="border-t border-[#3B82F6]/40 bg-[#0a0e1a] flex flex-col shrink-0" style={{ height: panelH }}>
+      {/* Drag the top edge to resize the dock (double-click resets) */}
+      <div
+        onMouseDown={onResizeDown}
+        onDoubleClick={() => setPanelH(340)}
+        title="ドラッグで高さ変更（ダブルクリックでリセット）"
+        className="h-1.5 shrink-0 cursor-row-resize bg-[#2D3A6E] hover:bg-[#3B82F6] transition-colors"
+      />
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#2D3A6E]">
         <span className="text-sm text-[#93C5FD] font-medium">✨ AI Assist</span>
@@ -221,6 +263,7 @@ export default function AiPanel({
         {runningCount > 0 && <span className="text-[10px] text-[#93C5FD] animate-pulse ml-1">● {runningCount} 実行中</span>}
       </div>
 
+      <div className="flex-1 min-h-0 flex flex-col">
       {tab === "tasks" ? (
         <AiTasksPanel tasks={ai.tasks} onCancel={ai.cancelTask} onClear={ai.clearTasks} />
       ) : (
@@ -301,7 +344,7 @@ export default function AiPanel({
       {/* Result — for a slide edit show before→after diff so it's never applied
           blind (you see what changed/was dropped) → 採用/却下. Deck gen keeps raw. */}
       {ai.result && (
-        <div className="flex flex-col min-h-0 border-t border-[#2D3A6E]">
+        <div className="flex-1 flex flex-col min-h-0 border-t border-[#2D3A6E]">
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-gray-400">
               {ai.generating ? "生成中…" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
@@ -326,9 +369,9 @@ export default function AiPanel({
             </div>
           </div>
           {slideScope && currentSlideMd && !ai.generating ? (
-            <DiffView before={currentSlideMd} after={ai.result} />
+            <DiffView before={currentSlideMd} after={ai.result} fill />
           ) : (
-            <pre className="overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap" style={{ maxHeight: 150 }}>
+            <pre className="flex-1 min-h-0 overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap">
               {ai.result}
             </pre>
           )}
@@ -336,6 +379,7 @@ export default function AiPanel({
       )}
       </>
       )}
+      </div>
     </div>
   );
 }

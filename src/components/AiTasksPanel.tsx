@@ -27,7 +27,7 @@ export default function AiTasksPanel({
   onClear: () => void;
 }) {
   return (
-    <div className="flex flex-col text-xs">
+    <div className="flex-1 min-h-0 flex flex-col text-xs">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#2D3A6E] shrink-0">
         <span className="text-gray-400">{tasks.length} 件のタスク</span>
         {tasks.length > 0 && (
@@ -36,7 +36,7 @@ export default function AiTasksPanel({
           </button>
         )}
       </div>
-      <div className="overflow-y-auto" style={{ maxHeight: 260 }}>
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {tasks.length === 0 ? (
           <div className="px-3 py-6 text-gray-500 text-center">まだ AI タスクはありません</div>
         ) : (

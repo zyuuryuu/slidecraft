@@ -6,11 +6,14 @@
 
 import { lineDiff, diffStat } from "../engine/line-diff";
 
-export default function DiffView({ before, after }: { before: string; after: string }) {
+export default function DiffView({ before, after, fill }: { before: string; after: string; fill?: boolean }) {
   const rows = lineDiff(before, after);
   const { del, add } = diffStat(rows);
   return (
-    <div className="overflow-auto text-[11px] font-mono leading-relaxed" style={{ maxHeight: 160 }}>
+    <div
+      className={`overflow-auto text-[11px] font-mono leading-relaxed ${fill ? "flex-1 min-h-0" : ""}`}
+      style={fill ? undefined : { maxHeight: 160 }}
+    >
       <div className="px-3 py-0.5 text-gray-500 sticky top-0 bg-[#0a0e1a]">
         変更: <span className="text-red-400">−{del}</span> <span className="text-green-400">+{add}</span>
         {del === 0 && add === 0 && <span className="text-gray-600"> （変更なし）</span>}
