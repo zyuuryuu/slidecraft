@@ -23,7 +23,7 @@ export default function App() {
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
-    diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd,
+    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
     catalog, setDeck,
   } = useDeckController();
@@ -164,8 +164,6 @@ export default function App() {
             currentSlideMd={currentSlideMd}
             onApplySlide={handleApplySlide}
             templateHint={deckHint}
-            issues={activeSlideIssues}
-            contentBox={contentBox}
             ai={ai}
           />
         )}
