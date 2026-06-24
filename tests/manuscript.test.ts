@@ -39,6 +39,22 @@ describe("structureManuscript", () => {
     expect(cmp?.table?.rows[0]).toEqual(["項目", "現行", "新"]); // GFM table preserved → native table
   });
 
+  it("H1 preamble → title-less lead slide, NOT the cover subtitle (no data loss)", () => {
+    // The old behavior put the 1st preamble line on the cover as ## subtitle and DROPPED
+    // the rest (e.g. an attendees line). It must keep every line on its own lead slide.
+    const md = "# キックオフ議事録\n\n2026-06-23 会議室B\n出席：田中、佐藤、鈴木\n\n## 議題\n\n- A\n- B";
+    const structured = structureManuscript(md);
+    expect(structured.split("---")[0]).not.toMatch(/\n##\s/); // cover: title only, no subtitle
+
+    const deck = parseMd(structured);
+    const cover = deck.slides[0];
+    expect(titleOf(cover)).toBe("キックオフ議事録");
+    expect(cover.placeholders.find((p) => p.idx === "1")).toBeUndefined(); // no subtitle on cover
+    // every preamble line survives somewhere in the deck (incl. the attendees line)
+    const json = JSON.stringify(deck);
+    for (const name of ["出席", "田中", "佐藤", "鈴木"]) expect(json).toContain(name);
+  });
+
   it("VISUALIZE: key-value bullets → native table; non-pair bullets stay bullets", () => {
     const ms = `# 製品X
 

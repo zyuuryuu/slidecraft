@@ -120,9 +120,13 @@ export function structureManuscript(md: string): string {
       continue;
     }
     if (!titleDone && sec.level === 1) {
-      const lead = sec.lines.map((l) => l.trim()).find((l) => l && !l.startsWith("#"));
-      slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}${lead ? `\n## ${lead}` : ""}`);
+      slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}`); // cover: title only
       titleDone = true;
+      // The H1's preamble (a description / date / attendees) is NOT a subtitle — turning
+      // it into one drops every line past the first (data loss) and clutters the cover.
+      // Keep it ALL on its own title-less lead-in slide instead.
+      const body = sectionBody(sec.lines);
+      if (body) slides.push(body);
       continue;
     }
     const body = sectionBody(sec.lines);
