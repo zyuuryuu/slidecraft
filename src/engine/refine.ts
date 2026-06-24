@@ -27,8 +27,9 @@ import { autoSelectLayout } from "./template-loader";
 export type RefineLevel = 1 | 2 | 3;
 
 /** Inject the AI: a slide-fix request (slideFixRequest) → the fixed slide's Markdown.
- *  Keeps the loop pure/testable; stage D (MCP) re-uses it with a different backend. */
-export type AiSlideFix = (request: string) => Promise<string>;
+ *  `meta.slideIndex` lets the host label the task. Keeps the loop pure/testable; stage
+ *  D (MCP) re-uses it with a different backend. */
+export type AiSlideFix = (request: string, meta: { slideIndex: number; signal?: AbortSignal }) => Promise<string>;
 
 export interface RefineChange {
   slideIndex: number;
@@ -72,7 +73,7 @@ function groupBySlide(issues: DeckIssue[]): Map<number, DeckIssue[]> {
 export async function refineDeck(
   deck: DeckIR,
   catalog: LayoutCatalog,
-  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number },
+  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; signal?: AbortSignal },
 ): Promise<RefineResult> {
   const maxIter = opts.maxIterations ?? 4;
   const box = contentBodyBox(catalog);
@@ -81,12 +82,14 @@ export async function refineDeck(
   let iterations = 0;
 
   for (; iterations < maxIter; iterations++) {
+    if (opts.signal?.aborted) break; // user cancelled the loop
     const issues = diagnoseDeck(current, catalog);
     if (issues.length === 0) break; // converged
     if (opts.level < 2) break; // Lv1 = diagnose only (flag, don't transform)
 
     let changedThisPass = false;
     for (const [idx, slideIssues] of groupBySlide(issues)) {
+      if (opts.signal?.aborted) break;
       if (!current.slides[idx]) continue;
       const before = slideToMd(current, idx, catalog);
 
@@ -107,7 +110,13 @@ export async function refineDeck(
       if (opts.level >= 3 && opts.aiFix) {
         const aiIssue = slideIssues.find((d) => d.levers.includes("condense") || d.levers.includes("title"));
         if (aiIssue) {
-          const after = (await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)))).trim();
+          // One slide's AI failure (or cancel) must not abort the whole batch — skip it.
+          let after = "";
+          try {
+            after = (await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)), { slideIndex: idx, signal: opts.signal })).trim();
+          } catch {
+            continue;
+          }
           const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
           if (newSlide) {
             current = replaceSlide(current, idx, newSlide);

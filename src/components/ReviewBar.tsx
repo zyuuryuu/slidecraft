@@ -21,11 +21,12 @@ interface ReviewBarProps {
   /** Run the whole-deck closed loop at the chosen intensity (stage C). Absent in the
    *  Initialize modal, where fixes are Markdown-span rewrites. */
   onRefine?: (level: RefineLevel) => void;
+  onCancelRefine?: () => void;
   refining?: boolean;
   aiReady?: boolean;
 }
 
-export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onRefine, refining, aiReady }: ReviewBarProps) {
+export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onRefine, onCancelRefine, refining, aiReady }: ReviewBarProps) {
   // Intensity: 2 = deterministic only (safe), 3 = + AI for the residue (condense/title).
   // Default to AI when a provider is ready, else deterministic.
   const [level, setLevel] = useState<2 | 3>(aiReady ? 3 : 2);
@@ -80,14 +81,23 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
             <option value={2}>決定論のみ</option>
             <option value={3} disabled={!aiReady}>{aiReady ? "AIも使う" : "AIも使う（未接続）"}</option>
           </select>
-          <button
-            onClick={() => onRefine(effLevel)}
-            disabled={refining}
-            title="課題のあるスライドを一括で整える（決定論先行→残りだけAI）。結果はレビューしてから採用"
-            className="px-2 py-0.5 rounded bg-[#3B82F6] text-white hover:bg-[#2563EB] disabled:opacity-50"
-          >
-            {refining ? "整形中…" : "✨ まとめて整える"}
-          </button>
+          {refining ? (
+            <button
+              onClick={onCancelRefine}
+              title="整形を中止（実行中のAIタスクも止めます）"
+              className="px-2 py-0.5 rounded bg-amber-600 text-white hover:bg-amber-700"
+            >
+              ✕ 中止
+            </button>
+          ) : (
+            <button
+              onClick={() => onRefine(effLevel)}
+              title="課題のあるスライドを一括で整える（決定論先行→残りだけAI）。結果はレビューしてから採用"
+              className="px-2 py-0.5 rounded bg-[#3B82F6] text-white hover:bg-[#2563EB]"
+            >
+              ✨ まとめて整える
+            </button>
+          )}
         </div>
       )}
     </div>

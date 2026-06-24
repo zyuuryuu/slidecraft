@@ -23,6 +23,32 @@ export interface AiProviderConfig {
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
 export type AiMode = "slides" | "slide" | "diagram" | "diagram-edit";
 
+export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
+/** One AI request as a tracked task — the unit of the central task store. Every
+ *  surface (AiPanel, LlmAssist, the refine loop) submits these, so progress, history
+ *  and cancellation are uniform and a manual request can't silently collide with the
+ *  loop's per-slide calls. */
+export interface AiTask {
+  id: string;
+  mode: AiMode;
+  label: string; // human scope, e.g. "スライド3を整形" / "デッキ生成"
+  prompt: string;
+  status: AiTaskStatus;
+  result: string; // streamed live, then post-processed on done
+  error?: string;
+  startedAt: number;
+  finishedAt?: number;
+}
+
+const MAX_TASKS = 50; // keep the most recent N in history
+
+const MODE_LABEL: Record<AiMode, string> = {
+  slides: "デッキ生成",
+  slide: "スライド整形",
+  diagram: "図の生成",
+  "diagram-edit": "図の編集",
+};
+
 function defaultConfigs(): AiConfigMap {
   const out = {} as AiConfigMap;
   for (const p of PROVIDERS) {
@@ -35,10 +61,13 @@ export function useAiGeneration() {
   const [provider, setProvider] = useState<ProviderId>("claude");
   const [configs, setConfigs] = useState<AiConfigMap>(defaultConfigs);
   const [rememberKey, setRememberKey] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [result, setResult] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  // Central AI task store: the live list (in-flight + history) + which task is the
+  // "foreground" one whose result/error the single-shot surfaces (AiPanel/LlmAssist)
+  // read. abortMap holds one AbortController per running task for cancellation.
+  const [tasks, setTasks] = useState<AiTask[]>([]);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const abortMap = useRef<Map<string, AbortController>>(new Map());
+  const idCounter = useRef(0);
   // Setup-assist state: local Ollama probe (null = not yet checked) + once-flags.
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -138,88 +167,138 @@ export function useAiGeneration() {
     [cfg, preset],
   );
 
-  const generate = useCallback(
-    async (userRequest: string, mode: AiMode) => {
-      if (!canGenerate(userRequest) || generating) return;
+  // Mode-specific post-processing: the model's raw text → the form each surface uses
+  // (slides → engine Markdown, slide → fenced Markdown, diagram-edit → validated YAML).
+  // Returns either a result or a human error — same outcomes as before, centralised so
+  // every task path (foreground + loop) treats responses identically.
+  const postProcess = useCallback((mode: AiMode, raw: string): { result?: string; error?: string } => {
+    if (mode === "slides") {
+      const parsed = extractDeckPlan(raw);
+      return parsed.ok ? { result: serializeMd(deckPlanToDeck(parsed.plan)) } : { error: `Couldn't read the generated plan: ${parsed.error}` };
+    }
+    if (mode === "slide") {
+      const md = stripMarkdownFence(raw);
+      return md ? { result: md } : { error: "Couldn't read the edited slide (empty response)." };
+    }
+    if (mode === "diagram-edit") {
+      const r = parseJsonLoose(raw);
+      if (!r.ok) return { error: "Couldn't find a diagram in the response." };
+      const parsed = DiagramSpecSchema.safeParse(r.value);
+      return parsed.success ? { result: diagramSpecToYaml(parsed.data) } : { error: `Invalid diagram: ${parsed.error.issues[0]?.message}` };
+    }
+    return { result: raw }; // "diagram" → raw passthrough (unchanged from before)
+  }, []);
 
-      if (rememberKey) {
-        localStorage.setItem(AI_CONFIG_STORAGE, JSON.stringify({ provider, configs }));
-      } else {
-        localStorage.removeItem(AI_CONFIG_STORAGE);
-      }
+  const patchTask = useCallback((id: string, patch: Partial<AiTask>) => {
+    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }, []);
 
-      setError(null);
-      setResult("");
-      setGenerating(true);
+  const enqueue = useCallback((prompt: string, mode: AiMode, label: string): AiTask => {
+    const task: AiTask = { id: `t${++idCounter.current}`, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
+    setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
+    return task;
+  }, []);
+
+  // Run ONE task: stream into its result, post-process, settle status. Resolves with
+  // the cleaned result; rejects on error/cancel (the loop awaits this).
+  const runTask = useCallback(
+    async (task: AiTask, externalSignal?: AbortSignal): Promise<string> => {
       const controller = new AbortController();
-      abortRef.current = controller;
-
+      // Let an external signal (e.g. the refine loop's) abort this task's HTTP too.
+      if (externalSignal) {
+        if (externalSignal.aborted) controller.abort();
+        else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+      }
+      abortMap.current.set(task.id, controller);
       try {
         const raw = await generateWithAI({
-          provider,
-          apiKey: cfg.apiKey,
-          baseURL: cfg.baseURL,
-          model: cfg.model,
-          mode,
-          userRequest,
-          onText: setResult,
+          provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL, model: cfg.model,
+          mode: task.mode, userRequest: task.prompt,
+          onText: (t) => patchTask(task.id, { result: t }),
           signal: controller.signal,
         });
-        // Slides come back as a DeckPlan JSON; the engine turns it into correct
-        // SlideCraft Markdown (right layouts/placeholders) for import + editing.
-        if (mode === "slides") {
-          const parsed = extractDeckPlan(raw);
-          if (parsed.ok) {
-            setResult(serializeMd(deckPlanToDeck(parsed.plan)));
-          } else {
-            setError(`Couldn't read the generated plan: ${parsed.error}`);
-          }
-        } else if (mode === "slide") {
-          // Whole-slide Markdown round-trip: the model returns the edited slide's
-          // Markdown (text + any ```diagram/```mermaid block); parseMd turns it back
-          // into a slide on apply, so one edit can revise text AND figure together.
-          const md = stripMarkdownFence(raw);
-          if (md) setResult(md);
-          else setError("Couldn't read the edited slide (empty response).");
-        } else if (mode === "diagram-edit") {
-          // AI returns the updated DiagramSpec JSON → validate → back to YAML.
-          const r = parseJsonLoose(raw);
-          if (!r.ok) {
-            setError("Couldn't find a diagram in the response.");
-          } else {
-            const parsed = DiagramSpecSchema.safeParse(r.value);
-            if (parsed.success) setResult(diagramSpecToYaml(parsed.data));
-            else setError(`Invalid diagram: ${parsed.error.issues[0]?.message}`);
-          }
+        const pp = postProcess(task.mode, raw);
+        if (pp.error) {
+          patchTask(task.id, { status: "error", error: pp.error, finishedAt: Date.now() });
+          throw new Error(pp.error);
         }
+        patchTask(task.id, { status: "done", result: pp.result ?? "", finishedAt: Date.now() });
+        return pp.result ?? "";
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        if (controller.signal.aborted) {
+          patchTask(task.id, { status: "cancelled", finishedAt: Date.now() });
+          throw new Error("cancelled");
+        }
+        const msg = e instanceof Error ? e.message : String(e);
+        patchTask(task.id, { status: "error", error: msg, finishedAt: Date.now() });
+        throw e;
       } finally {
-        setGenerating(false);
-        abortRef.current = null;
+        abortMap.current.delete(task.id);
       }
     },
-    [canGenerate, generating, rememberKey, provider, configs, cfg],
+    [provider, cfg, patchTask, postProcess],
   );
 
-  // One-shot promise variant for the closed-loop refiner (refineDeck's injected
-  // aiFix): returns the cleaned result instead of driving the streaming UI state, so
-  // the loop can call it per-slide. Same provider/model/contract as `generate`.
-  const runOnce = useCallback(
-    async (userRequest: string, mode: AiMode, signal?: AbortSignal): Promise<string> => {
-      const raw = await generateWithAI({
-        provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL, model: cfg.model, mode, userRequest, signal,
-      });
-      return mode === "slide" ? stripMarkdownFence(raw) : raw;
+  const persistConfig = useCallback(() => {
+    if (rememberKey) localStorage.setItem(AI_CONFIG_STORAGE, JSON.stringify({ provider, configs }));
+    else localStorage.removeItem(AI_CONFIG_STORAGE);
+  }, [rememberKey, provider, configs]);
+
+  // Background submit (no foreground tracking) → returns the task id. Errors are
+  // recorded on the task, not thrown here.
+  const submit = useCallback(
+    (prompt: string, mode: AiMode, label: string): string => {
+      const task = enqueue(prompt, mode, label);
+      void runTask(task).catch(() => {});
+      return task.id;
     },
-    [provider, cfg],
+    [enqueue, runTask],
   );
 
-  const cancel = useCallback(() => abortRef.current?.abort(), []);
-  const reset = useCallback(() => {
-    setResult("");
-    setError(null);
+  // Promise variant for the refine loop's per-slide aiFix — resolves with the result.
+  // An optional signal lets the loop's cancel abort this in-flight call.
+  const submitAndWait = useCallback(
+    (prompt: string, mode: AiMode, label: string, signal?: AbortSignal): Promise<string> =>
+      runTask(enqueue(prompt, mode, label), signal),
+    [enqueue, runTask],
+  );
+
+  // Foreground generate (AiPanel / LlmAssist): submit + track as the active task so
+  // result/generating/error reflect it. No single-flight guard — extra clicks just add
+  // tasks (all kept in history); the UI disables the button while generating.
+  const generate = useCallback(
+    (userRequest: string, mode: AiMode) => {
+      if (!canGenerate(userRequest)) return;
+      persistConfig();
+      const task = enqueue(userRequest, mode, MODE_LABEL[mode]);
+      setActiveTaskId(task.id);
+      void runTask(task).catch(() => {});
+    },
+    [canGenerate, persistConfig, enqueue, runTask],
+  );
+
+  const cancel = useCallback(() => {
+    if (activeTaskId) abortMap.current.get(activeTaskId)?.abort();
+  }, [activeTaskId]);
+  const cancelTask = useCallback((id: string) => abortMap.current.get(id)?.abort(), []);
+  const clearTasks = useCallback(() => {
+    setTasks((ts) => ts.filter((t) => t.status === "running")); // keep in-flight, drop history
   }, []);
+
+  // Hide the foreground result/diff (e.g. after apply) without losing it from history.
+  const reset = useCallback(() => setActiveTaskId(null), []);
+  // Back-compat for LlmAssist's manual paste: record it as a done task + make it active.
+  const setResult = useCallback((text: string) => {
+    const task: AiTask = { id: `t${++idCounter.current}`, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
+    setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
+    setActiveTaskId(task.id);
+  }, []);
+
+  // Foreground-task views the single-shot surfaces read (derived from the task store).
+  const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : undefined;
+  const result = activeTask?.result ?? "";
+  const generating = activeTask?.status === "running";
+  const error = activeTask?.status === "error" ? (activeTask.error ?? "エラー") : null;
 
   // One-click: switch to local Ollama, picking a valid installed model.
   const switchToOllama = useCallback(() => {
@@ -262,7 +341,8 @@ export function useAiGeneration() {
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error,
-    canGenerate, generate, runOnce, cancel, reset,
+    canGenerate, generate, cancel, reset,
+    tasks, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
   };

@@ -34,7 +34,7 @@ export default function App() {
   const ai = useAiGeneration();
   const refine = useDeckRefine({
     deck, catalog, setDeck,
-    aiFix: (req) => ai.runOnce(req, "slide"),
+    aiFix: (req, meta) => ai.submitAndWait(req, "slide", `スライド${meta.slideIndex + 1}を整形`, meta.signal),
     aiReady: ai.connection.ok,
   });
 
@@ -83,6 +83,7 @@ export default function App() {
           onJump={setActiveSlide}
           onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
           onRefine={refine.runRefine}
+          onCancelRefine={refine.cancelRefine}
           refining={refine.refining}
           aiReady={ai.connection.ok}
         />
@@ -159,7 +160,14 @@ export default function App() {
         )}
       </div>
 
-      <StatusBar spec={null} error={parseError} filePath={filePath} />
+      <StatusBar
+        spec={null}
+        error={parseError}
+        filePath={filePath}
+        aiTasks={ai.tasks}
+        onCancelTask={ai.cancelTask}
+        onClearTasks={ai.clearTasks}
+      />
 
       {/* Initialize phase (modal): Markdown lives only here → 確定 commits the deck */}
       <InitializeModal
