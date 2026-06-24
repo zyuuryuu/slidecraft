@@ -54,16 +54,6 @@ test.describe("SlideCraft", () => {
     expect((await download).suggestedFilename()).toMatch(/\.pptx$/);
   });
 
-  test("決定論で整える: opens the deterministic-batch proposal modal", async ({ page }) => {
-    // The sample deck has review issues → the bar shows + offers the deterministic batch.
-    const refineBtn = page.getByRole("button", { name: /決定論で整える/ });
-    await expect(refineBtn).toBeVisible({ timeout: 8000 });
-    await refineBtn.click();
-    await expect(page.getByText(/整形の確認/)).toBeVisible({ timeout: 8000 });
-    await page.getByRole("button", { name: /閉じる|キャンセル/ }).click();
-    await expect(page.getByText(/整形の確認/)).toHaveCount(0);
-  });
-
   test("✨直す: hands an AI issue off to AI Assist with a pre-filled prompt", async ({ page }) => {
     // The sample deck's long-bullet (condense) chips offer ✨直す → opens AI Assist
     // pre-filled (select slide + prompt), never a silent auto-AI.

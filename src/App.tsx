@@ -9,11 +9,9 @@ import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
-import RefineProposal from "./components/RefineProposal";
 import { useState } from "react";
 import { useDeckController } from "./components/useDeckController";
-import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
-import { useDeckRefine } from "./components/useDeckRefine";
+import { useAiGeneration } from "./components/useAiGeneration";
 
 export default function App() {
   const {
@@ -24,30 +22,13 @@ export default function App() {
     handleOpen, handleSave, handleGenerate, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
-    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
+    diagnostics, handleFixIssue, handleAutoTidy, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
-    catalog, setDeck,
   } = useDeckController();
 
-  // One shared AI instance for every surface (AiPanel / LlmAssist / refine loop) so
-  // provider + key config can never diverge. The closed-loop refiner (stage C) injects
-  // ai.runOnce as its per-slide aiFix and gates the Lv3 AI pass on a ready connection.
+  // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
+  // config can never diverge.
   const ai = useAiGeneration();
-  const refine = useDeckRefine({
-    deck, catalog, setDeck,
-    // Maps the task store's promise to a retry-aware outcome: a cancel is never retried,
-    // a transient failure (network/timeout/5xx/empty) is — the loop caps the retries.
-    aiFix: async (req, meta) => {
-      const label = `スライド${meta.slideIndex + 1}を整形${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}`;
-      try {
-        return { ok: true, markdown: await ai.submitAndWait(req, "slide", label, meta.signal) };
-      } catch (e) {
-        const c = classifyAiFailure(e, meta.signal);
-        return c.cancelled ? { ok: false, cancelled: true } : { ok: false, cancelled: false, retryable: c.retryable, message: c.message };
-      }
-    },
-    aiReady: ai.connection.ok,
-  });
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -59,10 +40,13 @@ export default function App() {
     setAiSeed({ prompt, ts: Date.now() });
   };
 
-  // Triage the review: 課題 (warn = overflow / no title, should fix) vs 提案 (info =
-  // condense / table-able, optional) so the skippable ones read as skippable.
-  const warnIssues = diagnostics.filter((d) => d.level === "warn");
-  const tipIssues = diagnostics.filter((d) => d.level === "info");
+  // Phase-split the diagnostics: Initialize = STRUCTURE (overflow/split + key-value, which
+  // "自動で整える" handles), Edit = POLISH (the fine details — condense/title — plus →表).
+  // Overflow (split) is Initialize's concern; it's not nagged about in Edit.
+  const editIssues = diagnostics.filter((d) => !d.levers.includes("split"));
+  const initIssues = diagnostics.filter((d) => d.levers.includes("split") || d.levers.includes("visualize"));
+  const warn = (list: typeof diagnostics) => list.filter((d) => d.level === "warn");
+  const tip = (list: typeof diagnostics) => list.filter((d) => d.level === "info");
 
   // While the Initialize modal is open, make the background non-interactive so Tab /
   // clicks can't reach the (visually obscured) Edit surface behind the dimmer.
@@ -100,13 +84,11 @@ export default function App() {
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
         {/* Non-destructive review, where you work — fix in deck (undoable) */}
         <ReviewBar
-          warnIssues={warnIssues}
-          tipIssues={tipIssues}
+          warnIssues={warn(editIssues)}
+          tipIssues={tip(editIssues)}
           onJump={(i) => selectSlide(i)}
           onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
           onAiFix={handleAiFix}
-          onRefine={() => refine.runRefine(2)}
-          refining={refine.refining}
         />
         <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
@@ -197,9 +179,10 @@ export default function App() {
         parseError={parseError}
         activeSlide={activeSlide}
         onSlideClick={handleSlideClick}
-        warnIssues={warnIssues}
-        tipIssues={tipIssues}
+        warnIssues={warn(initIssues)}
+        tipIssues={tip(initIssues)}
         onFixDeterministic={handleFixIssue}
+        onAutoTidy={handleAutoTidy}
         onCursorLine={handleCursorLine}
         gotoLine={gotoLine}
       />
@@ -211,15 +194,6 @@ export default function App() {
         templateHint={deckHint}
         ai={ai}
       />
-
-      {/* Closed-loop refiner: review the proposed before→after changes, then 採用 (one undo) */}
-      {refine.proposal && (
-        <RefineProposal
-          proposal={refine.proposal}
-          onAccept={refine.acceptProposal}
-          onCancel={refine.cancelProposal}
-        />
-      )}
     </>
   );
 }

@@ -90,10 +90,10 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
           <button
             onClick={onRefine}
             disabled={refining}
-            title="表に変換できる課題を一括で整える（決定論・元に戻せます）。AIは使いません"
+            title="詰め込みすぎを自動分割＋key-value を表に（AIなし・元に戻せます）"
             className="px-2 py-0.5 rounded bg-[#1f2a4d] text-[#5eead4] hover:bg-[#2D3A6E] border border-[#2D3A6E] disabled:opacity-50"
           >
-            {refining ? "整形中…" : "決定論で整える"}
+            {refining ? "整形中…" : "自動で整える"}
           </button>
         </div>
       )}

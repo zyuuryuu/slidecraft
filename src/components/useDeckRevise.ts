@@ -15,6 +15,8 @@ import { contentBodyBox } from "../engine/distill";
 import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { structureManuscript } from "../engine/manuscript";
+import { refineDeck } from "../engine/refine";
+import { serializeMd } from "../engine/md-serializer";
 import type { DeckIR } from "../engine/slide-schema";
 import type { LayoutCatalog } from "../engine/template-catalog";
 import type { HistoryMode } from "./useHistoryState";
@@ -76,5 +78,17 @@ export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, a
     [deck, mdText, replaceSlideSpan],
   );
 
-  return { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue };
+  // ── "自動で整える" (Initialize only): apply ALL deterministic levers in one pass —
+  // re-fit/split overloaded slides + key-value → table. No AI. Writes back to mdText so
+  // the live preview updates and it's one undoable editor step; the preview IS the review.
+  const handleAutoTidy = useCallback(async () => {
+    if (!deck || !catalog) return;
+    const { deck: tidied, changes } = await refineDeck(deck, catalog, { level: 2 });
+    if (changes.length === 0) return;
+    const md = serializeMd(tidied);
+    setMdText(md);
+    parseMdText(md, "silent");
+  }, [deck, catalog, setMdText, parseMdText]);
+
+  return { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue, handleAutoTidy };
 }

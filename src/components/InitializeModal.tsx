@@ -32,6 +32,8 @@ interface InitializeModalProps {
   warnIssues: DeckIssue[];
   tipIssues: DeckIssue[];
   onFixDeterministic: (issue: DeckIssue) => void;
+  /** "✨ 自動で整える" — deterministic batch (split + key-value→表) on the Markdown. */
+  onAutoTidy: () => void;
   onCursorLine: (line: number) => void;
   gotoLine?: { line: number; ts: number };
 }
@@ -41,7 +43,7 @@ const action = "px-2.5 py-1 rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
-  onFixDeterministic, onCursorLine, gotoLine,
+  onFixDeterministic, onAutoTidy, onCursorLine, gotoLine,
 }: InitializeModalProps) {
   if (!isOpen) return null;
   return (
@@ -75,12 +77,13 @@ export default function InitializeModal({
           <span className="text-gray-500">または下のエディタに直接貼り付け</span>
         </div>
 
-        {/* Non-destructive review of the resulting split */}
+        {/* Structure review of the resulting split + "✨ 自動で整える" (deterministic). */}
         <ReviewBar
           warnIssues={warnIssues}
           tipIssues={tipIssues}
           onJump={onSlideClick}
           onFixDeterministic={onFixDeterministic}
+          onRefine={onAutoTidy}
         />
 
         {/* Markdown source ⇄ live slide-split preview (flex-1 child → fills the middle) */}
