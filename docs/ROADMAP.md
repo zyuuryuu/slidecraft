@@ -137,9 +137,9 @@
 |---|---|---|
 | **A. フィードフォワード** | テンプレ制約（容量/kind/文字・行予算）を**生成前**の AI へ渡し、最初から収まる出力に。`deckHint`/`deckCapabilities` を強化 | △ 粗く実装 |
 | **B. 診断（非破壊レビュー）** | `diagnoseDeck` が課題＋推奨レバーを提示（変形しない＝差し戻し）。「整形レビュー」帯 | ✅ c1d76c0 |
-| **C. 閉ループ（自動修復＝Lv3）** | 生成→診断→**決定論レバー**(split/visualize)で直せる物を直す→**残りだけ AI**(condense/restructure)→再診断→収束 | 🔶 構成要素済・本体未 |
+| **C. 閉ループ（自動修復＝Lv3）** | 生成→診断→**決定論レバー**(split/visualize)で直せる物を直す→**残りだけ AI**(condense/restructure)→再診断→収束 | ✅ 本体実装（4b05a58 / 7f3884a） |
 
-**C の進捗**：契約 `slide-fix.ts`（buildSlideFix/slideFixRequest, 9a18535）／個別修正（「→表」決定論＝mdText 版 handleFixIssue・deck 版 handleVisualizeSlide／「AI で整える」差分＋採用/却下, 2c83a12）／CONDENSE プロンプト是正（Omit 防止, 298832c）は実装済み。**未着手＝"全自動ループ本体"**（生成→診断→決定論先行→残り AI→再診断→**反復収束**を回す orchestration）と 3 段階強度トグル。土台は揃っており、あとはループ駆動と収束保証（反復上限・問題スライドのみ）。
+**C の進捗**：**本体＝全自動ループ実装済み**。`engine/refine.ts`（`refineDeck`：診断→決定論先行→AI残余→再診断→反復収束、AI は注入＝純ロジック・テスト可・D で再利用可、no-progress 停止＋反復上限で収束保証, 4b05a58）。UI（7f3884a）：ReviewBar「✨ まとめて整える」＋3 段階強度（決定論のみ / AI も使う）、`useDeckRefine`（結果を PROPOSAL 保持→採用で 1 undo）、`RefineProposal` モーダル（before→after 差分＋決定論/AI 明示＝無言適用しない）。併せて ai を App に一本化（AI instance 多重の負債解消）。土台（契約 `slide-fix.ts` 9a18535／決定論レバー／AI 差分 2c83a12／CONDENSE 是正 298832c）はそのまま使用。**残**：A フィードフォワード強化・per-slide 並列/履歴（[[backlog-ai-request-mgmt]]）・D 再露出。
 | **D. 外部化（MCP/ツール化）** | 上流エージェントが本アプリのハーネスを"呼ぶ"。C と同じ「制約＋診断 ⇄ AI」契約をそのまま再露出 | ⬜ 将来 |
 
 **設計原則（付け足しにしないため）**
