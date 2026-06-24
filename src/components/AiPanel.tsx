@@ -13,6 +13,7 @@ import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import type { FitBox } from "../engine/distill";
 import DiffView from "./DiffView";
+import AiTasksPanel from "./AiTasksPanel";
 
 interface AiPanelProps {
   onApply: (markdown: string) => void;
@@ -43,6 +44,8 @@ export default function AiPanel({
 }: AiPanelProps) {
   const [userRequest, setUserRequest] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [tab, setTab] = useState<"gen" | "tasks">("gen");
+  const runningCount = ai.tasks.filter((t) => t.status === "running").length;
 
   const canSlide = !!currentSlideMd && !!onApplySlide;
   // "このスライド" edits the WHOLE slide as Markdown (text + any figure together) —
@@ -201,6 +204,27 @@ export default function AiPanel({
         </div>
       )}
 
+      {/* Tabs: generate/edit vs the AI task list (in-flight + history) */}
+      <div className="flex items-center gap-1 px-3 py-1 border-b border-[#2D3A6E]">
+        <button
+          onClick={() => setTab("gen")}
+          className={`px-2 py-0.5 rounded text-[11px] ${tab === "gen" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+        >
+          生成・編集
+        </button>
+        <button
+          onClick={() => setTab("tasks")}
+          className={`px-2 py-0.5 rounded text-[11px] ${tab === "tasks" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+        >
+          タスク{ai.tasks.length > 0 ? ` ${ai.tasks.length}` : ""}
+        </button>
+        {runningCount > 0 && <span className="text-[10px] text-[#93C5FD] animate-pulse ml-1">● {runningCount} 実行中</span>}
+      </div>
+
+      {tab === "tasks" ? (
+        <AiTasksPanel tasks={ai.tasks} onCancel={ai.cancelTask} onClear={ai.clearTasks} />
+      ) : (
+      <>
       {/* Scope + Prompt */}
       <div className="px-3 py-2 flex flex-col gap-2">
         {canSlide && (
@@ -309,6 +333,8 @@ export default function AiPanel({
             </pre>
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );

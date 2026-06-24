@@ -67,6 +67,13 @@ test.describe("SlideCraft", () => {
     await expect(page.getByText(/まとめて整える — 確認/)).toHaveCount(0);
   });
 
+  test("AI Assist hosts the task list (タスク tab)", async ({ page }) => {
+    await page.getByRole("button", { name: /AI Assist/ }).click();
+    // The panel opens with the generate/edit + タスク tabs; the task tab shows the list.
+    await page.getByRole("button", { name: /^タスク/ }).click();
+    await expect(page.getByText("まだ AI タスクはありません")).toBeVisible();
+  });
+
   test("does not crash on invalid editor input (in the Initialize modal)", async ({ page }) => {
     await page.getByRole("button", { name: /Import/ }).click();
     const editor = page.locator(".cm-editor .cm-content");

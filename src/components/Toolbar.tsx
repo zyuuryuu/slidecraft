@@ -3,6 +3,8 @@ interface ToolbarProps {
   onGenerate: () => void;
   onLoadTemplate?: () => void;
   onAiAssist?: () => void;
+  /** Number of AI tasks currently running → a live badge on the AI Assist button. */
+  aiRunning?: number;
   generating: boolean;
   hasSpec: boolean;
   templateName?: string;
@@ -17,6 +19,7 @@ export default function Toolbar({
   onGenerate,
   onLoadTemplate,
   onAiAssist,
+  aiRunning = 0,
   generating,
   hasSpec,
   templateName,
@@ -75,9 +78,15 @@ export default function Toolbar({
       {onAiAssist && (
         <button
           onClick={onAiAssist}
-          className="px-3 py-1.5 text-sm bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded transition-colors"
+          title={aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中` : "AI Assist（生成・整形・タスク履歴）"}
+          className="px-3 py-1.5 text-sm bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded transition-colors inline-flex items-center gap-1.5"
         >
-          AI Assist
+          ✨ AI Assist
+          {aiRunning > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-white/25 text-[10px] leading-none animate-pulse">
+              {aiRunning}
+            </span>
+          )}
         </button>
       )}
 

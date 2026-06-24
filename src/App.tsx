@@ -55,6 +55,7 @@ export default function App() {
           onGenerate={handleGenerate}
           onLoadTemplate={handleLoadTemplate}
           onAiAssist={() => setShowAiPanel((v) => !v)}
+          aiRunning={ai.tasks.filter((t) => t.status === "running").length}
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
@@ -160,14 +161,7 @@ export default function App() {
         )}
       </div>
 
-      <StatusBar
-        spec={null}
-        error={parseError}
-        filePath={filePath}
-        aiTasks={ai.tasks}
-        onCancelTask={ai.cancelTask}
-        onClearTasks={ai.clearTasks}
-      />
+      <StatusBar spec={null} error={parseError} filePath={filePath} />
 
       {/* Initialize phase (modal): Markdown lives only here → 確定 commits the deck */}
       <InitializeModal
