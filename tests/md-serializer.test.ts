@@ -372,4 +372,23 @@ Footer: Confidential
       );
     }
   });
+
+  it("preserves body text on a title slide that also has a subtitle (no duplicate idx 1)", () => {
+    const md = "<!-- slide: Title.1Title.Single -->\n# 表紙\n## サブ\n\n本文A\n本文B";
+    const d1 = parseMd(md);
+    // the body must NOT create a second idx-1 placeholder (which the serializer drops)
+    expect(d1.slides[0].placeholders.filter((p) => p.idx === "1")).toHaveLength(1);
+    const d2 = parseMd(serializeMd(d1));
+    const txt = JSON.stringify(d2);
+    expect(txt).toContain("本文A");
+    expect(txt).toContain("本文B");
+  });
+
+  it("does not drop or mislabel Meta when Date is also present (no idx-11 collision)", () => {
+    const md = "<!-- slide: Title.1Title.Single -->\n# T\n\nDate: 2026-06-25\nMeta: 補足情報";
+    const d2 = parseMd(serializeMd(parseMd(md)));
+    const txt = JSON.stringify(d2);
+    expect(txt).toContain("2026-06-25"); // Date survives
+    expect(txt).toContain("補足情報"); // Meta survives (as body, no longer colliding with Date)
+  });
 });

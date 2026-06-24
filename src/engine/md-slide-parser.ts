@@ -37,12 +37,13 @@ function mermaidToFigure(
   return { mermaidBlock: { mermaid: mmd, placeholderIdx } };
 }
 
+// Real title-slide metadata regions in the master. (Meta/Summary were previously
+// mapped to "11" too — colliding with Date and dropping one — so they're no longer
+// special-cased; "Meta:"/"Summary:" lines fall through to body text and survive.)
 const TITLE_FIELD_MAP: Record<string, string> = {
   category: "10",
   date: "11",
   footer: "12",
-  meta: "11",
-  summary: "11",
 };
 
 // ── Inline text parsing ──
@@ -281,7 +282,7 @@ export function parseSlideBlock(
     }
 
     // Key: Value fields (for title layouts)
-    const fieldMatch = trimmed.match(/^(Category|Date|Footer|Meta|Summary):\s*(.+)/i);
+    const fieldMatch = trimmed.match(/^(Category|Date|Footer):\s*(.+)/i);
     if (fieldMatch) {
       titleFields[fieldMatch[1].toLowerCase()] = fieldMatch[2];
       continue;
@@ -342,10 +343,14 @@ export function parseSlideBlock(
   if (tableRows) {
     table = { rows: tableRows, header: true, placeholderIdx: "1" };
   } else if (trimmedBody.length > 0) {
-    placeholders.push({
-      idx: "1",
-      paragraphs: linesToParagraphs(trimmedBody),
-    });
+    // Merge into an EXISTING idx "1" (a title layout's subtitle) rather than create a
+    // DUPLICATE idx "1": the serializer reads only the first idx-1 placeholder, so a
+    // duplicate silently drops the body on round-trip. Content layouts put the subtitle
+    // at idx 16, so there's no idx-1 yet and the body becomes its own placeholder.
+    const bodyParas = linesToParagraphs(trimmedBody);
+    const existing = placeholders.find((p) => p.idx === "1");
+    if (existing) existing.paragraphs.push(...bodyParas);
+    else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
 
   if (placeholders.length === 0 && !diagram && !mermaidBlock && !table) return null;
