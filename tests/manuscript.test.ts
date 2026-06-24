@@ -60,6 +60,17 @@ describe("structureManuscript", () => {
     expect(cmp?.placeholders.find((p) => p.idx === "1")?.paragraphs.length).toBe(2);
   });
 
+  it("keeps consecutive 'ラベル: 値' spec lines as separate bullets → native table (not a run-on)", () => {
+    // Raw manuscript spec lines on their own lines, no blank between, no 。 — must NOT
+    // merge into one bullet (which would defeat the visualize→table lever).
+    const ms = `# レポート\n\n## 指標\n想定ピーク: 8000 RPS\n仮想ユーザ数: 12000\n試験時間: 25分`;
+    const deck = parseMd(structureManuscript(ms));
+    const spec = deck.slides.find((s) => s.table);
+    expect(spec?.table?.rows).toEqual([
+      ["項目", "内容"], ["想定ピーク", "8000 RPS"], ["仮想ユーザ数", "12000"], ["試験時間", "25分"],
+    ]);
+  });
+
   it("a heading with no body becomes a section divider (autoSelect)", async () => {
     const { autoSelectLayout } = await import("../src/engine/template-loader");
     const deck = parseMd(structureManuscript("# T\n\n## 第1部\n\n## 内容\n- a"));

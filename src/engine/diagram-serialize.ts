@@ -28,6 +28,9 @@ import { xychartSpecToMermaid } from "./diagram-xychart";
  *   - plain flowchart: allowed (lossy for styles/lanes, but never type-breaking).
  */
 export function canSerializeToMermaid(spec: DiagramSpec): boolean {
+  // kpi / radar have NO Mermaid form — diagramSpecToMermaid would emit an empty
+  // "graph TD" stub and silently destroy the spec (unrecoverable). Block the toggle.
+  if (spec.type === "kpi" || spec.type === "radar") return false;
   if (spec.type === "sequence") return true;
   if (spec.type === "timeline") return true; // periods/events/sections/title all round-trip
   if (spec.type === "quadrant") return true; // axis/quadrant labels + points all round-trip
@@ -308,7 +311,8 @@ export function dumpDiagramLikeSource(obj: unknown, source: string): string {
 }
 
 export function diagramSpecToYaml(spec: DiagramSpec): string {
-  const q = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  // Coerce: a non-schema-parsed (partial) spec may have undefined label/value fields.
+  const q = (s: string | undefined | null) => `"${String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   let yaml = `type: ${spec.type}\n`;
   yaml += `direction: ${spec.direction}\n`;
   if (spec.title) yaml += `title: ${spec.title}\n`;
@@ -366,14 +370,14 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `\nquadrant:\n`;
     yaml += `  xLow: ${q(qd.xLow)}\n  xHigh: ${q(qd.xHigh)}\n  yLow: ${q(qd.yLow)}\n  yHigh: ${q(qd.yHigh)}\n`;
     yaml += `  q1: ${q(qd.q1)}\n  q2: ${q(qd.q2)}\n  q3: ${q(qd.q3)}\n  q4: ${q(qd.q4)}\n`;
-    yaml += qd.points.length ? `  points:\n` : `  points: []\n`;
-    for (const p of qd.points) yaml += `    - label: ${q(p.label)}\n      x: ${p.x}\n      y: ${p.y}\n`;
+    yaml += qd.points?.length ? `  points:\n` : `  points: []\n`;
+    for (const p of qd.points ?? []) yaml += `    - label: ${q(p.label)}\n      x: ${p.x}\n      y: ${p.y}\n`;
   }
   if (spec.gantt) {
     const gt = spec.gantt;
     yaml += `\ngantt:\n  startDate: ${q(gt.startDate)}\n`;
-    yaml += gt.tasks.length ? `  tasks:\n` : `  tasks: []\n`;
-    for (const t of gt.tasks) {
+    yaml += gt.tasks?.length ? `  tasks:\n` : `  tasks: []\n`;
+    for (const t of gt.tasks ?? []) {
       yaml += `    - name: ${q(t.name)}\n      section: ${q(t.section)}\n      start: ${t.start}\n      end: ${t.end}\n      status: ${q(t.status)}\n`;
     }
   }
@@ -382,18 +386,18 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `\nxychart:\n  xlabel: ${q(xc.xlabel)}\n  ylabel: ${q(xc.ylabel)}\n  ymin: ${xc.ymin}\n`;
     if (xc.ymax !== undefined) yaml += `  ymax: ${xc.ymax}\n`;
     yaml += `  categories: ${JSON.stringify(xc.categories)}\n`;
-    yaml += xc.series.length ? `  series:\n` : `  series: []\n`;
-    for (const s of xc.series) yaml += `    - kind: ${s.kind}\n      name: ${q(s.name)}\n      values: ${JSON.stringify(s.values)}\n`;
+    yaml += xc.series?.length ? `  series:\n` : `  series: []\n`;
+    for (const s of xc.series ?? []) yaml += `    - kind: ${s.kind}\n      name: ${q(s.name)}\n      values: ${JSON.stringify(s.values)}\n`;
   }
   if (spec.radar) {
     const rd = spec.radar;
     yaml += `\nradar:\n  max: ${rd.max}\n  axes: ${JSON.stringify(rd.axes)}\n`;
-    yaml += rd.series.length ? `  series:\n` : `  series: []\n`;
-    for (const s of rd.series) yaml += `    - name: ${q(s.name)}\n      values: ${JSON.stringify(s.values)}\n`;
+    yaml += rd.series?.length ? `  series:\n` : `  series: []\n`;
+    for (const s of rd.series ?? []) yaml += `    - name: ${q(s.name)}\n      values: ${JSON.stringify(s.values)}\n`;
   }
   if (spec.kpi) {
-    yaml += spec.kpi.cards.length ? `\nkpi:\n  cards:\n` : `\nkpi:\n  cards: []\n`;
-    for (const c of spec.kpi.cards) yaml += `    - value: ${q(c.value)}\n      label: ${q(c.label)}\n      delta: ${q(c.delta)}\n      trend: ${q(c.trend)}\n`;
+    yaml += spec.kpi.cards?.length ? `\nkpi:\n  cards:\n` : `\nkpi:\n  cards: []\n`;
+    for (const c of spec.kpi.cards ?? []) yaml += `    - value: ${q(c.value)}\n      label: ${q(c.label)}\n      delta: ${q(c.delta)}\n      trend: ${q(c.trend)}\n`;
   }
   return yaml;
 }

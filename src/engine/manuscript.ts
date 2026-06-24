@@ -68,6 +68,10 @@ function sectionBody(lines: string[]): string {
     if (/^[-*+]\s+/.test(t)) { flush(); out.push(`- ${t.replace(/^[-*+]\s+/, "")}`); continue; } // existing bullet
     if (t.startsWith("|")) { flush(); out.push(line); continue; } // table row — keep verbatim
     if (t.startsWith(">")) { flush(); out.push(`- ${t.replace(/^>\s*/, "")}`); continue; } // blockquote → bullet
+    // A standalone "ラベル: 値" spec line (no trailing sentence punctuation) is its OWN
+    // bullet — otherwise consecutive spec lines (no blank between, no 。) merge into one
+    // run-on bullet and the key-value → table lever never fires.
+    if (/^[^:：\n]{1,24}[:：]\s*\S/.test(t) && !/[。．！？!?]$/.test(t)) { flush(); out.push(`- ${t}`); continue; }
     para.push(t);
   }
   flush();

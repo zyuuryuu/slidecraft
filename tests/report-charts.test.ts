@@ -54,6 +54,9 @@ describe("radar (spider chart)", () => {
     expect(back.radar?.axes).toHaveLength(5);
     expect(back.radar?.series[1].values).toEqual([3, 5, 3, 4, 2]);
   });
+  it("cannot serialize to Mermaid — the toggle must stay disabled (no destructive stub)", () => {
+    expect(canSerializeToMermaid(radar())).toBe(false);
+  });
 });
 
 describe("kpi (stat cards)", () => {
@@ -70,5 +73,18 @@ describe("kpi (stat cards)", () => {
     const back = DiagramSpecSchema.parse(yaml.load(diagramSpecToYaml(kpi())));
     expect(back.kpi?.cards).toHaveLength(2);
     expect(back.kpi?.cards[0]).toMatchObject({ value: "1.2億", trend: "up" });
+  });
+  it("cannot serialize to Mermaid — toggle disabled (diagramSpecToMermaid has no kpi form)", () => {
+    expect(canSerializeToMermaid(kpi())).toBe(false);
+  });
+});
+
+describe("diagramSpecToYaml robustness", () => {
+  // A partial (non-schema-parsed) spec — e.g. JSON.parse of an edited diagram — must
+  // not crash the serializer (it's called on the editor's raw text on every toggle).
+  it("does not throw on partial specs missing optional arrays / labels", () => {
+    expect(() => diagramSpecToYaml({ type: "flowchart", direction: "TB", nodes: [{ id: "a" }] } as never)).not.toThrow();
+    expect(() => diagramSpecToYaml({ type: "kpi", direction: "TB", nodes: [], kpi: {} } as never)).not.toThrow();
+    expect(() => diagramSpecToYaml({ type: "radar", direction: "TB", nodes: [], radar: { max: 5, axes: [] } } as never)).not.toThrow();
   });
 });
