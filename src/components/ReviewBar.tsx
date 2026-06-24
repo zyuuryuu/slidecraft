@@ -73,13 +73,14 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] shrink-0">
-      <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0">
-        {warnIssues.length > 0 && <span className="text-amber-400 shrink-0 font-medium">⚠ 課題 {warnIssues.length}</span>}
-        {warnIssues.map((d, i) => chip(d, `w${i}`, true))}
-        {tipIssues.length > 0 && <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>}
-        {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
-      </div>
+    // Wrap chips to multiple rows instead of a 1-line horizontal scroll — that scrollbar
+    // sat on top of the thin strip and stole clicks. Capped height + vertical scroll for
+    // pathological issue counts (the right-edge scrollbar doesn't overlap the chips).
+    <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px] shrink-0 max-h-20 overflow-y-auto">
+      {warnIssues.length > 0 && <span className="text-amber-400 shrink-0 font-medium">⚠ 課題 {warnIssues.length}</span>}
+      {warnIssues.map((d, i) => chip(d, `w${i}`, true))}
+      {tipIssues.length > 0 && <span className="text-gray-500 shrink-0 ml-1.5">💡 提案 {tipIssues.length}</span>}
+      {tipIssues.map((d, i) => chip(d, `t${i}`, false))}
     </div>
   );
 }
