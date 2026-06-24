@@ -254,7 +254,10 @@ export async function loadTemplate(
   // ── Extract layouts ──
   const layouts: LayoutInfo[] = [];
 
-  for (let i = 1; i <= 30; i++) {
+  // Iterate until the slideLayout file is missing (PowerPoint numbers them 1..N
+  // contiguously across ALL masters). The 200 bound is just a runaway guard — the
+  // old hardcoded 30 silently dropped layouts 31+ on multi-master templates.
+  for (let i = 1; i <= 200; i++) {
     const path = `ppt/slideLayouts/slideLayout${i}.xml`;
     const file = zip.file(path);
     if (!file) break;

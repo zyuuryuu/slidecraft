@@ -9,6 +9,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, autoSelectLayout, type TemplateData } from "../src/engine/template-loader";
 import { buildCatalog, classifyLayout, type LayoutCatalog } from "../src/engine/template-catalog";
+import { contentBodyBox, distillDeck } from "../src/engine/distill";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
 import type { SlideIR } from "../src/engine/slide-schema";
@@ -67,6 +68,27 @@ describe("alien CC0 template flows through the harness", () => {
     const content = autoSelectLayout(mk([ph("15", "T"), ph("1", "body")]), 1, 5, cat);
     expect(content).not.toBe(title); // content must NOT collapse onto the title layout
     expect(cat.find((e) => e.name === content)?.role).toBe("content");
+  });
+
+  it("loads ALL slideLayouts across masters (no hardcoded 30 cap)", () => {
+    // lrk-slides has 32 layouts over 2 masters; the old `i <= 30` dropped 31/32.
+    expect(tpl.layouts.length).toBe(32);
+  });
+
+  it("contentBodyBox returns a USABLE text box — picks a text layout, not a picture one", () => {
+    // The alien template has picture layouts ("Two Pictures", maxLines 0) tied at
+    // bodyCount 1; pickLayout must avoid them so the SPLIT lever has a real box.
+    const box = contentBodyBox(cat);
+    expect(box).toBeDefined();
+    expect(box!.maxLines).toBeGreaterThan(0);
+    const single = autoSelectLayout(mk([ph("15", "T"), ph("1", "body")]), 1, 5, cat);
+    expect(single).not.toMatch(/picture|^one |^two pictures/i);
+  });
+
+  it("SPLIT lever fires on the alien template (overflow → more slides)", () => {
+    const bullets = Array.from({ length: 30 }, (_, i) => `- 項目${i} の説明テキストをそれなりの長さで書く`).join("\n");
+    const fitted = distillDeck(parseMd(`# 詰め込み\n\n${bullets}`), cat);
+    expect(fitted.slides.length).toBeGreaterThan(1);
   });
 
   it("degrades an explicit layout name the alien template lacks (no crash)", () => {

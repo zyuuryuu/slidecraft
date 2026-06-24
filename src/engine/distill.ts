@@ -99,9 +99,17 @@ function appendTitleMarker(paragraphs: Paragraph[], marker: string): Paragraph[]
 
 /** The content-body fit box for the loaded template, if it has a content layout. */
 export function contentBodyBox(catalog: LayoutCatalog): FitBox | undefined {
-  const body = pickLayout(catalog, "content", 1)?.placeholders.find((p) => p.role === "body");
-  if (!body || body.charsPerLine <= 0 || body.maxLines <= 0) return undefined;
-  return { charsPerLine: body.charsPerLine, maxLines: body.maxLines };
+  const box = (p?: { charsPerLine: number; maxLines: number }) =>
+    p && p.charsPerLine > 0 && p.maxLines > 0 ? { charsPerLine: p.charsPerLine, maxLines: p.maxLines } : undefined;
+  const best = box(pickLayout(catalog, "content", 1)?.placeholders.find((p) => p.role === "body"));
+  if (best) return best;
+  // Fallback: ANY content layout with a usable text body (robust on alien templates
+  // where even the best-scored layout might still have a degenerate body).
+  for (const e of catalog.filter((e) => e.role === "content")) {
+    const b = box(e.placeholders.find((p) => p.role === "body"));
+    if (b) return b;
+  }
+  return undefined;
 }
 
 /**
