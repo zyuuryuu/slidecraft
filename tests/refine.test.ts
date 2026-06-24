@@ -50,6 +50,19 @@ describe("refineDeck", () => {
     expect(r.converged).toBe(true);
   });
 
+  it("attempts each slide's AI at most once per run (no retry spam when it doesn't converge)", async () => {
+    let calls = 0;
+    // Returns a result that is STILL too long → the slide stays flagged. Without the
+    // once-per-run guard the loop would re-submit it every pass (the cancel-spam bug).
+    const aiFix = async () => {
+      calls++;
+      return "# 背景\n\n- まだ全く要約されていない非常に長い文章のままの箇条書きが返ってくる悪い例です";
+    };
+    const r = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix, maxIterations: 5 });
+    expect(calls).toBe(1); // one attempt for the one flagged slide — not 5
+    expect(r.converged).toBe(false);
+  });
+
   it("does not spin: a no-op aiFix stops the loop (no infinite iterations)", async () => {
     const r = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix: async () => "", maxIterations: 10 });
     expect(r.changes).toHaveLength(0); // empty AI result → no change applied

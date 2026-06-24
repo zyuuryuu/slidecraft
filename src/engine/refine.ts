@@ -80,6 +80,10 @@ export async function refineDeck(
   let current = deck;
   const changes: RefineChange[] = [];
   let iterations = 0;
+  // One AI attempt per slide per run: a still-flagged slide (cancelled, failed, or just
+  // not converged) must NOT be re-submitted next pass — that retries the same prompt and
+  // spams the task list. Deterministic levers aren't tracked (they're idempotent).
+  const aiAttempted = new Set<number>();
 
   for (; iterations < maxIter; iterations++) {
     if (opts.signal?.aborted) break; // user cancelled the loop
@@ -109,7 +113,8 @@ export async function refineDeck(
       // ② AI residue (Lv3) — condense long sentence-bullets / add a missing title.
       if (opts.level >= 3 && opts.aiFix) {
         const aiIssue = slideIssues.find((d) => d.levers.includes("condense") || d.levers.includes("title"));
-        if (aiIssue) {
+        if (aiIssue && !aiAttempted.has(idx)) {
+          aiAttempted.add(idx); // mark before awaiting — never retry this slide this run
           // One slide's AI failure (or cancel) must not abort the whole batch — skip it.
           let after = "";
           try {
