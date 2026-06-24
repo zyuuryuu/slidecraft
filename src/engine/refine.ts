@@ -45,7 +45,7 @@ export type AiSlideFix = (
 
 export interface RefineChange {
   slideIndex: number;
-  lever: Lever;
+  lever: Lever | "edit"; // "edit" = a freeform user instruction (multi-select batch)
   kind: "deterministic" | "ai";
   beforeMd: string;
   afterMd: string;
@@ -163,4 +163,38 @@ export async function refineDeck(
   }
 
   return { deck: current, changes, converged: diagnoseDeck(current, catalog).length === 0, iterations };
+}
+
+/**
+ * Multi-select batch edit: apply ONE user instruction to each selected slide and collect
+ * the before→after changes for review (RefineProposal). Sequential — one AI task at a
+ * time, visible in the task list; a slide whose AI fails or is cancelled is skipped, not
+ * fatal. Pure: the AI is injected, so it's testable + re-usable (stage D).
+ */
+export async function batchEditDeck(
+  deck: DeckIR,
+  catalog: LayoutCatalog,
+  opts: { indices: number[]; instruction: string; aiFix: AiSlideFix; signal?: AbortSignal },
+): Promise<RefineResult> {
+  let current = deck;
+  const changes: RefineChange[] = [];
+  for (const idx of opts.indices) {
+    if (opts.signal?.aborted) break;
+    if (!current.slides[idx]) continue;
+    const before = slideToMd(current, idx, catalog);
+    let after = "";
+    try {
+      const outcome = await opts.aiFix(`Current slide:\n${before}\n\nInstruction: ${opts.instruction}`, { slideIndex: idx, signal: opts.signal, attempt: 1 });
+      if (!outcome.ok) continue; // cancelled / failed → skip this slide
+      after = outcome.markdown.trim();
+    } catch {
+      continue;
+    }
+    const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
+    if (newSlide) {
+      current = replaceSlide(current, idx, newSlide);
+      changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after });
+    }
+  }
+  return { deck: current, changes, converged: true, iterations: 1 };
 }

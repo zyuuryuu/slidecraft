@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useRef, useState } from "react";
-import { refineDeck, type RefineLevel, type RefineResult, type AiSlideFix } from "../engine/refine";
+import { refineDeck, batchEditDeck, type RefineLevel, type RefineResult, type AiSlideFix } from "../engine/refine";
 import type { DeckIR } from "../engine/slide-schema";
 import type { LayoutCatalog } from "../engine/template-catalog";
 import type { HistoryMode } from "./useHistoryState";
@@ -54,8 +54,31 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady }: Refine
     [deck, catalog, refining, aiReady, aiFix],
   );
 
-  // Stop the loop: aborts the in-flight AI task and halts further passes. Any changes
-  // already made still surface as a proposal to review.
+  // Multi-select batch edit: apply ONE instruction to each selected slide → a proposal
+  // (before→after per slide) to review, applied as one undoable commit on 採用. Shares
+  // the proposal/cancel machinery with the refine loop.
+  const runBatchEdit = useCallback(
+    async (indices: number[], instruction: string) => {
+      if (!deck || !catalog || refining || indices.length === 0) return;
+      setRefineError(null);
+      setRefining(true);
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const result = await batchEditDeck(deck, catalog, { indices, instruction, aiFix, signal: controller.signal });
+        if (!(controller.signal.aborted && result.changes.length === 0)) setProposal(result);
+      } catch (e) {
+        setRefineError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setRefining(false);
+        abortRef.current = null;
+      }
+    },
+    [deck, catalog, refining, aiFix],
+  );
+
+  // Stop the loop / batch: aborts the in-flight AI task. Any changes already made still
+  // surface as a proposal to review.
   const cancelRefine = useCallback(() => abortRef.current?.abort(), []);
 
   const acceptProposal = useCallback(() => {
@@ -65,5 +88,5 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady }: Refine
 
   const cancelProposal = useCallback(() => setProposal(null), []);
 
-  return { refining, proposal, refineError, runRefine, cancelRefine, acceptProposal, cancelProposal };
+  return { refining, proposal, refineError, runRefine, runBatchEdit, cancelRefine, acceptProposal, cancelProposal };
 }

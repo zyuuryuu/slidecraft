@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { refineDeck } from "../src/engine/refine";
+import { refineDeck, batchEditDeck } from "../src/engine/refine";
 import { parseMd } from "../src/engine/md-parser";
 import { loadTemplate } from "../src/engine/template-loader";
 import { buildCatalog, type LayoutCatalog } from "../src/engine/template-catalog";
@@ -96,5 +96,30 @@ describe("refineDeck", () => {
     const r = await refineDeck(parseMd(KV_DECK), catalog, { level: 3, aiFix: async () => { aiCalls++; return { ok: true, markdown: "" }; } });
     expect(aiCalls).toBe(0); // visualize handled it deterministically; AI never needed
     expect(diagnoseDeck(r.deck, catalog)).toHaveLength(0);
+  });
+});
+
+describe("batchEditDeck (multi-select)", () => {
+  const DECK = "# 表紙\n\n---\n\n# A\n\n- 元のA\n\n---\n\n# B\n\n- 元のB";
+
+  it("applies one instruction to each selected slide, collecting before→after changes", async () => {
+    let calls = 0;
+    const aiFix = async (_req: string, meta: { slideIndex: number }) => {
+      calls++;
+      return { ok: true as const, markdown: `# 編集${meta.slideIndex}\n\n- 簡潔化された内容` };
+    };
+    const r = await batchEditDeck(parseMd(DECK), catalog, { indices: [1, 2], instruction: "簡潔に", aiFix });
+    expect(calls).toBe(2); // one AI call per selected slide
+    expect(r.changes.map((c) => c.slideIndex)).toEqual([1, 2]);
+    expect(r.changes.every((c) => c.lever === "edit" && c.kind === "ai")).toBe(true);
+  });
+
+  it("skips a slide whose AI is cancelled/fails — not fatal", async () => {
+    const aiFix = async (_req: string, meta: { slideIndex: number }) =>
+      meta.slideIndex === 1
+        ? { ok: false as const, cancelled: true as const }
+        : { ok: true as const, markdown: "# B2\n\n- 編集後" };
+    const r = await batchEditDeck(parseMd(DECK), catalog, { indices: [1, 2], instruction: "x", aiFix });
+    expect(r.changes.map((c) => c.slideIndex)).toEqual([2]); // slide 1 skipped, slide 2 applied
   });
 });

@@ -23,6 +23,9 @@ interface AiPanelProps {
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
+  /** Apply ONE instruction to all selected slides (multi-select batch) → review proposal. */
+  onBatchEdit?: (instruction: string) => void;
+  batchRunning?: boolean;
   /** Pre-fill the instruction box (ReviewBar "✨直す" handoff). `ts` re-seeds on repeat. */
   seed?: { prompt: string; ts: number };
   /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
@@ -35,6 +38,8 @@ export default function AiPanel({
   onApplySlide,
   activeSlideNum,
   selectedCount = 1,
+  onBatchEdit,
+  batchRunning,
   seed,
   ai,
 }: AiPanelProps) {
@@ -86,16 +91,18 @@ export default function AiPanel({
     };
   }, []);
 
-  // The dock edits the FOCUSED slide (text + any figure together as Markdown). Scope is
-  // the slide-list selection now — no toggle. Whole-deck GENERATION moved to Initialize
-  // (📄 Import → ✨AI生成); this dock is purely "edit the focused slide".
+  // Scope = the slide-list selection. 1 selected → edit the FOCUSED slide here (in-panel
+  // diff + 採用). >1 selected → apply the instruction to EACH selected slide (batch) →
+  // a review proposal. Whole-deck GENERATION moved to Initialize (📄 → ✨AI生成).
+  const batch = selectedCount > 1 && !!onBatchEdit;
   const canSlide = !!currentSlideMd && !!onApplySlide;
   const slideScope = canSlide;
 
-  const ready = ai.canGenerate(userRequest) && canSlide;
+  const ready = ai.canGenerate(userRequest) && !batchRunning && (batch || canSlide);
   const field = "px-2 py-1 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-xs text-white";
 
   const doGenerate = () => {
+    if (batch) { onBatchEdit(userRequest); return; } // one instruction → every selected slide
     if (!currentSlideMd) return;
     // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
     ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
@@ -247,17 +254,17 @@ export default function AiPanel({
       <>
       {/* Scope + Prompt — grows with the dock so the instruction box isn't stuck at 2 rows */}
       <div className="px-3 py-2 flex flex-col gap-2 flex-1 min-h-0">
-        {/* Scope = the slide-list selection (no toggle). Edits the focused slide. */}
+        {/* Scope = the slide-list selection (no toggle). 1 = focused slide, >1 = batch. */}
         <div className="flex items-center gap-1.5 text-xs text-gray-400">
           <span>編集対象:</span>
-          {canSlide ? (
+          {batch ? (
+            <span className="px-2 py-0.5 rounded bg-[#3B82F6]/20 text-[#93C5FD]">選択 {selectedCount} 枚を一括編集</span>
+          ) : canSlide ? (
             <span className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD]">スライド {activeSlideNum}</span>
           ) : (
             <span className="text-gray-500">スライドを選択してください</span>
           )}
-          {selectedCount > 1 && (
-            <span className="text-gray-500">— {selectedCount} 枚選択中（一括編集は近日対応）</span>
-          )}
+          {batch && <span className="text-gray-500">— 1つの指示を各スライドに適用 → 確認して採用</span>}
         </div>
         <div className="flex gap-2 flex-1 min-h-0">
           <textarea
@@ -283,7 +290,7 @@ export default function AiPanel({
               disabled={!ready}
               className="self-start px-4 py-2 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 disabled:text-white/40 text-white font-medium rounded shrink-0"
             >
-              生成
+              {batchRunning ? "一括編集中…" : batch ? `${selectedCount}枚を編集` : "生成"}
             </button>
           )}
         </div>

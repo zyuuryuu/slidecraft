@@ -9,9 +9,11 @@ import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
+import RefineProposal from "./components/RefineProposal";
 import { useState } from "react";
 import { useDeckController } from "./components/useDeckController";
-import { useAiGeneration } from "./components/useAiGeneration";
+import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
+import { useDeckRefine } from "./components/useDeckRefine";
 
 export default function App() {
   const {
@@ -24,11 +26,26 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
+    catalog, setDeck,
   } = useDeckController();
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
   const ai = useAiGeneration();
+  // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
+  const refine = useDeckRefine({
+    deck, catalog, setDeck,
+    aiFix: async (req, meta) => {
+      const label = `スライド${meta.slideIndex + 1}を編集${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}`;
+      try {
+        return { ok: true, markdown: await ai.submitAndWait(req, "slide", label, meta.signal) };
+      } catch (e) {
+        const c = classifyAiFailure(e, meta.signal);
+        return c.cancelled ? { ok: false, cancelled: true } : { ok: false, cancelled: false, retryable: c.retryable, message: c.message };
+      }
+    },
+    aiReady: ai.connection.ok,
+  });
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -156,6 +173,8 @@ export default function App() {
             onApplySlide={handleApplySlide}
             activeSlideNum={activeSlide + 1}
             selectedCount={selected?.size ?? 1}
+            onBatchEdit={(instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
+            batchRunning={refine.refining}
             seed={aiSeed}
             ai={ai}
           />
@@ -193,6 +212,15 @@ export default function App() {
         templateHint={deckHint}
         ai={ai}
       />
+
+      {/* Multi-select batch edit: review the before→after per slide, then 採用 (one undo) */}
+      {refine.proposal && (
+        <RefineProposal
+          proposal={refine.proposal}
+          onAccept={refine.acceptProposal}
+          onCancel={refine.cancelProposal}
+        />
+      )}
     </>
   );
 }

@@ -16,6 +16,7 @@ const LEVER_LABEL: Record<RefineChange["lever"], string> = {
   condense: "要約",
   title: "タイトル",
   split: "分割",
+  edit: "AI編集",
 };
 
 export default function RefineProposal({
