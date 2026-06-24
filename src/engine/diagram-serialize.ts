@@ -312,8 +312,8 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
   let yaml = `type: ${spec.type}\n`;
   yaml += `direction: ${spec.direction}\n`;
   if (spec.title) yaml += `title: ${spec.title}\n`;
-  yaml += spec.nodes.length ? `\nnodes:\n` : `\nnodes: []\n`; // empty block would parse as YAML null
-  for (const node of spec.nodes) {
+  yaml += spec.nodes?.length ? `\nnodes:\n` : `\nnodes: []\n`; // empty block would parse as YAML null
+  for (const node of spec.nodes ?? []) {
     yaml += `  - id: ${node.id}\n`;
     yaml += `    label: ${q(node.label)}\n`; // quote: an empty label (start/end dots) would otherwise be YAML null
     if (node.shape && node.shape !== "rect") yaml += `    shape: ${node.shape}\n`;
@@ -326,13 +326,13 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
       if (ov.length) yaml += `    override:\n${ov.map((k) => `      ${k}: ${node.override![k]}`).join("\n")}\n`;
     }
   }
-  if (spec.groups.length) {
+  if (spec.groups?.length) {
     // declared so node.group references resolve (timeline sections / subgraphs)
     yaml += `\ngroups:\n`;
     for (const g of spec.groups) yaml += `  - id: ${q(g.id)}\n    label: ${q(g.label)}\n`;
   }
-  yaml += spec.edges.length ? `\nedges:\n` : `\nedges: []\n`; // empty block would parse as YAML null
-  for (const edge of spec.edges) {
+  yaml += spec.edges?.length ? `\nedges:\n` : `\nedges: []\n`; // empty block would parse as YAML null
+  for (const edge of spec.edges ?? []) {
     yaml += `  - from: ${edge.from}\n`;
     yaml += `    to: ${edge.to}\n`;
     if (edge.label) yaml += `    label: ${q(edge.label)}\n`;

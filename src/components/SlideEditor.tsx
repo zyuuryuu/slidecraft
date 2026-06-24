@@ -249,6 +249,10 @@ function DiagramEditor({
       // Never convert a sequence/class diagram to Mermaid (would corrupt its type).
       if (newMode === "mermaid" && mermaidIncompatible) return;
 
+      // Only switch the mode if the content was actually converted — otherwise the
+      // editor would show e.g. the "YAML" label over still-JSON text (mode/content drift).
+      let applied = false;
+
       if (mode === "mermaid" && (newMode === "yaml" || newMode === "json")) {
         // Mermaid → DiagramSpec
         const mmd = slide.mermaidBlock?.mermaid || "";
@@ -260,6 +264,7 @@ function DiagramEditor({
             mermaidBlock: undefined,
             diagram: { yaml: newMode === "json" ? JSON.stringify(spec, null, 2) : yamlStr, placeholderIdx: "1" },
           });
+          applied = true;
         }
       } else if (mode === "yaml" && newMode === "mermaid") {
         // YAML → Mermaid
@@ -273,19 +278,23 @@ function DiagramEditor({
               diagram: undefined,
               mermaidBlock: { mermaid: mmd, placeholderIdx: "1" },
             });
+            applied = true;
           }
         } catch { /* keep current */ }
       } else if (mode === "yaml" && newMode === "json") {
-        // YAML → JSON
+        // YAML → JSON (raw object round-trip)
         try {
           const data = yaml.load(slide.diagram?.yaml || "");
           onUpdateDiagramYaml(JSON.stringify(data, null, 2));
+          applied = true;
         } catch { /* keep current */ }
       } else if (mode === "json" && newMode === "yaml") {
-        // JSON → YAML
+        // JSON → YAML — symmetric inverse of YAML→JSON (yaml.dump, not the strict
+        // diagramSpecToYaml which throws on a minimal/round-tripped spec).
         try {
           const data = JSON.parse(slide.diagram?.yaml || "{}");
-          onUpdateDiagramYaml(diagramSpecToYaml(data));
+          onUpdateDiagramYaml(yaml.dump(data));
+          applied = true;
         } catch { /* keep current */ }
       } else if (mode === "json" && newMode === "mermaid") {
         // JSON → Mermaid
@@ -299,11 +308,12 @@ function DiagramEditor({
               diagram: undefined,
               mermaidBlock: { mermaid: mmd, placeholderIdx: "1" },
             });
+            applied = true;
           }
         } catch { /* keep current */ }
       }
 
-      setMode(newMode);
+      if (applied) setMode(newMode);
     },
     [mode, slide, onChange, onUpdateDiagramYaml, mermaidIncompatible],
   );
