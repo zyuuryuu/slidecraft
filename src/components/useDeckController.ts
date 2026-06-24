@@ -53,24 +53,38 @@ export function useDeckController() {
   // ── Markdown mode: parse MD ──
   // mode controls undo history: "silent" = editor typing (text owns its undo),
   // "reset" = brand-new deck (file/AI-deck import), "commit" = undoable load.
-  const parseMdText = useCallback(
-    (text: string, mode: HistoryMode | "reset" = "silent") => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        try {
-          const parsed = text.trim() ? parseMd(text) : null;
-          // Distill to fit the template: split overflowing content slides (no shrink).
-          const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
-          if (mode === "reset") resetDeck(fitted);
-          else setDeck(fitted, mode);
-          setParseError(null);
-        } catch (e) {
-          setParseError(e instanceof Error ? e.message : String(e));
-          setDeck(null, "silent");
-        }
-      }, 300);
+  const clearParse = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
+
+  // Parse + distill + commit synchronously (the body of the debounced parse). Reused
+  // to FLUSH a pending parse on 確定 so the committed deck matches the visible Markdown.
+  const commitParse = useCallback(
+    (text: string, mode: HistoryMode | "reset") => {
+      try {
+        const parsed = text.trim() ? parseMd(text) : null;
+        // Distill to fit the template: split overflowing content slides (no shrink).
+        const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
+        if (mode === "reset") resetDeck(fitted);
+        else setDeck(fitted, mode);
+        setParseError(null);
+      } catch (e) {
+        setParseError(e instanceof Error ? e.message : String(e));
+        setDeck(null, "silent");
+      }
     },
     [setDeck, resetDeck, catalog],
+  );
+
+  const parseMdText = useCallback(
+    (text: string, mode: HistoryMode | "reset" = "silent") => {
+      clearParse();
+      debounceRef.current = setTimeout(() => commitParse(text, mode), 300);
+    },
+    [clearParse, commitParse],
   );
 
   // ── Editor change handlers ──
@@ -176,18 +190,50 @@ export function useDeckController() {
   );
 
   // ── Initialize (Import) ⇄ Edit ──
-  // 確定 → Edit: commit the structured deck and work visually (deck = source of truth).
-  const handleStartEditing = useCallback(() => {
-    if (deck) setSubMode("edit");
-  }, [deck]);
+  // Snapshot of the deck when the Initialize modal opens — used by 確定 (as the undo
+  // baseline) and キャンセル (to restore). Declared before the handlers that read it.
+  const initSnapshotRef = useRef<DeckIR | null>(null);
 
-  // Enter the Initialize phase from Edit: serialize the CURRENT deck back to Markdown
-  // first, so Import always reflects the live deck (deck = truth; no stale text).
-  // Guarded to Edit→Import so re-clicking Import mid-edit doesn't reformat the draft.
+  // 確定 → Edit: FLUSH any pending debounced parse so the committed deck matches the
+  // visible Markdown, and record the whole Initialize as ONE undo step (snapshot →
+  // result), then work visually (deck = source of truth).
+  const handleStartEditing = useCallback(() => {
+    if (!deck) return; // 確定 is disabled when the Markdown doesn't parse
+    clearParse();
+    try {
+      const parsed = mdText.trim() ? parseMd(mdText) : null;
+      const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
+      if (!fitted) return;
+      setDeck(initSnapshotRef.current, "silent"); // present = pre-Initialize…
+      setDeck(fitted, "commit"); // …then one undoable step to the committed result
+      setParseError(null);
+      setSubMode("edit");
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : String(e)); // stay in Initialize
+    }
+  }, [deck, mdText, catalog, clearParse, setDeck]);
+
+  // Open the Initialize phase (modal): serialize the CURRENT deck back to Markdown so
+  // it reflects the live deck (deck = truth), and snapshot the deck so キャンセル can
+  // discard whatever the modal's live edits did. Guarded so re-opening mid-edit is safe.
   const handleEnterImport = useCallback(() => {
-    if (subMode === "edit" && deck) setMdText(serializeMd(deck));
+    if (subMode === "edit") {
+      initSnapshotRef.current = deck;
+      if (deck) setMdText(serializeMd(deck));
+    }
     setSubMode("import");
   }, [subMode, deck]);
+
+  // Cancel Initialize: kill any pending parse (so a trailing debounce can't re-apply
+  // the discarded edits), restore the deck AND mdText to the pre-open snapshot, → Edit.
+  const handleCancelInitialize = useCallback(() => {
+    clearParse();
+    const snap = initSnapshotRef.current;
+    setDeck(snap, "silent");
+    setMdText(snap ? serializeMd(snap) : "");
+    setParseError(null);
+    setSubMode("edit");
+  }, [clearParse, setDeck]);
 
   // ── Slide editing: update a single slide in the deck ──
   const handleSlideUpdate = useCallback(
@@ -356,7 +402,7 @@ export function useDeckController() {
     filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleStructureManuscript, handleSlideUpdate,
+    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   };

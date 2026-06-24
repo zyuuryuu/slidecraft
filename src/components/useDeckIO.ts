@@ -8,6 +8,7 @@
 import { useState, useCallback } from "react";
 import { pickTextFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
+import { serializeMd } from "../engine/md-serializer";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import type { HistoryMode } from "./useHistoryState";
@@ -34,10 +35,11 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     setFilePath(picked.name);
   }, [parseMdText, setMdText]);
 
-  // Save the Markdown source.
+  // Save Markdown — serialize from the DECK (the source of truth) so visual Edit-mode
+  // changes are always included; fall back to mdText only when there's no deck yet.
   const handleSave = useCallback(() => {
-    void saveTextFile(mdText, filePath ?? "slidecraft.md");
-  }, [mdText, filePath]);
+    void saveTextFile(deck ? serializeMd(deck) : mdText, filePath ?? "slidecraft.md");
+  }, [deck, mdText, filePath]);
 
   // Generate + save the .pptx (mermaid pre-render + WYSIWYG rasterise in deck-export.ts).
   const handleGenerate = useCallback(async () => {

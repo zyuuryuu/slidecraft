@@ -1,10 +1,12 @@
 /**
- * ReviewBar — the Import-mode "整形レビュー" strip.
+ * ReviewBar — the "整形レビュー" strip, shown both in the Edit home and in the
+ * Initialize modal.
  *
  * Triaged into ⚠ 課題 (should fix) and 💡 提案 (optional). Each chip jumps to its
- * slide; a pure key-value list also offers "→表" (deterministic, instant, undoable).
- * AI fixes are NOT here — they live in the Edit AI dock with a before→after diff +
- * 採用/却下, so no edit is ever applied blind.
+ * slide; a pure key-value list also offers "→表" (deterministic, instant, undoable —
+ * deck-op in Edit, Markdown-span in the Initialize modal). AI fixes are NOT here —
+ * they live in the Edit AI dock with a before→after diff + 採用/却下, so no edit is
+ * ever applied blind.
  */
 
 import type { DeckIssue } from "../engine/deck-diagnostics";

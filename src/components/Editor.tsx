@@ -1,11 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { yaml } from "@codemirror/lang-yaml";
 import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { defaultKeymap, history, historyKeymap, undo, redo, undoDepth, redoDepth } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import {
   syntaxHighlighting,
   defaultHighlightStyle,
@@ -43,38 +43,15 @@ interface EditorProps {
   language?: "yaml" | "json" | "markdown";
   onCursorLine?: (line: number) => void;
   gotoLine?: { line: number; ts: number }; // ts forces re-trigger even for same line
-  /** Editor undo/redo availability — so a host toolbar can drive the editor's history. */
-  onHistory?: (canUndo: boolean, canRedo: boolean) => void;
 }
 
-/** Imperative handle so the toolbar's Undo/Redo can drive the editor's own history
- *  in Import mode (the Markdown text owns its undo; programmatic edits land here too). */
-export interface EditorHandle {
-  undo: () => void;
-  redo: () => void;
-}
-
-const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
-  { value, onChange, language = "yaml", onCursorLine, gotoLine, onHistory },
-  ref,
-) {
+// The Markdown editor owns its own undo (CodeMirror history + ⌘/Ctrl+Z), including
+// programmatic edits synced via the value prop — no host wiring needed.
+export default function Editor({ value, onChange, language = "yaml", onCursorLine, gotoLine }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onCursorLineRef = useRef(onCursorLine);
   onCursorLineRef.current = onCursorLine;
-  const onHistoryRef = useRef(onHistory);
-  onHistoryRef.current = onHistory;
-
-  useImperativeHandle(ref, () => ({
-    undo: () => {
-      const v = viewRef.current;
-      if (v) { undo(v); v.focus(); }
-    },
-    redo: () => {
-      const v = viewRef.current;
-      if (v) { redo(v); v.focus(); }
-    },
-  }), []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -97,7 +74,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChange(update.state.doc.toString());
-            onHistoryRef.current?.(undoDepth(update.state) > 0, redoDepth(update.state) > 0);
           }
           if (update.selectionSet || update.docChanged) {
             const pos = update.state.selection.main.head;
@@ -161,6 +137,4 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   return (
     <div ref={containerRef} className="h-full w-full overflow-hidden" />
   );
-});
-
-export default Editor;
+}

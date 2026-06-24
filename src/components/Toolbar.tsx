@@ -1,5 +1,4 @@
 interface ToolbarProps {
-  onOpen: () => void;
   onSave: () => void;
   onGenerate: () => void;
   onLoadTemplate?: () => void;
@@ -14,7 +13,6 @@ interface ToolbarProps {
 }
 
 export default function Toolbar({
-  onOpen,
   onSave,
   onGenerate,
   onLoadTemplate,
@@ -35,13 +33,6 @@ export default function Toolbar({
           SlideCraft
         </h1>
       </div>
-
-      <button
-        onClick={onOpen}
-        className="px-3 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded transition-colors"
-      >
-        Open
-      </button>
 
       <button
         onClick={onSave}

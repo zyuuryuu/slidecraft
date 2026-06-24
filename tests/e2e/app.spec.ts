@@ -1,6 +1,6 @@
 /**
  * E2E tests for SlideCraft. The visual Edit surface is the HOME (deck = source of
- * truth); Import is the one-time "Initialize" phase (Markdown in → 確定 → Edit).
+ * truth); "Import" opens the one-time "Initialize" modal (Markdown in → 確定 → Edit).
  * Runs against the Vite dev server (playwright.config webServer).
  */
 import { test, expect } from "@playwright/test";
@@ -12,7 +12,6 @@ test.describe("SlideCraft", () => {
 
   test("shell: title + core toolbar buttons", async ({ page }) => {
     await expect(page.getByText("SlideCraft").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Open" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Generate PPTX/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Template/ })).toBeVisible();
@@ -23,26 +22,27 @@ test.describe("SlideCraft", () => {
     await expect(page.getByText(/Slide Editor/)).toBeVisible();
   });
 
-  test("Import (Initialize) shows the Markdown editor + slide preview", async ({ page }) => {
-    await page.getByRole("button", { name: "Import", exact: true }).click();
+  test("Import opens the Initialize modal (Markdown editor + split preview)", async ({ page }) => {
+    await page.getByRole("button", { name: /Import/ }).click();
+    await expect(page.getByText(/Initialize/)).toBeVisible();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
-    await expect(page.getByText("Slide Preview")).toBeVisible();
+    await expect(page.getByText(/Slide Preview/)).toBeVisible();
+  });
+
+  test("Initialize: 確定 commits and returns to Edit", async ({ page }) => {
+    await page.getByRole("button", { name: /Import/ }).click();
+    await expect(page.getByText("Markdown Editor")).toBeVisible();
+    await page.getByRole("button", { name: /確定/ }).click();
+    await expect(page.getByText("Markdown Editor")).toHaveCount(0);
+    await expect(page.getByText("Slides", { exact: true })).toBeVisible();
   });
 
   test("preview renders slide cards for the sample deck", async ({ page }) => {
-    await page.getByRole("button", { name: "Import", exact: true }).click();
+    await page.getByRole("button", { name: /Import/ }).click();
     await page.waitForTimeout(1500); // serialize + debounced parse + distill
     const cards = page.locator("[style*='position: relative'][style*='overflow: hidden']");
     await expect(cards.first()).toBeVisible({ timeout: 8000 });
     expect(await cards.count()).toBeGreaterThanOrEqual(3);
-  });
-
-  test("Edit <-> Import sub-mode toggle", async ({ page }) => {
-    await expect(page.getByText("Slides", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Import", exact: true }).click();
-    await expect(page.getByText("Markdown Editor")).toBeVisible();
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
-    await expect(page.getByText("Slides", { exact: true })).toBeVisible();
   });
 
   test("Generate triggers a .pptx download", async ({ page }) => {
@@ -54,8 +54,8 @@ test.describe("SlideCraft", () => {
     expect((await download).suggestedFilename()).toMatch(/\.pptx$/);
   });
 
-  test("does not crash on invalid editor input", async ({ page }) => {
-    await page.getByRole("button", { name: "Import", exact: true }).click();
+  test("does not crash on invalid editor input (in the Initialize modal)", async ({ page }) => {
+    await page.getByRole("button", { name: /Import/ }).click();
     const editor = page.locator(".cm-editor .cm-content");
     await editor.click();
     await page.keyboard.press("Control+a");

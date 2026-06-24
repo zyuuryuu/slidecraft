@@ -1,5 +1,3 @@
-import { useRef, useState } from "react";
-import Editor, { type EditorHandle } from "./components/Editor";
 import ReviewBar from "./components/ReviewBar";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
@@ -10,6 +8,7 @@ import Toolbar from "./components/Toolbar";
 import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
+import InitializeModal from "./components/InitializeModal";
 import { useDeckController } from "./components/useDeckController";
 
 export default function App() {
@@ -19,151 +18,65 @@ export default function App() {
     filePath, activeSlide, setActiveSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
     handleOpen, handleSave, handleGenerate, hasContent,
-    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
-    currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
+    handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize,
+    handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
+    diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd,
+    handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
   } = useDeckController();
 
-  // Triage the review: 課題 (warn = overflow / no title, should fix) vs 提案
-  // (info = condense / table-able, optional) so the skippable ones read as skippable.
+  // Triage the review: 課題 (warn = overflow / no title, should fix) vs 提案 (info =
+  // condense / table-able, optional) so the skippable ones read as skippable.
   const warnIssues = diagnostics.filter((d) => d.level === "warn");
   const tipIssues = diagnostics.filter((d) => d.level === "info");
 
-  // In Import mode the Markdown editor owns undo (incl. programmatic 整形 / →表 edits),
-  // so route the toolbar's Undo/Redo to the editor's history there; deck history in Edit.
-  const editorRef = useRef<EditorHandle>(null);
-  const [editorHist, setEditorHist] = useState({ canUndo: false, canRedo: false });
-  const importMode = subMode === "import";
+  // While the Initialize modal is open, make the background non-interactive so Tab /
+  // clicks can't reach the (visually obscured) Edit surface behind the dimmer.
+  const bgInert = subMode === "import" ? true : undefined;
 
   return (
     <>
-      <div className="flex items-stretch bg-[#1E2761] border-b border-[#3B82F6]/30">
+      <div className="flex items-stretch bg-[#1E2761] border-b border-[#3B82F6]/30" inert={bgInert}>
         <Toolbar
-          onOpen={handleOpen}
           onSave={handleSave}
           onGenerate={handleGenerate}
           onLoadTemplate={handleLoadTemplate}
-          onAiAssist={() =>
-            subMode === "edit" ? setShowAiPanel((v) => !v) : setShowLlmAssist(true)
-          }
+          onAiAssist={() => setShowAiPanel((v) => !v)}
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
-          onUndo={importMode ? () => editorRef.current?.undo() : undoDeck}
-          onRedo={importMode ? () => editorRef.current?.redo() : redoDeck}
-          canUndo={importMode ? editorHist.canUndo : canUndo}
-          canRedo={importMode ? editorHist.canRedo : canRedo}
+          onUndo={undoDeck}
+          onRedo={redoDeck}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
         <div className="flex items-center gap-2 px-3 py-2">
-          <div className="flex rounded overflow-hidden border border-[#3B82F6]/40 text-xs">
-            <button
-              onClick={handleStartEditing}
-              title="スライドを視覚的に編集（メイン）"
-              className={`px-3 py-1 transition-colors ${
-                subMode === "edit"
-                  ? "bg-[#3B82F6] text-white"
-                  : "bg-[#1E2761] text-gray-400 hover:text-white"
-              }`}
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleEnterImport}
-              title="原稿/Markdownから取り込み直す（現在のスライドを反映）"
-              className={`px-3 py-1 transition-colors border-l border-[#3B82F6]/40 ${
-                subMode === "import"
-                  ? "bg-[#3B82F6] text-white"
-                  : "bg-[#1E2761] text-gray-400 hover:text-white"
-              }`}
-            >
-              Import
-            </button>
-          </div>
-          {subMode === "import" && (
-            <button
-              onClick={handleStructureManuscript}
-              title="生原稿（見出し＋文章）を、見出しごとのスライド（箇条書き化）に自動整形"
-              className="px-2.5 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40"
-            >
-              ✨ 原稿を整形
-            </button>
-          )}
+          <button
+            onClick={handleEnterImport}
+            title="原稿 / Markdown から取り込み・作成（Initialize）"
+            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40"
+          >
+            📄 Import
+          </button>
         </div>
       </div>
 
-      {/* ── Markdown editor + live preview ── */}
-      {subMode === "import" && (
-        <>
-          {/* Non-destructive review — 課題 (should fix) vs 提案 (optional), per-issue fixes */}
-          <ReviewBar
-            warnIssues={warnIssues}
-            tipIssues={tipIssues}
-            onJump={handleSlideClick}
-            onFixDeterministic={handleFixIssue}
-          />
-        <ResizableSplit
-          storageKey="slidecraft_split_import"
-          left={
-            <>
-              <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-                Markdown Editor
-              </div>
-              <div className="flex-1 min-h-0">
-                <Editor
-                  ref={editorRef}
-                  value={mdText}
-                  onChange={handleEditorChange}
-                  language="markdown"
-                  onCursorLine={handleCursorLine}
-                  gotoLine={gotoLine}
-                  onHistory={(canUndo, canRedo) => setEditorHist({ canUndo, canRedo })}
-                />
-              </div>
-            </>
-          }
-          right={
-            <>
-              <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
-                Slide Preview
-              </div>
-              <div className="flex-1 min-h-0 bg-[#0f1117]">
-                <SlidePreview
-                  deck={deck}
-                  template={templateData}
-                  error={parseError}
-                  activeSlide={activeSlide}
-                  onSlideClick={handleSlideClick}
-                />
-              </div>
-            </>
-          }
+      {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
+      <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
+        {/* Non-destructive review, where you work — fix in deck (undoable) */}
+        <ReviewBar
+          warnIssues={warnIssues}
+          tipIssues={tipIssues}
+          onJump={setActiveSlide}
+          onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
         />
-        </>
-      )}
-
-      {/* ── Edit mode (home): slide list + editor + preview ── */}
-      {subMode === "edit" && (
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* The same non-destructive review, now where you work — fix in deck (undoable) */}
-          <ReviewBar
-            warnIssues={warnIssues}
-            tipIssues={tipIssues}
-            onJump={setActiveSlide}
-            onFixDeterministic={(issue) => handleVisualizeSlide(issue.slideIndex)}
-          />
-          <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
           <div className="w-[220px] border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0a0e1a]">
             <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
               Slides
             </div>
             <div className="flex-1 min-h-0">
-              <SlideList
-                deck={deck}
-                template={templateData}
-                activeIndex={activeSlide}
-                onSelect={setActiveSlide}
-              />
+              <SlideList deck={deck} template={templateData} activeIndex={activeSlide} onSelect={setActiveSlide} />
             </div>
           </div>
 
@@ -196,17 +109,9 @@ export default function App() {
                       Select a slide
                     </div>
                   ) : slideEditView === "markdown" ? (
-                    <SlideMarkdownEditor
-                      key={activeSlide}
-                      md={currentSlideMd ?? ""}
-                      onChange={handleSlideMdChange}
-                    />
+                    <SlideMarkdownEditor key={activeSlide} md={currentSlideMd ?? ""} onChange={handleSlideMdChange} />
                   ) : (
-                    <SlideEditor
-                      slide={currentSlide}
-                      layout={currentLayout}
-                      onChange={(updated) => handleSlideUpdate(activeSlide, updated)}
-                    />
+                    <SlideEditor slide={currentSlide} layout={currentLayout} onChange={(updated) => handleSlideUpdate(activeSlide, updated)} />
                   )}
                 </div>
               </>
@@ -217,34 +122,48 @@ export default function App() {
                   Preview — Slide {activeSlide + 1}
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  <SlidePreview
-                    deck={deck}
-                    template={templateData}
-                    error={parseError}
-                    activeSlide={activeSlide}
-                    singleSlide
-                    onDiagramChange={handleDiagramChange}
-                  />
+                  <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
                 </div>
               </>
             }
           />
-          </div>
-          {showAiPanel && (
-            <AiPanel
-              onApply={handleAiApply}
-              onClose={() => setShowAiPanel(false)}
-              currentSlideMd={currentSlideMd}
-              onApplySlide={handleApplySlide}
-              templateHint={deckHint}
-              issues={activeSlideIssues}
-              contentBox={contentBox}
-            />
-          )}
         </div>
-      )}
+        {showAiPanel && (
+          <AiPanel
+            onApply={handleAiApply}
+            onClose={() => setShowAiPanel(false)}
+            currentSlideMd={currentSlideMd}
+            onApplySlide={handleApplySlide}
+            templateHint={deckHint}
+            issues={activeSlideIssues}
+            contentBox={contentBox}
+          />
+        )}
+      </div>
 
       <StatusBar spec={null} error={parseError} filePath={filePath} />
+
+      {/* Initialize phase (modal): Markdown lives only here → 確定 commits the deck */}
+      <InitializeModal
+        isOpen={subMode === "import"}
+        onCancel={handleCancelInitialize}
+        onConfirm={handleStartEditing}
+        mdText={mdText}
+        onMdChange={handleEditorChange}
+        onOpenFile={handleOpen}
+        onStructure={handleStructureManuscript}
+        onGenerateAI={() => setShowLlmAssist(true)}
+        deck={deck}
+        templateData={templateData}
+        parseError={parseError}
+        activeSlide={activeSlide}
+        onSlideClick={handleSlideClick}
+        warnIssues={warnIssues}
+        tipIssues={tipIssues}
+        onFixDeterministic={handleFixIssue}
+        onCursorLine={handleCursorLine}
+        gotoLine={gotoLine}
+      />
 
       <LlmAssist
         isOpen={showLlmAssist}
