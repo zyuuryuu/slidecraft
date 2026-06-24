@@ -9,8 +9,7 @@
 import { generateWithClaude } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
 import { appFetch } from "./app-fetch";
-import { deckPlanSystemPrompt, slideMarkdownEditPrompt } from "../engine/deck-plan";
-import { diagramSystemPrompt, diagramEditSystemPrompt } from "../engine/llm-prompts";
+import { systemPromptForMode } from "../engine/llm-prompts";
 
 export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "custom";
 
@@ -53,14 +52,7 @@ export function generateWithAI(req: AiRequest): Promise<string> {
   // turns into correct layouts); "slide" edits one slide (token-cheap);
   // "diagram" generates / "diagram-edit" revises a DiagramSpec.
   const today = new Date().toISOString().slice(0, 10);
-  const system =
-    req.mode === "slides"
-      ? deckPlanSystemPrompt(today)
-      : req.mode === "slide"
-        ? slideMarkdownEditPrompt()
-        : req.mode === "diagram-edit"
-          ? diagramEditSystemPrompt()
-          : diagramSystemPrompt();
+  const system = systemPromptForMode(req.mode, today);
 
   if (req.provider === "claude") {
     return generateWithClaude({

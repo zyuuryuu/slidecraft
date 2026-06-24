@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import type { AiTask } from "./useAiGeneration";
+import { systemPromptForMode } from "../engine/llm-prompts";
 
 const STATUS: Record<AiTask["status"], { icon: string; cls: string }> = {
   running: { icon: "●", cls: "text-[#93C5FD] animate-pulse" },
@@ -67,7 +68,13 @@ export default function AiTasksPanel({
                 {open && (
                   <div className="px-3 pb-2 space-y-2 bg-[#0a0e1a] border-t border-[#161a2b]">
                     <div>
-                      <div className="text-gray-500 text-[10px] pt-1.5 pb-0.5">送信プロンプト（mode: {t.mode}）</div>
+                      <div className="text-gray-500 text-[10px] pt-1.5 pb-0.5">System プロンプト（mode: {t.mode}）</div>
+                      <pre className="whitespace-pre-wrap break-words text-[#93C5FD]/80 max-h-44 overflow-auto bg-[#0f1117] border border-[#161a2b] rounded p-2 text-[10px] leading-relaxed">
+                        {systemPromptForMode(t.mode, new Date(t.startedAt).toISOString().slice(0, 10))}
+                      </pre>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 text-[10px] pb-0.5">User メッセージ</div>
                       <pre className="whitespace-pre-wrap break-words text-gray-300 max-h-44 overflow-auto bg-[#0f1117] border border-[#161a2b] rounded p-2 text-[10px] leading-relaxed">{t.prompt}</pre>
                     </div>
                     {t.result && (

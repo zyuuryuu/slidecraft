@@ -8,6 +8,20 @@
 
 import { LAYOUT_NAMES } from "./slide-schema";
 import { iconCatalogPromptList } from "./icon-catalog";
+import { deckPlanSystemPrompt, slideMarkdownEditPrompt } from "./deck-plan-prompts";
+
+/** The SYSTEM prompt actually sent for a given AI mode — the SAME selection ipc/ai.ts
+ *  uses, exported so the task panel can show exactly what was sent. `today` is only used
+ *  by the "slides" (whole-deck generation) prompt. */
+export function systemPromptForMode(mode: "slides" | "slide" | "diagram" | "diagram-edit", today: string): string {
+  return mode === "slides"
+    ? deckPlanSystemPrompt(today)
+    : mode === "slide"
+      ? slideMarkdownEditPrompt()
+      : mode === "diagram-edit"
+        ? diagramEditSystemPrompt()
+        : diagramSystemPrompt();
+}
 
 // ── Slide deck prompt ──
 
