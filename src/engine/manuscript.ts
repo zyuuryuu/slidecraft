@@ -120,13 +120,21 @@ export function structureManuscript(md: string): string {
       continue;
     }
     if (!titleDone && sec.level === 1) {
-      slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}`); // cover: title only
+      // A SHORT, clean preamble line (presenter name / tagline / short subtitle) belongs
+      // on the cover as the subtitle. A long / punctuated (句読点) / multi-line preamble
+      // (prose, meeting metadata) does NOT — it goes to its own title-less lead slide so
+      // the cover stays clean AND nothing is dropped (the old code kept only line 1).
+      const preamble = sec.lines.map((l) => l.trim()).filter(Boolean);
+      const subtitle =
+        preamble.length === 1 && preamble[0].length <= 28 && !/[。．、，！？!?]/.test(preamble[0])
+          ? preamble[0]
+          : null;
+      slides.push(`<!-- slide: Title.1Title.Single -->\n# ${sec.heading}${subtitle ? `\n## ${subtitle}` : ""}`);
       titleDone = true;
-      // The H1's preamble (a description / date / attendees) is NOT a subtitle — turning
-      // it into one drops every line past the first (data loss) and clutters the cover.
-      // Keep it ALL on its own title-less lead-in slide instead.
-      const body = sectionBody(sec.lines);
-      if (body) slides.push(body);
+      if (!subtitle) {
+        const body = sectionBody(sec.lines);
+        if (body) slides.push(body);
+      }
       continue;
     }
     const body = sectionBody(sec.lines);

@@ -55,6 +55,14 @@ describe("structureManuscript", () => {
     for (const name of ["出席", "田中", "佐藤", "鈴木"]) expect(json).toContain(name);
   });
 
+  it("a SHORT clean H1 preamble (single line, no 句読点) becomes the cover subtitle", () => {
+    const md = "# 2026年度 営業戦略\n\n営業本部 山田太郎\n\n## 概況\n\n- A";
+    const cover = parseMd(structureManuscript(md)).slides[0];
+    expect(titleOf(cover)).toBe("2026年度 営業戦略");
+    const sub = cover.placeholders.find((p) => p.idx === "1");
+    expect(sub?.paragraphs.map((x) => x.segments.map((g) => g.text).join("")).join("")).toBe("営業本部 山田太郎");
+  });
+
   it("VISUALIZE: key-value bullets → native table; non-pair bullets stay bullets", () => {
     const ms = `# 製品X
 
