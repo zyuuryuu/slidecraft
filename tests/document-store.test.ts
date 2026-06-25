@@ -61,6 +61,18 @@ describe("documentReducer — document collection + ISOLATION", () => {
     expect(byId(s, "a").mdText).toBe("A");
   });
 
+  it("opening a project (deck wrapped into a fresh-history new doc) preserves the current one", () => {
+    let s = documentReducer(one(), setDeck(deck(3), "commit")); // current doc a → deck3 (+1 undo step)
+    const opened = makeDoc({ id: "b", title: "proj", history: { past: [], present: deck(7), future: [], lastTs: 0 }, mdText: "MD" });
+    s = documentReducer(s, { type: "newDoc", doc: opened, activate: true });
+    expect(s.activeId).toBe("b");
+    expect(byId(s, "b").history.present).toEqual(deck(7));
+    expect(byId(s, "b").title).toBe("proj");
+    // the previously open project is fully intact, including its own undo history
+    expect(byId(s, "a").history.present).toEqual(deck(3));
+    expect(byId(s, "a").history.past.length).toBe(1);
+  });
+
   it("switchDoc changes the active doc; closeDoc removes it and reactivates a neighbor; the last doc is never closed", () => {
     let s: Store = { docs: [makeDoc({ id: "a" }), makeDoc({ id: "b" }), makeDoc({ id: "c" })], activeId: "c" };
     s = documentReducer(s, { type: "switchDoc", id: "a" });

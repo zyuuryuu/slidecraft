@@ -159,6 +159,30 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
     dispatch({ type: "newDoc", doc, activate: true });
     return doc.id;
   }, []);
+  /** Open a fully-formed document (e.g. a .slidecraft project) as a NEW active doc —
+   *  wraps the deck into a fresh history so it never destroys the current document. */
+  const openDoc = useCallback(
+    (init: {
+      deck: DeckIR | null;
+      templateData?: TemplateData | null;
+      templateName?: string;
+      mdText?: string;
+      filePath?: string | null;
+      title?: string;
+    }) => {
+      const doc = makeDoc({
+        history: { past: [], present: init.deck, future: [], lastTs: 0 },
+        templateData: init.templateData ?? null,
+        templateName: init.templateName ?? "",
+        mdText: init.mdText ?? "",
+        filePath: init.filePath ?? null,
+        title: init.title ?? "Untitled",
+      });
+      dispatch({ type: "newDoc", doc, activate: true });
+      return doc.id;
+    },
+    [],
+  );
   const switchDoc = useCallback((id: string) => dispatch({ type: "switchDoc", id }), []);
   const closeDoc = useCallback((id: string) => dispatch({ type: "closeDoc", id }), []);
 
@@ -185,6 +209,7 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
     docs: store.docs,
     activeId: store.activeId,
     createDoc,
+    openDoc,
     switchDoc,
     closeDoc,
   };

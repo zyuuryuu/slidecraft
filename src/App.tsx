@@ -5,6 +5,7 @@ import SlideEditor from "./components/SlideEditor";
 import SlideMarkdownEditor from "./components/SlideMarkdownEditor";
 import ResizableSplit from "./components/ResizableSplit";
 import Toolbar from "./components/Toolbar";
+import DocTabs from "./components/DocTabs";
 import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
@@ -26,7 +27,7 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
-    catalog, setDeck,
+    catalog, setDeck, docs, activeId, switchDoc, closeDoc,
   } = useDeckController();
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
@@ -101,6 +102,8 @@ export default function App() {
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
+        {/* Multi-document tabs — only rendered when >1 project is open */}
+        <DocTabs docs={docs} activeId={activeId} onSwitch={switchDoc} onClose={closeDoc} />
         {/* Non-destructive review, where you work — fix in deck (undoable) */}
         <ReviewBar
           warnIssues={warn(editIssues)}

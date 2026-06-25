@@ -41,8 +41,8 @@ export function useDeckController() {
     mdText, setMdText, templateData, setTemplateData, templateName, setTemplateName,
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
-    docs, activeId, createDoc, switchDoc, closeDoc,
-  } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]) });
+    docs, activeId, createDoc, openDoc, switchDoc, closeDoc,
+  } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "サンプル" });
 
   // Catalog → layout selection + capacity adapt to the loaded template (canonical = unchanged).
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
@@ -161,7 +161,7 @@ export function useDeckController() {
   // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
   const { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject } = useDeckIO({
     mdText, deck, templateData, parseMdText, setMdText, setParseError,
-    resetDeck, setTemplateData, templateName, setTemplateName, filePath, setFilePath,
+    templateName, filePath, setFilePath, openDoc,
   });
 
   const hasContent = deck !== null && templateData !== null;

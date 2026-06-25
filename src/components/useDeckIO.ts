@@ -20,17 +20,15 @@ interface IODeps {
   parseMdText: (text: string, mode?: "commit" | "silent" | "reset") => void;
   setMdText: (s: string) => void;
   setParseError: (e: string | null) => void;
-  /** For opening a project (.slidecraft): restore the full state directly. */
-  resetDeck: (deck: DeckIR | null) => void;
-  setTemplateData: (t: TemplateData | null) => void;
   templateName: string;
-  setTemplateName: (n: string) => void;
   /** Current file path is per-document (lives in the document store). */
   filePath: string | null;
   setFilePath: (n: string | null) => void;
+  /** Open a .slidecraft project as a NEW document (never destroys the current one). */
+  openDoc: (init: { deck: DeckIR | null; templateData?: TemplateData | null; templateName?: string; mdText?: string; filePath?: string | null; title?: string }) => string;
 }
 
-export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError, resetDeck, setTemplateData, templateName, setTemplateName, filePath, setFilePath }: IODeps) {
+export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError, templateName, filePath, setFilePath, openDoc }: IODeps) {
   const [generating, setGenerating] = useState(false);
 
   // Open a Markdown file → a brand-new deck (Initialize).
@@ -70,22 +68,24 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     await saveBinaryFile(bytes, `${base}.slidecraft`, ["slidecraft"], "SlideCraft Project");
   }, [deck, templateData, templateName, filePath]);
 
-  // Open a .slidecraft → restore the full state (deck + template) directly, no re-parse.
+  // Open a .slidecraft as a NEW document (a tab) so the current project is preserved.
   const handleOpenProject = useCallback(async () => {
     const picked = await pickBinaryFile(["slidecraft"], "SlideCraft Project");
     if (!picked) return;
     try {
       const { deck: openedDeck, template, meta } = await openProject(picked.bytes);
-      setTemplateData(template);
-      if (meta.templateName) setTemplateName(meta.templateName);
-      resetDeck(openedDeck); // fresh baseline (clears undo history)
-      setMdText(serializeMd(openedDeck)); // keep the Markdown view in sync
-      setParseError(null);
-      setFilePath(picked.name);
+      openDoc({
+        deck: openedDeck,
+        templateData: template,
+        templateName: meta.templateName ?? "",
+        mdText: serializeMd(openedDeck), // keep the Markdown view in sync
+        filePath: picked.name,
+        title: picked.name.replace(/\.slidecraft$/i, ""),
+      });
     } catch (e) {
       setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, [resetDeck, setTemplateData, setTemplateName, setMdText, setParseError, setFilePath]);
+  }, [openDoc, setParseError]);
 
   return { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject };
 }
