@@ -11,15 +11,26 @@
  */
 
 import JSZip from "jszip";
+import { z } from "zod";
 import { DeckIRSchema, type DeckIR } from "./slide-schema";
 import { loadTemplate, type TemplateData } from "./template-loader";
+import { loadZipSafe, readCappedString, readCappedBytes, readEntryString, ZIP_LIMITS } from "./zip-safe";
 
 const PROJECT_VERSION = 1;
 
-export interface ProjectMeta {
-  version: number;
-  templateName: string;
-  savedAt: string; // ISO timestamp
+const ProjectMetaSchema = z.object({
+  version: z.number(),
+  templateName: z.string().max(200),
+  savedAt: z.string().max(40),
+});
+export type ProjectMeta = z.infer<typeof ProjectMetaSchema>;
+
+/** Bound the untrusted deck beyond zod's TYPE check (the deck.json byte cap already
+ *  bounds total size; this rejects an absurd slide count cheaply). */
+function assertDeckBounds(deck: DeckIR): void {
+  if (deck.slides.length > ZIP_LIMITS.maxSlides) {
+    throw new Error(`スライド数が多すぎます（${deck.slides.length} > ${ZIP_LIMITS.maxSlides}）`);
+  }
 }
 
 /** Bundle the deck + its template into a `.slidecraft` zip (Uint8Array). */
@@ -39,17 +50,21 @@ export async function bundleProject(
 /** Open a `.slidecraft` zip → the full editing state. Throws on a malformed bundle or a
  *  deck.json that doesn't match the current schema. */
 export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ deck: DeckIR; template: TemplateData; meta: ProjectMeta }> {
-  const zip = await JSZip.loadAsync(bytes);
+  const zip = await loadZipSafe(bytes); // input-size + entry-count guard (cheap header parse)
   const deckFile = zip.file("deck.json");
   const tplFile = zip.file("template.pptx");
   if (!deckFile || !tplFile) {
     throw new Error("不正な .slidecraft ファイルです（deck.json / template.pptx が見つかりません）");
   }
-  const deck = DeckIRSchema.parse(JSON.parse(await deckFile.async("string")));
-  const template = await loadTemplate(await tplFile.async("arraybuffer"));
-  const metaFile = zip.file("meta.json");
-  const meta: ProjectMeta = metaFile
-    ? (JSON.parse(await metaFile.async("string")) as ProjectMeta)
-    : { version: 0, templateName: "", savedAt: "" };
+  // Stream-capped decompression (zip-bomb safe) → schema validation → bounds.
+  const deck = DeckIRSchema.parse(JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson)));
+  assertDeckBounds(deck);
+  const template = await loadTemplate(await readCappedBytes(tplFile, ZIP_LIMITS.templatePptx));
+  // meta is non-critical — validate, but fall back to defaults rather than reject the file.
+  let meta: ProjectMeta = { version: 0, templateName: "", savedAt: "" };
+  try {
+    const parsed = ProjectMetaSchema.safeParse(JSON.parse((await readEntryString(zip, "meta.json", 64 * 1024)) || "{}"));
+    if (parsed.success) meta = parsed.data;
+  } catch { /* malformed meta.json → keep defaults, still open the deck */ }
   return { deck, template, meta };
 }
