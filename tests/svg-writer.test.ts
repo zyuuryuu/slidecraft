@@ -73,4 +73,24 @@ describe("renderDiagramToSvg", () => {
     expect(svg).toContain("&lt;b&gt;&amp;");
     expect(svg).not.toContain("<b>&amp;");
   });
+
+  it("neutralizes malicious colors so they cannot break out of fill/style attributes (XSS)", () => {
+    // A hostile .slidecraft can set any string as a color (schema is z.string()). Without
+    // escaping, `red" onmouseover=…` would close fill="…" and inject an event handler.
+    const spec = {
+      ...FLOW,
+      nodes: [
+        {
+          id: "x",
+          label: "n",
+          shape: "rect",
+          style: { fill: 'red" onmouseover="alert(1)', font_color: '#fff" onclick="alert(2)' },
+        },
+      ],
+      edges: [],
+    } as unknown as DiagramSpec;
+    const svg = renderDiagramToSvg(spec);
+    expect(svg).not.toMatch(/ on\w+="/); // no real event-handler attribute anywhere
+    expect(svg).toContain("&quot;"); // the injected quotes were entity-encoded instead
+  });
 });

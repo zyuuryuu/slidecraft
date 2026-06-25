@@ -30,7 +30,9 @@ function px(inches: number): number {
 }
 
 function col(c: string): string {
-  return c.startsWith("#") ? c : `#${c}`;
+  // esc() too: colors come from untrusted deck data and land in style="…" / fill="…"
+  // attributes — a value like `red" onmouseover=…` would otherwise break out.
+  return esc(c.startsWith("#") ? c : `#${c}`);
 }
 
 function esc(s: string): string {
@@ -170,7 +172,7 @@ class SvgDrawTarget implements DrawTarget {
     const justify =
       opts.align === "left" ? "flex-start" : opts.align === "right" ? "flex-end" : "center";
     const alignItems = opts.valign === "top" ? "flex-start" : "center";
-    const textAlign = opts.align ?? "center";
+    const textAlign = esc(opts.align ?? "center"); // trusted in practice, esc'd for depth
 
     const inner = lines
       .map((r) => {
