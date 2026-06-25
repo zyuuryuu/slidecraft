@@ -6,23 +6,28 @@
  */
 
 import { useState, useCallback } from "react";
-import { pickTextFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
+import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
 import { serializeMd } from "../engine/md-serializer";
+import { bundleProject, openProject } from "../engine/project-io";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
-import type { HistoryMode } from "./useHistoryState";
 
 interface IODeps {
   mdText: string;
   deck: DeckIR | null;
   templateData: TemplateData | null;
-  parseMdText: (text: string, mode?: HistoryMode | "reset") => void;
+  parseMdText: (text: string, mode?: "commit" | "silent" | "reset") => void;
   setMdText: (s: string) => void;
   setParseError: (e: string | null) => void;
+  /** For opening a project (.slidecraft): restore the full state directly. */
+  resetDeck: (deck: DeckIR | null) => void;
+  setTemplateData: (t: TemplateData | null) => void;
+  templateName: string;
+  setTemplateName: (n: string) => void;
 }
 
-export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError }: IODeps) {
+export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError, resetDeck, setTemplateData, templateName, setTemplateName }: IODeps) {
   const [filePath, setFilePath] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -55,5 +60,30 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     }
   }, [deck, templateData, setParseError]);
 
-  return { filePath, generating, handleOpen, handleSave, handleGenerate };
+  // Save the PROJECT — deck + template in one self-contained .slidecraft (reopen losslessly).
+  const handleSaveProject = useCallback(async () => {
+    if (!deck || !templateData) return;
+    const bytes = await bundleProject(deck, templateData, { templateName, savedAt: new Date().toISOString() });
+    const base = (filePath ?? "project").replace(/\.[^./\\]+$/, "");
+    await saveBinaryFile(bytes, `${base}.slidecraft`, ["slidecraft"], "SlideCraft Project");
+  }, [deck, templateData, templateName, filePath]);
+
+  // Open a .slidecraft → restore the full state (deck + template) directly, no re-parse.
+  const handleOpenProject = useCallback(async () => {
+    const picked = await pickBinaryFile(["slidecraft"], "SlideCraft Project");
+    if (!picked) return;
+    try {
+      const { deck: openedDeck, template, meta } = await openProject(picked.bytes);
+      setTemplateData(template);
+      if (meta.templateName) setTemplateName(meta.templateName);
+      resetDeck(openedDeck); // fresh baseline (clears undo history)
+      setMdText(serializeMd(openedDeck)); // keep the Markdown view in sync
+      setParseError(null);
+      setFilePath(picked.name);
+    } catch (e) {
+      setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [resetDeck, setTemplateData, setTemplateName, setMdText, setParseError]);
+
+  return { filePath, generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject };
 }

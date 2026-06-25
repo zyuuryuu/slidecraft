@@ -3,6 +3,9 @@ import { useState } from "react";
 interface ToolbarProps {
   onSave: () => void;
   onGenerate: () => void;
+  /** Save / open the editable PROJECT (.slidecraft = deck + template). */
+  onSaveProject?: () => void;
+  onOpenProject?: () => void;
   onLoadTemplate?: () => void;
   onAiAssist?: () => void;
   /** Number of AI tasks currently running → a live badge on the AI Assist button. */
@@ -19,6 +22,8 @@ interface ToolbarProps {
 export default function Toolbar({
   onSave,
   onGenerate,
+  onSaveProject,
+  onOpenProject,
   onLoadTemplate,
   onAiAssist,
   aiRunning = 0,
@@ -74,32 +79,53 @@ export default function Toolbar({
 
       <div className="flex-1" />
 
-      {/* Export — merges Save (Markdown) + Generate (PPTX); both are exports. */}
+      {/* File menu — project save/open (.slidecraft = editable) + export (PPTX / Markdown). */}
       <div className="relative">
         <button
           onClick={() => setExportOpen((v) => !v)}
           className="px-4 py-1.5 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white font-medium rounded transition-colors inline-flex items-center gap-1.5"
         >
-          {generating ? "書き出し中…" : "Export"}
+          {generating ? "書き出し中…" : "ファイル"}
           <span className="text-[10px] opacity-80">▾</span>
         </button>
         {exportOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
-            <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1 text-sm">
+            <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1 text-sm">
+              {onOpenProject && (
+                <button
+                  onClick={() => { setExportOpen(false); onOpenProject(); }}
+                  className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"
+                >
+                  <span>📂 プロジェクトを開く</span>
+                  <span className="text-gray-500 text-xs">.slidecraft</span>
+                </button>
+              )}
+              {onSaveProject && (
+                <button
+                  onClick={() => { setExportOpen(false); onSaveProject(); }}
+                  disabled={!hasSpec}
+                  className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                >
+                  <span>💾 プロジェクトを保存</span>
+                  <span className="text-gray-500 text-xs">.slidecraft</span>
+                </button>
+              )}
+              <div className="my-1 border-t border-[#2D3A6E]" />
+              <div className="px-3 pb-0.5 text-[10px] text-gray-500">書き出す</div>
               <button
                 onClick={() => { setExportOpen(false); onGenerate(); }}
                 disabled={!hasSpec || generating}
                 className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
               >
-                <span>📊 as PPTX</span>
+                <span>📊 PPTX</span>
                 <span className="text-gray-500 text-xs">.pptx</span>
               </button>
               <button
                 onClick={() => { setExportOpen(false); onSave(); }}
                 className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"
               >
-                <span>📝 as Markdown</span>
+                <span>📝 Markdown</span>
                 <span className="text-gray-500 text-xs">.md</span>
               </button>
             </div>

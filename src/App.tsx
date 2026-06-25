@@ -21,7 +21,7 @@ export default function App() {
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
-    handleOpen, handleSave, handleGenerate, hasContent,
+    handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
@@ -75,6 +75,8 @@ export default function App() {
         <Toolbar
           onSave={handleSave}
           onGenerate={handleGenerate}
+          onSaveProject={handleSaveProject}
+          onOpenProject={handleOpenProject}
           onLoadTemplate={handleLoadTemplate}
           onAiAssist={() => setShowAiPanel((v) => !v)}
           aiRunning={ai.tasks.filter((t) => t.status === "running").length}

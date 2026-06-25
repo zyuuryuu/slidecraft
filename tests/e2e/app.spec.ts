@@ -12,7 +12,7 @@ test.describe("SlideCraft", () => {
 
   test("shell: title + core toolbar buttons", async ({ page }) => {
     await expect(page.getByText("SlideCraft").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /Export/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /ファイル/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Template/ })).toBeVisible();
   });
 
@@ -44,10 +44,11 @@ test.describe("SlideCraft", () => {
     expect(await cards.count()).toBeGreaterThanOrEqual(3);
   });
 
-  test("Export → as PPTX triggers a .pptx download", async ({ page }) => {
+  test("ファイル → PPTX triggers a .pptx download", async ({ page }) => {
     await page.waitForTimeout(2500); // wait for template + deck so PPTX export works
-    await page.getByRole("button", { name: /Export/ }).click();
-    const pptx = page.getByRole("button", { name: /as PPTX/ });
+    await page.getByRole("button", { name: /ファイル/ }).click();
+    await expect(page.getByText(/プロジェクトを開く/)).toBeVisible(); // .slidecraft entry present
+    const pptx = page.getByRole("button", { name: /PPTX/ });
     await expect(pptx).toBeEnabled({ timeout: 10000 });
     const download = page.waitForEvent("download", { timeout: 25000 });
     await pptx.click();
