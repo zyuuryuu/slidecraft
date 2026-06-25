@@ -25,10 +25,12 @@ interface IODeps {
   setTemplateData: (t: TemplateData | null) => void;
   templateName: string;
   setTemplateName: (n: string) => void;
+  /** Current file path is per-document (lives in the document store). */
+  filePath: string | null;
+  setFilePath: (n: string | null) => void;
 }
 
-export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError, resetDeck, setTemplateData, templateName, setTemplateName }: IODeps) {
-  const [filePath, setFilePath] = useState<string | null>(null);
+export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError, resetDeck, setTemplateData, templateName, setTemplateName, filePath, setFilePath }: IODeps) {
   const [generating, setGenerating] = useState(false);
 
   // Open a Markdown file → a brand-new deck (Initialize).
@@ -38,7 +40,7 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     setMdText(picked.content);
     parseMdText(picked.content, "reset");
     setFilePath(picked.name);
-  }, [parseMdText, setMdText]);
+  }, [parseMdText, setMdText, setFilePath]);
 
   // Save Markdown — serialize from the DECK (the source of truth) so visual Edit-mode
   // changes are always included; fall back to mdText only when there's no deck yet.
@@ -83,7 +85,7 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     } catch (e) {
       setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, [resetDeck, setTemplateData, setTemplateName, setMdText, setParseError]);
+  }, [resetDeck, setTemplateData, setTemplateName, setMdText, setParseError, setFilePath]);
 
-  return { filePath, generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject };
+  return { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject };
 }
