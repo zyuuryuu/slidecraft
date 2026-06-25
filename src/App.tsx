@@ -11,7 +11,7 @@ import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
@@ -33,6 +33,11 @@ export default function App() {
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
   const ai = useAiGeneration();
+  // Scope the AI task list/history to the active document (no cross-project bleed).
+  const { setActiveDocId } = ai;
+  useEffect(() => {
+    setActiveDocId(activeId);
+  }, [activeId, setActiveDocId]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,

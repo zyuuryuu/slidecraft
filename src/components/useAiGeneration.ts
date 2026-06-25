@@ -30,6 +30,7 @@ export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
  *  loop's per-slide calls. */
 export interface AiTask {
   id: string;
+  docId: string; // the document this task belongs to (multi-document scoping)
   mode: AiMode;
   label: string; // human scope, e.g. "スライド3を整形" / "デッキ生成"
   prompt: string;
@@ -79,6 +80,16 @@ export function useAiGeneration() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const abortMap = useRef<Map<string, AbortController>>(new Map());
   const idCounter = useRef(0);
+  // The document new tasks are stamped with + the visible list is filtered to — so each
+  // project keeps its own AI history. App keeps this in sync with the active document.
+  const [activeDocId, setActiveDocIdState] = useState<string>("");
+  const activeDocIdRef = useRef<string>("");
+  const setActiveDocId = useCallback((id: string) => {
+    if (activeDocIdRef.current === id) return;
+    activeDocIdRef.current = id;
+    setActiveDocIdState(id);
+    setActiveTaskId(null); // foreground result is per-doc — don't bleed across tabs
+  }, []);
   // Setup-assist state: local Ollama probe (null = not yet checked) + once-flags.
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -205,7 +216,7 @@ export function useAiGeneration() {
   }, []);
 
   const enqueue = useCallback((prompt: string, mode: AiMode, label: string): AiTask => {
-    const task: AiTask = { id: `t${++idCounter.current}`, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     return task;
   }, []);
@@ -300,7 +311,7 @@ export function useAiGeneration() {
   const reset = useCallback(() => setActiveTaskId(null), []);
   // Back-compat for LlmAssist's manual paste: record it as a done task + make it active.
   const setResult = useCallback((text: string) => {
-    const task: AiTask = { id: `t${++idCounter.current}`, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     setActiveTaskId(task.id);
   }, []);
@@ -347,13 +358,16 @@ export function useAiGeneration() {
     return { ok: true, tone: "ok", label: `${cfg.model}（接続OK・${models.length} モデル）` };
   })();
 
+  // Only the active document's tasks are surfaced (history is partitioned per project).
+  const docTasks = tasks.filter((t) => t.docId === activeDocId);
+
   return {
     provider, setProvider,
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error,
     canGenerate, generate, cancel, reset,
-    tasks, submit, submitAndWait, cancelTask, clearTasks,
+    tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
   };
