@@ -1,24 +1,14 @@
-#[tauri::command]
-fn read_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
-    std::fs::read(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn write_file(path: String, content: Vec<u8>) -> Result<(), String> {
-    std::fs::write(&path, &content).map_err(|e| e.to_string())
-}
-
+// File IO is handled by the scoped tauri-plugin-fs: the webview can only read/write
+// paths the user explicitly picked via the dialog plugin (the dialog grants those
+// paths to the fs scope at runtime), instead of the old hand-rolled read_file/
+// read_file_bytes/write_file commands that took an arbitrary absolute path — which
+// let a compromised webview read/write anywhere. That arbitrary-fs hole is now closed.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![read_file, read_file_bytes, write_file])
+        .plugin(tauri_plugin_fs::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

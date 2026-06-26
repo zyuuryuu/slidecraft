@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicedoc/tauri-schema/main/tauri.conf.schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "SlideCraft",
   "version": "0.1.0",
   "identifier": "com.slidecraft.desktop",
@@ -20,7 +20,22 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost http://localhost:11434 https://api.anthropic.com https://api.openai.com https://openrouter.ai",
+        "img-src": "'self' data: blob: asset: http://asset.localhost",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "script-src": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost ws://localhost:5173 http://localhost:5173 http://localhost:11434 https://api.anthropic.com https://api.openai.com https://openrouter.ai",
+        "img-src": "'self' data: blob: asset: http://asset.localhost",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "script-src": "'self' 'unsafe-eval'"
+      }
     }
   },
   "bundle": {
