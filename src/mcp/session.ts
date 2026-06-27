@@ -60,7 +60,7 @@ function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undef
   return serializeMd({ slides: [{ ...sl, layout: resolved }] });
 }
 
-function zodErr(issues: { path: (string | number)[]; message: string }[]): string {
+function zodErr(issues: { path: PropertyKey[]; message: string }[]): string {
   return issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; ");
 }
 
