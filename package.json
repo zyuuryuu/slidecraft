@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "tauri": "tauri",
+    "tauri:wsl": "bash scripts/tauri-dev-wsl.sh",
     "sbom": "npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json"
   },
   "dependencies": {
