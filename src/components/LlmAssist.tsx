@@ -13,6 +13,7 @@
 import { useState, useCallback } from "react";
 import { generateCombinedPrompt } from "../engine/llm-prompts";
 import { PROVIDERS, type ProviderId } from "../ipc/ai";
+import LocalOnlyToggle from "./LocalOnlyToggle";
 import type { AiGeneration } from "./useAiGeneration";
 
 interface LlmAssistProps {
@@ -124,12 +125,13 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               onChange={(e) => ai.setProvider(e.target.value as ProviderId)}
               className={fieldClass}
             >
-              {PROVIDERS.map((p) => (
+              {PROVIDERS.filter((p) => !ai.localModelOnly || p.local || p.id === "custom").map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
               ))}
             </select>
+            <LocalOnlyToggle ai={ai} />
 
             {/* Connection status + local-Ollama auto-detect (setup assist) */}
             <div className="flex items-center gap-2 text-[11px]">
