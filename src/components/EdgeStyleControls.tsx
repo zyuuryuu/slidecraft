@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 
 interface RawEdge {

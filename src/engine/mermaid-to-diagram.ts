@@ -5,7 +5,7 @@
  * Limitations: subgraphs, styling, click handlers not supported.
  */
 
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
 import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState, parseMermaidER, parseMermaidTimeline, parseMermaidQuadrant, parseMermaidPie, parseMermaidMindmap } from "./mermaid-uml-parser";
 import { parseMermaidGantt } from "./diagram-gantt";
