@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec, type NodeOverride } from "./schema";
 import { computeLayout, SLIDE_W, SLIDE_H, type NodePosition } from "./layout-engine";

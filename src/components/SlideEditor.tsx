@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource, canSerializeToMermaid } from "../engine/mermaid-to-diagram";
