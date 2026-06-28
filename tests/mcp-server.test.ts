@@ -46,7 +46,7 @@ describe("mcp server (in-memory client↔server pair)", () => {
   it("lists the deterministic tool surface", async () => {
     const client = await connect();
     const names = (await client.listTools()).tools.map((t) => t.name);
-    for (const n of ["open_project", "get_diagnostics", "apply_slide_markdown", "distill", "visualize_key_value", "set_diagram", "validate", "export_pptx"]) {
+    for (const n of ["open_project", "get_deck_issues", "set_slide_markdown", "split_overflowing_slides", "convert_bullets_to_table", "set_slide_diagram", "validate_deck", "export_pptx"]) {
       expect(names).toContain(n);
     }
   });
@@ -59,11 +59,11 @@ describe("mcp server (in-memory client↔server pair)", () => {
     const slideMd = (await call(client, "get_slide_markdown", { index: 1 })).data as string;
     expect(slideMd).toContain("速度");
 
-    const applied = (await call(client, "apply_slide_markdown", { index: 1, markdown: "# 差替\n\n- 一点" })).data as { ok: boolean; afterMd: string };
+    const applied = (await call(client, "set_slide_markdown", { index: 1, markdown: "# 差替\n\n- 一点" })).data as { ok: boolean; afterMd: string };
     expect(applied.ok).toBe(true);
     expect(applied.afterMd).toContain("差替");
 
-    const v = (await call(client, "validate")).data as { ok: boolean; exportReadiness: string };
+    const v = (await call(client, "validate_deck")).data as { ok: boolean; exportReadiness: string };
     expect(v.ok).toBe(true);
     expect(v.exportReadiness).toBe("native-ok");
   });

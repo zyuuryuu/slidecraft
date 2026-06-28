@@ -43,22 +43,22 @@ export function buildServer(session: Session): McpServer {
   server.registerTool("get_deck", { description: "現在の deck（DeckIR JSON）" }, () => run(() => S.getDeck(session)));
   server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で" }, () => run(() => S.getDeckMarkdown(session)));
   server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideMarkdown(session, i)));
-  server.registerTool("get_diagnostics", { description: "deck の診断（split/condense/visualize/title レバー付き）" }, () => run(() => S.getDiagnostics(session)));
-  server.registerTool("get_catalog", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）" }, () => run(() => S.getCatalog(session)));
-  server.registerTool("get_project_meta", { description: "現在のプロジェクトのメタ情報" }, () => run(() => S.getProjectMeta(session)));
-  server.registerTool("get_slide_fix", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、apply_slide_markdown で適用）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideFix(session, i)));
+  server.registerTool("get_deck_issues", { description: "deck の診断（split/condense/visualize/title レバー付き）" }, () => run(() => S.getDiagnostics(session)));
+  server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）" }, () => run(() => S.getCatalog(session)));
+  server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報" }, () => run(() => S.getProjectMeta(session)));
+  server.registerTool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideFix(session, i)));
 
   // ── deterministic mutations ──
-  server.registerTool("apply_slide_markdown", { description: "1スライドを Markdown で差し替え（zod 検証・不正は never-silent で拒否）", inputSchema: { ...index, markdown: z.string() } }, ({ index: i, markdown }) => run(() => S.applySlideMarkdown(session, i, markdown)));
-  server.registerTool("apply_deck_markdown", { description: "deck 全体を Markdown で差し替え", inputSchema: { markdown: z.string() } }, ({ markdown }) => run(() => S.applyDeckMarkdown(session, markdown)));
-  server.registerTool("distill", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割" }, () => run(() => S.distill(session)));
-  server.registerTool("visualize_key_value", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: index }, ({ index: i }) => run(() => S.visualizeKeyValue(session, i)));
+  server.registerTool("set_slide_markdown", { description: "1スライドを Markdown で差し替え（zod 検証・不正は never-silent で拒否）", inputSchema: { ...index, markdown: z.string() } }, ({ index: i, markdown }) => run(() => S.applySlideMarkdown(session, i, markdown)));
+  server.registerTool("set_deck_markdown", { description: "deck 全体を Markdown で差し替え", inputSchema: { markdown: z.string() } }, ({ markdown }) => run(() => S.applyDeckMarkdown(session, markdown)));
+  server.registerTool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割" }, () => run(() => S.distill(session)));
+  server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: index }, ({ index: i }) => run(() => S.visualizeKeyValue(session, i)));
   server.registerTool(
-    "set_diagram",
+    "set_slide_diagram",
     { description: "スライドの図を DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]) } },
     ({ index: i, source, format }) => run(() => S.setDiagram(session, i, source, format)),
   );
-  server.registerTool("validate", { description: "deck 検証＋exportReadiness（変換不能 mermaid スキャン）" }, () => run(() => S.validate(session)));
+  server.registerTool("validate_deck", { description: "deck 検証＋exportReadiness（変換不能 mermaid スキャン）" }, () => run(() => S.validate(session)));
 
   // ── persist / export (base64 over stdio) ──
   server.registerTool("save_project", { description: ".slidecraft を生成し base64 で返す" }, () =>
