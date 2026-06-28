@@ -6,6 +6,7 @@
  */
 
 import JSZip from "jszip";
+import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
 import { pickLayout, type LayoutCatalog, type LayoutRole } from "./template-catalog";
@@ -237,13 +238,15 @@ function extractPlaceholders(
 export async function loadTemplate(
   pptxBuffer: Buffer | ArrayBuffer | Uint8Array,
 ): Promise<TemplateData> {
-  const zip = await JSZip.loadAsync(pptxBuffer);
+  // Hardened against zip bombs / oversized input (the .pptx is untrusted: "Load
+  // Template" or the nested template.pptx in a .slidecraft). See [[zip-safe]].
+  const zip = await loadZipSafe(pptxBuffer, { maxInputBytes: ZIP_LIMITS.templatePptx });
 
   // ── Extract master styles ──
   const defaultStyle: MasterStyle = {
     fontSize: 14, fontColor: "1E293B", fontName: "Calibri", bold: false, align: "l", bulletChar: "",
   };
-  const masterXml = await zip.file("ppt/slideMasters/slideMaster1.xml")?.async("string") ?? "";
+  const masterXml = await readEntryString(zip, "ppt/slideMasters/slideMaster1.xml", ZIP_LIMITS.xmlEntry);
   const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];
   const bodyStyleXml = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0];
   const masterTitleStyle = parseMasterStyle(titleStyleXml, {
@@ -262,7 +265,7 @@ export async function loadTemplate(
     const file = zip.file(path);
     if (!file) break;
 
-    const xml = await file.async("string");
+    const xml = await readCappedString(file, ZIP_LIMITS.xmlEntry);
     const nameMatch = xml.match(/name="([^"]+)"/);
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
     const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle);
@@ -271,18 +274,12 @@ export async function loadTemplate(
     layouts.push({ index: i, name, placeholders, decorations });
   }
 
-  const presentationXml = await zip
-    .file("ppt/presentation.xml")!
-    .async("string");
-  const presentationRels = await zip
-    .file("ppt/_rels/presentation.xml.rels")!
-    .async("string");
-  const contentTypes = await zip
-    .file("[Content_Types].xml")!
-    .async("string");
+  const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
+  const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);
+  const contentTypes = await readEntryString(zip, "[Content_Types].xml", ZIP_LIMITS.xmlEntry);
 
   // ── Extract master background color from theme ──
-  const themeXml = await zip.file("ppt/theme/theme1.xml")?.async("string") ?? "";
+  const themeXml = await readEntryString(zip, "ppt/theme/theme1.xml", ZIP_LIMITS.xmlEntry);
   const lt1Match = themeXml.match(/<a:lt1>[\s\S]*?lastClr="([A-Fa-f0-9]{6})"/) ||
     themeXml.match(/<a:lt1>[\s\S]*?srgbClr val="([A-Fa-f0-9]{6})"/);
   const masterBgColor = lt1Match ? lt1Match[1] : "FFFFFF";

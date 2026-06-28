@@ -11,9 +11,12 @@ import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import { parseJsonLoose } from "../engine/json-salvage";
-import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, type ProviderId } from "../ipc/ai";
+import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
+/** Local-model-only toggle persists to its OWN key, UNCONDITIONALLY (a security setting
+ *  must not depend on the "remember API key" opt-in that gates AI_CONFIG_STORAGE). */
+export const LOCAL_ONLY_STORAGE = "slidecraft_local_only";
 
 export interface AiProviderConfig {
   baseURL: string;
@@ -30,6 +33,7 @@ export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
  *  loop's per-slide calls. */
 export interface AiTask {
   id: string;
+  docId: string; // the document this task belongs to (multi-document scoping)
   mode: AiMode;
   label: string; // human scope, e.g. "スライド3を整形" / "デッキ生成"
   prompt: string;
@@ -79,6 +83,19 @@ export function useAiGeneration() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const abortMap = useRef<Map<string, AbortController>>(new Map());
   const idCounter = useRef(0);
+  // The document new tasks are stamped with + the visible list is filtered to — so each
+  // project keeps its own AI history. App keeps this in sync with the active document.
+  // Local-model-only mode: when ON, generation is hard-blocked from any non-local target
+  // (enforced in canGenerate AND in generateWithAI). See LOCAL_ONLY_STORAGE.
+  const [localModelOnly, setLocalModelOnlyState] = useState(false);
+  const [activeDocId, setActiveDocIdState] = useState<string>("");
+  const activeDocIdRef = useRef<string>("");
+  const setActiveDocId = useCallback((id: string) => {
+    if (activeDocIdRef.current === id) return;
+    activeDocIdRef.current = id;
+    setActiveDocIdState(id);
+    setActiveTaskId(null); // foreground result is per-doc — don't bleed across tabs
+  }, []);
   // Setup-assist state: local Ollama probe (null = not yet checked) + once-flags.
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -88,6 +105,7 @@ export function useAiGeneration() {
   // Load saved provider + configs once.
   useEffect(() => {
     try {
+      setLocalModelOnlyState(localStorage.getItem(LOCAL_ONLY_STORAGE) === "1");
       const raw = localStorage.getItem(AI_CONFIG_STORAGE);
       if (!raw) return;
       hadSavedConfig.current = true; // user has configured before → don't auto-pick a provider
@@ -174,8 +192,9 @@ export function useAiGeneration() {
       userRequest.trim().length > 0 &&
       cfg.model.trim().length > 0 &&
       (preset.native || cfg.baseURL.trim().length > 0) &&
-      (!preset.keyRequired || cfg.apiKey.trim().length > 0),
-    [cfg, preset],
+      (!preset.keyRequired || cfg.apiKey.trim().length > 0) &&
+      !(localModelOnly && !isLocalTarget(provider, cfg.baseURL)), // local-only: no cloud target
+    [cfg, preset, localModelOnly, provider],
   );
 
   // Mode-specific post-processing: the model's raw text → the form each surface uses
@@ -205,7 +224,7 @@ export function useAiGeneration() {
   }, []);
 
   const enqueue = useCallback((prompt: string, mode: AiMode, label: string): AiTask => {
-    const task: AiTask = { id: `t${++idCounter.current}`, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     return task;
   }, []);
@@ -227,6 +246,7 @@ export function useAiGeneration() {
           mode: task.mode, userRequest: task.prompt,
           onText: (t) => patchTask(task.id, { result: t }),
           signal: controller.signal,
+          localOnly: localModelOnly, // hard egress block at the chokepoint
         });
         const pp = postProcess(task.mode, raw);
         if (pp.error) {
@@ -247,7 +267,7 @@ export function useAiGeneration() {
         abortMap.current.delete(task.id);
       }
     },
-    [provider, cfg, patchTask, postProcess],
+    [provider, cfg, patchTask, postProcess, localModelOnly],
   );
 
   const persistConfig = useCallback(() => {
@@ -300,7 +320,7 @@ export function useAiGeneration() {
   const reset = useCallback(() => setActiveTaskId(null), []);
   // Back-compat for LlmAssist's manual paste: record it as a done task + make it active.
   const setResult = useCallback((text: string) => {
-    const task: AiTask = { id: `t${++idCounter.current}`, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     setActiveTaskId(task.id);
   }, []);
@@ -322,6 +342,23 @@ export function useAiGeneration() {
       },
     }));
   }, [ollamaModels]);
+
+  // Toggle local-only: persist UNCONDITIONALLY; if turning ON while pointed at a cloud
+  // target, hop to local Ollama so the user can still generate.
+  const setLocalModelOnly = useCallback(
+    (on: boolean) => {
+      setLocalModelOnlyState(on);
+      try {
+        localStorage.setItem(LOCAL_ONLY_STORAGE, on ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      if (on && !isLocalTarget(provider, configs[provider].baseURL)) switchToOllama();
+    },
+    [provider, configs, switchToOllama],
+  );
+  // The current provider/endpoint would be blocked by local-only (UI lock badge).
+  const localBlocked = localModelOnly && !isLocalTarget(provider, cfg.baseURL);
 
   // A human-readable connection status for the CURRENT provider + an actionable
   // hint when it isn't ready — so the user knows exactly what to fix.
@@ -347,15 +384,19 @@ export function useAiGeneration() {
     return { ok: true, tone: "ok", label: `${cfg.model}（接続OK・${models.length} モデル）` };
   })();
 
+  // Only the active document's tasks are surfaced (history is partitioned per project).
+  const docTasks = tasks.filter((t) => t.docId === activeDocId);
+
   return {
     provider, setProvider,
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error,
     canGenerate, generate, cancel, reset,
-    tasks, submit, submitAndWait, cancelTask, clearTasks,
+    tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
+    localModelOnly, setLocalModelOnly, localBlocked,
   };
 }
 

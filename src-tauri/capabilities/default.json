@@ -1,11 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core + native file dialog permissions for the main window.",
+  "description": "Core + native dialog + scoped fs (dialog-picked paths only) for the main window.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:default",
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
     {
       "identifier": "http:default",
       "allow": [

@@ -1,0 +1,13 @@
+{
+  "//": "Headless MCP server (slidecraft serve) — Node target, kept OUT of tsconfig.app so",
+  "//2": "the frontend/R5-golden surface is untouched and src/mcp can use Node APIs.",
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "composite": false,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.mcp.tsbuildinfo",
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src/mcp", "src/engine"],
+  "exclude": []
+}

@@ -8,6 +8,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { PROVIDERS } from "../ipc/ai";
+import LocalOnlyToggle from "./LocalOnlyToggle";
 import type { AiGeneration } from "./useAiGeneration";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
@@ -159,7 +160,7 @@ export default function AiPanel({
               onChange={(e) => ai.setProvider(e.target.value as typeof ai.provider)}
               className={field}
             >
-              {PROVIDERS.map((p) => (
+              {PROVIDERS.filter((p) => !ai.localModelOnly || p.local || p.id === "custom").map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
             </select>
@@ -173,6 +174,7 @@ export default function AiPanel({
               </button>
             )}
           </div>
+          <LocalOnlyToggle ai={ai} />
           <div className="flex flex-wrap items-center gap-2">
           {!ai.preset.native && (
             <input
