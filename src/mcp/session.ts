@@ -9,7 +9,7 @@
  * plain Node and stays out of the Vite/R5 golden surface.
  */
 import { DeckIRSchema, type DeckIR, type SlideIR } from "../engine/slide-schema";
-import { type TemplateData, autoSelectLayout } from "../engine/template-loader";
+import { type TemplateData, autoSelectLayout, loadTemplate } from "../engine/template-loader";
 import { buildCatalog, deckCapabilities, type LayoutCatalog } from "../engine/template-catalog";
 import { openProject, bundleProject } from "../engine/project-io";
 import { parseMd } from "../engine/md-parser";
@@ -85,6 +85,22 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
   s.meta = { templateName: meta.templateName, savedAt: meta.savedAt };
   s.dirty = false;
   return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog) };
+}
+
+/** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses
+ *  the exact engine path as the GUI's Draft flow (parseMd → distillDeck), so "submit
+ *  Markdown, get well-fitted slides on this template" works with zero new layout logic.
+ *  With no Markdown, yields a valid single-slide deck the agent can then fill. */
+export async function newProject(s: Session, templateBytes: Uint8Array, markdown?: string) {
+  const template = await loadTemplate(templateBytes);
+  const catalog = buildCatalog(template);
+  const deck = distillDeck(parseMd(markdown?.trim() ? markdown : "# Untitled"), catalog);
+  s.template = template;
+  s.catalog = catalog;
+  s.deck = deck;
+  s.meta = { templateName: "", savedAt: undefined };
+  s.dirty = true; // a fresh, unsaved project
+  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, catalog) };
 }
 
 export function getDeck(s: Session): DeckIR {

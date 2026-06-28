@@ -16,11 +16,11 @@ import * as S from "../src/mcp/session";
 const DECK_MD = "# 表紙\n\n## サブ\n\n---\n\n# 中身\n\n- 速度: 0.8秒\n- 重量: 1.2kg\n- 価格: 1000円";
 
 let template: TemplateData;
+let templateBytes: Buffer;
 let bundle: Uint8Array;
 beforeAll(async () => {
-  template = await loadTemplate(
-    readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")),
-  );
+  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  template = await loadTemplate(templateBytes);
   bundle = await bundleProject(parseMd(DECK_MD), template, { templateName: "Midnight Executive", savedAt: "2026-06-27T00:00:00Z" });
 });
 
@@ -85,6 +85,24 @@ describe("mcp session — deterministic mutations", () => {
     const fix = S.getSlideFix(s, 1);
     expect(typeof fix.requestText).toBe("string");
     expect(fix.currentMarkdown).toContain("速度");
+  });
+});
+
+describe("mcp session — new_project (template + Markdown → slides)", () => {
+  it("creates a fresh project from a .pptx template + Markdown (same fit as the GUI Draft)", async () => {
+    const s = S.createSession(null);
+    const r = await S.newProject(s, templateBytes, "# 表紙\n\n## サブ\n\n---\n\n# 中身\n\n- A\n- B");
+    expect(r.slideCount).toBeGreaterThan(1);
+    expect(s.template).toBeDefined();
+    expect(s.catalog!.length).toBeGreaterThan(0);
+    expect(s.dirty).toBe(true);
+    expect(S.getDeckMarkdown(s)).toContain("中身");
+  });
+
+  it("yields a valid single-slide deck when no Markdown is given", async () => {
+    const s = S.createSession(null);
+    const r = await S.newProject(s, templateBytes);
+    expect(r.slideCount).toBeGreaterThanOrEqual(1);
   });
 });
 

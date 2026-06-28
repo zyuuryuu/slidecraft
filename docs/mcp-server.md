@@ -43,11 +43,14 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 
 ---
 
-## ツール一覧（16）
+## ツール一覧（17）
+
+入口は2つ：既存プロジェクトを開く `open_project`、テンプレ＋内容から新規作成する `new_project`。
 
 | 種別 | ツール | 内容 |
 |---|---|---|
 | 開く | `open_project(dataBase64)` | base64 の `.slidecraft` を読み込み（deck+template+catalog）。`{slideCount, diagnostics}` |
+| 新規 | `new_project(templateBase64, markdown?)` | base64 の `.pptx` テンプレ＋（任意）Markdown から新規作成（GUI の Draft と同じ parseMd→distill 整形）。`{slideCount, diagnostics}` |
 | 読む | `get_deck` / `get_deck_markdown` | deck（DeckIR JSON）/ deck 全体の Markdown |
 | 読む | `get_slide_markdown(index)` | 1スライドの Markdown（auto レイアウト解決済み） |
 | 読む | `get_deck_issues` | 診断（split/condense/visualize/title レバー付き） |

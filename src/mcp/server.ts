@@ -40,6 +40,11 @@ export function buildServer(session: Session): McpServer {
     { description: "base64 の .slidecraft を開きセッションに読み込む（deck + template + catalog）", inputSchema: { dataBase64: z.string() } },
     ({ dataBase64 }) => run(() => S.openProjectBytes(session, unb64(dataBase64))),
   );
+  server.registerTool(
+    "new_project",
+    { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規プロジェクトを作る（テンプレ持ち込み＋Markdown→スライド。GUI の Draft と同じ整形）", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
+    ({ templateBase64, markdown }) => run(() => S.newProject(session, unb64(templateBase64), markdown)),
+  );
   server.registerTool("get_deck", { description: "現在の deck（DeckIR JSON）" }, () => run(() => S.getDeck(session)));
   server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で" }, () => run(() => S.getDeckMarkdown(session)));
   server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideMarkdown(session, i)));
