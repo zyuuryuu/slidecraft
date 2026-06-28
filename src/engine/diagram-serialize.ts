@@ -8,7 +8,7 @@
  *   - diagramSpecToYaml: hand-rolled clean YAML (preserves class/sequence fields).
  */
 
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { DiagramSpec } from "./schema";
 import { ganttSpecToMermaid } from "./diagram-gantt";
 import { journeySpecToMermaid } from "./diagram-journey";
