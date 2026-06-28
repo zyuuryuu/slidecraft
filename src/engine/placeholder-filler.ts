@@ -7,7 +7,7 @@
  */
 
 import JSZip from "jszip";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
