@@ -9,7 +9,7 @@
  * plain Node and stays out of the Vite/R5 golden surface.
  */
 import { DeckIRSchema, type DeckIR, type SlideIR } from "../engine/slide-schema";
-import { type TemplateData, autoSelectLayout } from "../engine/template-loader";
+import { type TemplateData, autoSelectLayout, loadTemplate } from "../engine/template-loader";
 import { buildCatalog, deckCapabilities, type LayoutCatalog } from "../engine/template-catalog";
 import { openProject, bundleProject } from "../engine/project-io";
 import { parseMd } from "../engine/md-parser";
@@ -17,7 +17,9 @@ import { serializeMd } from "../engine/md-serializer";
 import { distillDeck, contentBodyBox } from "../engine/distill";
 import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
-import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
+import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
+import { diagramSpecToYaml } from "../engine/diagram-serialize";
+import { DiagramSpecSchema } from "../engine/schema";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import { generatePptx } from "../engine/placeholder-filler";
 
@@ -83,6 +85,22 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
   s.meta = { templateName: meta.templateName, savedAt: meta.savedAt };
   s.dirty = false;
   return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog) };
+}
+
+/** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses
+ *  the exact engine path as the GUI's Draft flow (parseMd → distillDeck), so "submit
+ *  Markdown, get well-fitted slides on this template" works with zero new layout logic.
+ *  With no Markdown, yields a valid single-slide deck the agent can then fill. */
+export async function newProject(s: Session, templateBytes: Uint8Array, markdown?: string) {
+  const template = await loadTemplate(templateBytes);
+  const catalog = buildCatalog(template);
+  const deck = distillDeck(parseMd(markdown?.trim() ? markdown : "# Untitled"), catalog);
+  s.template = template;
+  s.catalog = catalog;
+  s.deck = deck;
+  s.meta = { templateName: "", savedAt: undefined };
+  s.dirty = true; // a fresh, unsaved project
+  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, catalog) };
 }
 
 export function getDeck(s: Session): DeckIR {
@@ -172,6 +190,40 @@ export function visualizeKeyValue(s: Session, i: number) {
   s.deck = { ...deck, slides };
   s.dirty = true;
   return { ok: true as const, applicable: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog) };
+}
+
+/** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates +
+ *  canonicalizes to YAML, then writes it onto a slide that ALREADY has a figure slot — an
+ *  existing diagram is replaced, a Mermaid block GRADUATES to a native diagram (same as the
+ *  GUI). A slide with no figure placeholder is rejected (where would the diagram go?). */
+export function setDiagram(s: Session, i: number, source: string, format: DiagramFormat) {
+  const { deck, catalog } = requireLoaded(s);
+  assertIndex(deck, i);
+  const slide = deck.slides[i];
+  const placeholderIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
+  if (placeholderIdx === undefined) {
+    return { ok: false as const, error: "このスライドには図の配置先がありません（図 / mermaid を持つスライドにのみ set_diagram できます）。" };
+  }
+  const verr = validateDiagramSource(source, format);
+  if (verr) return { ok: false as const, error: verr };
+  let diagramYaml: string;
+  if (format === "mermaid") {
+    const spec = mermaidToDiagramSpec(source);
+    if (!spec) return { ok: false as const, error: "この Mermaid はネイティブ図に変換できません（gitGraph / sankey / C4 等）。" };
+    diagramYaml = diagramSpecToYaml(spec);
+  } else if (format === "json") {
+    diagramYaml = diagramSpecToYaml(DiagramSpecSchema.parse(JSON.parse(source)));
+  } else {
+    diagramYaml = source; // already-valid YAML, stored verbatim (matches the GUI)
+  }
+  const before = slideToMarkdown(deck, i, catalog);
+  const next: SlideIR = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx } };
+  delete next.mermaidBlock; // a Mermaid slide graduates to a native diagram
+  const slides = [...deck.slides];
+  slides[i] = next;
+  s.deck = { ...deck, slides };
+  s.dirty = true;
+  return { ok: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis

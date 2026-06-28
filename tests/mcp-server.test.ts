@@ -17,10 +17,11 @@ import { buildServer } from "../src/mcp/server";
 const DECK_MD = "# 表紙\n\n## サブ\n\n---\n\n# 中身\n\n- 速度: 0.8秒\n- 重量: 1.2kg";
 
 let bundleB64: string;
+let templateB64: string;
 beforeAll(async () => {
-  const template = await loadTemplate(
-    readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")),
-  );
+  const tBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateB64 = tBytes.toString("base64");
+  const template = await loadTemplate(tBytes);
   const bytes = await bundleProject(parseMd(DECK_MD), template, { templateName: "T", savedAt: "2026-06-28T00:00:00Z" });
   bundleB64 = Buffer.from(bytes).toString("base64");
 });
@@ -46,7 +47,7 @@ describe("mcp server (in-memory client↔server pair)", () => {
   it("lists the deterministic tool surface", async () => {
     const client = await connect();
     const names = (await client.listTools()).tools.map((t) => t.name);
-    for (const n of ["open_project", "get_diagnostics", "apply_slide_markdown", "distill", "visualize_key_value", "validate", "export_pptx"]) {
+    for (const n of ["open_project", "new_project", "get_deck_issues", "set_slide_markdown", "split_overflowing_slides", "convert_bullets_to_table", "set_slide_diagram", "validate_deck", "export_pptx"]) {
       expect(names).toContain(n);
     }
   });
@@ -59,13 +60,21 @@ describe("mcp server (in-memory client↔server pair)", () => {
     const slideMd = (await call(client, "get_slide_markdown", { index: 1 })).data as string;
     expect(slideMd).toContain("速度");
 
-    const applied = (await call(client, "apply_slide_markdown", { index: 1, markdown: "# 差替\n\n- 一点" })).data as { ok: boolean; afterMd: string };
+    const applied = (await call(client, "set_slide_markdown", { index: 1, markdown: "# 差替\n\n- 一点" })).data as { ok: boolean; afterMd: string };
     expect(applied.ok).toBe(true);
     expect(applied.afterMd).toContain("差替");
 
-    const v = (await call(client, "validate")).data as { ok: boolean; exportReadiness: string };
+    const v = (await call(client, "validate_deck")).data as { ok: boolean; exportReadiness: string };
     expect(v.ok).toBe(true);
     expect(v.exportReadiness).toBe("native-ok");
+  });
+
+  it("new_project creates a fitted deck from a template + Markdown (the bring-template entry)", async () => {
+    const client = await connect();
+    const r = (await call(client, "new_project", { templateBase64: templateB64, markdown: "# A\n\n---\n\n# B\n\n- x\n- y" })).data as { slideCount: number };
+    expect(r.slideCount).toBeGreaterThan(1);
+    const v = (await call(client, "validate_deck")).data as { ok: boolean };
+    expect(v.ok).toBe(true);
   });
 
   it("export_pptx returns base64 PK-zip bytes (headless native export)", async () => {

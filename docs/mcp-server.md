@@ -43,22 +43,26 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 
 ---
 
-## ツール一覧（15）
+## ツール一覧（17）
+
+入口は2つ：既存プロジェクトを開く `open_project`、テンプレ＋内容から新規作成する `new_project`。
 
 | 種別 | ツール | 内容 |
 |---|---|---|
 | 開く | `open_project(dataBase64)` | base64 の `.slidecraft` を読み込み（deck+template+catalog）。`{slideCount, diagnostics}` |
+| 新規 | `new_project(templateBase64, markdown?)` | base64 の `.pptx` テンプレ＋（任意）Markdown から新規作成（GUI の Draft と同じ parseMd→distill 整形）。`{slideCount, diagnostics}` |
 | 読む | `get_deck` / `get_deck_markdown` | deck（DeckIR JSON）/ deck 全体の Markdown |
 | 読む | `get_slide_markdown(index)` | 1スライドの Markdown（auto レイアウト解決済み） |
-| 読む | `get_diagnostics` | 診断（split/condense/visualize/title レバー付き） |
-| 読む | `get_catalog` | テンプレートの能力サマリ＋レイアウト一覧（生成の文脈） |
-| 読む | `get_project_meta` | テンプレート名・スライド数・dirty 等 |
-| 読む | `get_slide_fix(index)` | 修正リクエスト packet（**エージェントが LLM として埋める**） |
-| 編集 | `apply_slide_markdown(index, markdown)` | 1スライドを差し替え（zod 検証・不正は never-silent で拒否） |
-| 編集 | `apply_deck_markdown(markdown)` | deck 全体を差し替え |
-| 編集 | `distill` | 決定論レバー：溢れた本文をフォント縮小なしで分割 |
-| 編集 | `visualize_key_value(index)` | 決定論レバー：key-value 箇条書き → GFM 表 |
-| 検証 | `validate` | deck 検証＋`exportReadiness`（変換不能 mermaid スキャン） |
+| 読む | `get_deck_issues` | 診断（split/condense/visualize/title レバー付き） |
+| 読む | `get_template_capabilities` | テンプレートの能力サマリ＋レイアウト一覧（生成の文脈） |
+| 読む | `get_project_info` | テンプレート名・スライド数・dirty 等 |
+| 読む | `get_slide_fix_request(index)` | 修正リクエスト packet（**エージェントが LLM として埋める**） |
+| 編集 | `set_slide_markdown(index, markdown)` | 1スライドを差し替え（zod 検証・不正は never-silent で拒否） |
+| 編集 | `set_deck_markdown(markdown)` | deck 全体を差し替え |
+| 編集 | `split_overflowing_slides` | 決定論レバー：溢れた本文をフォント縮小なしで分割 |
+| 編集 | `convert_bullets_to_table(index)` | 決定論レバー：key-value 箇条書き → GFM 表 |
+| 編集 | `set_slide_diagram(index, source, format)` | 図を DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ。Mermaid はブラケットのノードラベル `A[label]` が必要） |
+| 検証 | `validate_deck` | deck 検証＋`exportReadiness`（変換不能 mermaid スキャン） |
 | 保存 | `save_project` | `.slidecraft` を生成し `{dataBase64}` で返す |
 | 出力 | `export_pptx(onUnsupportedMermaid?)` | `.pptx` を **native-vector で headless 生成**し `{dataBase64, skipped}` |
 
@@ -69,12 +73,12 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 ## 典型的なループ（エージェント視点）
 
 1. ローカルの `.slidecraft` を**自分のファイルツールで読み**、base64 化して `open_project`。
-2. `get_diagnostics` で課題（溢れ・冗長・表化候補・タイトル）を把握。
-3. 決定論で済むものは即適用：`distill`（溢れ分割）/ `visualize_key_value`（表化）。
-4. 文章の手直しが要るスライドは `get_slide_fix(i)` で制約＋診断の packet を取得 →
-   **エージェントが Markdown を書き** → `apply_slide_markdown(i, md)` で適用（戻り値の
+2. `get_deck_issues` で課題（溢れ・冗長・表化候補・タイトル）を把握。
+3. 決定論で済むものは即適用：`split_overflowing_slides`（溢れ分割）/ `convert_bullets_to_table`（表化）。
+4. 文章の手直しが要るスライドは `get_slide_fix_request(i)` で制約＋診断の packet を取得 →
+   **エージェントが Markdown を書き** → `set_slide_markdown(i, md)` で適用（戻り値の
    `diagnostics` で改善を確認）。
-5. `validate` で `exportReadiness` を確認。
+5. `validate_deck` で `exportReadiness` を確認。
 6. `export_pptx` の `dataBase64` を**自分で `.pptx` に書き出す**（または `save_project` で
    `.slidecraft` を保存）。
 
@@ -89,7 +93,7 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 - 変換可能な Mermaid は自動でネイティブ図になる。
 - **変換不能な Mermaid（gitGraph / sankey / C4 等）は headless では描けない**ため、
   `export_pptx` は既定で **reject**（無言消失させない）。`onUnsupportedMermaid: "skip"` を
-  渡すと当該スライドを省略し `skipped` で報告する。`validate` の `exportReadiness` で事前に分かる。
+  渡すと当該スライドを省略し `skipped` で報告する。`validate_deck` の `exportReadiness` で事前に分かる。
 
 ---
 
@@ -107,6 +111,6 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 ## v1 の制限（今後の拡張）
 
 - `--no-fs`（base64）のみ。`--root`（プロジェクトディレクトリ配下に限定した scoped fs）は次版。
-- `generate_from_plan`（DeckPlan からの新規生成）・`set_diagram` ・`apply_design_intent` の
-  ツールは未実装（session の決定論編集／検証／出力が先行）。
+- `generate_from_plan`（DeckPlan からの新規生成）・`apply_design_intent`（空間意図）の
+  ツールは未実装。
 - リソース（`deck://current` 等の MCP resource）は未提供（現状は tool 結果で deck 状態を返す）。
