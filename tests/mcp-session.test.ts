@@ -88,6 +88,39 @@ describe("mcp session — deterministic mutations", () => {
   });
 });
 
+describe("mcp session — set_diagram", () => {
+  const graftMermaid = (s: Awaited<ReturnType<typeof opened>>): number => {
+    const i = s.deck!.slides.length;
+    s.deck = { ...s.deck!, slides: [...s.deck!.slides, { layout: "auto", placeholders: [], mermaidBlock: { mermaid: "flowchart TD\n  A-->B", placeholderIdx: "1" } }] };
+    return i;
+  };
+
+  it("graduates a Mermaid slide to a native diagram (mermaidBlock → diagram, same placeholder)", async () => {
+    const s = await opened();
+    const i = graftMermaid(s);
+    const r = S.setDiagram(s, i, "flowchart LR\n  A[開始]-->B[処理]-->C[終了]", "mermaid");
+    expect(r.ok).toBe(true);
+    const slide = s.deck!.slides[i];
+    expect(slide.diagram).toBeDefined();
+    expect(slide.mermaidBlock).toBeUndefined();
+    expect(slide.diagram!.placeholderIdx).toBe("1");
+  });
+
+  it("rejects set_diagram on a slide with no figure placeholder", async () => {
+    const s = await opened();
+    const r = S.setDiagram(s, 0, "flowchart TD\n  A-->B", "mermaid");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/配置先/);
+  });
+
+  it("rejects Mermaid that has no native renderer (gitGraph)", async () => {
+    const s = await opened();
+    const i = graftMermaid(s);
+    const r = S.setDiagram(s, i, "gitGraph\n  commit", "mermaid");
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe("mcp session — validate + save + native export", () => {
   it("validate reports native-ok for a diagram-free deck", async () => {
     const s = await opened();
