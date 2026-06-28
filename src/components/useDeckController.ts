@@ -5,14 +5,15 @@
  * within the 400-line rule (R1). App.tsx renders; this hook owns the behaviour.
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useHistoryState, type HistoryMode } from "./useHistoryState";
+import { type HistoryMode } from "./useHistoryState";
+import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { loadTemplate, type TemplateData, autoSelectLayout, findLayout } from "../engine/template-loader";
+import { loadTemplate, autoSelectLayout, findLayout } from "../engine/template-loader";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
@@ -20,37 +21,31 @@ import { useDeckIO } from "./useDeckIO";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { SAMPLE_MD } from "../sample-deck";
 
-export type MarkdownSubMode = "import" | "edit";
+export type { MarkdownSubMode } from "./useDocumentStore";
 
 export function useDeckController() {
   // Edit (visual) is the home/main surface; Import is the one-time "Initialize"
   // phase (bring content → fix slide division + rough content → 確定 → Edit).
-  const [subMode, setSubMode] = useState<MarkdownSubMode>("edit");
+  // Global UI prefs (NOT per-document) stay as plain local state.
   const [showLlmAssist, setShowLlmAssist] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   // Edit-mode center pane: structured form vs raw per-slide Markdown.
   const [slideEditView, setSlideEditView] = useState<"form" | "markdown">("form");
-  const [mdText, setMdText] = useState(SAMPLE_MD);
-  // Deck state with unified undo/redo (covers drag/resize, slide edits, AI edits).
+
+  // Per-document state lives in the multi-document store; this binds to the ACTIVE
+  // document and re-exposes the same flat API the controller always had (deck = the
+  // single source of truth for the active doc; undo/redo, selection, mdText, template
+  // are all per-document so opening a 2nd project never destroys the 1st).
   const {
-    state: deck,
-    set: setDeck,
-    reset: resetDeck,
-    undo: undoDeck,
-    redo: redoDeck,
-    canUndo,
-    canRedo,
-  } = useHistoryState<DeckIR | null>(null);
-  const [templateData, setTemplateData] = useState<TemplateData | null>(null);
+    deck, setDeck, resetDeck, undoDeck, redoDeck, canUndo, canRedo,
+    mdText, setMdText, templateData, setTemplateData, templateName, setTemplateName,
+    parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
+    gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
+    docs, activeId, createDoc, openDoc, switchDoc, closeDoc,
+  } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "サンプル" });
+
   // Catalog → layout selection + capacity adapt to the loaded template (canonical = unchanged).
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [activeSlide, setActiveSlide] = useState(0);
-  // Slide-list selection: `activeSlide` is the FOCUSED slide (editor/AI target);
-  // `selected` is the highlighted set (multi-select → future batch ops / scope).
-  const [selected, setSelected] = useState<Set<number>>(() => new Set([0]));
-  const [gotoLine, setGotoLine] = useState<{ line: number; ts: number } | undefined>(undefined);
-  const [templateName, setTemplateName] = useState("Midnight Executive");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Markdown mode: parse MD ──
@@ -79,7 +74,7 @@ export function useDeckController() {
         setDeck(null, "silent");
       }
     },
-    [setDeck, resetDeck, catalog],
+    [setDeck, resetDeck, catalog, setParseError],
   );
 
   const parseMdText = useCallback(
@@ -96,7 +91,7 @@ export function useDeckController() {
       setMdText(value);
       parseMdText(value);
     },
-    [parseMdText],
+    [parseMdText, setMdText],
   );
 
   // Keyboard undo/redo — Edit mode only (the Import Markdown editor owns its own
@@ -161,11 +156,12 @@ export function useDeckController() {
     } catch (err) {
       setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, []);
+  }, [setTemplateData, setTemplateName, setParseError]);
 
-  // File & PPTX I/O (open / save / generate) — split out to keep this file ≤400 (R1).
-  const { filePath, generating, handleOpen, handleSave, handleGenerate } = useDeckIO({
+  // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
+  const { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject } = useDeckIO({
     mdText, deck, templateData, parseMdText, setMdText, setParseError,
+    templateName, filePath, setFilePath, openDoc,
   });
 
   const hasContent = deck !== null && templateData !== null;
@@ -178,7 +174,7 @@ export function useDeckController() {
       parseMdText(text, "reset");
       setSubMode("import");
     },
-    [parseMdText],
+    [parseMdText, setMdText, setSubMode],
   );
 
   // AI panel "適用"（デッキ全体）: replace the deck but stay in Edit to keep refining.
@@ -190,7 +186,7 @@ export function useDeckController() {
       setSelected(new Set([0])); // reset selection on a fresh deck
       setSubMode("edit");
     },
-    [parseMdText],
+    [parseMdText, setMdText, setActiveSlide, setSelected, setSubMode],
   );
 
   // ── Initialize (Import) ⇄ Edit ──
@@ -215,7 +211,7 @@ export function useDeckController() {
     } catch (e) {
       setParseError(e instanceof Error ? e.message : String(e)); // stay in Initialize
     }
-  }, [deck, mdText, catalog, clearParse, setDeck]);
+  }, [deck, mdText, catalog, clearParse, setDeck, setParseError, setSubMode]);
 
   // Open the Initialize phase (modal): serialize the CURRENT deck back to Markdown so
   // it reflects the live deck (deck = truth), and snapshot the deck so キャンセル can
@@ -226,7 +222,7 @@ export function useDeckController() {
       if (deck) setMdText(serializeMd(deck));
     }
     setSubMode("import");
-  }, [subMode, deck]);
+  }, [subMode, deck, setMdText, setSubMode]);
 
   // Cancel Initialize: kill any pending parse (so a trailing debounce can't re-apply
   // the discarded edits), restore the deck AND mdText to the pre-open snapshot, → Edit.
@@ -237,7 +233,7 @@ export function useDeckController() {
     setMdText(snap ? serializeMd(snap) : "");
     setParseError(null);
     setSubMode("edit");
-  }, [clearParse, setDeck]);
+  }, [clearParse, setDeck, setMdText, setParseError, setSubMode]);
 
   // ── Slide editing: update a single slide in the deck ──
   const handleSlideUpdate = useCallback(
@@ -326,7 +322,7 @@ export function useDeckController() {
         "commit", // AI edit = one discrete undo step
       );
     },
-    [deck, activeSlide, handleSlideUpdate],
+    [deck, activeSlide, handleSlideUpdate, setParseError],
   );
 
   // Markdown of the active slide → AI panel "this slide" + the Markdown view.
@@ -384,7 +380,7 @@ export function useDeckController() {
       }
       setActiveSlide(0);
     },
-    [deck],
+    [deck, setActiveSlide],
   );
 
   // Slide-list selection: plain = single, ⌘/Ctrl = toggle, Shift = range from the focus
@@ -409,7 +405,7 @@ export function useDeckController() {
       });
       setActiveSlide(index);
     },
-    [deck, activeSlide],
+    [deck, activeSlide, setSelected, setActiveSlide],
   );
 
   // ── Preview click → editor jump ──
@@ -423,7 +419,7 @@ export function useDeckController() {
         setGotoLine({ line: slide.sourceLineStart, ts: Date.now() });
       }
     },
-    [deck],
+    [deck, setActiveSlide, setSelected, setGotoLine],
   );
 
   return {
@@ -431,10 +427,11 @@ export function useDeckController() {
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
-    handleOpen, handleSave, handleGenerate, hasContent,
+    handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
+    docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
   };
 }

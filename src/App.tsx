@@ -5,12 +5,13 @@ import SlideEditor from "./components/SlideEditor";
 import SlideMarkdownEditor from "./components/SlideMarkdownEditor";
 import ResizableSplit from "./components/ResizableSplit";
 import Toolbar from "./components/Toolbar";
+import DocTabs from "./components/DocTabs";
 import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
@@ -21,17 +22,22 @@ export default function App() {
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
-    handleOpen, handleSave, handleGenerate, hasContent,
+    handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
-    catalog, setDeck,
+    catalog, setDeck, docs, activeId, switchDoc, closeDoc,
   } = useDeckController();
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
   const ai = useAiGeneration();
+  // Scope the AI task list/history to the active document (no cross-project bleed).
+  const { setActiveDocId } = ai;
+  useEffect(() => {
+    setActiveDocId(activeId);
+  }, [activeId, setActiveDocId]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -75,6 +81,8 @@ export default function App() {
         <Toolbar
           onSave={handleSave}
           onGenerate={handleGenerate}
+          onSaveProject={handleSaveProject}
+          onOpenProject={handleOpenProject}
           onLoadTemplate={handleLoadTemplate}
           onAiAssist={() => setShowAiPanel((v) => !v)}
           aiRunning={ai.tasks.filter((t) => t.status === "running").length}
@@ -99,6 +107,8 @@ export default function App() {
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
+        {/* Multi-document tabs — only rendered when >1 project is open */}
+        <DocTabs docs={docs} activeId={activeId} onSwitch={switchDoc} onClose={closeDoc} />
         {/* Non-destructive review, where you work — fix in deck (undoable) */}
         <ReviewBar
           warnIssues={warn(editIssues)}

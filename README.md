@@ -13,6 +13,8 @@ Tauri v2 + React + TypeScript + JSZip で構築。
 - **テンプレート読み込み** — 既存の .pptx テンプレートを読み込んでスタイルを適用
 - **ダイアグラムモード** — YAML/JSON でフローチャート・スイムレーンを PPTX 出力 (PptxGenJS)
 - **クロスプラットフォーム** — Windows (.msi) / macOS (.dmg) / Linux (.AppImage, .deb)
+- **AI エージェント連携 (MCP)** — 上流の AI から SlideCraft を駆動する headless な stdio MCP
+  サーバ `slidecraft serve`。接続方法・ツール一覧・使い方は [docs/mcp-server.md](docs/mcp-server.md) を参照
 
 ## セットアップ
 

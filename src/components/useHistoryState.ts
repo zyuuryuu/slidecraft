@@ -26,20 +26,22 @@ export interface History<T> {
   canRedo: boolean;
 }
 
-interface HState<T> {
+export interface HState<T> {
   past: T[];
   present: T;
   future: T[];
   lastTs: number;
 }
 
-type HAction<T> =
+export type HAction<T> =
   | { type: "set"; next: T; mode: HistoryMode; ts: number; coalesceMs: number }
   | { type: "reset"; next: T }
   | { type: "undo" }
   | { type: "redo" };
 
-function reducer<T>(s: HState<T>, a: HAction<T>): HState<T> {
+/** Pure undo/redo reducer — reused by useDocumentStore to give EACH document its own
+ *  history without duplicating the semantics (silent/coalesce/commit/reset). */
+export function historyReducer<T>(s: HState<T>, a: HAction<T>): HState<T> {
   switch (a.type) {
     case "set": {
       if (a.mode === "silent") return { ...s, present: a.next };
@@ -65,7 +67,7 @@ function reducer<T>(s: HState<T>, a: HAction<T>): HState<T> {
 
 export function useHistoryState<T>(initial: T, coalesceMs = 600): History<T> {
   const [s, dispatch] = useReducer(
-    reducer as (s: HState<T>, a: HAction<T>) => HState<T>,
+    historyReducer as (s: HState<T>, a: HAction<T>) => HState<T>,
     { past: [], present: initial, future: [], lastTs: 0 },
   );
 

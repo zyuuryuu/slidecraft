@@ -14,11 +14,6 @@ export function runningInTauri(): boolean {
   return isTauri;
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke: tauriInvoke } = await import("@tauri-apps/api/core");
-  return tauriInvoke<T>(cmd, args);
-}
-
 function baseName(p: string): string {
   return p.split(/[\\/]/).pop() ?? p;
 }
@@ -53,7 +48,9 @@ export async function pickTextFile(): Promise<PickedText | null> {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const path = await open({ multiple: false, filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }] });
     if (typeof path !== "string") return null;
-    return { name: baseName(path), content: await invoke<string>("read_file", { path }) };
+    // The dialog pick grants this path to the fs scope at runtime → readTextFile is allowed.
+    const { readTextFile } = await import("@tauri-apps/plugin-fs");
+    return { name: baseName(path), content: await readTextFile(path) };
   }
   const file = await browserPick(".md,.markdown,.txt");
   return file ? { name: file.name, content: await file.text() } : null;
@@ -65,8 +62,8 @@ export async function pickBinaryFile(extensions: string[], label: string): Promi
     const { open } = await import("@tauri-apps/plugin-dialog");
     const path = await open({ multiple: false, filters: [{ name: label, extensions }] });
     if (typeof path !== "string") return null;
-    const bytes = await invoke<number[]>("read_file_bytes", { path });
-    return { name: baseName(path), bytes: new Uint8Array(bytes) };
+    const { readFile } = await import("@tauri-apps/plugin-fs");
+    return { name: baseName(path), bytes: await readFile(path) }; // readFile → Uint8Array
   }
   const file = await browserPick(extensions.map((e) => "." + e).join(","));
   return file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null;
@@ -78,7 +75,8 @@ export async function saveBinaryFile(bytes: Uint8Array, defaultName: string, ext
     const { save } = await import("@tauri-apps/plugin-dialog");
     const path = await save({ defaultPath: defaultName, filters: [{ name: label, extensions }] });
     if (!path) return false;
-    await invoke<void>("write_file", { path, content: Array.from(bytes) });
+    const { writeFile } = await import("@tauri-apps/plugin-fs");
+    await writeFile(path, bytes); // dialog-granted path; pass the Uint8Array directly
     return true;
   }
   browserDownload(bytes, defaultName);
