@@ -53,6 +53,11 @@ export function buildServer(session: Session): McpServer {
   server.registerTool("apply_deck_markdown", { description: "deck 全体を Markdown で差し替え", inputSchema: { markdown: z.string() } }, ({ markdown }) => run(() => S.applyDeckMarkdown(session, markdown)));
   server.registerTool("distill", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割" }, () => run(() => S.distill(session)));
   server.registerTool("visualize_key_value", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: index }, ({ index: i }) => run(() => S.visualizeKeyValue(session, i)));
+  server.registerTool(
+    "set_diagram",
+    { description: "スライドの図を DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]) } },
+    ({ index: i, source, format }) => run(() => S.setDiagram(session, i, source, format)),
+  );
   server.registerTool("validate", { description: "deck 検証＋exportReadiness（変換不能 mermaid スキャン）" }, () => run(() => S.validate(session)));
 
   // ── persist / export (base64 over stdio) ──

@@ -46,7 +46,7 @@ describe("mcp server (in-memory client↔server pair)", () => {
   it("lists the deterministic tool surface", async () => {
     const client = await connect();
     const names = (await client.listTools()).tools.map((t) => t.name);
-    for (const n of ["open_project", "get_diagnostics", "apply_slide_markdown", "distill", "visualize_key_value", "validate", "export_pptx"]) {
+    for (const n of ["open_project", "get_diagnostics", "apply_slide_markdown", "distill", "visualize_key_value", "set_diagram", "validate", "export_pptx"]) {
       expect(names).toContain(n);
     }
   });
