@@ -43,7 +43,7 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 
 ---
 
-## ツール一覧（17）
+## ツール一覧（18）
 
 入口は2つ：既存プロジェクトを開く `open_project`、テンプレ＋内容から新規作成する `new_project`。
 
@@ -62,6 +62,7 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 | 編集 | `split_overflowing_slides` | 決定論レバー：溢れた本文をフォント縮小なしで分割 |
 | 編集 | `convert_bullets_to_table(index)` | 決定論レバー：key-value 箇条書き → GFM 表 |
 | 編集 | `set_slide_diagram(index, source, format)` | 図を DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ。Mermaid はブラケットのノードラベル `A[label]` が必要） |
+| 編集 | `apply_design_intent(index, intent)` | 図に**空間意図**（design edit）を適用：ops 配列の JSON で `regionSplit`(text-left/right/diagram-only) / `emphasize`(nodeId) / `relayout`(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図を持つスライドのみ。戻り値の `changed` で実際に変化したか分かる |
 | 検証 | `validate_deck` | deck 検証＋`exportReadiness`（変換不能 mermaid スキャン） |
 | 保存 | `save_project` | `.slidecraft` を生成し `{dataBase64}` で返す |
 | 出力 | `export_pptx(onUnsupportedMermaid?)` | `.pptx` を **native-vector で headless 生成**し `{dataBase64, skipped}` |
@@ -111,6 +112,6 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 ## v1 の制限（今後の拡張）
 
 - `--no-fs`（base64）のみ。`--root`（プロジェクトディレクトリ配下に限定した scoped fs）は次版。
-- `generate_from_plan`（DeckPlan からの新規生成）・`apply_design_intent`（空間意図）の
-  ツールは未実装。
+- `generate_from_plan`（DeckPlan からの新規生成）は未実装（テンプレ＋Markdown からの新規は
+  `new_project` で可能。`apply_design_intent`＝空間意図は実装済み）。
 - リソース（`deck://current` 等の MCP resource）は未提供（現状は tool 結果で deck 状態を返す）。

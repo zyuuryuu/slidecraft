@@ -63,6 +63,14 @@ export function buildServer(session: Session): McpServer {
     { description: "スライドの図を DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]) } },
     ({ index: i, source, format }) => run(() => S.setDiagram(session, i, source, format)),
   );
+  server.registerTool(
+    "apply_design_intent",
+    {
+      description: '図に空間意図（design edit）を適用：ops 配列の JSON で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。図/mermaid を持つスライドのみ。例: [{"op":"relayout","direction":"LR"}]',
+      inputSchema: { ...index, intent: z.string() },
+    },
+    ({ index: i, intent }) => run(() => S.applyDesignIntent(session, i, intent)),
+  );
   server.registerTool("validate_deck", { description: "deck 検証＋exportReadiness（変換不能 mermaid スキャン）" }, () => run(() => S.validate(session)));
 
   // ── persist / export (base64 over stdio) ──
