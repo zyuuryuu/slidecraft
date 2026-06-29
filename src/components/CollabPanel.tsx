@@ -67,12 +67,13 @@ export default function CollabPanel({
     url && token ? `claude mcp add --transport http slidecraft ${url} --header "Authorization: Bearer ${token}"` : "";
 
   const dot = connected ? "bg-emerald-400" : status === "connecting" ? "bg-amber-400 animate-pulse" : status === "error" ? "bg-rose-500" : "bg-gray-600";
+  const statusLabel = connected ? "接続中" : status === "connecting" ? "接続中…" : status === "error" ? "エラー" : "未接続";
 
   return (
     <div className="fixed bottom-2 right-2 z-50 w-[420px] max-w-[calc(100vw-1rem)] bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl text-sm">
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#2D3A6E]">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${dot}`} />
+          <span role="img" aria-label={statusLabel} className={`w-2 h-2 rounded-full ${dot}`} />
           <span className="text-white font-medium">🔗 協働（AI ライブ編集）</span>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-white px-1" title="閉じる">
@@ -93,8 +94,8 @@ export default function CollabPanel({
               AI の編集が <span className="text-emerald-300">この画面にライブ反映</span> されます。
             </p>
 
-            {status === "error" && error && (
-              <div className="text-[11px] text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded px-2 py-1.5 break-words">
+            {error && (
+              <div role="alert" className="text-[11px] text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded px-2 py-1.5 break-words">
                 {error}
               </div>
             )}

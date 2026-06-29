@@ -46,7 +46,9 @@ pub struct CollabState {
 
 /// Locate the host.cjs sidecar bundle. `SLIDECRAFT_HOST_CJS` overrides everything (escape hatch).
 /// Dev (`debug_assertions`): the repo file relative to this crate — resource resolution is
-/// unreliable under `tauri dev`. Release: a bundled resource at the resource root.
+/// unreliable under `tauri dev`. Release: a Resource-dir lookup — NOTE distribution is NOT yet wired
+/// (no bundle.resources entry, and node isn't bundled as an externalBin), so a PACKAGED build needs
+/// that follow-up distribution work before collab runs on a clean machine.
 fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     if let Ok(p) = std::env::var("SLIDECRAFT_HOST_CJS") {
         return Ok(std::path::PathBuf::from(p));
@@ -65,8 +67,9 @@ fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String
 }
 
 /// Spawn the collab sidecar and return its handshake. Idempotent: a live sidecar returns its
-/// existing {url,token}. Sync command — the brief blocking wait for READY is on the Tauri core
-/// thread only; the WebView2 webview is a separate process and stays responsive.
+/// existing {url,token}. Sync command — it blocks the Tauri core thread until READY (~1s normally,
+/// up to READY_TIMEOUT on a hang); the WebView2 webview (separate process) keeps painting, but other
+/// Rust IPC calls briefly queue behind this wait. (Moving it off the core thread is a follow-up.)
 #[tauri::command]
 pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>) -> Result<CollabInfo, String> {
     // Already running? hand back the live handshake. Otherwise reap a dead child and respawn.
@@ -116,7 +119,14 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
 
     // Drain stdout on a thread; forward the first READY line over a channel (and keep draining so a
     // full pipe never blocks the child).
-    let stdout = child.stdout.take().ok_or("子プロセスの stdout を取得できませんでした")?;
+    let stdout = match child.stdout.take() {
+        Some(s) => s,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("子プロセスの stdout を取得できませんでした".into());
+        }
+    };
     let (tx, rx) = mpsc::channel::<String>();
     std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
@@ -145,7 +155,14 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
         }
     };
 
-    let parsed: ReadyLine = serde_json::from_str(&ready).map_err(|e| format!("READY の解析に失敗しました: {e}"))?;
+    let parsed: ReadyLine = match serde_json::from_str(&ready) {
+        Ok(p) => p,
+        Err(e) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!("READY の解析に失敗しました: {e}"));
+        }
+    };
     let info = CollabInfo {
         url: parsed.url,
         token: parsed.token,
@@ -163,7 +180,7 @@ pub fn stop_collab(state: tauri::State<'_, CollabState>) -> Result<(), String> {
         let _ = child.kill();
         let _ = child.wait();
     }
-    *state.info.lock().unwrap() = None;
+    clear_host_json(&state);
     Ok(())
 }
 
@@ -174,5 +191,14 @@ pub fn reap(app: &tauri::AppHandle) {
         let _ = child.kill();
         let _ = child.wait();
     }
-    *state.info.lock().unwrap() = None;
+    clear_host_json(&state);
+}
+
+/// Remove the handshake file. On Windows kill() = TerminateProcess (no signal), so the sidecar's
+/// SIGTERM handler that would clear host.json never runs — Rust clears it so no stale 0600 token
+/// file lingers with a dead pid after every quit/stop.
+fn clear_host_json(state: &CollabState) {
+    if let Some(info) = state.info.lock().unwrap().take() {
+        let _ = std::fs::remove_file(&info.host_json_path);
+    }
 }

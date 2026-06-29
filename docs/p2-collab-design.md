@@ -147,3 +147,33 @@ P2.0 シーム → **P2.1 DocRegistry＋undo を InMemory で**（explicit-docId
 - **プライバシー既定**：AI 接続中、人間が開く全 deck が AI 可視（既定共有）でよいか／private-by-default にするか／接続時警告で足りるか
 - **テスト追加の承認**（R3）：`tests/history-core.test.ts` ＋ `tests/server-seam.test.ts` を追加してよいか
 - 確認（既定で進められる）：固定ポート 5174／installer +50-60MB（stock node）／expectedRev は人間必須・AI 任意／schema.ts 不変（R4）／token 配布は手コピペ
+
+---
+
+## P2.3 / P2.4 実装ノート（branch `claude/p2-sidecar-livesync`）
+
+実機で「AI 編集 → GUI ライブ更新」を確認済み。多エージェント敵対レビュー（18 件確認）を反映。
+
+### 実装した形
+- **P2.3（Rust）**：`src-tauri/src/collab.rs` が Node サイドカー（`dist/mcp/host.cjs`）を `std::process` で spawn・所有。`SLIDECRAFT_READY {url,token}` を stdout で受領し webview へ返す。`RunEvent::ExitRequested/Exit` で kill+wait、stop/quit 時に host.json を Rust が削除（Windows の TerminateProcess は SIGTERM クリーンアップを飛ばすため）。
+- **P2.4（webview）**：`collab-projection.ts`（gui クライアント・`deckChanged`/poll(1.2s) を rev ガードで集約 → `get_deck` → `setDeck`）、`useCollab.ts`、`CollabPanel.tsx`。
+- **seed**：開始時に現デッキを**正確な .slidecraft バイト**（`bundleProject` → `open_project`）で共有。初回 adopt は `'silent'` 適用＝**現在の編集物を上書きしない／undo を汚さない**。
+- **ライブ更新の二段**：SSE push が plugin-http で通らなくても poll(1.2s) が確実な床。tick エラー時は polling を止め `'error'` を出し、`開始` で再接続できる（never-silent）。
+
+### 設計からの意図的な逸脱（理由あり）
+- **固定ポート 5174 → ephemeral(0)**：webview は Rust plugin-http 経由でホストに到達するため CSP はポートを gate しない（境界は bearer token）。ephemeral でポート衝突・stale サイドカー衝突を回避。`claude mcp add` スニペットは READY が返す実 URL を表示。
+- **CSP / capability 変更なし**：上記の理由（plugin-http＝Origin 無し、http スコープは 127.0.0.1:* 既定許可）。
+
+### 既知の制限（後続フェーズ）
+| 項目 | 状態 | 後続 |
+|---|---|---|
+| **配布**：node を externalBin 同梱せず `host.cjs` も bundle.resources 未登録。`tauri dev` は動くが**パッケージ版はまだ collab 不可**（dev は `CARGO_MANIFEST_DIR` で解決） | dev のみ | stock node 同梱 ＋ resources |
+| **Windows ACL**：host.json は 0600（Windows では no-op）。Rust の ACL ロックダウン未実装。token は per-user プロファイル ACL ＋ per-launch ローテーションに依存 | 単一ユーザは可 | P2.5（icacls/windows-acl） |
+| **GUI Undo/Redo**：協働接続中は**無効化**（local undo はホスト真実に上書きされるため）。host の undo/redo tool 再ルートは未実装 | 無効化で非サイレント化 | P2.5（再ルート＋origin トースト） |
+| **multi-doc**：projection は単一 doc を active deck にミラー。複数 doc / タブ橋渡しは未実装 | 単一 doc 可 | P2.5（DocTabs↔docId） |
+| **human 編集往復**：expectedRev ガード・echo 抑制は未実装（P2.4 は読み取り射影のみ） | — | P2.5 |
+| **reap 保証**：通常終了は reap。Rust 側パニック/外部 kill では孤児化し得る（std Child に Drop kill なし） | 通常終了で可 | 将来 Win32 Job Object |
+| **start_collab**：sync コマンドで READY まで core thread をブロック（~1s／最大 15s）。他 IPC が一時キュー | 実用上可 | core thread 外へ |
+
+### 既知のエンジン課題（collab 外）
+- `md-serializer` ↔ `md-slide-parser` の Title スライド非対称：`#` 見出しが Title レイアウトでタイトル枠に乗らない場合がある。seed をバイト経由にしたことで collab では顕在化しないが、エンジン側の往復不整合として残る（R4/R5 注意・別途）。
