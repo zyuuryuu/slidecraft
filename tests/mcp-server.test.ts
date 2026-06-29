@@ -117,8 +117,9 @@ describe("mcp server (in-memory client↔server pair)", () => {
     const deck = JSON.parse((await client.readResource({ uri: "deck://current" })).contents[0].text as string) as { slides: unknown[] };
     expect(deck.slides.length).toBeGreaterThan(1);
 
-    const issues = JSON.parse((await client.readResource({ uri: "deck://issues" })).contents[0].text as string);
-    expect(Array.isArray(issues)).toBe(true);
+    const diag = JSON.parse((await client.readResource({ uri: "deck://issues" })).contents[0].text as string) as { budget: unknown; issues: unknown[] };
+    expect(Array.isArray(diag.issues)).toBe(true);
+    expect("budget" in diag).toBe(true); // capacity surfaced alongside the issues
 
     const slide1 = (await client.readResource({ uri: "slide://1/markdown" })).contents[0].text as string;
     expect(slide1).toMatch(/速度|中身/); // the content slide round-trips through the resource
