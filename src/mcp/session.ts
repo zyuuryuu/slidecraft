@@ -21,6 +21,7 @@ import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from 
 import { diagramSpecToYaml } from "../engine/diagram-serialize";
 import { DiagramSpecSchema } from "../engine/schema";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
+import { parseDesignIntent, applyDesignIntent as applyIntentToSlide } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
 
 export interface Session {
@@ -224,6 +225,34 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   s.deck = { ...deck, slides };
   s.dirty = true;
   return { ok: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog) };
+}
+
+/** Apply a DESIGN intent — the spatial half of two-stage editing — to a slide's figure.
+ *  The agent emits a tiny DesignIntent (ops array): regionSplit (text-left/right/diagram-only)
+ *  / emphasize(nodeId) / relayout(TB/LR/RL/BT); the ENGINE computes + CLAMPS the geometry.
+ *  Only meaningful on a slide that HAS a figure — figureless is rejected (not a silent no-op),
+ *  and `changed` reports whether the intent actually altered the slide (e.g. unknown nodeId
+ *  or a relayout to the same direction → no-op, surfaced rather than hidden). */
+export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
+  const { deck, catalog } = requireLoaded(s);
+  assertIndex(deck, i);
+  const slide = deck.slides[i];
+  if (!slide.diagram && !slide.mermaidBlock) {
+    return { ok: false as const, error: "このスライドには図がありません（design intent は図 / mermaid を持つスライドにのみ適用できます）。" };
+  }
+  const intent = parseDesignIntent(intentRaw);
+  if (!intent) {
+    return { ok: false as const, error: 'DesignIntent を解釈できませんでした（ops 配列の JSON。例: [{"op":"relayout","direction":"LR"}]）。' };
+  }
+  const before = slideToMarkdown(deck, i, catalog);
+  const slides = [...deck.slides];
+  slides[i] = applyIntentToSlide(slide, intent);
+  const check = DeckIRSchema.safeParse({ ...deck, slides });
+  if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
+  s.deck = check.data;
+  const afterMd = slideToMarkdown(s.deck, i, catalog);
+  s.dirty = s.dirty || afterMd !== before;
+  return { ok: true as const, changed: afterMd !== before, beforeMd: before, afterMd, diagnostics: diagnoseDeck(s.deck, catalog) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis
