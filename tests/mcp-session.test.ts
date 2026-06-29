@@ -39,7 +39,9 @@ describe("mcp session — open + read", () => {
     const s = await opened();
     expect(s.deck!.slides.length).toBeGreaterThan(1);
     expect(s.catalog!.length).toBeGreaterThan(0);
-    expect(S.getDiagnostics(s)).toBeInstanceOf(Array);
+    const diag = S.getDiagnostics(s);
+    expect(diag.issues).toBeInstanceOf(Array);
+    expect(diag.budget === null || typeof diag.budget.maxBullets === "number").toBe(true);
     expect(S.getCatalog(s).summary).toMatch(/\w/);
     expect(S.getProjectMeta(s).templateName).toBe("Midnight Executive");
   });
