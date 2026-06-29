@@ -9,10 +9,12 @@ import DocTabs from "./components/DocTabs";
 import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
+import CollabPanel from "./components/CollabPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
 import { useState, useEffect } from "react";
 import { useDeckController } from "./components/useDeckController";
+import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
 
@@ -52,6 +54,11 @@ export default function App() {
     },
     aiReady: ai.connection.ok,
   });
+
+  // P2.4 collaboration: the GUI hosts a local MCP sidecar; an upstream AI connects and its edits
+  // mirror into the active deck live (setDeck(...,'commit') per change). Desktop-only.
+  const [showCollab, setShowCollab] = useState(false);
+  const collab = useCollab({ applyDeck: (d) => setDeck(d, "commit"), deck });
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -101,6 +108,14 @@ export default function App() {
             className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40"
           >
             📝 Draft
+          </button>
+          <button
+            onClick={() => setShowCollab((v) => !v)}
+            title="AI と同じデッキをライブ共有（ローカル MCP サイドカー）"
+            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40 inline-flex items-center gap-1"
+          >
+            🔗 協働
+            {collab.status === "connected" && <span className="text-emerald-400 leading-none">●</span>}
           </button>
         </div>
       </div>
@@ -229,6 +244,23 @@ export default function App() {
           proposal={refine.proposal}
           onAccept={refine.acceptProposal}
           onCancel={refine.cancelProposal}
+        />
+      )}
+
+      {showCollab && (
+        <CollabPanel
+          onClose={() => setShowCollab(false)}
+          available={collab.available}
+          status={collab.status}
+          url={collab.url}
+          token={collab.token}
+          hostJsonPath={collab.hostJsonPath}
+          error={collab.error}
+          docCount={collab.docCount}
+          simulating={collab.simulating}
+          onStart={collab.start}
+          onStop={collab.stop}
+          onSimulate={collab.simulateAiEdit}
         />
       )}
     </>
