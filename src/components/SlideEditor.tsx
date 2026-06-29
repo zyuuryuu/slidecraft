@@ -5,7 +5,7 @@
  * For diagram slides, shows the YAML editor inline.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import * as yaml from "js-yaml";
 import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
@@ -215,6 +215,18 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
 
 type DiagramMode = "mermaid" | "yaml" | "json";
 
+/** A diagram that can't round-trip to Mermaid (sequence / UML class) — the MERMAID toggle is
+ *  disabled for these (edit in YAML/JSON). Plain function so the React Compiler memoizes the call. */
+function isMermaidIncompatible(diagramYaml: string | undefined): boolean {
+  if (!diagramYaml) return false;
+  try {
+    const result = DiagramSpecSchema.safeParse(yaml.load(diagramYaml));
+    return result.success ? !canSerializeToMermaid(result.data) : false;
+  } catch {
+    return false;
+  }
+}
+
 function DiagramEditor({
   slide,
   onUpdateDiagramYaml,
@@ -232,15 +244,7 @@ function DiagramEditor({
   // Mermaid graph syntax can't represent sequence / UML class diagrams, so the
   // YAML→Mermaid serializer would flatten them to a flowchart (lossy + type-
   // breaking). Disable the MERMAID toggle for those — edit them in YAML/JSON.
-  const mermaidIncompatible = useMemo(() => {
-    if (!slide.diagram?.yaml) return false;
-    try {
-      const result = DiagramSpecSchema.safeParse(yaml.load(slide.diagram.yaml));
-      return result.success ? !canSerializeToMermaid(result.data) : false;
-    } catch {
-      return false;
-    }
-  }, [slide.diagram?.yaml]);
+  const mermaidIncompatible = isMermaidIncompatible(slide.diagram?.yaml);
 
   // ── Convert between modes ──
   const switchMode = useCallback(

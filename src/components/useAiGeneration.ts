@@ -72,10 +72,25 @@ function defaultConfigs(): AiConfigMap {
   return out;
 }
 
+/** Read persisted AI config ONCE — used as a lazy useState initializer (NOT a mount effect), so
+ *  there is no synchronous setState / cascading render on mount. Seeds the state below + hadSavedConfig. */
+function loadSavedConfig(): { localOnly: boolean; provider?: ProviderId; configs?: Partial<AiConfigMap>; hadSaved: boolean } {
+  try {
+    const localOnly = localStorage.getItem(LOCAL_ONLY_STORAGE) === "1";
+    const raw = localStorage.getItem(AI_CONFIG_STORAGE);
+    if (!raw) return { localOnly, hadSaved: false };
+    const saved = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<AiConfigMap> };
+    return { localOnly, provider: saved.provider, configs: saved.configs, hadSaved: true };
+  } catch {
+    return { localOnly: false, hadSaved: false };
+  }
+}
+
 export function useAiGeneration() {
-  const [provider, setProvider] = useState<ProviderId>("claude");
-  const [configs, setConfigs] = useState<AiConfigMap>(defaultConfigs);
-  const [rememberKey, setRememberKey] = useState(false);
+  const [saved] = useState(loadSavedConfig);
+  const [provider, setProvider] = useState<ProviderId>(saved.provider ?? "claude");
+  const [configs, setConfigs] = useState<AiConfigMap>(() => (saved.configs ? { ...defaultConfigs(), ...saved.configs } : defaultConfigs()));
+  const [rememberKey, setRememberKey] = useState(!!saved.configs);
   // Central AI task store: the live list (in-flight + history) + which task is the
   // "foreground" one whose result/error the single-shot surfaces (AiPanel/LlmAssist)
   // read. abortMap holds one AbortController per running task for cancellation.
@@ -87,7 +102,7 @@ export function useAiGeneration() {
   // project keeps its own AI history. App keeps this in sync with the active document.
   // Local-model-only mode: when ON, generation is hard-blocked from any non-local target
   // (enforced in canGenerate AND in generateWithAI). See LOCAL_ONLY_STORAGE.
-  const [localModelOnly, setLocalModelOnlyState] = useState(false);
+  const [localModelOnly, setLocalModelOnlyState] = useState(saved.localOnly);
   const [activeDocId, setActiveDocIdState] = useState<string>("");
   const activeDocIdRef = useRef<string>("");
   const setActiveDocId = useCallback((id: string) => {
@@ -99,26 +114,8 @@ export function useAiGeneration() {
   // Setup-assist state: local Ollama probe (null = not yet checked) + once-flags.
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
-  const hadSavedConfig = useRef(false);
+  const hadSavedConfig = useRef(saved.hadSaved);
   const didAutoSelect = useRef(false);
-
-  // Load saved provider + configs once.
-  useEffect(() => {
-    try {
-      setLocalModelOnlyState(localStorage.getItem(LOCAL_ONLY_STORAGE) === "1");
-      const raw = localStorage.getItem(AI_CONFIG_STORAGE);
-      if (!raw) return;
-      hadSavedConfig.current = true; // user has configured before → don't auto-pick a provider
-      const saved = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<AiConfigMap> };
-      if (saved.provider) setProvider(saved.provider);
-      if (saved.configs) {
-        setConfigs((cur) => ({ ...cur, ...saved.configs }));
-        setRememberKey(true);
-      }
-    } catch {
-      /* ignore corrupt config */
-    }
-  }, []);
 
   // Probe local Ollama once, so the UI can surface it — and, on a fresh install
   // (no saved config), auto-select it so a local-AI user can generate immediately.
@@ -165,6 +162,7 @@ export function useAiGeneration() {
   const curApiKey = cfg.apiKey;
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional loading flag set as the fetch begins
     setModelsLoading(true);
     listProviderModels(provider, curBaseURL, curApiKey)
       .then((list) => {
@@ -258,7 +256,7 @@ export function useAiGeneration() {
       } catch (e) {
         if (controller.signal.aborted) {
           patchTask(task.id, { status: "cancelled", finishedAt: Date.now() });
-          throw new Error("cancelled");
+          throw new Error("cancelled", { cause: e });
         }
         const msg = e instanceof Error ? e.message : String(e);
         patchTask(task.id, { status: "error", error: msg, finishedAt: Date.now() });

@@ -68,7 +68,7 @@ export async function generateWithClaude(opts: GenerateOptions): Promise<string>
 
     return (text || full).trim();
   } catch (e) {
-    throw new Error(friendlyError(e));
+    throw new Error(friendlyError(e), { cause: e });
   }
 }
 

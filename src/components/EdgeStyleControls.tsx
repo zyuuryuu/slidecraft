@@ -28,7 +28,7 @@ export default function EdgeStyleControls({
 }) {
   const [sel, setSel] = useState(0);
 
-  let edges: RawEdge[] = [];
+  let edges: RawEdge[];
   try {
     edges = ((yaml.load(diagramYaml) ?? {}) as RawDiagram).edges ?? [];
   } catch {
