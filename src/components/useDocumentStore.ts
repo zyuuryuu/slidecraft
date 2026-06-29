@@ -20,7 +20,7 @@ import {
   type HState,
   type HAction,
   type HistoryMode,
-} from "./useHistoryState";
+} from "../shared/history-core";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 

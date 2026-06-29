@@ -13,8 +13,12 @@
  */
 
 import { useReducer, useCallback } from "react";
+import { historyReducer, type HState, type HAction, type HistoryMode } from "../shared/history-core";
 
-export type HistoryMode = "commit" | "coalesce" | "silent";
+// The pure reducer + its types now live in src/shared/history-core (React-free, shared with
+// the headless MCP host). Re-export them so existing importers of "./useHistoryState" keep working.
+export { historyReducer };
+export type { HState, HAction, HistoryMode } from "../shared/history-core";
 
 export interface History<T> {
   state: T;
@@ -24,45 +28,6 @@ export interface History<T> {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-}
-
-export interface HState<T> {
-  past: T[];
-  present: T;
-  future: T[];
-  lastTs: number;
-}
-
-export type HAction<T> =
-  | { type: "set"; next: T; mode: HistoryMode; ts: number; coalesceMs: number }
-  | { type: "reset"; next: T }
-  | { type: "undo" }
-  | { type: "redo" };
-
-/** Pure undo/redo reducer — reused by useDocumentStore to give EACH document its own
- *  history without duplicating the semantics (silent/coalesce/commit/reset). */
-export function historyReducer<T>(s: HState<T>, a: HAction<T>): HState<T> {
-  switch (a.type) {
-    case "set": {
-      if (a.mode === "silent") return { ...s, present: a.next };
-      const coalesce =
-        a.mode === "coalesce" && a.ts - s.lastTs < a.coalesceMs && s.past.length > 0;
-      const past = coalesce ? s.past : [...s.past, s.present].slice(-200);
-      return { past, present: a.next, future: [], lastTs: a.ts };
-    }
-    case "reset":
-      return { past: [], present: a.next, future: [], lastTs: 0 };
-    case "undo": {
-      if (s.past.length === 0) return s;
-      const prev = s.past[s.past.length - 1];
-      return { past: s.past.slice(0, -1), present: prev, future: [...s.future, s.present], lastTs: 0 };
-    }
-    case "redo": {
-      if (s.future.length === 0) return s;
-      const next = s.future[s.future.length - 1];
-      return { past: [...s.past, s.present], present: next, future: s.future.slice(0, -1), lastTs: 0 };
-    }
-  }
 }
 
 export function useHistoryState<T>(initial: T, coalesceMs = 600): History<T> {
