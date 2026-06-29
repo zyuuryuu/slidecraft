@@ -102,4 +102,30 @@ describe("mcp server (in-memory client↔server pair)", () => {
     expect(res.isError).toBe(true);
     expect(String(res.data)).toMatch(/範囲外/);
   });
+
+  it("exposes deck state as MCP resources (list + read reflect the open project)", async () => {
+    const client = await connect();
+    await call(client, "open_project", { dataBase64: bundleB64 });
+
+    const uris = (await client.listResources()).resources.map((r) => r.uri);
+    for (const u of ["deck://current", "deck://markdown", "deck://issues", "deck://capabilities", "deck://info"]) {
+      expect(uris).toContain(u);
+    }
+    // per-slide resources are listed dynamically from the open deck
+    expect(uris).toContain("slide://0/markdown");
+
+    const deck = JSON.parse((await client.readResource({ uri: "deck://current" })).contents[0].text as string) as { slides: unknown[] };
+    expect(deck.slides.length).toBeGreaterThan(1);
+
+    const issues = JSON.parse((await client.readResource({ uri: "deck://issues" })).contents[0].text as string);
+    expect(Array.isArray(issues)).toBe(true);
+
+    const slide1 = (await client.readResource({ uri: "slide://1/markdown" })).contents[0].text as string;
+    expect(slide1).toMatch(/速度|中身/); // the content slide round-trips through the resource
+  });
+
+  it("a resource read before open surfaces the engine's not-opened error (never a fake-empty deck)", async () => {
+    const client = await connect(); // fresh session, nothing opened
+    await expect(client.readResource({ uri: "deck://current" })).rejects.toThrow(/開かれていません/);
+  });
 });
