@@ -51,6 +51,7 @@ export default function AiPanel({
 
   // Pre-fill the instruction when handed off from the ReviewBar ("✨直す"). Keyed on
   // seed.ts so re-clicking the same issue re-seeds; switches to the gen tab.
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync the ReviewBar handoff (seed) into the editable instruction + tab */
   useEffect(() => {
     if (seed) {
       setUserRequest(seed.prompt);
@@ -58,6 +59,7 @@ export default function AiPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed?.ts]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Resizable height: drag the top edge to grow the dock upward (persisted). The dock
   // is bottom-anchored, so height = viewport bottom − pointer Y.

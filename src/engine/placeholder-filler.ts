@@ -216,7 +216,6 @@ async function buildSlideXml(
     const tablePh = visualBody(slide.table.placeholderIdx);
     if (tablePh) {
       shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id);
-      id++;
     }
   }
 

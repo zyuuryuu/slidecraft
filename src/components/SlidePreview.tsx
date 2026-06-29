@@ -29,7 +29,7 @@ function MermaidDirect({ mermaidSyntax, width, height, instanceId }: { mermaidSy
 
   useEffect(() => {
     cancelRef.current = false;
-    if (!mermaidSyntax.trim()) { setSvg(""); return; }
+    if (!mermaidSyntax.trim()) return;
     const id = instanceId ? `mmd-direct-${instanceId}-${++mermaidIdCounter}` : `mmd-direct-${++mermaidIdCounter}`;
     mermaid.render(id, mermaidSyntax).then(({ svg: rendered }) => {
       if (!cancelRef.current) setSvg(rendered);
@@ -39,7 +39,10 @@ function MermaidDirect({ mermaidSyntax, width, height, instanceId }: { mermaidSy
     return () => { cancelRef.current = true; };
   }, [mermaidSyntax, instanceId]);
 
-  const fittedSvg = svg.replace(
+  // Empty input renders nothing without a synchronous setState — the (possibly stale) svg is
+  // simply not shown, and the next non-empty render replaces it.
+  const shownSvg = mermaidSyntax.trim() ? svg : "";
+  const fittedSvg = shownSvg.replace(
     /<svg([^>]*)>/,
     (_match, attrs) => {
       const wMatch = attrs.match(/width="([\d.]+)/);
