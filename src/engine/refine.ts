@@ -182,18 +182,17 @@ export async function batchEditDeck(
     if (opts.signal?.aborted) break;
     if (!current.slides[idx]) continue;
     const before = slideToMd(current, idx, catalog);
-    let after = "";
     try {
       const outcome = await opts.aiFix(`Current slide:\n${before}\n\nInstruction: ${opts.instruction}`, { slideIndex: idx, signal: opts.signal, attempt: 1 });
       if (!outcome.ok) continue; // cancelled / failed → skip this slide
-      after = outcome.markdown.trim();
+      const after = outcome.markdown.trim();
+      const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
+      if (newSlide) {
+        current = replaceSlide(current, idx, newSlide);
+        changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after });
+      }
     } catch {
       continue;
-    }
-    const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
-    if (newSlide) {
-      current = replaceSlide(current, idx, newSlide);
-      changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after });
     }
   }
   return { deck: current, changes, converged: true, iterations: 1 };

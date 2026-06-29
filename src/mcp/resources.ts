@@ -62,7 +62,7 @@ export function registerResources(server: McpServer, session: Session): void {
         try {
           count = S.getDeck(session).slides.length;
         } catch {
-          count = 0; // no project open yet → nothing to list
+          /* no project open yet → nothing to list (count stays 0) */
         }
         return {
           resources: Array.from({ length: count }, (_, i) => ({

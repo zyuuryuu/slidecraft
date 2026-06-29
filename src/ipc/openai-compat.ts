@@ -57,7 +57,7 @@ export async function generateWithOpenAICompat(opts: OpenAICompatOptions): Promi
     }
     return full.trim();
   } catch (e) {
-    throw new Error(friendlyError(e));
+    throw new Error(friendlyError(e), { cause: e });
   }
 }
 

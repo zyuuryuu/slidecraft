@@ -93,7 +93,7 @@ describe("buildServer onMutate seam", () => {
     try {
       offUris = (await b.listResources()).resources.map((r) => r.uri);
     } catch {
-      offUris = []; // no resource registered → server doesn't advertise the capability
+      /* no resource registered → server doesn't advertise the capability (offUris stays []) */
     }
     expect(offUris).not.toContain("deck://current");
   });
