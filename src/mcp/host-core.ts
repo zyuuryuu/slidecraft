@@ -32,6 +32,21 @@ function seedHistory(deck: DeckIR | null): HState<DeckIR | null> {
   return { past: [], present: deck, future: [], lastTs: 0 };
 }
 
+/** The per-connection + registry surface the MCP server needs in HOST (collab) mode. The host
+ *  process (host.ts, P2.2) owns connection state (keyed on the MCP transport sessionId) and the
+ *  server→client notifications; buildServer just consumes this. Absent in stdio mode, where the
+ *  server keeps its single Session. */
+export interface HostContext {
+  registry: DocRegistry;
+  /** The active docId for the connection making the current call (host keys on extra.sessionId). */
+  active(extra: unknown): string | undefined;
+  setActive(extra: unknown, docId: string): void;
+  /** AI clients see only shared docs (private-by-default); the GUI sees all. */
+  sharedOnly: boolean;
+  notifyOpened?(entry: DocEntry): void;
+  notifyClosed?(docId: string): void;
+}
+
 /** A live map of docId → DocEntry. Holds NO transport/connection state (that lives in host.ts). */
 export class DocRegistry {
   private docs = new Map<string, DocEntry>();
