@@ -71,6 +71,25 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 
 ---
 
+## リソース（read-only state）
+
+deck の状態は **MCP resource** としても公開する。tool を連打せず `resources/read` で
+現在状態を取得できる（同じ engine セッションなので**常に最新の編集を反映**）。
+
+| URI | 内容 | mime |
+|---|---|---|
+| `deck://current` | DeckIR（構造化 JSON） | application/json |
+| `deck://markdown` | deck 全体の Markdown | text/markdown |
+| `deck://issues` | 診断（レバー付き課題一覧） | application/json |
+| `deck://capabilities` | テンプレートの能力＋レイアウト一覧 | application/json |
+| `deck://info` | プロジェクトのメタ（テンプレ名・枚数・dirty） | application/json |
+| `slide://{index}/markdown` | 1スライドの Markdown（`resources/list` で開いた deck の枚数分を列挙） | text/markdown |
+
+プロジェクト未オープンで read すると、エンジンの「開かれていません」エラーが返る
+（空 deck を偽装しない＝never-silent）。
+
+---
+
 ## 典型的なループ（エージェント視点）
 
 1. ローカルの `.slidecraft` を**自分のファイルツールで読み**、base64 化して `open_project`。
@@ -113,5 +132,4 @@ Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecra
 
 - `--no-fs`（base64）のみ。`--root`（プロジェクトディレクトリ配下に限定した scoped fs）は次版。
 - `generate_from_plan`（DeckPlan からの新規生成）は未実装（テンプレ＋Markdown からの新規は
-  `new_project` で可能。`apply_design_intent`＝空間意図は実装済み）。
-- リソース（`deck://current` 等の MCP resource）は未提供（現状は tool 結果で deck 状態を返す）。
+  `new_project` で可能。`apply_design_intent`＝空間意図、`deck://` 等のリソースは実装済み）。

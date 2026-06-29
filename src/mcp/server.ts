@@ -3,12 +3,14 @@
  * tools. The upstream agent IS the LLM; these tools are the deterministic engine ops, so
  * the server never calls a model. v1 transport is --no-fs: bytes (the .slidecraft / .pptx)
  * flow as base64 over stdio, so the server touches NO filesystem. Every tool returns fresh
- * result JSON (incl. diagnostics) so an agent always sees current deck state.
+ * result JSON (incl. diagnostics) so an agent always sees current deck state. The same state is
+ * also exposed read-only as MCP *resources* (deck://… , slide://{i}/markdown) via resources.ts.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Session } from "./session";
 import * as S from "./session";
+import { registerResources } from "./resources";
 
 interface ToolResult {
   content: { type: "text"; text: string }[];
@@ -86,6 +88,9 @@ export function buildServer(session: Session): McpServer {
         return { dataBase64: b64(bytes), skipped };
       }),
   );
+
+  // ── read-only deck state as MCP resources (deck://… , slide://{i}/markdown) ──
+  registerResources(server, session);
 
   return server;
 }
