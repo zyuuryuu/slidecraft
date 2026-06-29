@@ -10,7 +10,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { createCollabHost, type CollabHost } from "../src/mcp/host";
 import { CollabClient } from "../src/ipc/collab-client";
-import { CollabProjection, type ProjectedDeck } from "../src/ipc/collab-projection";
+import { CollabProjection, type ProjectedDeck, type CollabStatus } from "../src/ipc/collab-projection";
 
 let templateB64: string;
 beforeAll(() => {
@@ -72,6 +72,24 @@ describe("CollabProjection", () => {
     // produced exactly one apply — no duplicate re-renders.
     await new Promise((r) => setTimeout(r, 150));
     expect(applied.map((p) => p.rev)).toEqual([0, 1]);
+    // First apply of a doc is the adopt (isInitial=true → 'silent' so a seed never clobbers); the
+    // subsequent edit is isInitial=false (→ 'commit', one undoable live step).
+    expect(applied.map((p) => p.isInitial)).toEqual([true, false]);
+  });
+
+  it("on host failure, surfaces an error and STOPS polling (no forever-polling zombie)", async () => {
+    const statuses: CollabStatus[] = [];
+    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 40, onDeck: () => {}, onStatus: (s) => statuses.push(s) });
+    await proj.start();
+    expect(statuses).toContain("connected");
+
+    await host.close(); // pull the host out from under the projection
+    await waitFor(() => statuses.includes("error"));
+
+    // failAndStop cleared the poll interval — no continued error churn after the first failure.
+    const n = statuses.length;
+    await new Promise((r) => setTimeout(r, 200)); // > several poll intervals
+    expect(statuses.length).toBe(n);
   });
 
   it("surfaces an unauthorized connection as an error (bad token never silently no-ops)", async () => {

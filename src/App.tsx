@@ -56,9 +56,16 @@ export default function App() {
   });
 
   // P2.4 collaboration: the GUI hosts a local MCP sidecar; an upstream AI connects and its edits
-  // mirror into the active deck live (setDeck(...,'commit') per change). Desktop-only.
+  // mirror into the active deck live. A freshly adopted/seeded doc is applied 'silent' (replace the
+  // view, no undo step — so seeding the user's own deck never clobbers it); subsequent AI edits are
+  // 'commit' (undoable). Desktop-only.
   const [showCollab, setShowCollab] = useState(false);
-  const collab = useCollab({ applyDeck: (d) => setDeck(d, "commit"), deck });
+  const collab = useCollab({
+    applyDeck: (d, isInitial) => setDeck(d, isInitial ? "silent" : "commit"),
+    deck,
+    templateData,
+    templateName,
+  });
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -98,8 +105,8 @@ export default function App() {
           templateName={templateName}
           onUndo={undoDeck}
           onRedo={redoDeck}
-          canUndo={canUndo}
-          canRedo={canRedo}
+          canUndo={canUndo && collab.status !== "connected"}
+          canRedo={canRedo && collab.status !== "connected"}
         />
         <div className="flex items-center gap-2 px-3 py-2">
           <button

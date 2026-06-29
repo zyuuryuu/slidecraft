@@ -32,6 +32,10 @@ export interface ProjectedDeck {
   rev: number;
   docId: string;
   title: string;
+  /** True on the FIRST apply of a doc (adopt). The caller applies it 'silent' (replace the view
+   *  without an undo step) so seeding the user's own deck doesn't clobber/pollute undo; subsequent
+   *  revs are 'commit' (one undoable step per AI edit). */
+  isInitial: boolean;
 }
 
 export interface CollabProjectionOptions {
@@ -111,6 +115,20 @@ export class CollabProjection {
     }
   }
 
+  /** A tick hit a hard error (host gone, session dropped, sleep/wake). Stop polling + drop the
+   *  connection so it can't hammer a dead loopback forever, and surface the error. The hook nulls
+   *  its ref on 'error' so the next 開始 re-establishes a fresh session (never-silent recovery). */
+  private failAndStop(detail: string): void {
+    if (this.closed) return;
+    this.closed = true;
+    if (this.poll) {
+      clearInterval(this.poll);
+      this.poll = null;
+    }
+    void this.client.close().catch(() => {});
+    this.opts.onStatus?.("error", detail);
+  }
+
   private scheduleTick(): void {
     if (this.closed) return;
     void this.pump();
@@ -139,7 +157,7 @@ export class CollabProjection {
     try {
       listed = await this.client.callTool<{ documents: DocSummary[]; activeDocId: string | null }>("list_documents");
     } catch (e) {
-      this.opts.onStatus?.("error", msg(e));
+      this.failAndStop(msg(e));
       return;
     }
     const docs = listed.documents ?? [];
@@ -156,16 +174,17 @@ export class CollabProjection {
     this.targetDocId = target.docId;
     if (this.lastDocId === target.docId && target.rev <= this.lastRev) return; // already at this rev
 
+    const isInitial = this.lastDocId !== target.docId; // first apply of this doc → caller uses 'silent'
     let deck: DeckIR | null;
     try {
       deck = await this.client.callTool<DeckIR | null>("get_deck", { docId: target.docId });
     } catch (e) {
-      this.opts.onStatus?.("error", msg(e));
+      this.failAndStop(msg(e));
       return;
     }
     this.lastDocId = target.docId;
     this.lastRev = target.rev;
-    this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title });
+    this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title, isInitial });
   }
 }
 
