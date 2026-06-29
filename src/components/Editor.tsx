@@ -51,7 +51,9 @@ export default function Editor({ value, onChange, language = "yaml", onCursorLin
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onCursorLineRef = useRef(onCursorLine);
-  onCursorLineRef.current = onCursorLine;
+  useEffect(() => {
+    onCursorLineRef.current = onCursorLine; // keep the latest callback without re-creating the editor
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;
