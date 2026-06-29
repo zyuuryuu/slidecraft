@@ -139,6 +139,41 @@ describe("mcp session — set_diagram", () => {
   });
 });
 
+describe("mcp session — apply_design_intent (design half of two-stage editing)", () => {
+  // graft a slide with a NATIVE diagram (graduate a Mermaid block via set_diagram).
+  const graftDiagram = (s: Awaited<ReturnType<typeof opened>>): number => {
+    const i = s.deck!.slides.length;
+    s.deck = { ...s.deck!, slides: [...s.deck!.slides, { layout: "auto", placeholders: [], mermaidBlock: { mermaid: "flowchart TD\n  A[開始]-->B[終了]", placeholderIdx: "1" } }] };
+    expect(S.setDiagram(s, i, "flowchart TD\n  A[開始]-->B[終了]", "mermaid").ok).toBe(true);
+    return i;
+  };
+
+  it("relayout alters a diagram slide's geometry (engine computes + clamps); changed=true", async () => {
+    const s = await opened();
+    const i = graftDiagram(s);
+    const r = S.applyDesignIntent(s, i, '[{"op":"relayout","direction":"LR"}]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.changed).toBe(true);
+      expect(r.beforeMd).not.toEqual(r.afterMd);
+    }
+    expect(s.dirty).toBe(true);
+  });
+
+  it("rejects a figureless slide (never a silent no-op)", async () => {
+    const s = await opened();
+    const r = S.applyDesignIntent(s, 0, '[{"op":"relayout","direction":"LR"}]'); // cover has no figure
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/図がありません/);
+  });
+
+  it("rejects an unparseable intent", async () => {
+    const s = await opened();
+    const i = graftDiagram(s);
+    expect(S.applyDesignIntent(s, i, "not an intent").ok).toBe(false);
+  });
+});
+
 describe("mcp session — validate + save + native export", () => {
   it("validate reports native-ok for a diagram-free deck", async () => {
     const s = await opened();

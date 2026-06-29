@@ -47,9 +47,17 @@ describe("mcp server (in-memory client↔server pair)", () => {
   it("lists the deterministic tool surface", async () => {
     const client = await connect();
     const names = (await client.listTools()).tools.map((t) => t.name);
-    for (const n of ["open_project", "new_project", "get_deck_issues", "set_slide_markdown", "split_overflowing_slides", "convert_bullets_to_table", "set_slide_diagram", "validate_deck", "export_pptx"]) {
+    for (const n of ["open_project", "new_project", "get_deck_issues", "set_slide_markdown", "split_overflowing_slides", "convert_bullets_to_table", "set_slide_diagram", "apply_design_intent", "validate_deck", "export_pptx"]) {
       expect(names).toContain(n);
     }
+  });
+
+  it("apply_design_intent is wired (figureless slide → ok:false, not a thrown error)", async () => {
+    const client = await connect();
+    await call(client, "open_project", { dataBase64: bundleB64 });
+    const res = await call(client, "apply_design_intent", { index: 0, intent: '[{"op":"relayout","direction":"LR"}]' });
+    expect(res.isError).toBe(false); // a rejected intent is a normal result, not a transport error
+    expect((res.data as { ok: boolean }).ok).toBe(false);
   });
 
   it("open → get_slide_markdown → apply_slide_markdown → validate round trip", async () => {
