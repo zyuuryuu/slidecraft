@@ -43,6 +43,9 @@ export interface HostContext {
   setActive(extra: unknown, docId: string): void;
   /** AI clients see only shared docs (private-by-default); the GUI sees all. */
   sharedOnly: boolean;
+  /** A deck-changing op committed on `entry` (its docId/rev are current) — the host fans out
+   *  deckChanged to every connected client (incl. undo/redo, which mint a new rev). */
+  onMutated?(entry: DocEntry, tool: string): void;
   notifyOpened?(entry: DocEntry): void;
   notifyClosed?(docId: string): void;
 }

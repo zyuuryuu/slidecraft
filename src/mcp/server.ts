@@ -78,7 +78,10 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     try {
       const entry = entryOf(extra, docId);
       const { result, changed, rev } = await commitMutation(entry, fn);
-      if (changed) opts.onMutate?.(tool);
+      if (changed) {
+        opts.onMutate?.(tool);
+        host.onMutated?.(entry, tool); // fan out deckChanged to every connected client
+      }
       if (changed && result && typeof result === "object") return ok({ ...(result as object), rev, docId: entry.docId });
       return ok(result);
     } catch (e) {
@@ -176,7 +179,10 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       run(() => {
         const e = entryOf(extra, a.docId);
         const r = undoDoc(e);
-        if (r.ok) opts.onMutate?.("undo");
+        if (r.ok) {
+          opts.onMutate?.("undo");
+          host.onMutated?.(e, "undo");
+        }
         return { ...r, docId: e.docId };
       }),
     );
@@ -184,7 +190,10 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       run(() => {
         const e = entryOf(extra, a.docId);
         const r = redoDoc(e);
-        if (r.ok) opts.onMutate?.("redo");
+        if (r.ok) {
+          opts.onMutate?.("redo");
+          host.onMutated?.(e, "redo");
+        }
         return { ...r, docId: e.docId };
       }),
     );
