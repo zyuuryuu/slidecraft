@@ -47,33 +47,33 @@ export function buildServer(session: Session): McpServer {
     { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規プロジェクトを作る（テンプレ持ち込み＋Markdown→スライド。GUI の Draft と同じ整形）", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
     ({ templateBase64, markdown }) => run(() => S.newProject(session, unb64(templateBase64), markdown)),
   );
-  server.registerTool("get_deck", { description: "現在の deck（DeckIR JSON）" }, () => run(() => S.getDeck(session)));
-  server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で" }, () => run(() => S.getDeckMarkdown(session)));
-  server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideMarkdown(session, i)));
-  server.registerTool("get_deck_issues", { description: "deck の診断（split/condense/visualize/title レバー付き）" }, () => run(() => S.getDiagnostics(session)));
-  server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）" }, () => run(() => S.getCatalog(session)));
-  server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報" }, () => run(() => S.getProjectMeta(session)));
+  server.registerTool("get_deck", { description: "現在の deck（DeckIR JSON）。resource `deck://current` のミラー — resource を自律読みできるクライアントでは resource 推奨" }, () => run(() => S.getDeck(session)));
+  server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー（resource 推奨）" }, () => run(() => S.getDeckMarkdown(session)));
+  server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）。`slide://{index}/markdown` の確実版（テンプレ resource 非対応クライアント向けにツールが正）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideMarkdown(session, i)));
+  server.registerTool("get_deck_issues", { description: "deck の診断＝CONTENT レバー（split/condense/visualize/title）＋本文 budget（このテンプレの容量: maxBullets/charsPerBullet）。`deck://issues` のミラー。※ export 可否は validate_deck" }, () => run(() => S.getDiagnostics(session)));
+  server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー" }, () => run(() => S.getCatalog(session)));
+  server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー" }, () => run(() => S.getProjectMeta(session)));
   server.registerTool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: index }, ({ index: i }) => run(() => S.getSlideFix(session, i)));
 
   // ── deterministic mutations ──
-  server.registerTool("set_slide_markdown", { description: "1スライドを Markdown で差し替え（zod 検証・不正は never-silent で拒否）", inputSchema: { ...index, markdown: z.string() } }, ({ index: i, markdown }) => run(() => S.applySlideMarkdown(session, i, markdown)));
-  server.registerTool("set_deck_markdown", { description: "deck 全体を Markdown で差し替え", inputSchema: { markdown: z.string() } }, ({ markdown }) => run(() => S.applyDeckMarkdown(session, markdown)));
+  server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否", inputSchema: { ...index, markdown: z.string() } }, ({ index: i, markdown }) => run(() => S.applySlideMarkdown(session, i, markdown)));
+  server.registerTool("set_deck_markdown", { description: "⚠️ deck 全体を置換（スライド数が変わりうる・図は自動保持されない）。1枚だけ直すなら set_slide_markdown を使うこと", inputSchema: { markdown: z.string() } }, ({ markdown }) => run(() => S.applyDeckMarkdown(session, markdown)));
   server.registerTool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割" }, () => run(() => S.distill(session)));
   server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: index }, ({ index: i }) => run(() => S.visualizeKeyValue(session, i)));
   server.registerTool(
     "set_slide_diagram",
-    { description: "スライドの図を DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]) } },
+    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]) } },
     ({ index: i, source, format }) => run(() => S.setDiagram(session, i, source, format)),
   );
   server.registerTool(
     "apply_design_intent",
     {
-      description: '図に空間意図（design edit）を適用：ops 配列の JSON で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。図/mermaid を持つスライドのみ。例: [{"op":"relayout","direction":"LR"}]',
+      description: '図を【どう配置するか】（design edit）：ops 配列の JSON で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図/mermaid を持つスライドのみ。図の中身そのものは set_slide_diagram。例: [{"op":"relayout","direction":"LR"}]',
       inputSchema: { ...index, intent: z.string() },
     },
     ({ index: i, intent }) => run(() => S.applyDesignIntent(session, i, intent)),
   );
-  server.registerTool("validate_deck", { description: "deck 検証＋exportReadiness（変換不能 mermaid スキャン）" }, () => run(() => S.validate(session)));
+  server.registerTool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues" }, () => run(() => S.validate(session)));
 
   // ── persist / export (base64 over stdio) ──
   server.registerTool("save_project", { description: ".slidecraft を生成し base64 で返す" }, () =>

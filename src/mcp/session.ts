@@ -115,9 +115,17 @@ export function getSlideMarkdown(s: Session, i: number): string {
   assertIndex(deck, i);
   return slideToMarkdown(deck, i, catalog);
 }
-export function getDiagnostics(s: Session): DeckIssue[] {
+/** Body capacity (max bullets / chars-per-bullet) for THIS template's content layout — a
+ *  deck-level constant from contentBodyBox, robust on alien templates. Surfaced on the
+ *  diagnose read so an agent fixing overflow sees the target WITHOUT get_slide_fix_request. */
+function budgetOf(catalog: LayoutCatalog): { maxBullets: number; charsPerBullet: number } | null {
+  const box = contentBodyBox(catalog);
+  return box ? { maxBullets: box.maxLines, charsPerBullet: box.charsPerLine } : null;
+}
+
+export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[] } {
   const { deck, catalog } = requireLoaded(s);
-  return diagnoseDeck(deck, catalog);
+  return { budget: budgetOf(catalog), issues: diagnoseDeck(deck, catalog) };
 }
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);

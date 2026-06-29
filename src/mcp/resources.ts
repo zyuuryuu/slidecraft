@@ -36,7 +36,7 @@ export function registerResources(server: McpServer, session: Session): void {
   server.registerResource(
     "deck-issues",
     "deck://issues",
-    { title: "deck の診断", description: "split/condense/visualize/title レバー付きの課題一覧", mimeType: "application/json" },
+    { title: "deck の診断", description: "CONTENT レバー（split/condense/visualize/title）付きの課題一覧＋本文 budget（このテンプレの容量: maxBullets/charsPerBullet）", mimeType: "application/json" },
     (uri) => asJson(uri, S.getDiagnostics(session)),
   );
   server.registerResource(
