@@ -173,7 +173,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               )}
             </div>
 
-            {!ai.preset.native && (
+            {!ai.preset.native && ai.provider !== "builtin" && (
               <input
                 type="text"
                 value={ai.cfg.baseURL}
@@ -225,32 +225,37 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               </span>
             )}
 
-            <div className="flex gap-2 items-center">
-              <input
-                type={showKey ? "text" : "password"}
-                value={ai.cfg.apiKey}
-                onChange={(e) => ai.setField("apiKey", e.target.value)}
-                placeholder={ai.preset.keyRequired ? "API key" : "API key (optional for local)"}
-                className={`${fieldClass} font-mono`}
-                autoComplete="off"
-              />
-              <button
-                onClick={() => setShowKey((s) => !s)}
-                className="px-2 py-2 text-xs bg-[#2D3A6E] text-gray-200 rounded"
-                type="button"
-              >
-                {showKey ? "Hide" : "Show"}
-              </button>
-            </div>
+            {/* Base URL / API key / remember are runtime-managed for the builtin model — hide them. */}
+            {ai.provider !== "builtin" && (
+              <>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    value={ai.cfg.apiKey}
+                    onChange={(e) => ai.setField("apiKey", e.target.value)}
+                    placeholder={ai.preset.keyRequired ? "API key" : "API key (optional for local)"}
+                    className={`${fieldClass} font-mono`}
+                    autoComplete="off"
+                  />
+                  <button
+                    onClick={() => setShowKey((s) => !s)}
+                    className="px-2 py-2 text-xs bg-[#2D3A6E] text-gray-200 rounded"
+                    type="button"
+                  >
+                    {showKey ? "Hide" : "Show"}
+                  </button>
+                </div>
 
-            <label className="flex items-center gap-2 text-xs text-gray-400">
-              <input
-                type="checkbox"
-                checked={ai.rememberKey}
-                onChange={(e) => ai.setRememberKey(e.target.checked)}
-              />
-              Remember on this device (stored locally)
-            </label>
+                <label className="flex items-center gap-2 text-xs text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={ai.rememberKey}
+                    onChange={(e) => ai.setRememberKey(e.target.checked)}
+                  />
+                  Remember on this device (stored locally)
+                </label>
+              </>
+            )}
           </div>
 
           {/* Generate */}
