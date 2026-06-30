@@ -24,7 +24,11 @@ Rules:
 - Write EVERY field in the SAME language as the user's request, and keep that ONE
   language for the WHOLE deck — never switch or drift into another language mid-way.
 - Typically 6-10 slides. Start with a "title" slide and end with a "closing" slide.
-- PREFER a "table" over bullets for structured data (prices, metric comparisons, schedules), and a "diagram" for a PROCESS / flow / architecture / roadmap / sequence. Include at least one "table" or "diagram" when the topic warrants it — don't make every slide bullets.
+- The request may begin with a TEMPLATE CAPABILITIES note listing the slide kinds THIS
+  template actually supports. If present, it is AUTHORITATIVE: use ONLY the kinds it lists
+  and NEVER emit a kind it excludes (e.g. don't make a "table" or "columns" slide if the
+  note omits it — present that content as "content" bullets instead).
+- When the template offers them, PREFER a "table" over bullets for structured data (prices, metric comparisons, schedules), and a "diagram" for a PROCESS / flow / architecture / roadmap / sequence. Include at least one "table" or "diagram" when the topic warrants it AND the template provides that layout — don't make every slide bullets.
 - A "diagram"'s "mermaid" is a SMALL Mermaid diagram (≤ ~8 nodes), using a real newline (JSON \\n) between lines. Pick the fitting type: \`flowchart LR\`/\`flowchart TD\` (process/architecture), \`sequenceDiagram\` (interactions), \`timeline\` (history/roadmap), \`gantt\` (schedule), \`pie\` (proportions). Keep node labels short.
 - A "table" has a short "headers" row + concise cells (a few words each); 2-5 columns, 2-6 rows.
 - Each bullet is a SHORT key phrase, not a full sentence: aim for ≤ ~20 full-width
