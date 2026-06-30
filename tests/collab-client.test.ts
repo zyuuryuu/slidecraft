@@ -67,4 +67,25 @@ describe("CollabClient", () => {
     await client.callTool("new_project", { templateBase64: templateB64, markdown: "# A\n\n---\n\n# B" });
     await expect(client.callTool("get_slide_markdown", { index: 99 })).rejects.toThrow(/範囲外/);
   });
+
+  it("set_slide_markdown honours expectedRev (stale → never-silent) and echoes opId (P2.5 round-trip)", async () => {
+    client = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    await client.connect();
+    const made = await client.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# A\n\n- x\n\n---\n\n# B" });
+
+    // An edit based on the CURRENT rev (0) commits, reports the new rev, and echoes the opId.
+    const ok1 = await client.callTool<{ rev: number; opId: string }>("set_slide_markdown", { index: 0, markdown: "# A2\n\n- y", docId: made.docId, expectedRev: 0, opId: "op-1" });
+    expect(ok1.rev).toBe(1);
+    expect(ok1.opId).toBe("op-1");
+
+    // A STALE edit (expectedRev still 0 while rev is now 1) is rejected never-silently — no mutation.
+    const stale = await client.callTool<{ ok: boolean; stale?: boolean; currentRev?: number }>("set_slide_markdown", { index: 0, markdown: "# A3", docId: made.docId, expectedRev: 0, opId: "op-2" });
+    expect(stale.ok).toBe(false);
+    expect(stale.stale).toBe(true);
+    expect(stale.currentRev).toBe(1);
+
+    // The rejected edit didn't bump rev → a correct expectedRev=1 now commits at rev 2.
+    const ok2 = await client.callTool<{ rev: number }>("set_slide_markdown", { index: 0, markdown: "# A3\n\n- z", docId: made.docId, expectedRev: 1, opId: "op-3" });
+    expect(ok2.rev).toBe(2);
+  });
 });

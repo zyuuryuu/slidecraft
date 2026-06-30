@@ -12,7 +12,7 @@ import AiPanel from "./components/AiPanel";
 import CollabPanel from "./components/CollabPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
@@ -29,7 +29,7 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
-    catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef,
+    catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef, collabRef,
   } = useDeckController();
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
@@ -70,7 +70,37 @@ export default function App() {
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
   // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
   const editLocked = collab.status === "connected";
-  editLockedRef.current = editLocked;
+
+  // P2.5 collaboration bridge + transient toast: while connected, per-slide edits and Undo/Redo are
+  // routed to the host (single truth); stale/empty results surface a never-silent toast.
+  const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
+  const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
+  const collabBridge = useMemo(
+    () =>
+      editLocked
+        ? { sendSlideMarkdown: collab.sendSlideMarkdown, serverUndo: collab.serverUndo, serverRedo: collab.serverRedo, notify }
+        : null,
+    [editLocked, collab.sendSlideMarkdown, collab.serverUndo, collab.serverRedo, notify],
+  );
+  // Sync the latest observe-lock + bridge into the controller's refs from an EFFECT (not during
+  // render → satisfies react-hooks/refs). Handlers read them at event time, after this effect runs.
+  useEffect(() => {
+    editLockedRef.current = editLocked;
+    collabRef.current = collabBridge;
+  }, [editLocked, collabBridge, editLockedRef, collabRef]);
+  const handleCollabUndo = async () => {
+    const r = await collab.serverUndo();
+    if (!r.ok) notify("戻せる操作がありません");
+  };
+  const handleCollabRedo = async () => {
+    const r = await collab.serverRedo();
+    if (!r.ok) notify("やり直せる操作がありません");
+  };
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(undefined), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -108,10 +138,10 @@ export default function App() {
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
-          onUndo={undoDeck}
-          onRedo={redoDeck}
-          canUndo={canUndo && !editLocked}
-          canRedo={canRedo && !editLocked}
+          onUndo={editLocked ? handleCollabUndo : undoDeck}
+          onRedo={editLocked ? handleCollabRedo : redoDeck}
+          canUndo={editLocked ? true : canUndo}
+          canRedo={editLocked ? true : canRedo}
         />
         <div className="flex items-center gap-2 px-3 py-2">
           <button
@@ -132,10 +162,10 @@ export default function App() {
           </button>
           {editLocked && (
             <span
-              title="協働接続中はホストのデッキをライブ表示します。編集・取り消しは無効です（停止すると再開）。"
-              className="px-2 py-1 text-xs rounded bg-amber-500/15 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1"
+              title="協働接続中：編集は host（単一の真実）へ送られ AI とライブ共有されます。Undo もホスト側で実行されます。"
+              className="px-2 py-1 text-xs rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1"
             >
-              👁 観察モード（読み取り専用）
+              ✍️ 協働編集中
             </span>
           )}
         </div>
@@ -189,16 +219,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  {editLocked ? (
-                    <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-6">
-                      <span className="text-2xl">👁</span>
-                      <span className="font-medium text-amber-200">観察モード（協働接続中）</span>
-                      <span className="text-xs text-gray-400 max-w-xs leading-relaxed">
-                        ホストのデッキをライブ表示中です。編集は AI（ホスト）側で行われ、ここに即反映されます。
-                        ローカル編集・取り消しは無効です。「協働」パネルの「停止」で編集を再開できます。
-                      </span>
-                    </div>
-                  ) : !currentSlide ? (
+                  {!currentSlide ? (
                     <div className="h-full flex items-center justify-center text-gray-500 text-sm">
                       Select a slide
                     </div>
@@ -216,7 +237,7 @@ export default function App() {
                   Preview — Slide {activeSlide + 1}
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} singleSlide onDiagramChange={editLocked ? undefined : handleDiagramChange} />
+                  <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
                 </div>
               </>
             }
@@ -226,7 +247,7 @@ export default function App() {
           <AiPanel
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
-            onApplySlide={editLocked ? undefined : handleApplySlide}
+            onApplySlide={handleApplySlide}
             activeSlideNum={activeSlide + 1}
             selectedCount={selected?.size ?? 1}
             onBatchEdit={editLocked ? undefined : (instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
@@ -293,6 +314,16 @@ export default function App() {
           onStop={collab.stop}
           onSimulate={collab.simulateAiEdit}
         />
+      )}
+
+      {toast && (
+        <div
+          key={toast.ts}
+          role="status"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg bg-[#1E2761] border border-[#3B82F6]/50 text-sm text-amber-100 shadow-2xl"
+        >
+          {toast.message}
+        </div>
       )}
     </>
   );
