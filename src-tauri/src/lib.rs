@@ -4,6 +4,7 @@
 // read_file_bytes/write_file commands that took an arbitrary absolute path — which
 // let a compromised webview read/write anywhere. That arbitrary-fs hole is now closed.
 mod collab; // P2.3: spawn / supervise / reap the Node collab sidecar (start_collab/stop_collab)
+mod local_ai; // roadmap #2: spawn / supervise / reap the bundled llamafile in-app AI runtime
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,7 +17,14 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .manage(collab::CollabState::default())
-        .invoke_handler(tauri::generate_handler![collab::start_collab, collab::stop_collab])
+        .manage(local_ai::LocalAiState::default())
+        .invoke_handler(tauri::generate_handler![
+            collab::start_collab,
+            collab::stop_collab,
+            local_ai::start_local_ai,
+            local_ai::stop_local_ai,
+            local_ai::local_ai_status
+        ])
         .setup(|_app| {
             eprintln!("[slidecraft] setup() reached — main window created, entering event loop");
             Ok(())
@@ -26,8 +34,14 @@ pub fn run() {
 
     // run-loop: reap the collab sidecar on quit so node never orphans (no Drop on std Child).
     app.run(|app_handle, event| match event {
-        tauri::RunEvent::ExitRequested { .. } => collab::reap(app_handle),
-        tauri::RunEvent::Exit => collab::reap(app_handle),
+        tauri::RunEvent::ExitRequested { .. } => {
+            collab::reap(app_handle);
+            local_ai::reap(app_handle);
+        }
+        tauri::RunEvent::Exit => {
+            collab::reap(app_handle);
+            local_ai::reap(app_handle);
+        }
         _ => {}
     });
     eprintln!("[slidecraft] run() returned — app exited cleanly");
