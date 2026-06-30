@@ -19,6 +19,7 @@ import type { LayoutCatalog } from "./template-catalog";
 import { diagnoseDeck, type DeckIssue, type Lever } from "./deck-diagnostics";
 import { contentBodyBox } from "./distill";
 import { buildSlideFix, slideFixRequest } from "./slide-fix";
+import { validateCondense } from "./ai-validate";
 import { visualizeKeyValueMd } from "./slide-rewrite";
 import { serializeMd } from "./md-serializer";
 import { parseMd } from "./md-parser";
@@ -139,9 +140,18 @@ export async function refineDeck(
             continue;
           }
           if (outcome.ok) {
-            aiDone.add(idx); // succeeded → settled (even if it didn't fully converge)
             const after = outcome.markdown.trim();
-            const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
+            // GUARDRAIL: a small model occasionally drops a fact / drifts language / returns
+            // the wrong format. Validate before applying; a HARD violation is rejected and
+            // retried (never apply a fact-corrupting edit blind), keeping the original on
+            // exhaustion so the slide stays flagged-unconverged, not silently mangled.
+            const verdict = validateCondense(before, after, box);
+            if (verdict.hasHard && attempt < 1 + maxRetries) {
+              pendingRetry = true; // re-submit this slide next pass (don't settle it)
+              continue;
+            }
+            aiDone.add(idx); // succeeded (or retries exhausted) → settled
+            const newSlide = after && after !== before && !verdict.hasHard ? parseMd(after).slides[0] : undefined;
             if (newSlide) {
               current = replaceSlide(current, idx, newSlide);
               changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: after });
