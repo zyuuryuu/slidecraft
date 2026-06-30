@@ -15,7 +15,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const NOTIFY = "notifications/slidecraft/";
 
-export interface DeckChangedEvent { docId: string; rev: number; }
+export interface DeckChangedEvent { docId: string; rev: number; opId?: string; }
 export interface DocumentOpenedEvent { docId: string; title: string; slideCount: number; }
 export interface DocumentClosedEvent { docId: string; }
 

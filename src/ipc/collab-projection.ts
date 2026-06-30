@@ -13,7 +13,7 @@
  * Pure (no React / no Tauri): the hook injects the Tauri plugin-http fetch; tests drive it against a
  * real createCollabHost over Node's global fetch.
  */
-import { CollabClient } from "./collab-client";
+import { CollabClient, type DeckChangedEvent } from "./collab-client";
 import type { DeckIR } from "../engine/slide-schema";
 
 export type CollabStatus = "idle" | "connecting" | "connected" | "error";
@@ -51,6 +51,24 @@ export interface CollabProjectionOptions {
   onDocs?(docs: DocSummary[]): void;
 }
 
+/** Result of a P2.5 human edit round-trip. `stale` = the doc moved on under us (someone edited first);
+ *  the projection has already re-pulled the host truth. */
+export interface SendResult {
+  ok: boolean;
+  rev?: number;
+  stale?: boolean;
+  message?: string;
+}
+
+/** Result of a rerouted GUI Undo/Redo (host server-side history). */
+export interface UndoResult {
+  ok: boolean;
+  rev?: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  reason?: string;
+}
+
 export class CollabProjection {
   private readonly client: CollabClient;
   private readonly opts: CollabProjectionOptions;
@@ -61,6 +79,11 @@ export class CollabProjection {
   private running = false;
   private pending = false;
   private closed = false;
+  // P2.5 round-trip: while an edit is being sent, pause pulls (don't re-clobber the optimistic local
+  // edit before the send's rev lands). recentSelfOpIds lets us drop the echo of our own edits.
+  private sending = false;
+  private readonly recentSelfOpIds = new Set<string>();
+  private opSeq = 0;
 
   constructor(opts: CollabProjectionOptions) {
     this.opts = opts;
@@ -70,7 +93,7 @@ export class CollabProjection {
       role: "gui", // the human's webview sees ALL docs (private-by-default applies to AI clients)
       fetch: opts.fetch,
       events: {
-        onDeckChanged: () => this.scheduleTick(),
+        onDeckChanged: (e) => this.onRemoteDeckChanged(e),
         onDocumentOpened: () => this.scheduleTick(),
         onDocumentClosed: () => this.scheduleTick(),
       },
@@ -100,6 +123,81 @@ export class CollabProjection {
   /** Pin which doc to mirror; null = auto-adopt the first available. Triggers a reconcile. */
   setTargetDoc(docId: string | null): void {
     this.targetDocId = docId;
+    this.scheduleTick();
+  }
+
+  /** P2.5 round-trip: push a per-slide human edit to the host (the single truth). The caller has
+   *  already applied it locally (optimistic); we send with `expectedRev` so a stale edit (someone
+   *  edited first) is rejected never-silently → we re-pull and report `stale`. The echo of our own
+   *  `opId` is suppressed (onRemoteDeckChanged) so we never re-apply our own edit on top of itself. */
+  async sendSlideMarkdown(index: number, markdown: string): Promise<SendResult> {
+    const docId = this.targetDocId;
+    if (!docId) return { ok: false, message: "ドキュメントが選択されていません" };
+    const opId = this.mintOpId();
+    this.recentSelfOpIds.add(opId);
+    if (this.recentSelfOpIds.size > 64) this.recentSelfOpIds.delete(this.recentSelfOpIds.values().next().value as string);
+    this.sending = true;
+    try {
+      const res = await this.client.callTool<{ ok?: boolean; stale?: boolean; error?: string; rev?: number }>("set_slide_markdown", {
+        index,
+        markdown,
+        docId,
+        expectedRev: this.lastRev,
+        opId,
+      });
+      if (res.ok === false) {
+        this.recentSelfOpIds.delete(opId);
+        this.scheduleTick(); // reconcile local view with host truth
+        return { ok: false, stale: !!res.stale, message: res.error ?? (res.stale ? "他のクライアントが先に編集しました（再取得しました）" : "編集を適用できませんでした") };
+      }
+      if (typeof res.rev === "number") {
+        this.lastRev = res.rev; // advance so neither the echo nor the poll re-pulls our own edit
+        this.lastDocId = docId;
+      }
+      return { ok: true, rev: res.rev };
+    } catch (e) {
+      this.recentSelfOpIds.delete(opId);
+      return { ok: false, message: msg(e) };
+    } finally {
+      this.sending = false;
+    }
+  }
+
+  /** P2.5: reroute the GUI Undo/Redo to the HOST's server-side history (single truth). The rolled-back
+   *  deck arrives via the normal pull (its deckChanged carries no opId → not suppressed). Returns the
+   *  host's canUndo/canRedo so the UI reflects the shared timeline. */
+  async serverUndo(): Promise<UndoResult> {
+    return this.serverHistory("undo");
+  }
+  async serverRedo(): Promise<UndoResult> {
+    return this.serverHistory("redo");
+  }
+  private async serverHistory(tool: "undo" | "redo"): Promise<UndoResult> {
+    const docId = this.targetDocId;
+    if (!docId) return { ok: false, reason: "no-document" };
+    try {
+      const r = await this.client.callTool<UndoResult>(tool, { docId });
+      if (r.ok) this.scheduleTick(); // pull the rolled-back deck promptly (the push will also arrive)
+      return r;
+    } catch (e) {
+      return { ok: false, reason: msg(e) };
+    }
+  }
+
+  private mintOpId(): string {
+    const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+    return c?.randomUUID ? c.randomUUID() : `op-${++this.opSeq}`;
+  }
+
+  /** A deckChanged arrived. If it's the echo of OUR OWN edit (an opId we sent), suppress the re-pull
+   *  — we already applied it optimistically — but advance lastRev so the poll doesn't re-pull it.
+   *  Anyone else's change (AI edit, undo/redo, foreign/absent opId) → reconcile by pulling. */
+  private onRemoteDeckChanged(e: DeckChangedEvent): void {
+    if (e.opId && this.recentSelfOpIds.has(e.opId)) {
+      this.recentSelfOpIds.delete(e.opId);
+      if (e.docId === this.targetDocId && e.rev > this.lastRev) this.lastRev = e.rev;
+      return;
+    }
     this.scheduleTick();
   }
 
@@ -153,7 +251,7 @@ export class CollabProjection {
   }
 
   private async tick(): Promise<void> {
-    if (this.closed) return;
+    if (this.closed || this.sending) return; // don't pull mid-send (would re-clobber our optimistic edit)
     let listed: { documents: DocSummary[]; activeDocId: string | null };
     try {
       listed = await this.client.callTool<{ documents: DocSummary[]; activeDocId: string | null }>("list_documents");

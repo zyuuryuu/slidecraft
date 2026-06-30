@@ -71,7 +71,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
     active: (extra) => { const s = sidOf(extra); return s ? activeByConn.get(s) : undefined; },
     setActive: (extra, docId) => { const s = sidOf(extra); if (s) activeByConn.set(s, docId); },
     sharedOnly: aiClient,
-    onMutated: (entry) => broadcast("deckChanged", { docId: entry.docId, rev: entry.rev }),
+    onMutated: (entry, _tool, opId) => broadcast("deckChanged", { docId: entry.docId, rev: entry.rev, opId }),
     notifyOpened: (entry) => broadcast("documentOpened", { docId: entry.docId, title: entry.title, slideCount: entry.session.deck?.slides.length ?? 0 }),
     notifyClosed: (docId) => broadcast("documentClosed", { docId }),
   });
