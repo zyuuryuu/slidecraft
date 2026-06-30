@@ -19,12 +19,16 @@ jobs:
         include:
           - platform: macos-latest # Apple Silicon
             args: "--target aarch64-apple-darwin"
+            triple: aarch64-apple-darwin
           - platform: macos-latest # Intel
             args: "--target x86_64-apple-darwin"
+            triple: x86_64-apple-darwin
           - platform: ubuntu-latest # .deb + .AppImage
             args: ""
+            triple: x86_64-unknown-linux-gnu
           - platform: windows-latest # .msi + .exe (NSIS)
             args: ""
+            triple: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -50,7 +54,16 @@ jobs:
 
       - run: npm ci
 
-      # tauri-action runs the tauri.conf beforeBuildCommand (npm run build) itself.
+      # Stage the Node runtime as the externalBin sidecar for THIS matrix target. Must precede
+      # tauri-action: Tauri validates externalBin existence at build time. (Bundles the collab host.)
+      - name: Stage Node sidecar (externalBin)
+        run: node scripts/stage-node.mjs ${{ matrix.triple }}
+
+      # tauri-action runs the tauri.conf beforeBuildCommand (npm run build && npm run build:host).
+      # `--config` applies the release-only overlay (externalBin node + host.cjs resource) so the
+      # PACKAGED collab works; the overlay is kept out of the base config so `tauri dev` needs no
+      # staged node. (macOS: unsigned for now — the bundled node may need ad-hoc/Developer-ID signing
+      # to avoid a Gatekeeper "killed: 9"; tracked as the remaining mac sub-task.)
       - name: Build + publish (draft release)
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
@@ -61,4 +74,4 @@ jobs:
           releaseBody: "Download the installer for your OS below. (Unsigned — see README for first-run notes.)"
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json
