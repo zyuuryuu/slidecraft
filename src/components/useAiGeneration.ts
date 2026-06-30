@@ -24,7 +24,7 @@ export interface AiProviderConfig {
   apiKey: string;
 }
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
-export type AiMode = "slides" | "slide" | "diagram" | "diagram-edit";
+export type AiMode = "slides" | "slide" | "condense" | "diagram" | "diagram-edit";
 
 export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
 /** One AI request as a tracked task — the unit of the central task store. Every
@@ -204,7 +204,7 @@ export function useAiGeneration() {
       const parsed = extractDeckPlan(raw);
       return parsed.ok ? { result: serializeMd(deckPlanToDeck(parsed.plan)) } : { error: `Couldn't read the generated plan: ${parsed.error}` };
     }
-    if (mode === "slide") {
+    if (mode === "slide" || mode === "condense") {
       const md = stripMarkdownFence(raw);
       return md ? { result: md } : { error: "Couldn't read the edited slide (empty response)." };
     }

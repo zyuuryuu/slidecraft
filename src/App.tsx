@@ -46,7 +46,12 @@ export default function App() {
     aiFix: async (req, meta) => {
       const label = `スライド${meta.slideIndex + 1}を編集${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}`;
       try {
-        return { ok: true, markdown: await ai.submitAndWait(req, "slide", label, meta.signal) };
+        // The refine/condense residue uses the Markdown-ONLY sub-prompt (no JSON-ops branch)
+        // so a small in-app model can't mis-pick the design-ops format; a freeform batch edit
+        // keeps the dual-mode "slide" prompt (it may want design ops). Validate-and-retry lives
+        // in refineDeck for both paths.
+        const mode = meta.kind === "condense" ? "condense" : "slide";
+        return { ok: true, markdown: await ai.submitAndWait(req, mode, label, meta.signal) };
       } catch (e) {
         const c = classifyAiFailure(e, meta.signal);
         return c.cancelled ? { ok: false, cancelled: true } : { ok: false, cancelled: false, retryable: c.retryable, message: c.message };
