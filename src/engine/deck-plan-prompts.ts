@@ -69,6 +69,25 @@ Rules:
 - Reply with EITHER the Markdown (A) OR the JSON array (B) — nothing else.`;
 }
 
+/**
+ * Markdown-ONLY system prompt for the harness refine/condense RESIDUE (roadmap #2 P1,
+ * [[inapp_ai_design]]). The dual-mode slideMarkdownEditPrompt lets the model CHOOSE
+ * Markdown-or-JSON, and a small in-app model mis-picks the JSON-ops branch (Phase-0).
+ * The refine loop only ever rewrites text, so this drops the (B) ops branch entirely and
+ * forbids non-Markdown output. Pairs with validateCondense (the deterministic guardrail).
+ */
+export function slideCondensePrompt(): string {
+  return `あなたはスライド整形アシスタントです。与えられた1枚のスライドの Markdown を、指示の制約に収まるよう短く整形します。
+
+厳守事項:
+- 出力は本文の Markdown のみ（"# 見出し" と "- 箇条書き"）。JSON・op・コードフェンス・説明文・注釈は一切禁止。
+- 各箇条書きは指定文字数以内の短いキーフレーズに（語尾・助詞・冗長表現を削る）。
+- 数値・固有名詞・パーセント・金額は絶対に削除も改変もしない（増減の向きも変えない）。
+- 入力が既に制約内ならそのまま返す。
+- 入力の言語を保つ（英語入力は英語のまま、日本語入力は日本語のまま。他言語へ翻訳しない）。
+- 図（\`\`\`diagram / \`\`\`mermaid ブロック）があればそのまま残す。`;
+}
+
 /** Strip an OUTER ```markdown wrapper a model may add, preserving inner ```diagram fences. */
 export function stripMarkdownFence(raw: string): string {
   const t = raw.trim();
