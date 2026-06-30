@@ -184,6 +184,15 @@ export function useCollab({ applyDeck, deck, templateData, templateName }: UseCo
     }
   }, [info, simulating]);
 
+  // P2.5 round-trip: per-slide human edits + Undo/Redo go through the projection to the host (the
+  // single truth). Stable identities (projRef is read at call time); no-op shape when disconnected.
+  const sendSlideMarkdown = useCallback(
+    (index: number, markdown: string) => projRef.current?.sendSlideMarkdown(index, markdown) ?? Promise.resolve({ ok: false as const, message: "未接続" }),
+    [],
+  );
+  const serverUndo = useCallback(() => projRef.current?.serverUndo() ?? Promise.resolve({ ok: false as const, reason: "未接続" }), []);
+  const serverRedo = useCallback(() => projRef.current?.serverRedo() ?? Promise.resolve({ ok: false as const, reason: "未接続" }), []);
+
   // Tear down the projection (poll interval + MCP client) on unmount / Vite HMR so dev reloads don't
   // accumulate zombie pollers. (Production App never unmounts; this is dev-loop hygiene.)
   useEffect(() => () => {
@@ -203,5 +212,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName }: UseCo
     start,
     stop,
     simulateAiEdit,
+    sendSlideMarkdown,
+    serverUndo,
+    serverRedo,
   };
 }
