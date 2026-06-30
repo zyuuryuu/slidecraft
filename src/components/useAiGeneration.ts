@@ -12,6 +12,7 @@ import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import { parseJsonLoose } from "../engine/json-salvage";
 import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
+import { runningInTauri } from "../ipc/commands";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
 /** Local-model-only toggle persists to its OWN key, UNCONDITIONALLY (a security setting
@@ -341,6 +342,27 @@ export function useAiGeneration() {
     }));
   }, [ollamaModels]);
 
+  // One-click: enable the bundled llamafile runtime — Rust start_local_ai spawns it (polls /health),
+  // returns the loopback baseURL, which we runtime-fill into the "builtin" provider. Desktop-only +
+  // opt-in (never auto-probed: spawning a model is a deliberate, multi-second-cold-load action).
+  const [builtinStatus, setBuiltinStatus] = useState<{ kind: "idle" | "starting" | "running" | "error"; message?: string }>({ kind: "idle" });
+  const switchToBuiltin = useCallback(async () => {
+    if (!runningInTauri()) {
+      setBuiltinStatus({ kind: "error", message: "組み込みモデルはデスクトップ版でのみ利用できます。" });
+      return;
+    }
+    setBuiltinStatus({ kind: "starting" });
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const info = await invoke<{ baseUrl: string }>("start_local_ai");
+      setConfigs((c) => ({ ...c, builtin: { ...c.builtin, baseURL: info.baseUrl } }));
+      setProvider("builtin");
+      setBuiltinStatus({ kind: "running" });
+    } catch (e) {
+      setBuiltinStatus({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  }, []);
+
   // Toggle local-only: persist UNCONDITIONALLY; if turning ON while pointed at a cloud
   // target, hop to local Ollama so the user can still generate.
   const setLocalModelOnly = useCallback(
@@ -366,6 +388,12 @@ export function useAiGeneration() {
       if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: "APIキー未設定", hint: "下の設定に Anthropic の API キーを入力" };
       if (!cfg.model.trim()) return { ok: false, tone: "warn", label: "モデル未選択" };
       return { ok: true, tone: "ok", label: `${cfg.model} を使用` };
+    }
+    if (provider === "builtin") {
+      if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: "オフラインAIを起動中…（初回は数十秒）" };
+      if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: "オフラインAIの起動に失敗", hint: builtinStatus.message };
+      if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "『組み込みを有効化』で起動（要モデル）" };
+      // baseURL filled → fall through to the generic model checks below.
     }
     if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "Base URL 未設定" };
     if (modelsLoading) return { ok: false, tone: "checking", label: "接続を確認中…" };
@@ -394,6 +422,7 @@ export function useAiGeneration() {
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
+    switchToBuiltin, builtinStatus,
     localModelOnly, setLocalModelOnly, localBlocked,
   };
 }
