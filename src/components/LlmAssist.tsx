@@ -161,7 +161,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                   🦙 Ollama検出（{ai.ollamaModels.length}）→ 使う
                 </button>
               )}
-              {runningInTauri() && ai.provider !== "builtin" && (
+              {runningInTauri() && ai.builtinStatus.kind !== "running" && (
                 <button
                   onClick={ai.switchToBuiltin}
                   disabled={ai.builtinStatus.kind === "starting"}
