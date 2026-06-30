@@ -51,6 +51,13 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   const index = { index: z.number().int().describe("0-based slide index") };
   // Optional target doc (host mode only; ignored in stdio where there is one Session).
   const doc = { docId: z.string().optional().describe("対象ドキュメント（host のみ。省略時は選択doc/唯一doc）") };
+  // Optional optimistic-concurrency fields (host mode, P2.5): a client-generated opId so the
+  // originator can suppress its own deckChanged echo, and expectedRev so a stale edit (the doc moved
+  // on under it) is rejected NEVER-SILENTLY. Absent on AI edits and in stdio.
+  const cc = {
+    opId: z.string().optional().describe("クライアント生成の操作ID（echo 抑制用・host のみ）"),
+    expectedRev: z.number().int().optional().describe("この編集が前提とする rev。現在 rev と不一致なら stale 拒否（host のみ）"),
+  };
 
   // ── doc resolution ── stdio: the lone Session. host: explicit docId → connection active doc →
   // the sole open doc; otherwise never-silent ("select a document").
@@ -65,7 +72,13 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
 
   // A deck MUTATION: stdio runs the handler + fires onMutate on success; host commits through the
   // doc's undo history + bumps rev. A {ok:false} reject never bumps rev / fires onMutate.
-  const mutate = async (extra: unknown, docId: string | undefined, tool: string, fn: (s: Session) => unknown | Promise<unknown>): Promise<ToolResult> => {
+  const mutate = async (
+    extra: unknown,
+    docId: string | undefined,
+    tool: string,
+    fn: (s: Session) => unknown | Promise<unknown>,
+    cc?: { opId?: string; expectedRev?: number },
+  ): Promise<ToolResult> => {
     if (!host) {
       try {
         const v = await fn(session);
@@ -77,12 +90,18 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     }
     try {
       const entry = entryOf(extra, docId);
+      // Optimistic-concurrency guard (P2.5): a human edit carries the rev it was based on; if the doc
+      // moved on (e.g. an AI edit landed first), reject NEVER-SILENTLY so the client re-pulls — never
+      // overwrite a newer rev.
+      if (cc?.expectedRev !== undefined && cc.expectedRev !== entry.rev) {
+        return ok({ ok: false as const, stale: true as const, expectedRev: cc.expectedRev, currentRev: entry.rev, docId: entry.docId });
+      }
       const { result, changed, rev } = await commitMutation(entry, fn);
       if (changed) {
         opts.onMutate?.(tool);
-        host.onMutated?.(entry, tool); // fan out deckChanged to every connected client
+        host.onMutated?.(entry, tool, cc?.opId); // fan out deckChanged (opId lets the originator suppress its echo)
       }
-      if (changed && result && typeof result === "object") return ok({ ...(result as object), rev, docId: entry.docId });
+      if (changed && result && typeof result === "object") return ok({ ...(result as object), rev, docId: entry.docId, opId: cc?.opId });
       return ok(result);
     } catch (e) {
       return fail(e);
@@ -123,22 +142,22 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
 
   // ── deterministic mutations ──
-  server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否", inputSchema: { ...index, markdown: z.string(), ...doc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown)));
-  server.registerTool("set_deck_markdown", { description: "⚠️ deck 全体を置換（スライド数が変わりうる・図は自動保持されない）。1枚だけ直すなら set_slide_markdown を使うこと", inputSchema: { markdown: z.string(), ...doc } }, (a, extra) => mutate(extra, a.docId, "set_deck_markdown", (s) => S.applyDeckMarkdown(s, a.markdown)));
-  server.registerTool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割", inputSchema: doc }, (a, extra) => mutate(extra, a.docId, "split_overflowing_slides", (s) => S.distill(s)));
-  server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index)));
+  server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("set_deck_markdown", { description: "⚠️ deck 全体を置換（スライド数が変わりうる・図は自動保持されない）。1枚だけ直すなら set_slide_markdown を使うこと", inputSchema: { markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_deck_markdown", (s) => S.applyDeckMarkdown(s, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割", inputSchema: { ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "split_overflowing_slides", (s) => S.distill(s), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
   server.registerTool(
     "set_slide_diagram",
-    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]), ...doc } },
-    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format)),
+    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]), ...doc, ...cc } },
+    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format), { opId: a.opId, expectedRev: a.expectedRev }),
   );
   server.registerTool(
     "apply_design_intent",
     {
       description: '図を【どう配置するか】（design edit）：ops 配列の JSON で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図/mermaid を持つスライドのみ。図の中身そのものは set_slide_diagram。例: [{"op":"relayout","direction":"LR"}]',
-      inputSchema: { ...index, intent: z.string(), ...doc },
+      inputSchema: { ...index, intent: z.string(), ...doc, ...cc },
     },
-    (a, extra) => mutate(extra, a.docId, "apply_design_intent", (s) => S.applyDesignIntent(s, a.index, a.intent)),
+    (a, extra) => mutate(extra, a.docId, "apply_design_intent", (s) => S.applyDesignIntent(s, a.index, a.intent), { opId: a.opId, expectedRev: a.expectedRev }),
   );
   server.registerTool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues", inputSchema: doc }, (a, extra) => run(() => S.validate(sessionOf(extra, a.docId))));
 

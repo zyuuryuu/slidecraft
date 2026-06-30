@@ -44,8 +44,10 @@ export interface HostContext {
   /** AI clients see only shared docs (private-by-default); the GUI sees all. */
   sharedOnly: boolean;
   /** A deck-changing op committed on `entry` (its docId/rev are current) — the host fans out
-   *  deckChanged to every connected client (incl. undo/redo, which mint a new rev). */
-  onMutated?(entry: DocEntry, tool: string): void;
+   *  deckChanged to every connected client (incl. undo/redo, which mint a new rev). `opId` (when the
+   *  caller supplied one) rides along on the notification so the ORIGINATOR can suppress its own echo
+   *  (P2.5 round-trip); undo/redo and AI edits pass none → everyone re-pulls. */
+  onMutated?(entry: DocEntry, tool: string, opId?: string): void;
   notifyOpened?(entry: DocEntry): void;
   notifyClosed?(docId: string): void;
 }

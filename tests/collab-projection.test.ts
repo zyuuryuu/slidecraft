@@ -92,6 +92,48 @@ describe("CollabProjection", () => {
     expect(statuses.length).toBe(n);
   });
 
+  it("suppresses the echo of its OWN edit (no double apply) but applies others' edits (P2.5 round-trip)", async () => {
+    const applied: ProjectedDeck[] = [];
+    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    await proj.start();
+    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    await ai.connect();
+    const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# Hello\n\n- one\n\n---\n\n# Two\n\n- a" });
+    await waitFor(() => applied.some((p) => p.rev === 0)); // adopt
+
+    // The GUI sends its OWN edit → rev 1. The echo (opId) must be SUPPRESSED (no onDeck for rev 1).
+    const sent = await proj.sendSlideMarkdown(0, "# 自分の編集\n\n- z");
+    expect(sent.ok).toBe(true);
+    expect(sent.rev).toBe(1);
+
+    // A foreign (AI) edit → rev 2 → DOES apply.
+    await ai.callTool("set_slide_markdown", { index: 0, markdown: "# AI の編集\n\n- q", docId: made.docId });
+    await waitFor(() => applied.some((p) => p.rev === 2));
+
+    await new Promise((r) => setTimeout(r, 120));
+    expect(applied.map((p) => p.rev)).toEqual([0, 2]); // rev 1 (our own) was never re-applied
+    expect(JSON.stringify(applied.find((p) => p.rev === 2)!.deck)).toContain("AI の編集");
+  });
+
+  it("reroutes Undo to the host and pulls the rolled-back deck (P2.5 server-undo)", async () => {
+    const applied: ProjectedDeck[] = [];
+    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    await proj.start();
+    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    await ai.connect();
+    const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# 元のタイトル\n\n- a" });
+    await waitFor(() => applied.some((p) => p.rev === 0));
+    await ai.callTool("set_slide_markdown", { index: 0, markdown: "# 編集後\n\n- b", docId: made.docId });
+    await waitFor(() => applied.some((p) => p.rev === 1));
+    expect(JSON.stringify(applied.find((p) => p.rev === 1)!.deck)).toContain("編集後");
+
+    // GUI Undo → host server-undo → a new forward rev whose deck equals the pre-edit deck.
+    const undo = await proj.serverUndo();
+    expect(undo.ok).toBe(true);
+    await waitFor(() => applied.some((p) => p.rev === 2));
+    expect(JSON.stringify(applied.find((p) => p.rev === 2)!.deck)).toContain("元のタイトル");
+  });
+
   it("surfaces an unauthorized connection as an error (bad token never silently no-ops)", async () => {
     proj = new CollabProjection({ url: host.url, token: "wrong-token", pollMs: 0, onDeck: () => {} });
     await expect(proj.start()).rejects.toThrow();
