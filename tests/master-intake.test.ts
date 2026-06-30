@@ -12,7 +12,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
-import { buildCatalog, placeholderRole, assessTemplateHealth } from "../src/engine/template-catalog";
+import { buildCatalog, placeholderRole, assessTemplateHealth, classifyLayout } from "../src/engine/template-catalog";
 import { parseMd } from "../src/engine/md-parser";
 import { distillDeck } from "../src/engine/distill";
 import { generatePptx } from "../src/engine/placeholder-filler";
@@ -129,5 +129,31 @@ describe("P3 acceptance gate — lenient: reject ONLY structural impossibility",
     const kinds = assessTemplateHealth(buildCatalog(canon)).usableKinds;
     expect(kinds).toContain("title");
     expect(kinds).toContain("content");
+  });
+});
+
+describe("P2 classification — geometric peers, not bare body count (name-less path)", () => {
+  const info = { hasTitle: true, hasSubtitle: false, bodyCount: 2 };
+  // two equal side-by-side boxes → genuine columns
+  const twoEqual = [{ x: 0.5, y: 2, w: 5.5, h: 4 }, { x: 6.5, y: 2, w: 5.5, h: 4 }];
+  // a primary body + a narrow sidebar (width ratio ~0.36) → NOT columns
+  const primarySidebar = [{ x: 0.5, y: 2, w: 8.2, h: 4 }, { x: 9, y: 2, w: 3.0, h: 4 }];
+  // two stacked boxes → NOT columns
+  const stacked = [{ x: 0.5, y: 1.5, w: 11, h: 2 }, { x: 0.5, y: 4, w: 11, h: 2 }];
+
+  it("garbage-named layout with 2 EQUAL side-by-side bodies → columns", () => {
+    expect(classifyLayout("X9z", { ...info, bodyBoxes: twoEqual })).toBe("columns");
+  });
+  it("garbage-named layout with primary+sidebar bodies → content (NOT columns)", () => {
+    expect(classifyLayout("X9z", { ...info, bodyBoxes: primarySidebar })).toBe("content");
+  });
+  it("garbage-named layout with STACKED bodies → content (NOT columns)", () => {
+    expect(classifyLayout("X9z", { ...info, bodyBoxes: stacked })).toBe("content");
+  });
+  it("back-compat: NO geometry → legacy bodyCount≥2 rule still yields columns", () => {
+    expect(classifyLayout("X9z", info)).toBe("columns");
+  });
+  it("a real layout NAME still wins before structure (canonical unaffected)", () => {
+    expect(classifyLayout("Content.1Body.Single", { ...info, bodyBoxes: twoEqual })).toBe("content");
   });
 });

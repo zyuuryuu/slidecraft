@@ -102,10 +102,42 @@ function nameKeywordRole(name: string): LayoutRole {
   return "other";
 }
 
-/** Structure-only role from the placeholder composition (the truly name-agnostic backbone). */
-function structureRole(hasTitle: boolean, hasSubtitle: boolean, bodyCount: number): LayoutRole {
-  if (bodyCount >= 2) return "columns";
-  if (bodyCount === 1) return "content";
+type Box = { x: number; y: number; w: number; h: number };
+
+/** Two body boxes are "columns peers": side-by-side, top-aligned, comparable size, and each
+ *  big enough to be real content (excludes logo/decoration strips). Needs real geometry. */
+function isPeer(a: Box, b: Box): boolean {
+  if (a.w <= 0 || a.h <= 0 || b.w <= 0 || b.h <= 0) return false; // inherited xfrm — can't judge
+  const minW = Math.min(a.w, b.w), maxW = Math.max(a.w, b.w);
+  const minH = Math.min(a.h, b.h), maxH = Math.max(a.h, b.h);
+  const overlapX = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+  return (
+    overlapX < 0.25 * minW && // horizontally separated (not stacked)
+    Math.abs(a.y - b.y) < 0.8 && // top-aligned
+    minH >= 0.65 * maxH && // similar height
+    minW >= 0.45 * maxW && // comparable width (excludes primary+sidebar, ratio ~0.37)
+    minW >= 0.15 * SLIDE_W_IN && minH >= 0.15 * SLIDE_H_IN // each big enough (excludes logo strips)
+  );
+}
+/** Size of the largest mutually-peer body group (n ≤ ~4, so O(n²) is fine). */
+function peerBodyCount(boxes: Box[]): number {
+  let best = boxes.length > 0 ? 1 : 0;
+  for (let i = 0; i < boxes.length; i++) {
+    let count = 1;
+    for (let j = 0; j < boxes.length; j++) if (i !== j && isPeer(boxes[i], boxes[j])) count++;
+    best = Math.max(best, count);
+  }
+  return best;
+}
+
+/** Structure-only role from the placeholder composition (the name-agnostic backbone). With
+ *  body GEOMETRY, "columns" requires ≥2 side-by-side PEER bodies (so a 1-title+1-body or a
+ *  primary+sidebar layout is "content", not "columns"); without geometry, the legacy
+ *  bodyCount≥2 rule is kept for back-compat. */
+function structureRole(hasTitle: boolean, hasSubtitle: boolean, bodyCount: number, bodyBoxes?: Box[]): LayoutRole {
+  const isColumns = bodyBoxes && bodyBoxes.length >= 2 ? peerBodyCount(bodyBoxes) >= 2 : bodyCount >= 2;
+  if (isColumns) return "columns";
+  if (bodyCount >= 1) return "content"; // non-column body(s) → content
   if (hasSubtitle) return "title"; // a no-body cover usually carries a subtitle
   if (hasTitle) return "section"; // title-only, no body → a divider
   return "other";
@@ -118,13 +150,13 @@ function structureRole(hasTitle: boolean, hasSubtitle: boolean, bodyCount: numbe
  */
 export function classifyLayout(
   name: string,
-  info: { hasTitle: boolean; hasSubtitle: boolean; bodyCount: number },
+  info: { hasTitle: boolean; hasSubtitle: boolean; bodyCount: number; bodyBoxes?: Box[] },
 ): LayoutRole {
   const byName = layoutRole(name);
   if (byName !== "other") return byName;
   const byKeyword = nameKeywordRole(name);
   if (byKeyword !== "other") return byKeyword;
-  return structureRole(info.hasTitle, info.hasSubtitle, info.bodyCount);
+  return structureRole(info.hasTitle, info.hasSubtitle, info.bodyCount, info.bodyBoxes);
 }
 
 // Slide geometry facts (inches, 16:9 13.333×7.5) — kept LOCAL so this pure role module
@@ -268,9 +300,14 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
   const bodyCount = placeholders.filter((p) => p.role === "body").length;
   const hasTitle = placeholders.some((p) => p.role === "title");
   const hasSubtitle = placeholders.some((p) => p.role === "subtitle");
+  // Body geometry lets classifyLayout tell true side-by-side columns from a primary+sidebar
+  // or 1-body content layout (only matters on the name-less/degraded path).
+  const bodyBoxes = layout.placeholders
+    .filter((ph) => placeholderRole(ph) === "body")
+    .map((ph) => ({ x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h }));
   return {
     name: layout.name,
-    role: classifyLayout(layout.name, { hasTitle, hasSubtitle, bodyCount }),
+    role: classifyLayout(layout.name, { hasTitle, hasSubtitle, bodyCount, bodyBoxes }),
     bodyCount,
     hasTitle,
     hasSubtitle,
