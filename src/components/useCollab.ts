@@ -61,14 +61,18 @@ export function useCollab({ applyDeck, deck, templateData, templateName }: UseCo
   // Refs so start/stop keep a stable identity yet always read the latest deck / template / apply fn.
   const projRef = useRef<CollabProjection | null>(null);
   const deckRef = useRef(deck);
-  deckRef.current = deck;
   const templateRef = useRef(templateData);
-  templateRef.current = templateData;
   const nameRef = useRef(templateName);
-  nameRef.current = templateName;
   const applyRef = useRef(applyDeck);
-  applyRef.current = applyDeck;
   const simCounterRef = useRef(0);
+  // Sync the latest values into the refs from an EFFECT (not during render → satisfies
+  // react-hooks/refs). start()/seed/onDeck all run after commit, so an effect is timely enough.
+  useEffect(() => {
+    deckRef.current = deck;
+    templateRef.current = templateData;
+    nameRef.current = templateName;
+    applyRef.current = applyDeck;
+  });
 
   const start = useCallback(async () => {
     if (!available || projRef.current) return;

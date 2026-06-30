@@ -169,11 +169,19 @@ P2.0 シーム → **P2.1 DocRegistry＋undo を InMemory で**（explicit-docId
 |---|---|---|
 | **配布**：node を externalBin 同梱せず `host.cjs` も bundle.resources 未登録。`tauri dev` は動くが**パッケージ版はまだ collab 不可**（dev は `CARGO_MANIFEST_DIR` で解決） | dev のみ | stock node 同梱 ＋ resources |
 | **Windows ACL**：host.json は 0600（Windows では no-op）。Rust の ACL ロックダウン未実装。token は per-user プロファイル ACL ＋ per-launch ローテーションに依存 | 単一ユーザは可 | P2.5（icacls/windows-acl） |
-| **接続中は観察モード（read-only）**：local 編集・Undo/Redo を**全経路でロック**（キーボード Undo／各エディタ／図ドラッグ／AI 適用／batch／Draft／テンプレ変更／タブ切替まで。host=単一真実）。単一 `editLockedRef` 由来・ハンドラ層で no-op（projection の host-apply のみ非ゲート）＋ 👁 観察モードバッジ＋エディタを観察表示に置換 | 実装済（観察のみ） | P2.5：完全往復（expectedRev/echo・undo を host tool へ再ルート） |
-| **multi-doc**：projection は単一 doc を active deck にミラー。複数 doc / タブ橋渡しは未実装 | 単一 doc 可 | P2.5（DocTabs↔docId） |
-| **human 編集往復**：expectedRev ガード・echo 抑制は未実装（P2.4 は読み取り射影のみ） | — | P2.5 |
+| **接続中は協働編集（P2.5a）**：per-slide 編集（フォーム/Markdown/図ドラッグ/→表/AI スライド適用）は**楽観ローカル＋debounce(600ms)で host へ往復**（set_slide_markdown・expectedRev/opId）。Undo/Redo は host の undo/redo へ再ルート。構造系（Draft 全置換/Load Template/プロジェクトを開く/batch/タブ切替）は接続中ロック維持。✍️ 協働編集中バッジ | **実装済（P2.5a）** | P2.5b：on-blur flush・per-doc apply-queue |
+| **multi-doc**：projection は単一 doc を active deck にミラー。複数 doc / タブ橋渡しは未実装 | 単一 doc 可 | P2.5b（DocTabs↔docId） |
+| **human 編集往復**：expectedRev ガード（never-silent stale）＋ opId echo 抑制 ＋ server-undo 再ルートを実装。stale/送信エラー/空 Undo はトーストで非サイレント | **実装済（P2.5a）** | presence・mid-type マージ・canUndo/canRedo のボタン反映は P2.5b |
 | **reap 保証**：通常終了は reap。Rust 側パニック/外部 kill では孤児化し得る（std Child に Drop kill なし） | 通常終了で可 | 将来 Win32 Job Object |
 | **start_collab**：sync コマンドで READY まで core thread をブロック（~1s／最大 15s）。他 IPC が一時キュー | 実用上可 | core thread 外へ |
+
+### P2.5a（接続中の協働編集）実装ノート（branch `claude/p2-collab-roundtrip`）
+観察モードを協働編集へ昇格。多エージェント敵対レビュー反映。
+- **host**：6 mutating tool に任意 `opId`/`expectedRev`。`mutate()` は rev 不一致を never-silent な stale 拒否、`deckChanged` に `opId`（発信元の echo 抑制）。
+- **projection**：`sendSlideMarkdown`（楽観送信・expectedRev・opId・stale 再 pull・送信中は pull 停止）、`recentSelfOpIds` で自分発 echo 抑制、`serverUndo/serverRedo`。
+- **GUI**：`handleSlideUpdate` が接続中は楽観ローカル `setDeck` ＋ **per-index Map** にバッファ→debounce(600ms) で host へ順次送信（取りこぼし無し）。キーボード/ボタン Undo/Redo を host へ再ルート。stale/送信エラー/空 Undo はトースト。ref 同期は effect 内（react-hooks/refs 準拠）。
+- **v1 割り切り（→ P2.5b）**：presence（「AI がスライド N 編集中」）／同一スライド mid-type マージ（同時編集は expectedRev で last-writer＋stale トースト）／`canUndo/canRedo` のボタン反映（今は接続中常時有効＋空 Undo トースト）／on-blur flush（今は 600ms idle debounce。`SlideMarkdownEditor` は !focused 時のみ外部 md を反映するのでカーソル飛びは防止）。
+- **テストの穴**：per-slide 編集バッファ（A→B 取りこぼし無し）の単体テストは hook 描画基盤（RTL）が無く未追加。手動/WSL クロス検証で担保。
 
 ### 既知のエンジン課題（collab 外）
 - `md-serializer` ↔ `md-slide-parser` の Title スライド非対称：`#` 見出しが Title レイアウトでタイトル枠に乗らない場合がある。seed をバイト経由にしたことで collab では顕在化しないが、エンジン側の往復不整合として残る（R4/R5 注意・別途）。

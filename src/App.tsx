@@ -12,7 +12,7 @@ import AiPanel from "./components/AiPanel";
 import CollabPanel from "./components/CollabPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
@@ -70,15 +70,24 @@ export default function App() {
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
   // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
   const editLocked = collab.status === "connected";
-  editLockedRef.current = editLocked;
 
   // P2.5 collaboration bridge + transient toast: while connected, per-slide edits and Undo/Redo are
   // routed to the host (single truth); stale/empty results surface a never-silent toast.
   const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
-  const notify = (message: string) => setToast({ message, ts: Date.now() });
-  collabRef.current = editLocked
-    ? { sendSlideMarkdown: collab.sendSlideMarkdown, serverUndo: collab.serverUndo, serverRedo: collab.serverRedo, notify }
-    : null;
+  const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
+  const collabBridge = useMemo(
+    () =>
+      editLocked
+        ? { sendSlideMarkdown: collab.sendSlideMarkdown, serverUndo: collab.serverUndo, serverRedo: collab.serverRedo, notify }
+        : null,
+    [editLocked, collab.sendSlideMarkdown, collab.serverUndo, collab.serverRedo, notify],
+  );
+  // Sync the latest observe-lock + bridge into the controller's refs from an EFFECT (not during
+  // render → satisfies react-hooks/refs). Handlers read them at event time, after this effect runs.
+  useEffect(() => {
+    editLockedRef.current = editLocked;
+    collabRef.current = collabBridge;
+  }, [editLocked, collabBridge, editLockedRef, collabRef]);
   const handleCollabUndo = async () => {
     const r = await collab.serverUndo();
     if (!r.ok) notify("戻せる操作がありません");
