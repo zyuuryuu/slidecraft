@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "externalBin": ["binaries/node"],
+    "resources": {
+      "../dist/mcp/host.cjs": "host.cjs"
+    }
+  }
+}

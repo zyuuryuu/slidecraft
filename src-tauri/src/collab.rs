@@ -46,9 +46,8 @@ pub struct CollabState {
 
 /// Locate the host.cjs sidecar bundle. `SLIDECRAFT_HOST_CJS` overrides everything (escape hatch).
 /// Dev (`debug_assertions`): the repo file relative to this crate — resource resolution is
-/// unreliable under `tauri dev`. Release: a Resource-dir lookup — NOTE distribution is NOT yet wired
-/// (no bundle.resources entry, and node isn't bundled as an externalBin), so a PACKAGED build needs
-/// that follow-up distribution work before collab runs on a clean machine.
+/// unreliable under `tauri dev`. Release: bundled at the resource root via tauri.conf
+/// `bundle.resources` (`"../dist/mcp/host.cjs" → "host.cjs"`), which resolves next to SlideCraft.exe.
 fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     if let Ok(p) = std::env::var("SLIDECRAFT_HOST_CJS") {
         return Ok(std::path::PathBuf::from(p));
@@ -63,6 +62,24 @@ fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String
         app.path()
             .resolve("host.cjs", tauri::path::BaseDirectory::Resource)
             .map_err(|e| e.to_string())
+    }
+}
+
+/// Resolve the `node` runtime. Dev: from PATH. Release: the bundled externalBin sits next to the main
+/// exe (Tauri strips the `-<target-triple>` suffix at install → `node.exe`/`node`), staged by
+/// scripts/stage-node.ps1. Falls back to PATH if current_exe() is somehow unavailable.
+fn resolve_node() -> std::path::PathBuf {
+    #[cfg(debug_assertions)]
+    {
+        std::path::PathBuf::from("node")
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let name = if cfg!(windows) { "node.exe" } else { "node" };
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join(name)))
+            .unwrap_or_else(|| std::path::PathBuf::from("node"))
     }
 }
 
@@ -104,7 +121,7 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let host_json = data_dir.join("host.json");
 
-    let mut cmd = Command::new("node");
+    let mut cmd = Command::new(resolve_node());
     cmd.arg(&host_cjs)
         .env("SLIDECRAFT_PORT", "0") // ephemeral → no port conflicts; the real url comes via READY
         .env("SLIDECRAFT_HOST_JSON", &host_json)
@@ -115,7 +132,7 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
 
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("node の起動に失敗しました（PATH に node がありますか？）: {e}"))?;
+        .map_err(|e| format!("collab サイドカー(node)の起動に失敗しました: {e}"))?;
 
     // Drain stdout on a thread; forward the first READY line over a channel (and keep draining so a
     // full pipe never blocks the child).
