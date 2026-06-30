@@ -81,7 +81,7 @@ export interface AiRequest {
   apiKey: string;
   baseURL: string;
   model: string;
-  mode: "slides" | "slide" | "diagram" | "diagram-edit";
+  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit";
   userRequest: string;
   onText?: (fullText: string) => void;
   signal?: AbortSignal;
