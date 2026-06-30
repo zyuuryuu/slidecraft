@@ -34,6 +34,9 @@ src-tauri/*.cdx.json
 /src-tauri/target/
 /src-tauri/gen/
 
+# Bundled Node sidecar binary (staged by scripts/stage-node.ps1 before `tauri build`; not source)
+/src-tauri/binaries/
+
 # IDE workspace
 *.code-workspace
 

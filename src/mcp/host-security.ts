@@ -26,6 +26,18 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb);
 }
 
+/** The webview's PRODUCTION Origin differs by platform (Tauri v2) and can shift across versions:
+ *  macOS/Linux = tauri://localhost, Windows (WebView2) = http(s)://tauri.localhost. The webview
+ *  reaches the host via Rust plugin-http, which forwards this Origin, so ALL must be admitted or the
+ *  packaged app 403s (the Windows http://tauri.localhost gap caused exactly that). This is the ONE
+ *  source of truth shared by host.ts AND tests/host-origin-policy.test.ts so the policy can never
+ *  regress to per-OS hand-patching again. Rationale: the Origin layer is only a BROWSER DNS-rebinding
+ *  belt — the bearer TOKEN is the real boundary — so this list tracks legit webview/dev ORIGINS and
+ *  must never be relied on to gate access. */
+export const TAURI_WEBVIEW_ORIGINS = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"] as const;
+/** Browser dev origins we trust (the Vite dev server). */
+export const DEV_BROWSER_ORIGINS = ["http://localhost:5173"] as const;
+
 export interface SecurityConfig {
   /** the per-launch bearer every request must carry */
   token: string;
