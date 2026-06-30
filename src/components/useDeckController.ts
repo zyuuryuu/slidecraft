@@ -23,6 +23,15 @@ import { SAMPLE_MD } from "../sample-deck";
 
 export type { MarkdownSubMode } from "./useDocumentStore";
 
+/** P2.5 collaboration bridge App injects when connected — per-slide edits + Undo/Redo are routed to
+ *  the host (the single truth) instead of mutating local state. Null when not collaborating. */
+export interface CollabBridge {
+  sendSlideMarkdown(index: number, markdown: string): Promise<{ ok: boolean; stale?: boolean; message?: string }>;
+  serverUndo(): Promise<{ ok: boolean; reason?: string }>;
+  serverRedo(): Promise<{ ok: boolean; reason?: string }>;
+  notify(message: string): void;
+}
+
 /** Observe-only: while `editLockedRef.current` is true (App syncs it from collab.status each render),
  *  EVERY local deck-mutation entry point here no-ops — the host is the single truth and the
  *  projection's applyDeck (in App, NOT routed through here) is the only writer. Gates live in this
@@ -39,6 +48,9 @@ export function useDeckController() {
   // Observe-only lock (App writes this from collab.status each render). Every mutation handler/effect
   // below reads `.current`; a useRef so the linter knows it's stable (no deps churn).
   const editLockedRef = useRef(false);
+  // P2.5 round-trip bridge (App writes this when connected): per-slide edits + Undo/Redo route to the
+  // host. Null when disconnected. A ref so handlers read the latest without re-subscribing.
+  const collabRef = useRef<CollabBridge | null>(null);
 
   // Per-document state lives in the multi-document store; this binds to the ACTIVE
   // document and re-exposes the same flat API the controller always had (deck = the
@@ -107,18 +119,24 @@ export function useDeckController() {
   // text undo, so we don't hijack ⌘Z there).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (editLockedRef.current || subMode !== "edit" || !(e.metaKey || e.ctrlKey)) return; // observe-only: no local undo/redo
+      if (subMode !== "edit" || !(e.metaKey || e.ctrlKey)) return;
       // Don't hijack undo while editing a text field — it owns its own text undo.
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable)) return;
       const k = e.key.toLowerCase();
-      if (k === "z") {
-        e.preventDefault();
-        if (e.shiftKey) redoDeck();
-        else undoDeck();
-      } else if (k === "y") {
-        e.preventDefault();
+      if (k !== "z" && k !== "y") return;
+      e.preventDefault();
+      const wantRedo = k === "y" || e.shiftKey;
+      const bridge = editLockedRef.current ? collabRef.current : null;
+      if (bridge) {
+        // P2.5: reroute Undo/Redo to the host's server-side history (single truth).
+        void (wantRedo ? bridge.serverRedo() : bridge.serverUndo()).then((r) => {
+          if (!r.ok) bridge.notify(wantRedo ? "やり直せる操作がありません" : "戻せる操作がありません");
+        });
+      } else if (wantRedo) {
         redoDeck();
+      } else {
+        undoDeck();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -248,14 +266,49 @@ export function useDeckController() {
   }, [clearParse, setDeck, setMdText, setParseError, setSubMode]);
 
   // ── Slide editing: update a single slide in the deck ──
+  // P2.5 round-trip: while collaborating, the edit is applied locally (optimistic) AND pushed to the
+  // host. Typing ('coalesce') debounces into one send; a discrete 'commit' edit flushes immediately.
+  const hostSendTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // PER-INDEX buffer (NOT a single slot): editing slide A then slide B within the debounce window
+  // must send BOTH — a single slot would drop A, silently diverging the host from the local deck.
+  const pendingSend = useRef<Map<number, SlideIR>>(new Map());
+  const flushHostSend = useCallback(async () => {
+    if (hostSendTimer.current) {
+      clearTimeout(hostSendTimer.current);
+      hostSendTimer.current = null;
+    }
+    const bridge = collabRef.current;
+    const pending = pendingSend.current;
+    pendingSend.current = new Map();
+    if (!bridge || pending.size === 0) return;
+    const count = deckRef.current?.slides.length ?? 1;
+    // Sequentially (not concurrently): each send advances the doc's rev, so concurrent sends would
+    // make the second stale. Awaiting keeps every buffered slide's edit landing in order.
+    for (const [index, slide] of pending) {
+      const resolved = slide.layout === "auto" ? autoSelectLayout(slide, index, count, catalog) : slide.layout;
+      const md = serializeMd({ slides: [{ ...slide, layout: resolved }] });
+      const r = await bridge.sendSlideMarkdown(index, md);
+      if (!r.ok) bridge.notify(r.message ?? "編集を host に送れませんでした");
+    }
+  }, [catalog]);
+  const scheduleHostSend = useCallback(
+    (index: number, slide: SlideIR, immediate: boolean) => {
+      pendingSend.current.set(index, slide); // accumulate per index — no cross-slide edit is dropped
+      if (hostSendTimer.current) clearTimeout(hostSendTimer.current);
+      if (immediate) void flushHostSend();
+      else hostSendTimer.current = setTimeout(() => void flushHostSend(), 600);
+    },
+    [flushHostSend],
+  );
   const handleSlideUpdate = useCallback(
     (index: number, updated: SlideIR, mode: HistoryMode = "coalesce") => {
-      if (editLockedRef.current || !deck) return; // observe-only: THE choke point (form/markdown/drag/→表/AI-apply)
+      if (!deck) return;
       const newSlides = [...deck.slides];
       newSlides[index] = updated;
       setDeck({ ...deck, slides: newSlides }, mode);
+      if (editLockedRef.current) scheduleHostSend(index, updated, mode !== "coalesce"); // P2.5 round-trip
     },
-    [deck, setDeck],
+    [deck, setDeck, scheduleHostSend],
   );
 
   // Deterministic "→表" in Edit (deck = source of truth): serialize the slide →
@@ -446,5 +499,6 @@ export function useDeckController() {
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
     editLockedRef, // App syncs this from collab.status to drive observe-only locking
+    collabRef, // App injects the P2.5 collaboration bridge here when connected
   };
 }
