@@ -22,7 +22,9 @@ import { writeHostJson, clearHostJson, type HostHandshake } from "./host-json";
 const NOTIFY = "notifications/slidecraft/";
 
 export interface CollabHostOptions {
-  /** loopback port; 0 = ephemeral (tests). Default 5174 (matches the CSP allowlist). */
+  /** loopback port; 0 = ephemeral (the Tauri host passes 0 → no port conflicts / no stale-sidecar
+   *  clashes). Default 5174 is the legacy/standalone default. (The webview reaches the host via Rust
+   *  plugin-http, so the CSP does not gate this port — the bearer token is the boundary.) */
   port?: number;
   /** bind address; default 127.0.0.1 (never 0.0.0.0). */
   host?: string;

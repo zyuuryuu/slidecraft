@@ -4,7 +4,8 @@
  * stdio's no-surface posture, so we harden in DEPTH but the BEARER TOKEN is the real trust
  * boundary: the webview connects through Rust plugin-http with NO Origin header (it is a no-Origin
  * client), so the token — not Origin/CORS — is what gates it. OS-user remains the trust boundary
- * (the token file is 0600; same-user malware is explicitly out of scope, as with stdio).
+ * (the token file is 0600 on POSIX — a no-op on Windows, where a real ACL lock-down is deferred;
+ * same-user malware is explicitly out of scope, as with stdio).
  */
 import { randomBytes, timingSafeEqual } from "crypto";
 

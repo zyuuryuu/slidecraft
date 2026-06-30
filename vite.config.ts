@@ -11,6 +11,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Don't watch the Rust crate: while `tauri dev` runs, cargo writes/locks files under
+    // src-tauri/target (build-script .exes), and Vite's file watcher crashes with EBUSY on
+    // those locked files on Windows. Tauri's own scaffold excludes src-tauri for this reason.
+    watch: {
+      ignored: ["**/src-tauri/**"],
+    },
   },
   test: {
     globals: true,
