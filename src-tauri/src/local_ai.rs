@@ -28,7 +28,9 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// The pinned default model filename, downloaded into app-local-data/models by the (separate)
 /// weight-download step. `SLIDECRAFT_GGUF` overrides it (escape hatch for dev/testing).
-const WEIGHTS_NAME: &str = "qwen2.5-3b-instruct-q4_k_m.gguf";
+/// phi-3.5-mini is the Phase-0-validated tier (budget/parse/drift 5/5 with the Markdown-only
+/// prompt); qwen had a JA→中文 drift risk, so phi is the safer default.
+const WEIGHTS_NAME: &str = "phi-3.5-mini-instruct-q4_k_m.gguf";
 /// Generous cap: a 3B Q4 cold-load on CPU can take 10-60s (a 0.5B was ~1s in the spike).
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(90);
 const POLL_INTERVAL: Duration = Duration::from_millis(400);
