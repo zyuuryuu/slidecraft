@@ -9,10 +9,12 @@ import DocTabs from "./components/DocTabs";
 import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
+import CollabPanel from "./components/CollabPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
 import { useState, useEffect } from "react";
 import { useDeckController } from "./components/useDeckController";
+import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
 
@@ -27,7 +29,7 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
-    catalog, setDeck, docs, activeId, switchDoc, closeDoc,
+    catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef,
   } = useDeckController();
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
@@ -52,6 +54,23 @@ export default function App() {
     },
     aiReady: ai.connection.ok,
   });
+
+  // P2.4 collaboration: the GUI hosts a local MCP sidecar; an upstream AI connects and its edits
+  // mirror into the active deck live. A freshly adopted/seeded doc is applied 'silent' (replace the
+  // view, no undo step — so seeding the user's own deck never clobbers it); subsequent AI edits are
+  // 'commit' (undoable). Desktop-only.
+  const [showCollab, setShowCollab] = useState(false);
+  const collab = useCollab({
+    applyDeck: (d, isInitial) => setDeck(d, isInitial ? "silent" : "commit"),
+    deck,
+    templateData,
+    templateName,
+  });
+
+  // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
+  // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
+  const editLocked = collab.status === "connected";
+  editLockedRef.current = editLocked;
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -82,8 +101,8 @@ export default function App() {
           onSave={handleSave}
           onGenerate={handleGenerate}
           onSaveProject={handleSaveProject}
-          onOpenProject={handleOpenProject}
-          onLoadTemplate={handleLoadTemplate}
+          onOpenProject={editLocked ? undefined : handleOpenProject}
+          onLoadTemplate={editLocked ? undefined : handleLoadTemplate}
           onAiAssist={() => setShowAiPanel((v) => !v)}
           aiRunning={ai.tasks.filter((t) => t.status === "running").length}
           generating={generating}
@@ -91,24 +110,42 @@ export default function App() {
           templateName={templateName}
           onUndo={undoDeck}
           onRedo={redoDeck}
-          canUndo={canUndo}
-          canRedo={canRedo}
+          canUndo={canUndo && !editLocked}
+          canRedo={canRedo && !editLocked}
         />
         <div className="flex items-center gap-2 px-3 py-2">
           <button
             onClick={handleEnterImport}
-            title="原稿（テキスト）からスライドを作る・取り込む"
-            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40"
+            disabled={editLocked}
+            title={editLocked ? "協働接続中は編集ロック中" : "原稿（テキスト）からスライドを作る・取り込む"}
+            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40 disabled:opacity-40 disabled:hover:bg-[#1E2761]"
           >
             📝 Draft
           </button>
+          <button
+            onClick={() => setShowCollab((v) => !v)}
+            title="AI と同じデッキをライブ共有（ローカル MCP サイドカー）"
+            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40 inline-flex items-center gap-1"
+          >
+            🔗 協働
+            {collab.status === "connected" && <span className="text-emerald-400 leading-none">●</span>}
+          </button>
+          {editLocked && (
+            <span
+              title="協働接続中はホストのデッキをライブ表示します。編集・取り消しは無効です（停止すると再開）。"
+              className="px-2 py-1 text-xs rounded bg-amber-500/15 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1"
+            >
+              👁 観察モード（読み取り専用）
+            </span>
+          )}
         </div>
       </div>
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
         {/* Multi-document tabs — only rendered when >1 project is open */}
-        <DocTabs docs={docs} activeId={activeId} onSwitch={switchDoc} onClose={closeDoc} />
+        {/* While connected, switching/closing tabs would repoint the projection onto another doc → pinned. */}
+        <DocTabs docs={docs} activeId={activeId} onSwitch={editLocked ? () => {} : switchDoc} onClose={editLocked ? () => {} : closeDoc} />
         {/* Non-destructive review, where you work — fix in deck (undoable) */}
         <ReviewBar
           warnIssues={warn(editIssues)}
@@ -152,7 +189,16 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  {!currentSlide ? (
+                  {editLocked ? (
+                    <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-6">
+                      <span className="text-2xl">👁</span>
+                      <span className="font-medium text-amber-200">観察モード（協働接続中）</span>
+                      <span className="text-xs text-gray-400 max-w-xs leading-relaxed">
+                        ホストのデッキをライブ表示中です。編集は AI（ホスト）側で行われ、ここに即反映されます。
+                        ローカル編集・取り消しは無効です。「協働」パネルの「停止」で編集を再開できます。
+                      </span>
+                    </div>
+                  ) : !currentSlide ? (
                     <div className="h-full flex items-center justify-center text-gray-500 text-sm">
                       Select a slide
                     </div>
@@ -170,7 +216,7 @@ export default function App() {
                   Preview — Slide {activeSlide + 1}
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
+                  <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} singleSlide onDiagramChange={editLocked ? undefined : handleDiagramChange} />
                 </div>
               </>
             }
@@ -180,10 +226,10 @@ export default function App() {
           <AiPanel
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
-            onApplySlide={handleApplySlide}
+            onApplySlide={editLocked ? undefined : handleApplySlide}
             activeSlideNum={activeSlide + 1}
             selectedCount={selected?.size ?? 1}
-            onBatchEdit={(instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
+            onBatchEdit={editLocked ? undefined : (instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
             batchRunning={refine.refining}
             seed={aiSeed}
             ai={ai}
@@ -227,8 +273,25 @@ export default function App() {
       {refine.proposal && (
         <RefineProposal
           proposal={refine.proposal}
-          onAccept={refine.acceptProposal}
+          onAccept={editLocked ? () => {} : refine.acceptProposal}
           onCancel={refine.cancelProposal}
+        />
+      )}
+
+      {showCollab && (
+        <CollabPanel
+          onClose={() => setShowCollab(false)}
+          available={collab.available}
+          status={collab.status}
+          url={collab.url}
+          token={collab.token}
+          hostJsonPath={collab.hostJsonPath}
+          error={collab.error}
+          docCount={collab.docCount}
+          simulating={collab.simulating}
+          onStart={collab.start}
+          onStop={collab.stop}
+          onSimulate={collab.simulateAiEdit}
         />
       )}
     </>

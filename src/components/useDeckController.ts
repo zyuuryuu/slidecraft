@@ -23,6 +23,11 @@ import { SAMPLE_MD } from "../sample-deck";
 
 export type { MarkdownSubMode } from "./useDocumentStore";
 
+/** Observe-only: while `editLockedRef.current` is true (App syncs it from collab.status each render),
+ *  EVERY local deck-mutation entry point here no-ops — the host is the single truth and the
+ *  projection's applyDeck (in App, NOT routed through here) is the only writer. Gates live in this
+ *  handler layer, never in setDeck/the reducer (that would freeze the projection too). The ref is
+ *  RETURNED so App drives it; a ref (not a prop) so handlers/effects read the latest without re-subscribing. */
 export function useDeckController() {
   // Edit (visual) is the home/main surface; Import is the one-time "Initialize"
   // phase (bring content → fix slide division + rough content → 確定 → Edit).
@@ -31,6 +36,9 @@ export function useDeckController() {
   const [showAiPanel, setShowAiPanel] = useState(false);
   // Edit-mode center pane: structured form vs raw per-slide Markdown.
   const [slideEditView, setSlideEditView] = useState<"form" | "markdown">("form");
+  // Observe-only lock (App writes this from collab.status each render). Every mutation handler/effect
+  // below reads `.current`; a useRef so the linter knows it's stable (no deps churn).
+  const editLockedRef = useRef(false);
 
   // Per-document state lives in the multi-document store; this binds to the ACTIVE
   // document and re-exposes the same flat API the controller always had (deck = the
@@ -62,6 +70,7 @@ export function useDeckController() {
   // to FLUSH a pending parse on 確定 so the committed deck matches the visible Markdown.
   const commitParse = useCallback(
     (text: string, mode: HistoryMode | "reset") => {
+      if (editLockedRef.current) return; // observe-only: host = truth (covers every parseMdText caller)
       try {
         const parsed = text.trim() ? parseMd(text) : null;
         // Distill to fit the template: split overflowing content slides (no shrink).
@@ -98,7 +107,7 @@ export function useDeckController() {
   // text undo, so we don't hijack ⌘Z there).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (subMode !== "edit" || !(e.metaKey || e.ctrlKey)) return;
+      if (editLockedRef.current || subMode !== "edit" || !(e.metaKey || e.ctrlKey)) return; // observe-only: no local undo/redo
       // Don't hijack undo while editing a text field — it owns its own text undo.
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable)) return;
@@ -138,7 +147,7 @@ export function useDeckController() {
     deckRef.current = deck;
   }, [deck]);
   useEffect(() => {
-    if (!catalog || !deckRef.current) return;
+    if (editLockedRef.current || !catalog || !deckRef.current) return; // observe-only: no indirect re-fit
     const fitted = distillDeck(deckRef.current, catalog);
     if (fitted.slides.length !== deckRef.current.slides.length) {
       setDeck(fitted, "silent");
@@ -147,6 +156,7 @@ export function useDeckController() {
 
   // Load a custom template (.pptx) — native Open dialog on desktop, file picker in browser
   const handleLoadTemplate = useCallback(async () => {
+    if (editLockedRef.current) return; // observe-only: changing template would diverge from host
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
     try {
@@ -198,6 +208,7 @@ export function useDeckController() {
   // visible Markdown, and record the whole Initialize as ONE undo step (snapshot →
   // result), then work visually (deck = source of truth).
   const handleStartEditing = useCallback(() => {
+    if (editLockedRef.current) return; // observe-only: Draft 確定 writes setDeck directly (bypasses commitParse)
     if (!deck) return; // 確定 is disabled when the Markdown doesn't parse
     clearParse();
     try {
@@ -227,6 +238,7 @@ export function useDeckController() {
   // Cancel Initialize: kill any pending parse (so a trailing debounce can't re-apply
   // the discarded edits), restore the deck AND mdText to the pre-open snapshot, → Edit.
   const handleCancelInitialize = useCallback(() => {
+    if (editLockedRef.current) return; // observe-only: restoring a stale snapshot would clobber host truth
     clearParse();
     const snap = initSnapshotRef.current;
     setDeck(snap, "silent");
@@ -238,7 +250,7 @@ export function useDeckController() {
   // ── Slide editing: update a single slide in the deck ──
   const handleSlideUpdate = useCallback(
     (index: number, updated: SlideIR, mode: HistoryMode = "coalesce") => {
-      if (!deck) return;
+      if (editLockedRef.current || !deck) return; // observe-only: THE choke point (form/markdown/drag/→表/AI-apply)
       const newSlides = [...deck.slides];
       newSlides[index] = updated;
       setDeck({ ...deck, slides: newSlides }, mode);
@@ -433,5 +445,6 @@ export function useDeckController() {
     currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
+    editLockedRef, // App syncs this from collab.status to drive observe-only locking
   };
 }

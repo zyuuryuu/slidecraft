@@ -4,11 +4,15 @@
  * listener, and reaps cleanly on SIGINT/SIGTERM. Errors exit non-zero so the supervisor notices.
  */
 import { createCollabHost } from "./host";
+import { formatReadyLine } from "./host-handshake";
 
 async function main(): Promise<void> {
   const port = Number(process.env.SLIDECRAFT_PORT ?? 5174);
   const hostJsonPath = process.env.SLIDECRAFT_HOST_JSON ?? null;
   const host = await createCollabHost({ port, hostJsonPath });
+  // Machine-readable handshake on STDOUT for the Tauri supervisor (P2.3) to read {url,token}
+  // directly off the child's pipe — no race against the host.json write. One tagged line.
+  process.stdout.write(formatReadyLine({ url: host.url, token: host.token }) + "\n");
   process.stderr.write(`[slidecraft-host] listening ${host.url}\n`);
 
   let closing = false;

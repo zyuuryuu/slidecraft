@@ -1,9 +1,11 @@
 /**
  * host-json.ts — the handshake file the collab listener (host.ts) writes after binding, so the
- * GUI/agent can discover the listener's URL + per-launch token. Written 0600 (only the OS user can
- * read the token). Windows ACL hardening is applied by the Rust host (P2.3); on POSIX the
- * mode + chmod is umask-proof. The file is rewritten on every launch (token rotates) and cleared
- * on exit, so a stale file's token is already invalid once a fresh sidecar rebinds.
+ * GUI/agent can discover the listener's URL + per-launch token. Written 0600. On POSIX the
+ * mode + chmod is umask-proof; on WINDOWS the 0600 mode is a no-op and a true ACL lock-down is NOT
+ * yet implemented (deferred) — the token instead relies on the per-user profile dir's default ACL +
+ * per-launch rotation. The file is rewritten on every launch (token rotates) and cleared on exit
+ * (the Rust host removes it on quit/stop, since a Windows TerminateProcess skips the sidecar's own
+ * SIGTERM cleanup), so a stale file's token is invalid once a fresh sidecar rebinds.
  */
 import { writeFileSync, readFileSync, existsSync, rmSync, chmodSync } from "fs";
 
