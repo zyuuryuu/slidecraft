@@ -167,7 +167,7 @@ P2.0 シーム → **P2.1 DocRegistry＋undo を InMemory で**（explicit-docId
 ### 既知の制限（後続フェーズ）
 | 項目 | 状態 | 後続 |
 |---|---|---|
-| **配布**：stock node を externalBin、host.cjs を resources で同梱。**release-only overlay** `src-tauri/tauri.bundle.conf.json`（`tauri dev`/`cargo check` を壊さないため base から分離）＋ `scripts/stage-node.ps1`（版固定 DL→`binaries/node-<triple>.exe`）。collab.rs release は `current_exe()` 隣の node＋resource host.cjs を解決。`npm run build:desktop` で installer 生成 | **実装済（要 build:desktop 実機検証・Windows x64）** | mac/linux の triple 追加・署名/notarization |
+| **配布**：stock node を externalBin、host.cjs を resources で同梱。**release-only overlay** `src-tauri/tauri.bundle.conf.json`（`tauri dev`/`cargo check` を壊さないため base から分離）＋ **クロスプラットフォーム** `scripts/stage-node.mjs`（triple→nodejs.org dist を版固定 DL→`binaries/node-<triple>[.exe]`）。`release.yml` は per-matrix で staging＋`--config` overlay を適用（win/mac/linux で node 同梱）。collab.rs release は `current_exe()` 隣の node（mac は `Contents/MacOS/`）＋resource host.cjs（mac は `Contents/Resources/`）を解決 | Windows: 実機✅ ／ CI・mac/linux: コード済・要検証 | **mac 署名**：unsigned は Gatekeeper で同梱 node が "killed:9" の恐れ → ad-hoc 署名(無料)→Developer ID＋notarization。collab.rs は mac でもパス正（要 .app 確認） |
 | **Windows ACL**：host.json は 0600（Windows では no-op）。Rust の ACL ロックダウン未実装。token は per-user プロファイル ACL ＋ per-launch ローテーションに依存 | 単一ユーザは可 | P2.5（icacls/windows-acl） |
 | **接続中は協働編集（P2.5a）**：per-slide 編集（フォーム/Markdown/図ドラッグ/→表/AI スライド適用）は**楽観ローカル＋debounce(600ms)で host へ往復**（set_slide_markdown・expectedRev/opId）。Undo/Redo は host の undo/redo へ再ルート。構造系（Draft 全置換/Load Template/プロジェクトを開く/batch/タブ切替）は接続中ロック維持。✍️ 協働編集中バッジ | **実装済（P2.5a）** | P2.5b：on-blur flush・per-doc apply-queue |
 | **multi-doc**：projection は単一 doc を active deck にミラー。複数 doc / タブ橋渡しは未実装 | 単一 doc 可 | P2.5b（DocTabs↔docId） |
