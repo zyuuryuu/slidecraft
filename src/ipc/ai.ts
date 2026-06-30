@@ -11,7 +11,7 @@ import { generateWithOpenAICompat } from "./openai-compat";
 import { appFetch } from "./app-fetch";
 import { systemPromptForMode } from "../engine/llm-prompts";
 
-export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "custom";
+export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "builtin" | "custom";
 
 export interface ProviderPreset {
   id: ProviderId;
@@ -34,6 +34,10 @@ export const PROVIDERS: ProviderPreset[] = [
   { id: "openai", label: "OpenAI", native: false, baseURL: "https://api.openai.com/v1", model: "gpt-4o", keyRequired: true, local: false },
   { id: "openrouter", label: "OpenRouter", native: false, baseURL: "https://openrouter.ai/api/v1", model: "openai/gpt-4o", keyRequired: true, local: false },
   { id: "ollama", label: "Ollama (local)", native: false, baseURL: "http://localhost:11434/v1", model: "llama3.1", keyRequired: false, local: true },
+  // The bundled llamafile runtime. baseURL is RUNTIME-FILLED after start_local_ai spawns it on a
+  // loopback ephemeral port (it stays "" until then). local:true + the filled 127.0.0.1 URL make
+  // isLocalTarget() true, so the egress gate + condense guardrail work unchanged.
+  { id: "builtin", label: "組み込み (llamafile・オフライン)", native: false, baseURL: "", model: "qwen2.5-3b-instruct-q4_k_m", keyRequired: false, local: true },
   { id: "custom", label: "Custom (OpenAI-compatible)", native: false, baseURL: "", model: "", keyRequired: false, local: false },
 ];
 
