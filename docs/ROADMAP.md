@@ -1,264 +1,47 @@
 # SlideCraft ロードマップ
 
-## v1 完了フェーズ (ダイアグラム → PPTX)
+前方向きの計画のみを記す。完了フェーズ（v1/v2/v4/v5・E1〜E6・閉ループ A〜C）の履歴は
+**ADR と git に移管済み**。決定の記録は `docs/adr/` を参照。
 
-| Phase | 内容 | テスト数 | 状態 |
-|-------|------|---------|------|
-| P0 | PptxGenJS スパイク検証 | - | 完了 |
-| P1 | schema.ts + theme.ts | 44 | 完了 |
-| P2 | layout-engine.ts | 37 | 完了 |
-| P3 | pptx-writer.ts | 13 | 完了 |
-| P4 | icons.ts + theme-extractor.ts | 24 | 完了 |
-| P5 | Tauri GUI + IPC | - | 完了 |
-| P6 | E2E テスト + インストーラ | 6 (E2E) | 完了 |
-
-**v1 合計: 118 ユニットテスト + 6 E2E テスト**
+現在地：P2 コラボ弧（AI↔人のライブ共同編集・push/pull 同期・共有 undo）まで検証済み。
+配布/パッケージングは Windows セッションで進行中。完了後、下記テーマがリードとして戻る。
 
 ---
 
-## v2 完了フェーズ (Markdown → PPTX テンプレート流し込み)
+## 次の主要テーマ（優先順）
 
-設計書: [MarkdownToPptx_Design.md](MarkdownToPptx_Design.md)
+土台を検証 → 差別化アーキ → 磨き込み → 機能、の順。詳細は開発メモリ `roadmap_post_p2` 参照。
 
-| Phase | 内容 | テスト数 | 状態 |
-|-------|------|---------|------|
-| S0 | スパイク: JSZip OOXML 操作検証 | - | 完了 |
-| S1 | slide-schema.ts + md-parser.ts | 15 | 完了 |
-| S2 | template-loader.ts + レイアウトレジストリ | 14 | 完了 |
-| S3 | placeholder-filler.ts + md-to-ooxml.ts | 12 | 完了 |
-| S4 | SlidePreview.tsx (WYSIWYG) | - | 完了 |
-| S5 | GUI 統合 + テンプレート選択 + E2E | 11 (E2E) | 完了 |
-
-**v2 合計: 41 ユニットテスト + 11 E2E テスト**
-
-**プロジェクト全体: 159 ユニットテスト + 11 E2E テスト**
-
-### 解決した技術課題
-
-**OOXML スタイル階層の正しい設計:**
-- Theme: `majorFont=Georgia`, `minorFont=Calibri`
-- Master: `titleStyle`/`bodyStyle` でテーマフォント参照 (`+mj-lt`/`+mn-lt`)
-- Layout `lstStyle`: マスターとの差分のみ（サイズ・色）をオーバーライド
-- Slide: テキスト内容のみ、スタイル情報なし
-
-**教訓:** `lstStyle` にフォント名・サイズ・色を全レベルでハードコードすると、スライドマスターの UI 編集が無効化される。レイアウトには差分のみ指定する。
-
----
-
-## 今後の改善項目
-
-### v2 改善 (優先度高)
-
-#### スライドテンプレート再作成 — 完了
-- 全30レイアウト × 151プレースホルダー復元済み
-- OOXML スタイル階層正しく構築済み
-
-#### ダイアグラムスライド — 完了
-- 3つの入力形式: ```` ```mermaid ```` (SVG画像), ```` ```diagram ```` (PptxGenJSシェイプ), ```` ```mermaid-shapes ```` (変換シェイプ)
-- Mermaid↔YAML↔JSON 相互変換（Edit モードで切替可能）
-- サムネイル: SVG viewBox スケーリングで修正済み
-
-#### Diagram モードの Mermaid プレビュー修復 — 完了
-- `specKey` (JSON.stringify) による useEffect 再トリガー
-- Mermaid 予約語 (`end` 等) のエスケープ
-
-#### AI Assist / LLM 連携 — 完了 (基本)
-- プロンプトテンプレート: スライドデッキ生成用 + ダイアグラム生成用
-- コピー&ペーストワークフロー: リクエスト入力 → プロンプト生成 → LLM にコピー → 結果をインポート
-- 将来: API 直接呼び出し、ローカル LLM 同梱
-
-#### Mermaid↔DiagramSpec 変換 — 完了
-- subgraph ↔ groups 双方向変換
-- Edit モードで MERMAID/YAML/JSON 切替
-- enterprise_network.json (36ノード, 49エッジ, 8グループ) ラウンドトリップ確認済み
-
-#### テンプレートの色完全復元
-- **サイズ**: M
-- **内容**: 一部のプレースホルダーでフォント色が元のデザインと異なる
-- **対応**: `create_30_layouts.py` の意図に合わせて `lstStyle` の色オーバーライドを精査
-
----
-
-## v4 完了: ネイティブ図・グラフの大幅拡充 (2026-06)
-
-すべて **共有 painter（DrawTarget）→ プレビュー SVG ＝ PPTX ネイティブ図形**（WYSIWYG・編集可能・画像ゼロ）。
-
-| 区分 | 内容 | 状態 |
-|------|------|------|
-| ネイティブ図 14 種 | flowchart / class / sequence / state / ER / timeline / quadrant / pie / gantt / journey / mindmap ＋ 報告グラフ xychart(棒+折れ線) / radar / kpi | 完了 |
-| Mermaid 入力 | 上記の該当構文を parse 時に DiagramSpec へ自動 graduate、MERMAID↔YAML↔JSON 無損失往復 | 完了 |
-| ノードアイコン | `node.icon` を 15 種のネイティブグリフで描画（router/server/db/cloud…）。単一カタログ `icon-catalog.ts` から名前・プロンプト・検証・エイリアスを導出 | 完了 |
-| AI 連携(図) | `diagramSystemPrompt()` にアイコン一覧を注入、不正アイコンは検証警告＋エイリアス正規化 | 完了 |
-| 残 Mermaid | gitGraph / sankey / C4 / requirement は画像フォールバック | 保留 |
-
-詳細設計: 開発メモリ `diagram_format_architecture` 参照。残 Mermaid 型は報告用途での頻度が低いため後回し。
-
----
-
-## v5 完了: UX 統合 — Edit 専一・deck=真実・Initialize モーダル (2026-06)
-
-決定「**出力が PPTX → 視覚 Edit が主、Markdown は入力に過ぎない**」（開発メモリ `primary_surface_deck`）。下記 v3「統合 UI」の設計思想（Markdown＝入出力／SlideIR[]＝唯一のモデル）を**完全実現**。
-
-| 区分 | 内容 | コミット |
-|------|------|---------|
-| Edit ホーム化 | 起動＝視覚編集、deck＝唯一の源、Import＝Initialize 入口（入場時に現 deck を直列化） | c55b56a |
-| Initialize モーダル | Markdown 編集＋分割プレビュー＋レビューをモーダル化。Edit/Import トグル・Open・Export MD を撤去 | aafa58a |
-| 整形レビューを Edit へ | 課題/提案＋「→表」(deck 操作)＋「AI で整える」 | 949e7af |
-| AI 修正の透明化 | before→after 差分＋採用/却下、文章丸ごと Omit 防止 | 2c83a12 / 298832c |
-| プレビュー fit＋ズーム | ペインへ自動フィット＋% ズーム操作 | 7d96e19 |
-| 多エージェント・レビュー | 実装後に敵対的レビューで 13 実バグ検出→全修正→再検証(allGood) | aafa58a |
-
-→ 下記 v3（E1〜E6）は本作業で達成。**E6「V1 旧モード廃止」も完了**（トグル撤去・Markdown は Initialize モーダルのみ）。
-
-### 技術負債 R1（400 行ルール）
-
-- App.tsx 1145 → 236（`sample-deck.ts` ＋ `useDeckController.ts` ＋ `deck-export.ts` へ分割）— 完了
-- md-parser.ts 518 → 113（`md-slide-parser.ts` ＋ `md-separators.ts` へ分割）— 完了
-- schema.ts → `schema-constants.ts` ＋ `schema-charts.ts` へ分離 — 完了
-- `layout-engine.ts`（1601 行）は座標計算の公認例外。`sample-deck.ts`（〜540 行）は単一データ文字列
-
----
-
-## 次の主要テーマ (2026-06 時点・優先順)
-
-ユーザー指定。詳細は開発メモリ `next_themes_post_r1` 参照。
-
-| # | テーマ | 内容 | サイズ |
+| # | テーマ | 一行 | サイズ |
 |---|--------|------|-------|
-| 1 | **AI の一体化** | コピペ運用 → アプリ内蔵の統合 AI 体験へ。AiPanel/LlmAssist/llm-prompts を土台に、リクエスト履歴・実行中一覧・並列実行（[[backlog-ai-request-mgmt]]） | L |
-| 2 | **ユーザ利用ガイド** | 図 14 種・二段階編集・テンプレ流し込み等を網羅したエンドユーザ向けガイド/オンボーディング | M |
-| 3 | **原稿 Markdown → マスター整形の補助** | 製品の北極星。原稿レベルの Markdown を **入力スライドマスターに応じた**フォーマットへ（分割/要約/可視化/整形、テンプレ尊重、フォント縮小禁止）。`engine/distill.ts` ＋ template-catalog を土台に | L |
+| 1 | **テンプレ差し替えの堅牢性を検証** | 任意マスターで実際に壊れないか確認（土台・最優先） | S |
+| 2 | **アプリ内蔵 AI のアーキ設計** | 軽い整形=埋め込み小モデル／重い生成=外部、の役割分担（bundle vs sidecar） | L |
+| 3 | **UI / ボタン再編** | Collab・AI Assist・Draft・ファイルの増殖を整理。プレビュー自動追従 | M |
+| 4 | **プロンプト磨き込み** | 旧「Release-B」。AI 生成品質の底上げ | M |
+| 5 | **テンプレ作成補助** | 新テンプレの作成/登録支援。原稿→マスター整形と重なる最大機能 | L |
 
-### ①③の交点 — Harness-directed AI loop（要石・付け足しにしない）
-
-テーマ①（AI一体化）と③（原稿→マスター整形）は**別物ではなく、「ハーネスが AI を方向づける反復ループ」に収束**する。診断（③）を**人が直す材料**でなく**上流 AI に返すフィードバック信号**として使うのが本筋で、これを 4 段階の progression として段階的に作る（単発機能にしない）。
-
-| 段階 | 内容 | 状態 |
-|---|---|---|
-| **A. フィードフォワード** | テンプレ制約（容量/kind/文字・行予算）を**生成前**の AI へ渡し、最初から収まる出力に。`deckHint`/`deckCapabilities` を強化 | △ 粗く実装 |
-| **B. 診断（非破壊レビュー）** | `diagnoseDeck` が課題＋推奨レバーを提示（変形しない＝差し戻し）。「整形レビュー」帯 | ✅ c1d76c0 |
-| **C. 閉ループ（自動修復＝Lv3）** | 生成→診断→**決定論レバー**(split/visualize)で直せる物を直す→**残りだけ AI**(condense/restructure)→再診断→収束 | ✅ 本体実装（4b05a58 / 7f3884a） |
-
-**C の進捗**：**本体＝全自動ループ実装済み**。`engine/refine.ts`（`refineDeck`：診断→決定論先行→AI残余→再診断→反復収束、AI は注入＝純ロジック・テスト可・D で再利用可、no-progress 停止＋反復上限で収束保証, 4b05a58）。UI（7f3884a）：ReviewBar「✨ まとめて整える」＋3 段階強度（決定論のみ / AI も使う）、`useDeckRefine`（結果を PROPOSAL 保持→採用で 1 undo）、`RefineProposal` モーダル（before→after 差分＋決定論/AI 明示＝無言適用しない）。併せて ai を App に一本化（AI instance 多重の負債解消）。土台（契約 `slide-fix.ts` 9a18535／決定論レバー／AI 差分 2c83a12／CONDENSE 是正 298832c）はそのまま使用。**残**：A フィードフォワード強化・per-slide 並列/履歴（[[backlog-ai-request-mgmt]]）・D 再露出。
-| **D. 外部化（MCP/ツール化）** | 上流エージェントが本アプリのハーネスを"呼ぶ"。C と同じ「制約＋診断 ⇄ AI」契約をそのまま再露出 | ⬜ 将来 |
-
-**設計原則（付け足しにしないため）**
-
-1. **ワンクリック再生成ボタンとして作らない** → 「**制約＋診断 ⇄ AI の構造化コントラクト（feedback packet）**」として作る。in-app ループ・バッチ・MCP で再利用でき、C を正しく作れば D は再露出で済む（作り直し不要）。
-2. **決定論レバー優先**（安く確実）→ 残りだけ AI。= 3 段階強度（Lv1-2 決定論 / Lv3 AI）と一致。
-3. **3 段階強度に明示的に紐付ける**（C = Lv3）。distill の物語の一部にし、独立機能にしない。
-
-**論点**：コスト/収束（反復上限・問題スライドのみ・per-slide 安価・新たな課題を生まない収束保証）。複数 AI 呼び出しが要るため [[backlog-ai-request-mgmt]]（履歴/並列）が**この機能で必要化**＝テーマ①の backlog と連動。
-
-**distill 4 レバー進捗**：STRUCTURE（36a6c96）/ VISUALIZE: key-value→ネイティブ表（d3f493d）/ DIAGNOSE（c1d76c0）済。CONDENSE は**内容への干渉**のため低強度では出さず、C の中で AI レバーとして提供する。
-
-### C 実装で顕在化した次の2課題（2026-06-24 決定・順序付き）
-
-閉ループ本体（4b05a58 / 7f3884a）の完成で、先送りできなくなった2件。**①を先に実装 → ②は設計から**。
-
-1. **AI タスク管理 ✅READY（次に着手）** — 進捗・履歴・実行中一覧・並列・キャンセル。
-   C ループが per-slide で AI を逐次 N 回叩くようになり、`整形中…` のブール1個では不足：
-   何枚目か不可視・**キャンセル不可**・履歴ゼロ・`runOnce` が手動 generate と**衝突し得る**。
-   → 中央の **AI タスクストア**（id / status / scope / prompt / result / 時刻）に全 AI 面を集約。
-   実行中＋履歴を UI 購読、**並列は同パス内のみ・同時数キャップ**（再診断の反復は逐次のまま）。
-   [[backlog-ai-request-mgmt]] を「backlog」から「次の実装」へ昇格。
-2. **Integration 設計 💬DISCUSS（①の後）** — **MCP に限定しない**統合アーキを一から。
-   連携の形（MCP / CLI / ライブラリ / ファイル契約 …）と **State 保持**を設計で確定してから着手：
-   deck は**ステートレス in/out**（純 engine を活用）／template は**レジストリ**（重いので id 参照）／
-   **AI レバーは呼び出し元へ委譲**（`refineDeck(aiFix)` の注入設計が既に許す）。
-   原則：engine は純粋のまま、state は薄い**セッション層**が持つ（desktop = React / 外部 = ドキュメントストア）。
-   ①のタスクストアは、このセッション層の AI 半分に相当。
-
-### 旧ロードマップの陳腐化メモ
-
-- バンドル識別子 `com.slidecraft.desktop` — **対応済み**
-- v3 スライド単位エディタ（下記）E1〜E6 **全完了**（上記 v5 で Markdown を Initialize モーダルへ閉じ込め、視覚 Edit を専一の編集 UI に。旧 Import/Edit トグル廃止）
-- CI 3-OS ビルド確認 — **完了**（毎 push で test/e2e/win/mac/linux green）
-- CodeMirror Markdown ハイライト — **完了**（`Editor.tsx` が `language==="markdown"` で `markdown()` を適用）
+**既知リスク（#1 の要点）**：`autoSelectLayout`（Markdown 経路）はロールベースで任意テンプレに追従するが、
+`slidePlanToSlide`（DeckPlan 経路）は**レイアウト名をハードコード**しており alien master で壊れ得る。
+`public/templates/slide/lrk-slides-velis_CC0.pptx`（第2/別系統テンプレ）で headless 生成し、破綻しないか今すぐ安価に検証可能（開発メモリ guardrail_any_template）。
 
 ---
 
-## v3 スライド単位エディタ (統合 UI)
+## バックログ（将来）
 
-V1 ダイアグラム機能を V2 Markdown パイプラインに完全統合し、スライド単位の編集 UI を提供する。
-
-### 設計思想
-
-- **Markdown はインポート/エクスポート形式** — 日常の編集 UI ではない
-- **SlideIR[] が唯一のデータモデル** — すべての編集はここに反映
-- **スライドタイプに最適な編集 UI** — テキスト、ダイアグラム、カラム等で異なるエディタ
-- **V1 ダイアグラムエディタ = ダイアグラムスライドの編集モード**
-
-### ワークフロー
-
-```text
-Markdown 入力 (Import / LLM 出力)
-    ↓ parseMd()
-SlideIR[] (内部データモデル)
-    ↓
-スライド単位エディタ (Main UI)
-    ├── テキストスライド → リッチテキスト or Markdown テキストエリア
-    ├── ダイアグラムスライド → YAML エディタ + Mermaid プレビュー (V1)
-    ├── カラムスライド → 左右のテキストエリア
-    └── KPI / Process 等 → 専用フォーム
-    ↓
-SlideIR[] (編集結果)
-    ├── → PPTX 出力
-    └── → Markdown エクスポート (LLM 再修正用)
-```
-
-### フェーズ
-
-| Phase | 内容 | サイズ |
-|-------|------|-------|
-| E1 | `md-serializer.ts` — SlideIR[] → Markdown 逆変換 | S |
-| E2 | スライド一覧 UI — カード表示、選択 | M |
-| E3 | テキストスライドエディタ — プレースホルダー単位の編集 | M |
-| E4 | ダイアグラムスライドエディタ — V1 YAML エディタ統合 | M |
-| E5 | Markdown インポート/エクスポート UI | S |
-| E6 | V1 Diagram モード廃止、統合完了 | S |
-
-### 補足
-
-- スライドの順番入れ替え・追加・削除は将来対応（優先度低）
-- リッチテキストエディタの採用は制約・開発難易度次第で Markdown テキストエリアにフォールバック可
-- E1 の md-serializer は LLM に修正を依頼する際に必須
+| 項目 | 内容 | サイズ |
+|------|------|-------|
+| 自動アップデート | Tauri Updater 経由（GitHub Releases） | M |
+| アプリアイコン正式デザイン | 仮アイコン（青背景 "S"）を正式版へ差し替え | S |
+| 画像・チャートの Markdown 埋め込み | `![alt](path)` / ```` ```chart ```` ブロック対応 | L |
+| テーマ切り替え | 複数テンプレ PPTX の管理・切り替え | M |
+| 追加レイアウト自動選択の改善 | KPI / Process / Compare 等の自動判定精度向上 | S |
+| ユーザ利用ガイド | 図 14 種・二段階編集・テンプレ流し込みを網羅したオンボーディング | M |
 
 ---
 
-### インフラ改善
+## 保留中の依存・運用
 
-#### アプリアイコン正式デザイン
-- **サイズ**: S
-- **内容**: 仮アイコン（青背景に "S"）を正式デザインに差し替え
-
-#### バンドル識別子の修正
-- **サイズ**: S
-- **内容**: `com.diagram-pipeline.app` → `com.slidecraft.desktop` に変更
-
-#### CI ビルド結果の確認・修正
-- **サイズ**: S
-- **内容**: GitHub Actions で Win/macOS/Linux ビルドが通ることを確認
-
-#### 自動アップデート (Tauri Updater)
-- **サイズ**: M
-- **内容**: GitHub Releases 経由の自動アップデート機能
-
-### 機能拡張 (将来)
-
-#### CodeMirror Markdown ハイライト
-- **サイズ**: S
-- **内容**: エディタの言語モードを YAML から Markdown に切り替え
-- **現状**: Markdown モードでも YAML ハイライトが適用されている
-
-#### テーマ切り替え機能
-- **サイズ**: M
-- **内容**: 複数テンプレート PPTX の管理・切り替え
-
-#### 追加レイアウト自動選択の改善
-- **サイズ**: S
-- **内容**: KPI / Process / Compare 等のレイアウト自動判定精度向上
-
-#### 画像・チャートの Markdown 埋め込み
-- **サイズ**: L
-- **内容**: `![alt](path)` や ```` ```chart ```` ブロックの対応
+- **#34** — ブロッカー解消待ち。
+- **#13 / js-yaml5** — 依存更新待ち（YAML パーサ）。
+- **#2〜#4 / GitHub Actions** — **CI 再有効化後**に再着手（請求枠リセット 2026-07-01 → 3-OS マトリクスは release-only へ軽量化、開発メモリ ci_actions_billing）。
+- **実験用一時ファイルの後始末** — テンプレ検証・headless 生成で散らかった temp 出力を整理。
