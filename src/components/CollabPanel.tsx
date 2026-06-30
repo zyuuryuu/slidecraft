@@ -116,8 +116,8 @@ export default function CollabPanel({
                   </span>
                   <span>ドキュメント: {docCount}</span>
                 </div>
-                <p className="text-[10px] text-amber-300/80 leading-relaxed">
-                  👁 観察モード：接続中はローカル編集・取り消し（⌘Z）は無効です。編集はホスト（AI）側で行われライブ反映されます。「停止」で編集を再開できます。
+                <p className="text-[10px] text-emerald-300/80 leading-relaxed">
+                  ✍️ 協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレ・タブ切替は接続中ロック）。
                 </p>
 
                 {url && <Field label="MCP エンドポイント" value={url} />}
