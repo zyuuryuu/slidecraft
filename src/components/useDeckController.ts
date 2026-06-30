@@ -269,29 +269,34 @@ export function useDeckController() {
   // P2.5 round-trip: while collaborating, the edit is applied locally (optimistic) AND pushed to the
   // host. Typing ('coalesce') debounces into one send; a discrete 'commit' edit flushes immediately.
   const hostSendTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSend = useRef<{ index: number; slide: SlideIR } | null>(null);
-  const flushHostSend = useCallback(() => {
+  // PER-INDEX buffer (NOT a single slot): editing slide A then slide B within the debounce window
+  // must send BOTH — a single slot would drop A, silently diverging the host from the local deck.
+  const pendingSend = useRef<Map<number, SlideIR>>(new Map());
+  const flushHostSend = useCallback(async () => {
     if (hostSendTimer.current) {
       clearTimeout(hostSendTimer.current);
       hostSendTimer.current = null;
     }
-    const p = pendingSend.current;
     const bridge = collabRef.current;
-    pendingSend.current = null;
-    if (!p || !bridge) return;
+    const pending = pendingSend.current;
+    pendingSend.current = new Map();
+    if (!bridge || pending.size === 0) return;
     const count = deckRef.current?.slides.length ?? 1;
-    const resolved = p.slide.layout === "auto" ? autoSelectLayout(p.slide, p.index, count, catalog) : p.slide.layout;
-    const md = serializeMd({ slides: [{ ...p.slide, layout: resolved }] });
-    void bridge.sendSlideMarkdown(p.index, md).then((r) => {
+    // Sequentially (not concurrently): each send advances the doc's rev, so concurrent sends would
+    // make the second stale. Awaiting keeps every buffered slide's edit landing in order.
+    for (const [index, slide] of pending) {
+      const resolved = slide.layout === "auto" ? autoSelectLayout(slide, index, count, catalog) : slide.layout;
+      const md = serializeMd({ slides: [{ ...slide, layout: resolved }] });
+      const r = await bridge.sendSlideMarkdown(index, md);
       if (!r.ok) bridge.notify(r.message ?? "編集を host に送れませんでした");
-    });
+    }
   }, [catalog]);
   const scheduleHostSend = useCallback(
     (index: number, slide: SlideIR, immediate: boolean) => {
-      pendingSend.current = { index, slide };
+      pendingSend.current.set(index, slide); // accumulate per index — no cross-slide edit is dropped
       if (hostSendTimer.current) clearTimeout(hostSendTimer.current);
-      if (immediate) flushHostSend();
-      else hostSendTimer.current = setTimeout(flushHostSend, 600);
+      if (immediate) void flushHostSend();
+      else hostSendTimer.current = setTimeout(() => void flushHostSend(), 600);
     },
     [flushHostSend],
   );

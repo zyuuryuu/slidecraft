@@ -137,6 +137,7 @@ export class CollabProjection {
     this.recentSelfOpIds.add(opId);
     if (this.recentSelfOpIds.size > 64) this.recentSelfOpIds.delete(this.recentSelfOpIds.values().next().value as string);
     this.sending = true;
+    let reconcile = false; // re-pull AFTER `sending` clears (a scheduleTick now would bail in tick())
     try {
       const res = await this.client.callTool<{ ok?: boolean; stale?: boolean; error?: string; rev?: number }>("set_slide_markdown", {
         index,
@@ -147,7 +148,7 @@ export class CollabProjection {
       });
       if (res.ok === false) {
         this.recentSelfOpIds.delete(opId);
-        this.scheduleTick(); // reconcile local view with host truth
+        reconcile = true; // reconcile local view with host truth
         return { ok: false, stale: !!res.stale, message: res.error ?? (res.stale ? "他のクライアントが先に編集しました（再取得しました）" : "編集を適用できませんでした") };
       }
       if (typeof res.rev === "number") {
@@ -157,15 +158,18 @@ export class CollabProjection {
       return { ok: true, rev: res.rev };
     } catch (e) {
       this.recentSelfOpIds.delete(opId);
+      reconcile = true;
       return { ok: false, message: msg(e) };
     } finally {
       this.sending = false;
+      if (reconcile) this.scheduleTick(); // now `sending` is false → tick() will actually pull
     }
   }
 
   /** P2.5: reroute the GUI Undo/Redo to the HOST's server-side history (single truth). The rolled-back
    *  deck arrives via the normal pull (its deckChanged carries no opId → not suppressed). Returns the
-   *  host's canUndo/canRedo so the UI reflects the shared timeline. */
+   *  host's canUndo/canRedo in the result; for now the GUI keeps Undo/Redo enabled while connected and
+   *  toasts on an empty history (wiring the buttons to these values is a P2.5b refinement). */
   async serverUndo(): Promise<UndoResult> {
     return this.serverHistory("undo");
   }
