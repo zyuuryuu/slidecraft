@@ -16,7 +16,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createSession } from "./session";
 import { buildServer } from "./server";
 import { DocRegistry, type HostContext } from "./host-core";
-import { mintToken, checkRequest, type SecurityConfig } from "./host-security";
+import { mintToken, checkRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type SecurityConfig } from "./host-security";
 import { writeHostJson, clearHostJson, type HostHandshake } from "./host-json";
 
 const NOTIFY = "notifications/slidecraft/";
@@ -50,10 +50,9 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
   const token = mintToken();
   const sec: SecurityConfig = {
     token,
-    // The webview's production origin DIFFERS by OS (Tauri v2): macOS/Linux = tauri://localhost,
-    // Windows (WebView2) = http(s)://tauri.localhost. plugin-http forwards that Origin, so all must be
-    // allowed or the PACKAGED app gets a 403 "origin not allowed" (dev only ever sends localhost:5173).
-    allowedOrigins: new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:5173"]),
+    // ONE source of truth (host-security) shared with the origin-policy test — never hand-patch
+    // per-OS origins here again. The token is the boundary; this list is the browser-rebinding belt.
+    allowedOrigins: new Set([...TAURI_WEBVIEW_ORIGINS, ...DEV_BROWSER_ORIGINS]),
     allowedHosts: new Set(["127.0.0.1", "localhost"]),
   };
 
