@@ -176,7 +176,7 @@ export default function AiPanel({
                 🦙 Ollama → 使う
               </button>
             )}
-            {runningInTauri() && ai.provider !== "builtin" && (
+            {runningInTauri() && ai.builtinStatus.kind !== "running" && (
               <button
                 onClick={ai.switchToBuiltin}
                 disabled={ai.builtinStatus.kind === "starting"}
