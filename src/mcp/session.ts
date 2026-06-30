@@ -10,7 +10,7 @@
  */
 import { DeckIRSchema, type DeckIR, type SlideIR } from "../engine/slide-schema";
 import { type TemplateData, autoSelectLayout, loadTemplate } from "../engine/template-loader";
-import { buildCatalog, deckCapabilities, type LayoutCatalog } from "../engine/template-catalog";
+import { buildCatalog, deckCapabilities, assessTemplateHealth, type LayoutCatalog } from "../engine/template-catalog";
 import { openProject, bundleProject } from "../engine/project-io";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
@@ -95,6 +95,7 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
 export async function newProject(s: Session, templateBytes: Uint8Array, markdown?: string) {
   const template = await loadTemplate(templateBytes);
   const catalog = buildCatalog(template);
+  assertTemplateUsable(catalog); // reject a structurally-unusable master, never-silent
   const deck = distillDeck(parseMd(markdown?.trim() ? markdown : "# Untitled"), catalog);
   s.template = template;
   s.catalog = catalog;
@@ -129,7 +130,18 @@ export function getDiagnostics(s: Session): { budget: { maxBullets: number; char
 }
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);
-  return { summary: deckCapabilities(catalog), entries: catalog };
+  const health = assessTemplateHealth(catalog);
+  return { summary: deckCapabilities(catalog, health.status), health, entries: catalog };
+}
+
+/** Reject a structurally-unusable master (no title/body role even after recovery) at intake
+ *  — a connected agent gets a clear error instead of silently building title-less slides. */
+function assertTemplateUsable(catalog: LayoutCatalog): void {
+  const health = assessTemplateHealth(catalog);
+  if (health.status === "rejected") {
+    const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
+    throw new Error(`このテンプレートは使用できません: ${reason}`);
+  }
 }
 export function getProjectMeta(s: Session) {
   const { deck } = requireLoaded(s);
