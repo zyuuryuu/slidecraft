@@ -37,7 +37,7 @@ export const PROVIDERS: ProviderPreset[] = [
   // The bundled llamafile runtime. baseURL is RUNTIME-FILLED after start_local_ai spawns it on a
   // loopback ephemeral port (it stays "" until then). local:true + the filled 127.0.0.1 URL make
   // isLocalTarget() true, so the egress gate + condense guardrail work unchanged.
-  { id: "builtin", label: "組み込み (llamafile・オフライン)", native: false, baseURL: "", model: "qwen2.5-3b-instruct-q4_k_m", keyRequired: false, local: true },
+  { id: "builtin", label: "組み込み (llamafile・オフライン)", native: false, baseURL: "", model: "phi-3.5-mini-instruct-q4_k_m", keyRequired: false, local: true },
   { id: "custom", label: "Custom (OpenAI-compatible)", native: false, baseURL: "", model: "", keyRequired: false, local: false },
 ];
 
