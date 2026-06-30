@@ -16,7 +16,7 @@
     "typecheck:mcp": "tsc -p tsconfig.mcp.json",
     "build:mcp": "esbuild src/mcp/cli.ts --bundle --platform=node --format=esm --outfile=dist/mcp/cli.js --packages=external --banner:js='#!/usr/bin/env node'",
     "build:host": "esbuild src/mcp/host-main.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist/mcp/host.cjs",
-    "stage-node": "powershell -ExecutionPolicy Bypass -File scripts/stage-node.ps1",
+    "stage-node": "node scripts/stage-node.mjs",
     "build:desktop": "npm run stage-node && npm run tauri build -- --config src-tauri/tauri.bundle.conf.json",
     "sbom": "npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json"
   },
