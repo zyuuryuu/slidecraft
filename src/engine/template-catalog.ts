@@ -127,7 +127,49 @@ export function classifyLayout(
   return structureRole(info.hasTitle, info.hasSubtitle, info.bodyCount);
 }
 
-/** Placeholder role from its PPTX type, with idx conventions as refinement. */
+// Slide geometry facts (inches, 16:9 13.333×7.5) — kept LOCAL so this pure role module
+// stays lean (no import of the heavy layout-engine). Cross-ref: layout-engine.ts SLIDE_*.
+const SLIDE_W_IN = 13.333;
+const SLIDE_H_IN = 7.5;
+
+/** Best-effort role from POSITION/size — a BONUS recovery tier for type-stripped masters
+ *  that still carry explicit xfrm (e.g. canonical). Returns null when geometry is absent
+ *  (inherited xfrm → w/h 0, the common real-world case) or the box is large/central (left
+ *  to the area→body fallback), so it never misfires on a healthy or geometry-less master. */
+function geometryRole(s: { x: number; y: number; w: number; h: number }): PlaceholderRole | null {
+  if (s.w <= 0 || s.h <= 0) return null; // inherited xfrm — no geometry to judge
+  const lowStrip = s.h <= 0.6 && s.y >= 0.82 * SLIDE_H_IN;
+  if (lowStrip && s.w <= 0.25 * SLIDE_W_IN && s.x >= 0.6 * SLIDE_W_IN) return "slideNumber";
+  if (lowStrip && s.x <= 0.3 * SLIDE_W_IN) return "date";
+  if (lowStrip) return "footer";
+  if (s.y <= 0.18 * SLIDE_H_IN && s.w >= 0.55 * SLIDE_W_IN && s.h <= 0.22 * SLIDE_H_IN) return "title";
+  if (s.y <= 0.42 * SLIDE_H_IN && s.w >= 0.5 * SLIDE_W_IN && s.h <= 0.18 * SLIDE_H_IN) return "subtitle";
+  return null;
+}
+
+// Placeholder NAME keywords — the LAST-RESORT signal (the probe proved names are noise for
+// binding, so this sits BELOW geometry). JA + EN. Subtitle before title (so "subtitle" never
+// matches the title rule).
+const PH_NAME_ROLE: Array<[RegExp, PlaceholderRole]> = [
+  [/subtitle|サブ|副題/i, "subtitle"],
+  [/title|見出し|タイトル|表題/i, "title"],
+  [/category|カテゴリ/i, "category"],
+  [/slide.?num|page.?num|ページ番号/i, "slideNumber"],
+  [/footer|フッ?ター/i, "footer"],
+  [/date|日付/i, "date"],
+  [/body|content|本文|コンテンツ|箇条/i, "body"],
+];
+function nameRole(name: string): PlaceholderRole | null {
+  for (const [re, r] of PH_NAME_ROLE) if (re.test(name)) return r;
+  return null;
+}
+
+/**
+ * Placeholder role from its PPTX type, idx conventions as refinement, then a RECOVERY
+ * ladder (geometry → name → area) reached ONLY when the type is "" (a typeless ph, the
+ * loader no longer fakes "body") AND the idx is non-conventional. Every explicit-type /
+ * conventional-idx branch returns exactly as before → healthy masters are byte-identical.
+ */
 export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   const t = ph.type.toLowerCase();
   const idx = ph.idx;
@@ -143,8 +185,14 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   if (idx === "10") return "category";
   if (idx === "15") return "title";
   if (idx === "16") return "subtitle";
-  if (t === "body") return "body";
-  if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body";
+  if (t === "body") return "body"; // a REAL body type
+  if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
+  // ── RECOVERY (only a typeless ph with a non-conventional idx falls through to here) ──
+  const g = geometryRole(ph.style); // T3 geometry (bonus; null when xfrm inherited)
+  if (g) return g;
+  const n = nameRole(ph.name); // T4 name keyword (last resort)
+  if (n) return n;
+  if (ph.style.w > 0 && ph.style.h > 0 && ph.style.w * ph.style.h >= 1.0) return "body"; // T5 area
   return "other";
 }
 
@@ -242,28 +290,81 @@ export function buildCatalog(template: TemplateData): LayoutCatalog {
  * whatever the template actually offers. Prefers an exact body-count match and
  * the simplest variant (fewest "+addon" sections).
  */
-/**
- * A short capability summary of the loaded template, for the deck-generation AI
- * prompt: which slide kinds it offers, the column limit, and rough body capacity.
- * Lets the model use only what THIS template supports and keep slides within
- * capacity (split, don't overflow — we never shrink the template's fonts).
- */
-export function deckCapabilities(catalog: LayoutCatalog): string {
+// ── Acceptance gate (Initialize health) ──
+
+export type HealthStatus = "ok" | "degraded" | "rejected";
+export interface HealthFinding {
+  code: string;
+  level: "block" | "warn" | "info";
+  message: string; // JP, user-facing
+}
+export interface TemplateHealth {
+  status: HealthStatus;
+  findings: HealthFinding[];
+  usableKinds: string[]; // the slide kinds this master can actually express
+}
+
+/** Slide kinds THIS master can actually express (role-gated) — shared by the gate + the
+ *  AI prompts so we advertise only what the template supports. */
+export function templateKinds(catalog: LayoutCatalog): string[] {
   const roles = new Set(catalog.map((e) => e.role));
   const maxCols = Math.max(0, ...catalog.filter((e) => e.role === "columns").map((e) => e.bodyCount));
   const kinds = ["title"];
   if (roles.has("section")) kinds.push("section");
   kinds.push("content");
   if (maxCols >= 2) kinds.push("columns");
+  if (roles.has("table")) kinds.push("table");
+  if (catalog.some((e) => e.bodyCount >= 1)) kinds.push("diagram"); // a figure rides a content body
   if (roles.has("closing")) kinds.push("closing");
+  return kinds;
+}
 
+/**
+ * Acceptance gate: judge a loaded master OK / DEGRADED / REJECTED, AFTER role recovery.
+ * LENIENT by design — blocks ONLY on the two structural minima (a title role AND a body
+ * role must exist SOMEWHERE in the catalog), keyed on ROLE, never on names / idx / layout
+ * count — so it cannot false-reject an unusual-but-valid master (a minimalist or non-JP
+ * master whose title/body come from TYPE all pass). Everything else proceeds as degraded.
+ * Pure (R2). The caller surfaces a rejection (GUI parseError / MCP throw) — never silent.
+ */
+export function assessTemplateHealth(catalog: LayoutCatalog): TemplateHealth {
+  const findings: HealthFinding[] = [];
+  const hasTitle = catalog.some((e) => e.hasTitle);
+  const hasBody = catalog.some((e) => e.bodyCount >= 1);
+  if (!hasTitle)
+    findings.push({ code: "NO_TITLE_ROLE", level: "block", message: "タイトル枠が見つかりません（プレースホルダが種別 type を持っていない可能性）。PowerPoint で開いて再保存すると改善する場合があります。" });
+  if (!hasBody)
+    findings.push({ code: "NO_BODY_ROLE", level: "block", message: "本文（body）枠が見つかりません。コンテンツスライドを作成できません。別のテンプレートをお使いください。" });
+
+  // Capacity caution — a body box whose geometry is inherited from the master has unknown
+  // capacity (usable, just unverifiable). Common + fine; NEVER a block.
+  const hasUsableBody = catalog.some((e) => e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0));
+  if (hasBody && !hasUsableBody)
+    findings.push({ code: "BODY_CAPACITY_UNKNOWN", level: "warn", message: "本文枠のサイズがマスター継承で、文字容量を判定できません（通常は問題ありません）。" });
+
+  const blocked = findings.some((f) => f.level === "block");
+  const status: HealthStatus = blocked ? "rejected" : !hasUsableBody ? "degraded" : "ok";
+  return { status, findings, usableKinds: templateKinds(catalog) };
+}
+
+/**
+ * A short capability summary of the loaded template, for the deck-generation AI
+ * prompt: which slide kinds it offers, the column limit, and rough body capacity.
+ * Lets the model use only what THIS template supports and keep slides within
+ * capacity (split, don't overflow — we never shrink the template's fonts).
+ */
+export function deckCapabilities(catalog: LayoutCatalog, health?: HealthStatus): string {
+  const kinds = templateKinds(catalog);
+  const maxCols = Math.max(0, ...catalog.filter((e) => e.role === "columns").map((e) => e.bodyCount));
   const bodyCap = catalog.find((e) => e.role === "content")?.placeholders.find((p) => p.role === "body")?.capacity ?? 0;
 
   let s = `This template supports these slide kinds: ${kinds.join(", ")}.`;
   s += maxCols >= 2 ? ` "columns" can have up to ${maxCols}.` : ` It has NO multi-column layout — use "content" instead of "columns".`;
+  if (!kinds.includes("table")) s += ` It has NO table layout — present tabular data as bullets, not a "table" slide.`;
   if (bodyCap > 0) {
     s += ` A content slide's body holds roughly ${bodyCap} full-width characters — keep each slide within that and SPLIT into more slides rather than overflowing.`;
   }
+  if (health === "degraded") s += ` Note: this template's layout metadata is partial — rely only on the kinds listed above.`;
   return s;
 }
 
