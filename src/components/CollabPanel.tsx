@@ -116,6 +116,9 @@ export default function CollabPanel({
                   </span>
                   <span>ドキュメント: {docCount}</span>
                 </div>
+                <p className="text-[10px] text-amber-300/80 leading-relaxed">
+                  👁 観察モード：接続中はローカル編集・取り消し（⌘Z）は無効です。編集はホスト（AI）側で行われライブ反映されます。「停止」で編集を再開できます。
+                </p>
 
                 {url && <Field label="MCP エンドポイント" value={url} />}
                 {token && <Field label="トークン（per-launch）" value={token} />}

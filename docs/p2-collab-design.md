@@ -169,7 +169,7 @@ P2.0 シーム → **P2.1 DocRegistry＋undo を InMemory で**（explicit-docId
 |---|---|---|
 | **配布**：node を externalBin 同梱せず `host.cjs` も bundle.resources 未登録。`tauri dev` は動くが**パッケージ版はまだ collab 不可**（dev は `CARGO_MANIFEST_DIR` で解決） | dev のみ | stock node 同梱 ＋ resources |
 | **Windows ACL**：host.json は 0600（Windows では no-op）。Rust の ACL ロックダウン未実装。token は per-user プロファイル ACL ＋ per-launch ローテーションに依存 | 単一ユーザは可 | P2.5（icacls/windows-acl） |
-| **GUI Undo/Redo**：協働接続中は**無効化**（local undo はホスト真実に上書きされるため）。host の undo/redo tool 再ルートは未実装 | 無効化で非サイレント化 | P2.5（再ルート＋origin トースト） |
+| **接続中は観察モード（read-only）**：local 編集・Undo/Redo を**全経路でロック**（キーボード Undo／各エディタ／図ドラッグ／AI 適用／batch／Draft／テンプレ変更／タブ切替まで。host=単一真実）。単一 `editLockedRef` 由来・ハンドラ層で no-op（projection の host-apply のみ非ゲート）＋ 👁 観察モードバッジ＋エディタを観察表示に置換 | 実装済（観察のみ） | P2.5：完全往復（expectedRev/echo・undo を host tool へ再ルート） |
 | **multi-doc**：projection は単一 doc を active deck にミラー。複数 doc / タブ橋渡しは未実装 | 単一 doc 可 | P2.5（DocTabs↔docId） |
 | **human 編集往復**：expectedRev ガード・echo 抑制は未実装（P2.4 は読み取り射影のみ） | — | P2.5 |
 | **reap 保証**：通常終了は reap。Rust 側パニック/外部 kill では孤児化し得る（std Child に Drop kill なし） | 通常終了で可 | 将来 Win32 Job Object |

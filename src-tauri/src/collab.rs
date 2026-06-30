@@ -74,11 +74,11 @@ fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String
 pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>) -> Result<CollabInfo, String> {
     // Already running? hand back the live handshake. Otherwise reap a dead child and respawn.
     {
-        let mut guard = state.child.lock().unwrap();
+        let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(c) = guard.as_mut() {
             match c.try_wait() {
                 Ok(None) => {
-                    if let Some(info) = state.info.lock().unwrap().clone() {
+                    if let Some(info) = state.info.lock().unwrap_or_else(|e| e.into_inner()).clone() {
                         return Ok(info);
                     }
                 }
@@ -169,14 +169,14 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
         host_json_path: host_json.to_string_lossy().to_string(),
     };
 
-    *state.child.lock().unwrap() = Some(child);
-    *state.info.lock().unwrap() = Some(info.clone());
+    *state.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
+    *state.info.lock().unwrap_or_else(|e| e.into_inner()) = Some(info.clone());
     Ok(info)
 }
 
 #[tauri::command]
 pub fn stop_collab(state: tauri::State<'_, CollabState>) -> Result<(), String> {
-    if let Some(mut child) = state.child.lock().unwrap().take() {
+    if let Some(mut child) = state.child.lock().unwrap_or_else(|e| e.into_inner()).take() {
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -187,7 +187,7 @@ pub fn stop_collab(state: tauri::State<'_, CollabState>) -> Result<(), String> {
 /// Kill the sidecar on app exit (wired to RunEvent::ExitRequested / Exit). Safe to call repeatedly.
 pub fn reap(app: &tauri::AppHandle) {
     let state = app.state::<CollabState>();
-    if let Some(mut child) = state.child.lock().unwrap().take() {
+    if let Some(mut child) = state.child.lock().unwrap_or_else(|e| e.into_inner()).take() {
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -198,7 +198,7 @@ pub fn reap(app: &tauri::AppHandle) {
 /// SIGTERM handler that would clear host.json never runs — Rust clears it so no stale 0600 token
 /// file lingers with a dead pid after every quit/stop.
 fn clear_host_json(state: &CollabState) {
-    if let Some(info) = state.info.lock().unwrap().take() {
+    if let Some(info) = state.info.lock().unwrap_or_else(|e| e.into_inner()).take() {
         let _ = std::fs::remove_file(&info.host_json_path);
     }
 }
