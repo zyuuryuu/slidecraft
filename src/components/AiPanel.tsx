@@ -189,7 +189,7 @@ export default function AiPanel({
           </div>
           <LocalOnlyToggle ai={ai} />
           <div className="flex flex-wrap items-center gap-2">
-          {!ai.preset.native && (
+          {!ai.preset.native && ai.provider !== "builtin" && (
             <input
               className={`${field} w-56`}
               placeholder="Base URL"
@@ -226,21 +226,26 @@ export default function AiPanel({
           >
             ↻
           </button>
-          <input
-            className={`${field} w-56`}
-            type="password"
-            placeholder={ai.preset.keyRequired ? "API key" : "API key (任意)"}
-            value={ai.cfg.apiKey}
-            onChange={(e) => ai.setField("apiKey", e.target.value)}
-          />
-          <label className="flex items-center gap-1 text-xs text-gray-400">
-            <input
-              type="checkbox"
-              checked={ai.rememberKey}
-              onChange={(e) => ai.setRememberKey(e.target.checked)}
-            />
-            キーを記憶
-          </label>
+          {/* API key / remember are unused for the runtime-managed builtin model — hide them. */}
+          {ai.provider !== "builtin" && (
+            <>
+              <input
+                className={`${field} w-56`}
+                type="password"
+                placeholder={ai.preset.keyRequired ? "API key" : "API key (任意)"}
+                value={ai.cfg.apiKey}
+                onChange={(e) => ai.setField("apiKey", e.target.value)}
+              />
+              <label className="flex items-center gap-1 text-xs text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={ai.rememberKey}
+                  onChange={(e) => ai.setRememberKey(e.target.checked)}
+                />
+                キーを記憶
+              </label>
+            </>
+          )}
           </div>
         </div>
       )}
