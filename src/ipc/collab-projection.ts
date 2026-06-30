@@ -87,6 +87,7 @@ export class CollabProjection {
     }
     this.opts.onStatus?.("connected");
     await this.pump(); // initial reconcile: adopt + mirror any doc already open
+    if (this.closed) return; // the initial reconcile hit a hard error (failAndStop) → don't start polling
     const ms = this.opts.pollMs ?? 1200;
     if (ms > 0) this.poll = setInterval(() => this.scheduleTick(), ms);
   }
