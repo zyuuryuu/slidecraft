@@ -223,7 +223,10 @@ function extractPlaceholders(
     const nameMatch = sp.match(/cNvPr[^>]*name="([^"]*)"/);
 
     const idx = idxMatch ? idxMatch[1] : "0";
-    const type = typeMatch ? typeMatch[1] : "body";
+    // A typeless <p:ph> stays "" (a sentinel) — do NOT fabricate "body". Defaulting to
+    // "body" erased the title/subtitle distinction and dropped content on masters whose
+    // placeholders omit type (see placeholderRole's recovery tiers + assessTemplateHealth).
+    const type = typeMatch ? typeMatch[1] : "";
     const name = nameMatch ? nameMatch[1] : "";
     const style = extractStyle(sp, masterTitle, masterBody);
 
