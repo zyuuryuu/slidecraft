@@ -7,7 +7,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { type HistoryMode } from "./useHistoryState";
 import { useDocumentStore } from "./useDocumentStore";
-import { buildCatalog, deckCapabilities } from "../engine/template-catalog";
+import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
@@ -179,6 +179,14 @@ export function useDeckController() {
     if (!picked) return;
     try {
       const tpl = await loadTemplate(picked.bytes.buffer as ArrayBuffer);
+      // Acceptance gate: reject a structurally-unusable master (no title/body role even
+      // after recovery) instead of silently producing title-less slides — never-silent.
+      const health = assessTemplateHealth(buildCatalog(tpl));
+      if (health.status === "rejected") {
+        const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
+        setParseError(`このテンプレートは使用できません: ${reason}`);
+        return;
+      }
       setTemplateData(tpl);
       setTemplateName(picked.name.replace(/\.pptx$/i, ""));
     } catch (err) {
@@ -395,7 +403,11 @@ export function useDeckController() {
   // autoSelectLayout's "first slide → Title" rule would otherwise mangle a
   // content slide into Title format. Pinning the resolved layout keeps it correct.
   // Template capability summary handed to the deck-generation AI (kinds/columns/capacity).
-  const deckHint = useMemo(() => (catalog ? deckCapabilities(catalog) : undefined), [catalog]);
+  // Pass the health status so a degraded master's hint warns the AI its metadata is partial.
+  const deckHint = useMemo(
+    () => (catalog ? deckCapabilities(catalog, assessTemplateHealth(catalog).status) : undefined),
+    [catalog],
+  );
 
   // The 整形 (distill) cluster: review + manuscript structuring + per-issue fixes.
   const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue } = useDeckRevise({
