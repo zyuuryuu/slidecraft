@@ -41,7 +41,7 @@ export type AiFixOutcome =
  *  (MCP) re-uses it with a different backend. */
 export type AiSlideFix = (
   request: string,
-  meta: { slideIndex: number; signal?: AbortSignal; attempt: number },
+  meta: { slideIndex: number; signal?: AbortSignal; attempt: number; kind: "condense" | "edit" },
 ) => Promise<AiFixOutcome>;
 
 export interface RefineChange {
@@ -134,7 +134,7 @@ export async function refineDeck(
           aiAttempts.set(idx, attempt);
           let outcome: AiFixOutcome;
           try {
-            outcome = await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)), { slideIndex: idx, signal: opts.signal, attempt });
+            outcome = await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)), { slideIndex: idx, signal: opts.signal, attempt, kind: "condense" });
           } catch {
             aiDone.add(idx); // aiFix should resolve an outcome; a throw = unknown → don't retry
             continue;
@@ -193,7 +193,7 @@ export async function batchEditDeck(
     if (!current.slides[idx]) continue;
     const before = slideToMd(current, idx, catalog);
     try {
-      const outcome = await opts.aiFix(`Current slide:\n${before}\n\nInstruction: ${opts.instruction}`, { slideIndex: idx, signal: opts.signal, attempt: 1 });
+      const outcome = await opts.aiFix(`Current slide:\n${before}\n\nInstruction: ${opts.instruction}`, { slideIndex: idx, signal: opts.signal, attempt: 1, kind: "edit" });
       if (!outcome.ok) continue; // cancelled / failed → skip this slide
       const after = outcome.markdown.trim();
       const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
