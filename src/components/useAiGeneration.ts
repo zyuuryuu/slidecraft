@@ -355,7 +355,16 @@ export function useAiGeneration() {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       const info = await invoke<{ baseUrl: string }>("start_local_ai");
-      setConfigs((c) => ({ ...c, builtin: { ...c.builtin, baseURL: info.baseUrl } }));
+      // Auto-select the model llamafile actually reports (its /v1/models id is the loaded GGUF's
+      // basename, which won't match the preset name) so the badge shows 接続OK, not モデルを選択.
+      let model: string | undefined;
+      try {
+        const list = await listProviderModels("builtin", info.baseUrl, "");
+        model = list[0];
+      } catch {
+        /* keep the preset model name */
+      }
+      setConfigs((c) => ({ ...c, builtin: { ...c.builtin, baseURL: info.baseUrl, ...(model ? { model } : {}) } }));
       setProvider("builtin");
       setBuiltinStatus({ kind: "running" });
     } catch (e) {
