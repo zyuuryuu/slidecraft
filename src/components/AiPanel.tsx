@@ -8,6 +8,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { PROVIDERS } from "../ipc/ai";
+import { runningInTauri } from "../ipc/commands";
 import LocalOnlyToggle from "./LocalOnlyToggle";
 import type { AiGeneration } from "./useAiGeneration";
 import DiffView from "./DiffView";
@@ -173,6 +174,16 @@ export default function AiPanel({
                 title="ローカルの Ollama に切り替え"
               >
                 🦙 Ollama → 使う
+              </button>
+            )}
+            {runningInTauri() && ai.provider !== "builtin" && (
+              <button
+                onClick={ai.switchToBuiltin}
+                disabled={ai.builtinStatus.kind === "starting"}
+                className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E] disabled:opacity-60"
+                title="バンドルされた llamafile をローカル起動（オフラインAI）"
+              >
+                {ai.builtinStatus.kind === "starting" ? "⏳ 起動中…" : "💻 組み込みAI"}
               </button>
             )}
           </div>
