@@ -91,8 +91,10 @@ public/templates/    # スライドマスター (.pptx)
 
 ## ドキュメント
 
-- [開発設計書](docs/DesktopApp_DevelopmentDesign.md)
-- [ロードマップ](docs/ROADMAP.md)
+- [アーキテクチャ決定記録 (ADR)](docs/adr/) — 決定済み＆実装済みの設計判断
+- [ロードマップ](docs/ROADMAP.md) — 前方向きの計画
+- [詳細設計](docs/design/) — 補助設計資料
+- [MCP サーバの使い方](docs/mcp-server.md)
 
 ## ライセンス
 
