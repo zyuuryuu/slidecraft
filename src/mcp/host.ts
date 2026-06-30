@@ -50,7 +50,10 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
   const token = mintToken();
   const sec: SecurityConfig = {
     token,
-    allowedOrigins: new Set(["tauri://localhost", "http://localhost:5173"]),
+    // The webview's production origin DIFFERS by OS (Tauri v2): macOS/Linux = tauri://localhost,
+    // Windows (WebView2) = http(s)://tauri.localhost. plugin-http forwards that Origin, so all must be
+    // allowed or the PACKAGED app gets a 403 "origin not allowed" (dev only ever sends localhost:5173).
+    allowedOrigins: new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:5173"]),
     allowedHosts: new Set(["127.0.0.1", "localhost"]),
   };
 
