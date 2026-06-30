@@ -89,7 +89,9 @@ function loadSavedConfig(): { localOnly: boolean; provider?: ProviderId; configs
 
 export function useAiGeneration() {
   const [saved] = useState(loadSavedConfig);
-  const [provider, setProvider] = useState<ProviderId>(saved.provider ?? "claude");
+  // Default to the bundled offline model on desktop (the product's offline-first north star);
+  // the browser/demo build can't spawn a runtime, so it falls back to Claude. A saved choice wins.
+  const [provider, setProvider] = useState<ProviderId>(saved.provider ?? (runningInTauri() ? "builtin" : "claude"));
   const [configs, setConfigs] = useState<AiConfigMap>(() => (saved.configs ? { ...defaultConfigs(), ...saved.configs } : defaultConfigs()));
   const [rememberKey, setRememberKey] = useState(!!saved.configs);
   // Central AI task store: the live list (in-flight + history) + which task is the
@@ -126,7 +128,10 @@ export function useAiGeneration() {
       .then((list) => {
         if (cancelled) return;
         setOllamaModels(list);
-        if (!hadSavedConfig.current && !didAutoSelect.current && list.length > 0) {
+        // On DESKTOP the default is the bundled builtin model, so don't auto-hop to Ollama (it
+        // stays a one-click "🦙 Ollama → 使う"). On the browser/demo build (no builtin runtime),
+        // keep auto-selecting Ollama so a local-AI user can generate immediately.
+        if (!hadSavedConfig.current && !didAutoSelect.current && list.length > 0 && !runningInTauri()) {
           didAutoSelect.current = true;
           setProvider("ollama");
           setConfigs((c) => ({
