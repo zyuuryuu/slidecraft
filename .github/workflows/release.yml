@@ -59,6 +59,11 @@ jobs:
       - name: Stage Node sidecar (externalBin)
         run: node scripts/stage-node.mjs ${{ matrix.triple }}
 
+      # Stage the llamafile runtime (in-app offline AI). Assimilates the APE to the runner's native
+      # format on its own OS (matrix runner OS == triple OS), so it's runnable + codesignable.
+      - name: Stage llamafile sidecar (externalBin)
+        run: node scripts/stage-llamafile.mjs ${{ matrix.triple }}
+
       # tauri-action runs the tauri.conf beforeBuildCommand (npm run build && npm run build:host).
       # `--config` applies the release-only overlay (externalBin node + host.cjs resource) so the
       # PACKAGED collab works; the overlay is kept out of the base config so `tauri dev` needs no
