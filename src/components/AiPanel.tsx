@@ -186,6 +186,15 @@ export default function AiPanel({
                 {ai.builtinStatus.kind === "starting" ? "⏳ 起動中…" : "💻 組み込みAI"}
               </button>
             )}
+            {runningInTauri() && ai.builtinStatus.kind === "running" && (
+              <button
+                onClick={ai.stopBuiltin}
+                className="px-2 py-0.5 rounded bg-[#1a1f3a] text-gray-300 hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+                title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
+              >
+                ⏹ 停止
+              </button>
+            )}
           </div>
           <LocalOnlyToggle ai={ai} />
           <div className="flex flex-wrap items-center gap-2">
