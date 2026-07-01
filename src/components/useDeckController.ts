@@ -14,6 +14,7 @@ import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, findLayout } from "../engine/template-loader";
+import { applyTemplateBytes } from "./apply-template";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
@@ -172,27 +173,20 @@ export function useDeckController() {
     }
   }, [catalog, setDeck]);
 
+  // Apply .pptx bytes as the active document's template, through the shared acceptance gate
+  // (apply-template.ts). Reused by the top-bar loader AND the draft master picker (registry).
+  const applyMasterBytes = useCallback(
+    (buf: ArrayBuffer | Uint8Array, name: string) => applyTemplateBytes(buf, name, { setTemplateData, setTemplateName, setParseError }),
+    [setTemplateData, setTemplateName, setParseError],
+  );
+
   // Load a custom template (.pptx) — native Open dialog on desktop, file picker in browser
   const handleLoadTemplate = useCallback(async () => {
     if (editLockedRef.current) return; // observe-only: changing template would diverge from host
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
-    try {
-      const tpl = await loadTemplate(picked.bytes.buffer as ArrayBuffer);
-      // Acceptance gate: reject a structurally-unusable master (no title/body role even
-      // after recovery) instead of silently producing title-less slides — never-silent.
-      const health = assessTemplateHealth(buildCatalog(tpl));
-      if (health.status === "rejected") {
-        const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
-        setParseError(`このテンプレートは使用できません: ${reason}`);
-        return;
-      }
-      setTemplateData(tpl);
-      setTemplateName(picked.name.replace(/\.pptx$/i, ""));
-    } catch (err) {
-      setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [setTemplateData, setTemplateName, setParseError]);
+    await applyMasterBytes(picked.bytes.buffer as ArrayBuffer, picked.name);
+  }, [applyMasterBytes]);
 
   // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
   const { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject } = useDeckIO({
@@ -503,7 +497,7 @@ export function useDeckController() {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes,
     handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
