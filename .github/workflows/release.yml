@@ -17,10 +17,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest # Apple Silicon
+          - platform: macos-latest # Apple Silicon (arm64 runner)
             args: "--target aarch64-apple-darwin"
             triple: aarch64-apple-darwin
-          - platform: macos-latest # Intel
+          # Intel — MUST run on an Intel runner: stage-llamafile `--assimilate`s host-native, so an
+          # arm64 runner would emit an arm64 llamafile into the x64 bundle.
+          - platform: macos-13
             args: "--target x86_64-apple-darwin"
             triple: x86_64-apple-darwin
           - platform: ubuntu-latest # .deb + .AppImage
@@ -41,7 +43,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-latest'
@@ -64,11 +66,27 @@ jobs:
       - name: Stage llamafile sidecar (externalBin)
         run: node scripts/stage-llamafile.mjs ${{ matrix.triple }}
 
+      # Ad-hoc sign the bundled child binaries BEFORE Tauri packages them (inside-out signing order).
+      # The app SPAWNS node + llamafile as separate processes; on Apple Silicon the kernel refuses to
+      # exec an UNSIGNED binary ("killed: 9"), so each sidecar needs its own signature — the outer
+      # app's signature does not cover child processes. `-s -` is ad-hoc (FREE, no Apple account); we
+      # deliberately DO NOT pass `--options runtime` (hardened runtime) because llamafile JITs its
+      # GGML kernels and hardened runtime would block executable memory. Distribution is via a
+      # Homebrew cask, which strips com.apple.quarantine on install, so notarization is not required.
+      - name: Ad-hoc sign bundled sidecars (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          codesign --force --sign - "src-tauri/binaries/node-${{ matrix.triple }}"
+          codesign --force --sign - "src-tauri/binaries/llamafile-${{ matrix.triple }}"
+          codesign --verify --verbose "src-tauri/binaries/node-${{ matrix.triple }}"
+          codesign --verify --verbose "src-tauri/binaries/llamafile-${{ matrix.triple }}"
+
       # tauri-action runs the tauri.conf beforeBuildCommand (npm run build && npm run build:host).
-      # `--config` applies the release-only overlay (externalBin node + host.cjs resource) so the
-      # PACKAGED collab works; the overlay is kept out of the base config so `tauri dev` needs no
-      # staged node. (macOS: unsigned for now — the bundled node may need ad-hoc/Developer-ID signing
-      # to avoid a Gatekeeper "killed: 9"; tracked as the remaining mac sub-task.)
+      # `--config` applies the release-only overlay (externalBin node + host.cjs resource + macOS
+      # ad-hoc signing) so the PACKAGED collab + offline AI work; the overlay is kept out of the base
+      # config so `tauri dev` needs no staged node/signing. macOS: the overlay sets
+      # macOS.signingIdentity="-" (ad-hoc) + hardenedRuntime=false, so Tauri signs the .app itself and
+      # the already-signed sidecars are sealed inside it. Not notarized — install via `brew` cask.
       - name: Build + publish (draft release)
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
@@ -76,7 +94,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "SlideCraft v__VERSION__"
-          releaseBody: "Download the installer for your OS below. (Unsigned — see README for first-run notes.)"
+          releaseBody: "Download the installer for your OS below. macOS is ad-hoc signed (not notarized) — install via `brew install --cask zyuuryuu/slidecraft/slidecraft` for a clean first run, or right-click → Open on a direct .dmg download. See README for details."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json
