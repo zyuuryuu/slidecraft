@@ -173,15 +173,19 @@ fn spawn_llamafile(bin: &Path, gguf: &Path, port: u16) -> Result<Child, String> 
     Ok(child)
 }
 
-/// Start (or return the already-running) llamafile server. Lazy + idempotent. Sync like
-/// start_collab — it blocks the core thread during the (one-time, multi-second) cold model load;
-/// the UI shows a 起動中 status before calling. Returns { baseUrl } the webview writes into the
-/// "builtin" provider config.
+/// Start (or return the already-running) llamafile server. Lazy + idempotent. ASYNC: the blocking
+/// spawn + cold-load /health poll run on a WORKER thread (tauri::async_runtime::spawn_blocking) so
+/// the Tauri core thread — and the whole UI — never freezes ("応答なし") during the one-time,
+/// multi-second model load. Returns { baseUrl } the webview writes into the "builtin" provider config.
 #[tauri::command]
-pub fn start_local_ai(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, LocalAiState>,
-) -> Result<LocalAiInfo, String> {
+pub async fn start_local_ai(app: tauri::AppHandle) -> Result<LocalAiInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || start_local_ai_blocking(&app))
+        .await
+        .map_err(|e| format!("起動タスクの実行に失敗しました: {e}"))?
+}
+
+fn start_local_ai_blocking(app: &tauri::AppHandle) -> Result<LocalAiInfo, String> {
+    let state = app.state::<LocalAiState>();
     // Already running? hand back the live base URL. Otherwise reap a dead child and respawn.
     {
         let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
@@ -202,7 +206,7 @@ pub fn start_local_ai(
     }
 
     let llamafile = resolve_llamafile();
-    let gguf = resolve_weights(&app)?;
+    let gguf = resolve_weights(app)?;
     if !gguf.exists() {
         return Err(format!(
             "モデルがまだダウンロードされていません: {}（先にオフライン AI を有効化してください）",
