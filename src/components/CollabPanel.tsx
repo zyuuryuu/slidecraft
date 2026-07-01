@@ -1,8 +1,7 @@
 /**
  * CollabPanel.tsx — the P2.4 "Connect" surface. Starts/stops GUI-hosted collaboration and shows the
  * loopback URL + per-launch token plus a ready-to-paste `claude mcp add` snippet so an upstream AI
- * can connect. The deck mirrors the host's truth live while connected; the "AI 編集をシミュレート"
- * button drives a real ai-role edit so the live-update loop can be confirmed without an external AI.
+ * can connect. The deck mirrors the host's truth live while connected.
  */
 import { useState } from "react";
 import type { CollabStatus } from "../ipc/collab-projection";
@@ -16,10 +15,8 @@ interface CollabPanelProps {
   hostJsonPath?: string;
   error?: string;
   docCount: number;
-  simulating: boolean;
   onStart: () => void;
   onStop: () => void;
-  onSimulate: () => void;
 }
 
 function CopyButton({ value }: { value: string }) {
@@ -60,7 +57,7 @@ function Field({ label, value, mono = true }: { label: string; value: string; mo
 }
 
 export default function CollabPanel({
-  onClose, available, status, url, token, hostJsonPath, error, docCount, simulating, onStart, onStop, onSimulate,
+  onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop,
 }: CollabPanelProps) {
   const connected = status === "connected";
   const snippet =
@@ -143,16 +140,8 @@ export default function CollabPanel({
                   <div className="text-[10px] text-gray-600 break-all">handshake: {hostJsonPath}</div>
                 )}
 
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    onClick={onSimulate}
-                    disabled={simulating}
-                    title="ai ロールで実際に接続し、スライドを編集して動作確認します"
-                    className="flex-1 py-1.5 rounded bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 text-white text-xs"
-                  >
-                    {simulating ? "編集中…" : "🤖 AI 編集をシミュレート"}
-                  </button>
-                  <button onClick={onStop} className="px-3 py-1.5 rounded bg-[#2D3A6E] hover:bg-[#3B4684] text-white text-xs">
+                <div className="flex items-center justify-end pt-1">
+                  <button onClick={onStop} className="px-4 py-1.5 rounded bg-[#2D3A6E] hover:bg-[#3B4684] text-white text-xs">
                     停止
                   </button>
                 </div>
