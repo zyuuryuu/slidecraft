@@ -32,6 +32,20 @@ cd slidecraft
 npm install
 ```
 
+### 配布版のインストール（エンドユーザ向け）
+
+- **Windows / Linux** — [Releases](https://github.com/zyuuryuu/slidecraft/releases) から `.msi` / `.AppImage` / `.deb` を取得。
+- **macOS** — ad-hoc 署名（ノータライズなし）のため、**Homebrew tap 経由**が最もクリーンです:
+
+  ```bash
+  brew install --cask zyuuryuu/slidecraft/slidecraft
+  ```
+
+  `brew` はインストール時に quarantine 属性を剥がすため、初回起動の警告なしで開けます。
+  直接 `.dmg` をダウンロードした場合は初回のみ右クリック →「開く」、または
+  `xattr -dr com.apple.quarantine /Applications/SlideCraft.app` が必要です。
+  詳細・tap の公開手順は [packaging/homebrew/README.md](packaging/homebrew/README.md) を参照。
+
 ## 開発
 
 ```bash
