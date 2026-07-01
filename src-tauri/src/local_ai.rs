@@ -18,7 +18,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -31,6 +31,9 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// phi-3.5-mini is the Phase-0-validated tier (budget/parse/drift 5/5 with the Markdown-only
 /// prompt); qwen had a JA→中文 drift risk, so phi is the safer default.
 const WEIGHTS_NAME: &str = "phi-3.5-mini-instruct-q4_k_m.gguf";
+/// Pinned model download (bartowski's phi-3.5-mini Q4_K_M, ~2.39 GB) + its SHA256 for integrity.
+const WEIGHTS_URL: &str = "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf";
+const WEIGHTS_SHA256: &str = "e4165e3a71af97f1b4820da61079826d8752a2088e313af0c7d346796c38eff5";
 /// Generous cap: a 3B Q4 cold-load on CPU can take 10-60s (a 0.5B was ~1s in the spike).
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(90);
 const POLL_INTERVAL: Duration = Duration::from_millis(400);
@@ -81,6 +84,98 @@ fn resolve_weights(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| e.to_string())?
         .join("models");
     Ok(dir.join(WEIGHTS_NAME))
+}
+
+/// SHA256 of a file, streamed (never buffers the whole ~2.4 GB).
+fn sha256_file(path: &Path) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// True if the model is available (the file exists, or the SLIDECRAFT_GGUF dev override is set).
+#[tauri::command]
+pub fn model_weights_present(app: tauri::AppHandle) -> Result<bool, String> {
+    if std::env::var("SLIDECRAFT_GGUF").is_ok() {
+        return Ok(true);
+    }
+    Ok(resolve_weights(&app)?.exists())
+}
+
+/// Download the pinned GGUF into app-local-data/models on first use — streamed to a `.part` file
+/// (HTTP Range resume), hashed, atomically renamed on success. Emits `builtin://download` {pct}.
+/// No-op if SLIDECRAFT_GGUF is set or the file already exists. Async so the UI stays responsive.
+#[tauri::command]
+pub async fn ensure_model_weights(app: tauri::AppHandle) -> Result<String, String> {
+    if let Ok(p) = std::env::var("SLIDECRAFT_GGUF") {
+        return Ok(p); // dev override — never download
+    }
+    let dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let final_path = dir.join(WEIGHTS_NAME);
+    if final_path.exists() {
+        return Ok(final_path.to_string_lossy().to_string());
+    }
+    let part_path = dir.join(format!("{WEIGHTS_NAME}.part"));
+    let have = std::fs::metadata(&part_path).map(|m| m.len()).unwrap_or(0);
+
+    let client = reqwest::Client::new();
+    let mut builder = client.get(WEIGHTS_URL);
+    if have > 0 {
+        builder = builder.header(reqwest::header::RANGE, format!("bytes={have}-"));
+    }
+    let mut resp = builder.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(format!("モデルのダウンロードに失敗しました: HTTP {status}"));
+    }
+    let total = have + resp.content_length().unwrap_or(0);
+
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&part_path)
+        .map_err(|e| e.to_string())?;
+    let mut done = have;
+    let mut last = Instant::now();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        use std::io::Write;
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        done += chunk.len() as u64;
+        if last.elapsed() >= Duration::from_millis(250) {
+            let pct = if total > 0 { (done * 100 / total) as u32 } else { 0 };
+            let _ = app.emit("builtin://download", serde_json::json!({ "pct": pct, "done": done, "total": total }));
+            last = Instant::now();
+        }
+    }
+    drop(file);
+
+    if sha256_file(&part_path)? != WEIGHTS_SHA256 {
+        let _ = std::fs::remove_file(&part_path);
+        return Err("ダウンロードしたモデルの検証に失敗しました（チェックサム不一致・再取得してください）".into());
+    }
+    std::fs::rename(&part_path, &final_path).map_err(|e| e.to_string())?;
+    let _ = app.emit("builtin://download", serde_json::json!({ "pct": 100 }));
+    Ok(final_path.to_string_lossy().to_string())
+}
+
+/// Delete the downloaded model to free disk (~2.4 GB); the next enable re-downloads it.
+#[tauri::command]
+pub fn evict_model_weights(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    let _ = std::fs::remove_file(dir.join(WEIGHTS_NAME));
+    let _ = std::fs::remove_file(dir.join(format!("{WEIGHTS_NAME}.part")));
+    Ok(())
 }
 
 /// Pick a free loopback port (the listener drops at end-of-fn, freeing it for llamafile).
