@@ -23,7 +23,10 @@ pub fn run() {
             collab::stop_collab,
             local_ai::start_local_ai,
             local_ai::stop_local_ai,
-            local_ai::local_ai_status
+            local_ai::local_ai_status,
+            local_ai::ensure_model_weights,
+            local_ai::evict_model_weights,
+            local_ai::model_weights_present
         ])
         .setup(|_app| {
             eprintln!("[slidecraft] setup() reached — main window created, entering event loop");
