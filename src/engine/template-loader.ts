@@ -113,13 +113,52 @@ function emuToInch(emu: string | undefined): number {
   return emu ? parseInt(emu) / EMU_PER_INCH : 0;
 }
 
+// ── Theme color resolution (schemeClr → hex) ──
+
+/**
+ * token → hex from the theme clrScheme, plus the master clrMap aliases (bg1/tx1/bg2/tx2 point at
+ * scheme slots). Needed because most real templates color TEXT via `schemeClr` (a theme reference),
+ * not an explicit `srgbClr`. Without this, such a title/body color can't be read and falls back to
+ * the master default (which for titles is WHITE) → a white-on-white, invisible title in the preview.
+ */
+function buildThemeColors(themeXml: string, masterXml: string): Record<string, string> {
+  const scheme = themeXml.match(/<a:clrScheme[\s\S]*?<\/a:clrScheme>/)?.[0] ?? "";
+  const colors: Record<string, string> = {};
+  for (const m of scheme.matchAll(/<a:(dk1|lt1|dk2|lt2|accent[1-6]|hlink|folHlink)>([\s\S]*?)<\/a:\1>/g)) {
+    const hex = m[2].match(/lastClr="([A-Fa-f0-9]{6})"/)?.[1] ?? m[2].match(/srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
+    if (hex) colors[m[1]] = hex.toUpperCase();
+  }
+  const clrMap = masterXml.match(/<p:clrMap\b[^>]*\/>/)?.[0] ?? "";
+  for (const alias of ["bg1", "tx1", "bg2", "tx2"]) {
+    const slot = clrMap.match(new RegExp(`\\b${alias}="(\\w+)"`))?.[1];
+    if (slot && colors[slot]) colors[alias] = colors[slot];
+  }
+  return colors;
+}
+
+/**
+ * A shape's TEXT color: an explicit srgbClr wins (canonical bakes these — unchanged); else a theme
+ * `schemeClr` resolved via the clrScheme, read from the TEXT region only (the `<p:spPr>` fill/outline
+ * is excluded so an accent-filled box doesn't hijack the text color); else undefined → the caller
+ * falls back to the master/default color.
+ */
+function extractTextColor(sp: string, theme: Record<string, string>): string | undefined {
+  const srgb = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
+  if (srgb) return srgb;
+  const txScope = sp.replace(/<p:spPr>[\s\S]*?<\/p:spPr>/, "");
+  const token = txScope.match(/schemeClr val="(\w+)"/)?.[1];
+  return token ? theme[token] : undefined;
+}
+
 // ── Extract master style from titleStyle or bodyStyle XML ──
 
-function parseMasterStyle(xml: string | undefined, fallback: MasterStyle): MasterStyle {
+function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme: Record<string, string>): MasterStyle {
   if (!xml) return fallback;
   const szMatch = xml.match(/defRPr[^>]*sz="(\d+)"/);
   const boldMatch = xml.match(/defRPr[^>]*b="1"/);
-  const colorMatch = xml.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
+  const srgb = xml.match(/srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
+  const schemeToken = srgb ? undefined : xml.match(/schemeClr val="(\w+)"/)?.[1];
+  const fontColor = srgb ?? (schemeToken ? theme[schemeToken] : undefined) ?? fallback.fontColor;
   const fontMatch = xml.match(/<a:latin typeface="([^"]+)"/);
   const alignMatch = xml.match(/algn="(\w+)"/);
   // Bullet glyph from the level-1 paragraph style (buChar), or "" when buNone.
@@ -127,7 +166,7 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle): Maste
   const buChar = lvl1.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
   return {
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : fallback.fontSize,
-    fontColor: colorMatch ? colorMatch[1] : fallback.fontColor,
+    fontColor,
     fontName: fontMatch ? fontMatch[1] : fallback.fontName,
     bold: boldMatch ? true : fallback.bold,
     align: alignMatch ? alignMatch[1] : fallback.align,
@@ -137,7 +176,7 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle): Maste
 
 // ── Extract style from shape XML, merging with master defaults ──
 
-function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle): PlaceholderStyle {
+function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>): PlaceholderStyle {
   // Determine if this is a title-type placeholder
   const phType = sp.match(/<p:ph[^>]*type="(\w+)"/)?.[1] || "body";
   const isTitle = phType === "ctrTitle" || phType === "title";
@@ -150,7 +189,7 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   // Font info: check layout lstStyle first, then rPr, then fall back to master
   const szMatch = sp.match(/defRPr[^>]*sz="(\d+)"/) || sp.match(/<a:rPr[^>]*sz="(\d+)"/);
   const boldMatch = sp.match(/defRPr[^>]*b="1"/) || sp.match(/<a:rPr[^>]*b="1"/);
-  const colorMatch = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
+  const textColor = extractTextColor(sp, theme); // srgbClr → theme schemeClr → undefined
   const fontMatch = sp.match(/<a:latin typeface="([^"]+)"/);
   const alignMatch = sp.match(/<a:(?:def)?PPr[^>]*algn="(\w+)"/);
 
@@ -165,7 +204,7 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
     w: emuToInch(extMatch?.[1]),
     h: emuToInch(extMatch?.[2]),
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : master.fontSize,
-    fontColor: colorMatch ? colorMatch[1] : master.fontColor,
+    fontColor: textColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
     bold: boldMatch ? true : master.bold,
     align: alignMatch ? alignMatch[1] : master.align,
@@ -208,6 +247,7 @@ function extractPlaceholders(
   layoutXml: string,
   masterTitle: MasterStyle,
   masterBody: MasterStyle,
+  theme: Record<string, string>,
 ): PlaceholderInfo[] {
   const normalized = normalizeNs(layoutXml);
   const shapes = normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
@@ -228,7 +268,7 @@ function extractPlaceholders(
     // placeholders omit type (see placeholderRole's recovery tiers + assessTemplateHealth).
     const type = typeMatch ? typeMatch[1] : "";
     const name = nameMatch ? nameMatch[1] : "";
-    const style = extractStyle(sp, masterTitle, masterBody);
+    const style = extractStyle(sp, masterTitle, masterBody, theme);
 
     placeholders.push({ idx, type, name, shapeXml: sp, style });
   }
@@ -250,12 +290,16 @@ export async function loadTemplate(
     fontSize: 14, fontColor: "1E293B", fontName: "Calibri", bold: false, align: "l", bulletChar: "",
   };
   const masterXml = await readEntryString(zip, "ppt/slideMasters/slideMaster1.xml", ZIP_LIMITS.xmlEntry);
+  // Theme colors first — master + placeholder text may color via `schemeClr` (a theme reference),
+  // which we resolve to hex so a theme-colored title isn't lost to the white master fallback.
+  const themeXml = await readEntryString(zip, "ppt/theme/theme1.xml", ZIP_LIMITS.xmlEntry);
+  const themeColors = buildThemeColors(themeXml, masterXml);
   const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];
   const bodyStyleXml = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0];
   const masterTitleStyle = parseMasterStyle(titleStyleXml, {
     ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF",
-  });
-  const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle);
+  }, themeColors);
+  const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle, themeColors);
 
   // ── Extract layouts ──
   const layouts: LayoutInfo[] = [];
@@ -271,7 +315,7 @@ export async function loadTemplate(
     const xml = await readCappedString(file, ZIP_LIMITS.xmlEntry);
     const nameMatch = xml.match(/name="([^"]+)"/);
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
-    const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle);
+    const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle, themeColors);
     const decorations = extractDecorations(xml);
 
     layouts.push({ index: i, name, placeholders, decorations });
@@ -281,11 +325,8 @@ export async function loadTemplate(
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);
   const contentTypes = await readEntryString(zip, "[Content_Types].xml", ZIP_LIMITS.xmlEntry);
 
-  // ── Extract master background color from theme ──
-  const themeXml = await readEntryString(zip, "ppt/theme/theme1.xml", ZIP_LIMITS.xmlEntry);
-  const lt1Match = themeXml.match(/<a:lt1>[\s\S]*?lastClr="([A-Fa-f0-9]{6})"/) ||
-    themeXml.match(/<a:lt1>[\s\S]*?srgbClr val="([A-Fa-f0-9]{6})"/);
-  const masterBgColor = lt1Match ? lt1Match[1] : "FFFFFF";
+  // ── Master background color (bg1 via the clrMap, else the theme lt1) ──
+  const masterBgColor = themeColors.bg1 ?? themeColors.lt1 ?? "FFFFFF";
 
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
