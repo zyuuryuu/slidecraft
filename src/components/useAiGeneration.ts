@@ -357,11 +357,29 @@ export function useAiGeneration() {
     }));
   }, [ollamaModels]);
 
-  // The bundled llamafile runtime lifecycle. startBuiltin spawns it (Rust start_local_ai polls
-  // /health, returns the loopback baseURL) and adopts the model llamafile reports; it serves BOTH
-  // the manual "有効化" button AND auto-start-on-generate (runTask). Idempotent on the Rust side
-  // (a live child is reused). Desktop-only.
-  const [builtinStatus, setBuiltinStatus] = useState<{ kind: "idle" | "starting" | "running" | "error"; message?: string }>({ kind: "idle" });
+  // The bundled llamafile runtime lifecycle. startBuiltin SPAWNS it (Rust start_local_ai polls
+  // /health, returns the loopback baseURL) and adopts the reported model; it serves auto-start-on-
+  // generate (runTask), which needs the weights already downloaded. switchToBuiltin is the explicit
+  // enable: it DOWNLOADS the model on first use (with progress) then spawns. Desktop-only.
+  const [builtinStatus, setBuiltinStatus] = useState<{ kind: "idle" | "downloading" | "starting" | "running" | "error"; message?: string; pct?: number }>({ kind: "idle" });
+  const [weightsPresent, setWeightsPresent] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!runningInTauri()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const present = await invoke<boolean>("model_weights_present");
+        if (!cancelled) setWeightsPresent(present);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const startBuiltin = useCallback(async (): Promise<string> => {
     if (!runningInTauri()) throw new Error("組み込みモデルはデスクトップ版でのみ利用できます。");
     setBuiltinStatus({ kind: "starting" });
@@ -384,8 +402,25 @@ export function useAiGeneration() {
     startBuiltinRef.current = startBuiltin; // let runTask auto-start without a forward reference
   }, [startBuiltin]);
 
+  // Explicit enable: download the model on first use (streamed, with progress), then spawn + select.
   const switchToBuiltin = useCallback(async () => {
+    if (!runningInTauri()) {
+      setBuiltinStatus({ kind: "error", message: "組み込みモデルはデスクトップ版でのみ利用できます。" });
+      return;
+    }
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      if (!(await invoke<boolean>("model_weights_present"))) {
+        setBuiltinStatus({ kind: "downloading", pct: 0 });
+        const { listen } = await import("@tauri-apps/api/event");
+        const un = await listen<{ pct: number }>("builtin://download", (e) => setBuiltinStatus({ kind: "downloading", pct: e.payload.pct }));
+        try {
+          await invoke("ensure_model_weights");
+        } finally {
+          un();
+        }
+        setWeightsPresent(true);
+      }
       await startBuiltin();
       setProvider("builtin");
     } catch (e) {
@@ -433,9 +468,14 @@ export function useAiGeneration() {
       return { ok: true, tone: "ok", label: `${cfg.model} を使用` };
     }
     if (provider === "builtin") {
+      if (builtinStatus.kind === "downloading") return { ok: false, tone: "checking", label: `モデルをダウンロード中… ${builtinStatus.pct ?? 0}%` };
       if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: "オフラインAIを起動中…（初回は数十秒）" };
       if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: "オフラインAIの起動に失敗", hint: builtinStatus.message };
-      if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "そのまま生成すると自動で起動します（初回は数十秒）" };
+      if (!cfg.baseURL.trim()) {
+        return weightsPresent === false
+          ? { ok: false, tone: "warn", label: "オフラインAI モデル未取得", hint: "『⬇ モデルをDL』で初回ダウンロード（約2.4GB）" }
+          : { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "そのまま生成すると自動で起動します（初回は数十秒）" };
+      }
       // baseURL filled → fall through to the generic model checks below.
     }
     if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "Base URL 未設定" };
@@ -465,7 +505,7 @@ export function useAiGeneration() {
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
-    switchToBuiltin, stopBuiltin, builtinStatus,
+    switchToBuiltin, stopBuiltin, builtinStatus, weightsPresent,
     localModelOnly, setLocalModelOnly, localBlocked,
   };
 }
