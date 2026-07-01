@@ -83,6 +83,10 @@ describe("template swap — works on an ALIEN master (different layout names)", 
       const resolved = autoSelectLayout(s, i, deck.slides.length, alien.catalog);
       expect(names.has(resolved)).toBe(true); // degraded to a REAL alien layout, not the dangling canonical name
     });
+    // ...and the CONTENT survives the degraded-layout placeholder mapping (role-based, not idx-blind):
+    // title/body/column text lands in the alien layout's placeholders instead of being dropped.
+    const text = await slideText(bytes);
+    for (const t of ["表紙", "中身", "速度", "比較", "A案", "ありがとうございました"]) expect(text).toContain(t);
   });
 
   it("sanity: the same DeckPlan also exports on the canonical template (names match natively)", async () => {
