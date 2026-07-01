@@ -12,7 +12,8 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { buildCatalog, placeholderRole, slideIdxRole, type PlaceholderRole } from "./template-catalog";
+import { buildCatalog } from "./template-catalog";
+import { bindContentByRole, bodyPlaceholders, nthBody } from "./placeholder-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
@@ -119,32 +120,14 @@ async function buildSlideXml(
       };
     }
   }
-  // Bind content to placeholders BY ROLE (not idx), so any template's layout —
-  // whatever idxs it uses — gets the right content. For the canonical template
-  // (idx convention == roles) this is identical to the old idx matching.
-  const byIdx = <T extends { idx: string }>(a: T, b: T) =>
-    a.idx.length - b.idx.length || a.idx.localeCompare(b.idx);
-  const hasCtrTitle = slide.placeholders.some((p) => p.idx === "0");
+  // Bind content to placeholders BY ROLE (not idx) via the SHARED binding — the SAME function the
+  // live preview uses, so export and preview can't diverge (WYSIWYG), and any template's idx
+  // convention binds correctly (an alien master's title/body idxs match through their role).
+  const contentFor = bindContentByRole(slide, layout.placeholders);
 
-  const contentByRole = new Map<PlaceholderRole, PlaceholderContent[]>();
-  for (const c of [...slide.placeholders].sort(byIdx)) {
-    const role = slideIdxRole(c.idx, hasCtrTitle);
-    const list = contentByRole.get(role);
-    if (list) list.push(c);
-    else contentByRole.set(role, [c]);
-  }
-
-  const layoutMeta = new Map<string, { role: PlaceholderRole; order: number }>();
-  const roleSeen: Record<string, number> = {};
-  for (const lph of [...layout.placeholders].sort(byIdx)) {
-    const role = placeholderRole(lph);
-    roleSeen[role] = (roleSeen[role] ?? 0) + 1;
-    layoutMeta.set(lph.idx, { role, order: roleSeen[role] });
-  }
-
-  // Diagram/mermaid occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
-  const bodyPhs = [...layout.placeholders].sort(byIdx).filter((p) => placeholderRole(p) === "body");
-  const visualBody = (pi?: string) => (pi ? bodyPhs[Math.max(1, parseInt(pi) || 1) - 1] : undefined);
+  // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
+  const bodyPhs = bodyPlaceholders(layout.placeholders);
+  const visualBody = (pi?: string) => nthBody(bodyPhs, pi);
   const diagBodyIdx = slide.diagram ? visualBody(slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
@@ -154,9 +137,7 @@ async function buildSlideXml(
 
   for (const ph of layout.placeholders) {
     if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx) continue; // replaced by the visual
-    const meta = layoutMeta.get(ph.idx);
-    if (!meta) continue;
-    const content = contentByRole.get(meta.role)?.[meta.order - 1];
+    const content = contentFor.get(ph.idx);
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content);

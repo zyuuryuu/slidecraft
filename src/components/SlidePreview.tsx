@@ -11,6 +11,7 @@ import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-
 import type { TemplateData, LayoutInfo } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
+import { bindContentByRole, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -111,7 +112,15 @@ interface SlideCardProps {
 }
 
 function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
-  const contentMap = new Map(slide.placeholders.map((p) => [p.idx, p]));
+  // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
+  // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
+  // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
+  const layoutPhs = layout?.placeholders ?? [];
+  const contentFor = bindContentByRole(slide, layoutPhs);
+  const bodyPhs = bodyPlaceholders(layoutPhs);
+  const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
+  const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
+  const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
@@ -153,9 +162,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
       {layout?.placeholders.map((ph) => {
         const s = ph.style;
 
-        // If this placeholder is replaced by a diagram or mermaid, render it
-        const isDiagramPh = slide.diagram && ph.idx === slide.diagram.placeholderIdx;
-        const isMermaidPh = slide.mermaidBlock && ph.idx === slide.mermaidBlock.placeholderIdx;
+        // If this placeholder is replaced by a diagram or mermaid, render it (role-resolved body idx)
+        const isDiagramPh = slide.diagram && ph.idx === diagBodyIdx;
+        const isMermaidPh = slide.mermaidBlock && ph.idx === mermBodyIdx;
 
         // Diagram: full-slide transparent SVG overlay (matches how the export
         // embeds diagram shapes at absolute slide coordinates).
@@ -214,7 +223,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         }
 
         // Native table → an HTML <table> at the placeholder box (matches the export).
-        if (slide.table && ph.idx === slide.table.placeholderIdx) {
+        if (slide.table && ph.idx === tableBodyIdx) {
           const t = slide.table;
           return (
             <div
@@ -260,7 +269,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
           );
         }
 
-        const content = contentMap.get(ph.idx);
+        const content = contentFor.get(ph.idx);
         if (!content) return null;
 
         return (
