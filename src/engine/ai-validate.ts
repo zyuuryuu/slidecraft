@@ -61,7 +61,11 @@ export function validateCondense(beforeRaw: string, afterRaw: string, box?: FitB
     v.push({ kind: "parse", severity: "hard", detail: "JSON が返った（Markdown ではない）" });
   } else {
     const slide = parseMd(trimmed).slides[0];
-    const hasContent = !!slide && (!!slide.title || bullets(trimmed).length > 0);
+    // SlideIR has no `.title` — a title lands in a placeholder. "Has content" = any placeholder
+    // carries non-empty text, or the raw markdown has bullets.
+    const hasPlaceholderText = !!slide && slide.placeholders.some((p) =>
+      p.paragraphs.some((pp) => pp.segments.some((s) => s.text.trim().length > 0)));
+    const hasContent = hasPlaceholderText || bullets(trimmed).length > 0;
     if (!hasContent) v.push({ kind: "parse", severity: "hard", detail: "パース可能なスライド本文が無い" });
   }
 
