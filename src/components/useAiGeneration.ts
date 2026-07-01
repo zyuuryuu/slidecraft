@@ -435,7 +435,7 @@ export function useAiGeneration() {
     if (provider === "builtin") {
       if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: "オフラインAIを起動中…（初回は数十秒）" };
       if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: "オフラインAIの起動に失敗", hint: builtinStatus.message };
-      if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "『組み込みを有効化』で起動（要モデル）" };
+      if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "そのまま生成すると自動で起動します（初回は数十秒）" };
       // baseURL filled → fall through to the generic model checks below.
     }
     if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "Base URL 未設定" };
