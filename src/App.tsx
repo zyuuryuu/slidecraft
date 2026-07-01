@@ -314,10 +314,8 @@ export default function App() {
           hostJsonPath={collab.hostJsonPath}
           error={collab.error}
           docCount={collab.docCount}
-          simulating={collab.simulating}
           onStart={collab.start}
           onStop={collab.stop}
-          onSimulate={collab.simulateAiEdit}
         />
       )}
 
