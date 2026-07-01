@@ -1,5 +1,6 @@
 /**
- * LlmAssist.tsx — AI Assist dialog (used from Import mode).
+ * LlmAssist.tsx — the "AIで生成" dialog (whole-deck generation, opened from Draft/Import).
+ * Distinct from the top-bar "AI Assist" dock (AiPanel), which EDITS the current deck.
  *
  * Primary flow: describe a request → generate slide Markdown / diagram JSON
  * directly with the selected AI provider (BYOK), streamed live → import.
@@ -74,7 +75,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
       <div className="bg-[#0f1117] border border-[#2D3A6E] rounded-lg w-[800px] max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#2D3A6E]">
-          <h2 className="text-white font-semibold">AI Assist — Generate with AI</h2>
+          <h2 className="text-white font-semibold">✨ AIで生成 — 原稿からデッキを生成</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-lg">
             ×
           </button>

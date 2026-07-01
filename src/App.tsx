@@ -149,30 +149,32 @@ export default function App() {
           canRedo={editLocked ? true : canRedo}
         />
         <div className="flex items-center gap-2 px-3 py-2">
+          {/* Draft + 協働 = secondary actions; matched to the Toolbar's secondary button style so
+              the whole top bar reads as one tier (AI Assist / ファイル stay accent/primary). */}
           <button
             onClick={handleEnterImport}
             disabled={editLocked}
             title={editLocked ? "協働接続中は編集ロック中" : "原稿（テキスト）からスライドを作る・取り込む"}
-            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40 disabled:opacity-40 disabled:hover:bg-[#1E2761]"
+            className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E]"
           >
             📝 Draft
           </button>
+          {/* Single source of collab status: connected → the button itself becomes the emerald
+              "協働編集中" indicator (no separate chip). Click always opens/closes the panel. */}
           <button
             onClick={() => setShowCollab((v) => !v)}
-            title="AI と同じデッキをライブ共有（ローカル MCP サイドカー）"
-            className="px-3 py-1 text-xs rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40 inline-flex items-center gap-1"
+            title={editLocked
+              ? "協働編集中：あなたの編集は host（単一の真実）へ送られ AI とライブ共有されます。Undo もホスト側。クリックで接続パネルを開閉。"
+              : "AI と同じデッキをライブ共有（ローカル MCP サイドカー）"}
+            className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
+              editLocked
+                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
+                : "bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white"
+            }`}
           >
-            🔗 協働
-            {collab.status === "connected" && <span className="text-emerald-400 leading-none">●</span>}
+            {editLocked ? "✍️ 協働編集中" : "🔗 協働"}
+            {editLocked && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           </button>
-          {editLocked && (
-            <span
-              title="協働接続中：編集は host（単一の真実）へ送られ AI とライブ共有されます。Undo もホスト側で実行されます。"
-              className="px-2 py-1 text-xs rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1"
-            >
-              ✍️ 協働編集中
-            </span>
-          )}
         </div>
       </div>
 
