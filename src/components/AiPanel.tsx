@@ -176,16 +176,17 @@ export default function AiPanel({
                 🦙 Ollama → 使う
               </button>
             )}
-            {runningInTauri() && ai.provider !== "builtin" && (
-              <button
-                onClick={ai.switchToBuiltin}
-                disabled={ai.builtinStatus.kind === "starting"}
-                className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E] disabled:opacity-60"
-                title="オフラインの組み込みモデルに切り替えて使う"
-              >
-                {ai.builtinStatus.kind === "starting" ? "⏳ 起動中…" : "💻 オフラインAIを使う"}
-              </button>
-            )}
+            {runningInTauri() &&
+              (ai.builtinStatus.kind === "idle" || ai.builtinStatus.kind === "error") &&
+              (ai.provider !== "builtin" || ai.weightsPresent === false) && (
+                <button
+                  onClick={ai.switchToBuiltin}
+                  className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+                  title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
+                >
+                  {ai.weightsPresent === false ? "⬇ オフラインAI（初回DL 2.4GB）" : "💻 オフラインAIを使う"}
+                </button>
+              )}
             {runningInTauri() && ai.builtinStatus.kind === "running" && (
               <button
                 onClick={ai.stopBuiltin}
