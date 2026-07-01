@@ -14,16 +14,18 @@ import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDeckController } from "./components/useDeckController";
+import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
+import { pickBinaryFile } from "./ipc/commands";
 
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes,
     handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
@@ -31,6 +33,26 @@ export default function App() {
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef, collabRef,
   } = useDeckController();
+
+  // Master registry (Slice 1a): the global set of slide masters the draft can pick from (bundled
+  // sample + any imported this session). Selecting/importing applies it to the active doc (gated).
+  const { masters, importMaster: registerMaster, getBytes: getMasterBytes } = useMasterRegistry();
+  const [masterId, setMasterId] = useState(BUILTIN_MASTER.id);
+  const handleSelectMaster = useCallback(async (id: string) => {
+    const entry = masters.find((m) => m.id === id);
+    if (!entry) return;
+    const bytes = await getMasterBytes(id).catch(() => null);
+    if (!bytes) return;
+    const r = await applyMasterBytes(bytes, entry.name);
+    if (r.ok) setMasterId(id);
+  }, [masters, getMasterBytes, applyMasterBytes]);
+  const handleImportMaster = useCallback(async () => {
+    const picked = await pickBinaryFile(["pptx"], "PowerPoint");
+    if (!picked) return;
+    const entry = registerMaster(picked.name, picked.bytes);
+    const r = await applyMasterBytes(picked.bytes, entry.name);
+    if (r.ok) setMasterId(entry.id);
+  }, [registerMaster, applyMasterBytes]);
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
@@ -277,6 +299,10 @@ export default function App() {
         onOpenFile={handleOpen}
         onStructure={handleStructureManuscript}
         onGenerateAI={() => setShowLlmAssist(true)}
+        masters={masters}
+        activeMasterId={masterId}
+        onSelectMaster={handleSelectMaster}
+        onImportMaster={handleImportMaster}
         deck={deck}
         templateData={templateData}
         parseError={parseError}
