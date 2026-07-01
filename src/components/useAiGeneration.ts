@@ -50,6 +50,7 @@ const MAX_TASKS = 50; // keep the most recent N in history
 const MODE_LABEL: Record<AiMode, string> = {
   slides: "デッキ生成",
   slide: "スライド整形",
+  condense: "本文を要約",
   diagram: "図の生成",
   "diagram-edit": "図の編集",
 };
