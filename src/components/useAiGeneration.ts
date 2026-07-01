@@ -119,6 +119,9 @@ export function useAiGeneration() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const hadSavedConfig = useRef(saved.hadSaved);
   const didAutoSelect = useRef(false);
+  // Holds startBuiltin so runTask (defined earlier) can auto-start the runtime on first use
+  // without a forward reference. Populated by an effect below.
+  const startBuiltinRef = useRef<null | (() => Promise<string>)>(null);
 
   // Probe local Ollama once, so the UI can surface it — and, on a fresh install
   // (no saved config), auto-select it so a local-AI user can generate immediately.
@@ -195,7 +198,8 @@ export function useAiGeneration() {
     (userRequest: string) =>
       userRequest.trim().length > 0 &&
       cfg.model.trim().length > 0 &&
-      (preset.native || cfg.baseURL.trim().length > 0) &&
+      // builtin auto-starts on generate (desktop), so it needn't already have a baseURL.
+      (preset.native || cfg.baseURL.trim().length > 0 || (provider === "builtin" && runningInTauri())) &&
       (!preset.keyRequired || cfg.apiKey.trim().length > 0) &&
       !(localModelOnly && !isLocalTarget(provider, cfg.baseURL)), // local-only: no cloud target
     [cfg, preset, localModelOnly, provider],
@@ -245,8 +249,14 @@ export function useAiGeneration() {
       }
       abortMap.current.set(task.id, controller);
       try {
+        // Auto-start the bundled runtime on first use (no manual "有効化" required). Use the
+        // returned URL directly — cfg.baseURL in this closure is stale until the next render.
+        let baseURL = cfg.baseURL;
+        if (provider === "builtin" && !baseURL.trim() && startBuiltinRef.current) {
+          baseURL = await startBuiltinRef.current();
+        }
         const raw = await generateWithAI({
-          provider, apiKey: cfg.apiKey, baseURL: cfg.baseURL, model: cfg.model,
+          provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
           mode: task.mode, userRequest: task.prompt,
           onText: (t) => patchTask(task.id, { result: t }),
           signal: controller.signal,
@@ -347,34 +357,53 @@ export function useAiGeneration() {
     }));
   }, [ollamaModels]);
 
-  // One-click: enable the bundled llamafile runtime — Rust start_local_ai spawns it (polls /health),
-  // returns the loopback baseURL, which we runtime-fill into the "builtin" provider. Desktop-only +
-  // opt-in (never auto-probed: spawning a model is a deliberate, multi-second-cold-load action).
+  // The bundled llamafile runtime lifecycle. startBuiltin spawns it (Rust start_local_ai polls
+  // /health, returns the loopback baseURL) and adopts the model llamafile reports; it serves BOTH
+  // the manual "有効化" button AND auto-start-on-generate (runTask). Idempotent on the Rust side
+  // (a live child is reused). Desktop-only.
   const [builtinStatus, setBuiltinStatus] = useState<{ kind: "idle" | "starting" | "running" | "error"; message?: string }>({ kind: "idle" });
-  const switchToBuiltin = useCallback(async () => {
-    if (!runningInTauri()) {
-      setBuiltinStatus({ kind: "error", message: "組み込みモデルはデスクトップ版でのみ利用できます。" });
-      return;
-    }
+  const startBuiltin = useCallback(async (): Promise<string> => {
+    if (!runningInTauri()) throw new Error("組み込みモデルはデスクトップ版でのみ利用できます。");
     setBuiltinStatus({ kind: "starting" });
+    const { invoke } = await import("@tauri-apps/api/core");
+    const info = await invoke<{ baseUrl: string }>("start_local_ai");
+    // The reported model id (/v1/models = loaded GGUF basename) won't match the preset name, so
+    // adopt it → the badge shows 接続OK, not モデルを選択.
+    let model: string | undefined;
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const info = await invoke<{ baseUrl: string }>("start_local_ai");
-      // Auto-select the model llamafile actually reports (its /v1/models id is the loaded GGUF's
-      // basename, which won't match the preset name) so the badge shows 接続OK, not モデルを選択.
-      let model: string | undefined;
-      try {
-        const list = await listProviderModels("builtin", info.baseUrl, "");
-        model = list[0];
-      } catch {
-        /* keep the preset model name */
-      }
-      setConfigs((c) => ({ ...c, builtin: { ...c.builtin, baseURL: info.baseUrl, ...(model ? { model } : {}) } }));
+      const list = await listProviderModels("builtin", info.baseUrl, "");
+      model = list[0];
+    } catch {
+      /* keep the preset model name */
+    }
+    setConfigs((c) => ({ ...c, builtin: { ...c.builtin, baseURL: info.baseUrl, ...(model ? { model } : {}) } }));
+    setBuiltinStatus({ kind: "running" });
+    return info.baseUrl;
+  }, []);
+  useEffect(() => {
+    startBuiltinRef.current = startBuiltin; // let runTask auto-start without a forward reference
+  }, [startBuiltin]);
+
+  const switchToBuiltin = useCallback(async () => {
+    try {
+      await startBuiltin();
       setProvider("builtin");
-      setBuiltinStatus({ kind: "running" });
     } catch (e) {
       setBuiltinStatus({ kind: "error", message: e instanceof Error ? e.message : String(e) });
     }
+  }, [startBuiltin]);
+
+  // Stop the runtime + free its memory (~GB); the next generate auto-starts it again.
+  const stopBuiltin = useCallback(async () => {
+    if (!runningInTauri()) return;
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("stop_local_ai");
+    } catch {
+      /* ignore */
+    }
+    setConfigs((c) => ({ ...c, builtin: { ...c.builtin, baseURL: "" } }));
+    setBuiltinStatus({ kind: "idle" });
   }, []);
 
   // Toggle local-only: persist UNCONDITIONALLY; if turning ON while pointed at a cloud
@@ -436,7 +465,7 @@ export function useAiGeneration() {
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
-    switchToBuiltin, builtinStatus,
+    switchToBuiltin, stopBuiltin, builtinStatus,
     localModelOnly, setLocalModelOnly, localBlocked,
   };
 }

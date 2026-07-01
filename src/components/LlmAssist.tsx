@@ -171,6 +171,15 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                   {ai.builtinStatus.kind === "starting" ? "⏳ 起動中…" : "💻 組み込みAIを有効化"}
                 </button>
               )}
+              {runningInTauri() && ai.builtinStatus.kind === "running" && (
+                <button
+                  onClick={ai.stopBuiltin}
+                  className="px-2 py-0.5 rounded bg-[#2D3A6E] text-gray-300 hover:bg-[#3B4A7E] shrink-0"
+                  title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
+                >
+                  ⏹ 停止
+                </button>
+              )}
             </div>
 
             {!ai.preset.native && ai.provider !== "builtin" && (

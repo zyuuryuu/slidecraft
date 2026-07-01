@@ -76,6 +76,7 @@ export function isLocalBaseURL(url: string): boolean {
 /** Whether sending to this provider+endpoint stays on the local machine/LAN. Native
  *  Claude is always cloud; everything else is decided by the actual baseURL host. */
 export function isLocalTarget(provider: ProviderId, baseURL: string): boolean {
+  if (provider === "builtin") return true; // the bundled runtime is always a loopback server
   const preset = providerPreset(provider);
   return preset.native ? preset.local : isLocalBaseURL(baseURL);
 }
