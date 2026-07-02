@@ -54,6 +54,15 @@ describe("preview fidelity: layout background + decorations", () => {
     expect(withLine).toBeDefined(); // e.g. the full-width title/footer rules
   });
 
+  it("honors the LAYOUT's own paragraph alignment (lvl1pPr algn), not just the master's", () => {
+    // The report cover's title sets algn="l" in <a:lvl1pPr> while the master's titleStyle is "ctr".
+    // The layout override must win (left) — the old regex matched no pPr element so align was ALWAYS
+    // inherited from the master → a left-aligned title rendered centered.
+    const cover = report.layouts.find((l) => l.name === "00_表紙")!;
+    const title = cover.placeholders.find((p) => p.type === "ctrTitle")!;
+    expect(title.style.align).toBe("l");
+  });
+
   it("a canonical-pinned cover resolves to a REAL layout with its background (not blank)", () => {
     // The sample cover is pinned `<!-- slide: Title.1Title.Single -->` — a name this template lacks.
     // The preview/thumbnail must resolve it via autoSelectLayout (degrade → 00_表紙) so it isn't
