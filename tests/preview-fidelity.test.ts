@@ -39,6 +39,16 @@ describe("preview fidelity: layout background + decorations", () => {
     expect(cover.decorations.some((d) => d.color === "7FD4F5" && (d.radius ?? 0) > 0)).toBe(true);
   });
 
+  it("renders non-placeholder static TEXT labels (e.g. the cover's 日付/部署/作成者)", () => {
+    const cover = report.layouts.find((l) => l.name === "00_表紙")!;
+    const label = cover.staticTexts.find((t) => t.text.includes("日付"));
+    expect(label).toBeDefined();
+    expect(label!.text).toContain("作成者");
+    expect(label!.style.fontSize).toBeLessThan(20); // a small label, not a 32pt body dump
+    // the canonical master has no stray text boxes → no spurious static texts (no regression).
+    expect(canon.layouts.reduce((n, l) => n + l.staticTexts.length, 0)).toBe(0);
+  });
+
   it("captures connector lines (<p:cxnSp>) as thin decorations", () => {
     const withLine = report.layouts.find((l) => l.decorations.some((d) => d.h < 0.05 && d.w > 5));
     expect(withLine).toBeDefined(); // e.g. the full-width title/footer rules
