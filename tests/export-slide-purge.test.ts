@@ -16,6 +16,8 @@ import { generatePptx } from "../src/engine/placeholder-filler";
 
 const WITH_SLIDES = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
 const SLIDE_FREE = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+// This master's presentation.xml OMITS <p:sldIdLst> entirely (hand/generated template).
+const NO_SLDIDLST = resolve(__dirname, "../public/templates/slide/報告書テンプレート_マスター階層版.pptx");
 const MD = "# 表紙\n\n## サブ\n\n---\n\n# 本文\n\n- A\n- B\n\n---\n\n# まとめ\n\n- おわり";
 
 async function assemble(tpl: TemplateData) {
@@ -46,5 +48,15 @@ describe("generatePptx purges the template's baked-in slides", () => {
     expect(r.slides).toBe(r.deckLen);
     expect(r.sldIds).toBe(r.deckLen);
     expect(new Set(r.overrides).size).toBe(r.overrides.length);
+  });
+
+  it("a master whose presentation.xml OMITS sldIdLst still lists every slide (not 1 blank)", async () => {
+    // Regression: without an inserted <p:sldIdLst>, the deck's slide parts exist but the presentation
+    // references none → PowerPoint/LibreOffice show a single blank default slide.
+    const tpl = await loadTemplate(readFileSync(NO_SLDIDLST));
+    const r = await assemble(tpl);
+    expect(r.deckLen).toBeGreaterThan(1);
+    expect(r.slides).toBe(r.deckLen);
+    expect(r.sldIds).toBe(r.deckLen); // sldIdLst was inserted + populated
   });
 });
