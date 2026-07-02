@@ -249,10 +249,14 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const boldMatch = sp.match(/defRPr[^>]*b="1"/) || sp.match(/<a:rPr[^>]*b="1"/);
   const textColor = extractTextColor(sp, theme); // srgbClr → theme schemeClr → undefined
   const fontMatch = sp.match(/<a:latin typeface="([^"]+)"/);
-  // Alignment lives in a paragraph-props element: <a:pPr>, a list-style level <a:lvlNpPr>, or
-  // <a:defPPr>. The old /<a:(?:def)?PPr/ matched NONE of these (wrong case + no lvl), so alignment
-  // was silently ALWAYS inherited from the master — a left-aligned layout title rendered centered.
-  const alignMatch = sp.match(/<a:(?:lvl\d+pPr|pPr|defPPr)\b[^>]*algn="(\w+)"/);
+  // Alignment for level-1 text: a paragraph's own <a:pPr>, else the lstStyle's <a:lvl1pPr>, else
+  // <a:defPPr>. Deliberately NOT lvl2-9 (deeper list levels) — templates may author lvl2-9 BEFORE
+  // lvl1, so a naive "first pPr-like" match grabbed a lvl2 center align for a left subtitle. The old
+  // /<a:(?:def)?PPr/ matched nothing at all → alignment was ALWAYS inherited from the master.
+  const alignMatch =
+    sp.match(/<a:pPr\b[^>]*algn="(\w+)"/) ||
+    sp.match(/<a:lvl1pPr\b[^>]*algn="(\w+)"/) ||
+    sp.match(/<a:defPPr\b[^>]*algn="(\w+)"/);
 
   // Bullet: shape's own buChar/buNone wins, else inherit the master's body bullet
   // (title placeholders never bullet). "" = no bullet.
