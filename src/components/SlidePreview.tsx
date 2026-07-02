@@ -376,7 +376,10 @@ export default function SlidePreview({
   const hasSlides = !!deck && deck.slides.length > 0;
 
   const slideCard = (slide: SlideIR, i: number, active: boolean) => {
-    const layoutName = slide.layout === "auto" ? autoSelectLayout(slide, i, deck!.slides.length, catalog) : slide.layout;
+    // ALWAYS resolve through autoSelectLayout: it honors a valid pinned name but DEGRADES a name this
+    // template lacks (e.g. a canonical "Title.1Title.Single" pin on an alien master) to a real layout
+    // — matching the export path. Using slide.layout directly left the cover with no layout = blank.
+    const layoutName = autoSelectLayout(slide, i, deck!.slides.length, catalog);
     const layout = template ? findLayout(template, layoutName) : undefined;
     return (
       <SlideCard
