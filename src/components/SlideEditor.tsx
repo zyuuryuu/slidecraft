@@ -17,6 +17,10 @@ import { LAYOUT_NAMES } from "../engine/slide-schema";
 interface SlideEditorProps {
   slide: SlideIR;
   layout: LayoutInfo | undefined;
+  /** The LOADED template's actual layout names for the picker. Falls back to the canonical names
+   *  when no template is loaded. (Offering canonical names for a non-canonical master made the picker
+   *  a no-op: every pick was absent from the catalog and degraded to the same layout.) */
+  layoutNames?: string[];
   onChange: (updated: SlideIR) => void;
 }
 
@@ -85,7 +89,7 @@ function textToParagraphs(text: string): Paragraph[] {
   });
 }
 
-export default function SlideEditor({ slide, layout, onChange }: SlideEditorProps) {
+export default function SlideEditor({ slide, layout, layoutNames, onChange }: SlideEditorProps) {
   // ── Update a specific placeholder ──
   const updatePlaceholder = useCallback(
     (idx: string, text: string) => {
@@ -161,7 +165,7 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
           className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
         >
           <option value="auto">Auto</option>
-          {LAYOUT_NAMES.map((name) => (
+          {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
             <option key={name} value={name}>
               {name}
             </option>

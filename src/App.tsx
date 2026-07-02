@@ -255,7 +255,7 @@ export default function App() {
                   ) : slideEditView === "markdown" ? (
                     <SlideMarkdownEditor key={activeSlide} md={currentSlideMd ?? ""} onChange={handleSlideMdChange} />
                   ) : (
-                    <SlideEditor key={activeSlide} slide={currentSlide} layout={currentLayout} onChange={(updated) => handleSlideUpdate(activeSlide, updated)} />
+                    <SlideEditor key={activeSlide} slide={currentSlide} layout={currentLayout} layoutNames={templateData?.layouts.map((l) => l.name)} onChange={(updated) => handleSlideUpdate(activeSlide, updated)} />
                   )}
                 </div>
               </>
