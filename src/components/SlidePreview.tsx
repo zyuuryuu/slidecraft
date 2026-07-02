@@ -124,8 +124,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
-  // Background = master bg color. Decorative shapes are painted on top.
-  const bgColor = `#${masterBgColor}`;
+  // Background = the LAYOUT's own <p:bg> fill if it has one (e.g. a full-bleed cover panel),
+  // else the master bg color. Decorative shapes are painted on top.
+  const bgColor = `#${layout?.background ?? masterBgColor}`;
 
   return (
     <div
@@ -143,7 +144,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         flexShrink: 0,
       }}
     >
-      {/* Decorative shapes from template */}
+      {/* Decorative shapes from template (fill + optional rounded corners + outline) */}
       {layout?.decorations.map((d, i) => (
         <div
           key={`deco-${i}`}
@@ -154,6 +155,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
             width: `${(d.w / SLIDE_W) * 100}%`,
             height: `${(d.h / SLIDE_H) * 100}%`,
             backgroundColor: `#${d.color}`,
+            ...(d.radius ? { borderRadius: d.radius * scale } : {}),
+            ...(d.border ? { border: `${Math.max(1, 0.014 * scale)}px solid #${d.border}` } : {}),
           }}
         />
       ))}

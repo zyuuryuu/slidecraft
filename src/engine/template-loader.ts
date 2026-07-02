@@ -39,7 +39,9 @@ export interface DecoRect {
   y: number;
   w: number;
   h: number;
-  color: string; // hex without #
+  color: string; // fill hex without #
+  radius?: number; // corner radius in inches (roundRect / ellipse) — for a faithful preview
+  border?: string; // outline color hex without # (a bordered/white card would otherwise vanish)
 }
 
 export interface LayoutInfo {
@@ -47,6 +49,7 @@ export interface LayoutInfo {
   name: string; // layout name from cSld
   placeholders: PlaceholderInfo[];
   decorations: DecoRect[]; // decorative shapes (backgrounds, bars, panels)
+  background?: string; // resolved layout <p:bg> fill (hex, no #); undefined = inherit master bg
 }
 
 export interface MasterStyle {
@@ -150,6 +153,22 @@ function extractTextColor(sp: string, theme: Record<string, string>): string | u
   return token ? theme[token] : undefined;
 }
 
+/**
+ * A layout/master's own `<p:bg>` fill as hex, or undefined (inherit). Handles the two common forms:
+ * `<p:bgPr><a:solidFill>` (explicit srgbClr or a theme schemeClr) and `<p:bgRef><a:schemeClr>` (a
+ * theme fill-style reference — for the standard solid style the referenced color IS the schemeClr
+ * token, so resolving the token is correct). Design like a full-bleed cover panel lives HERE, not in
+ * a shape, so the preview must read it to match the export.
+ */
+function extractBackground(xml: string, theme: Record<string, string>): string | undefined {
+  const bg = xml.match(/<p:bg>[\s\S]*?<\/p:bg>/)?.[0];
+  if (!bg) return undefined;
+  const srgb = bg.match(/<a:srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
+  if (srgb) return srgb.toUpperCase();
+  const token = bg.match(/<a:schemeClr val="(\w+)"/)?.[1];
+  return token ? theme[token] : undefined;
+}
+
 // ── Extract master style from titleStyle or bodyStyle XML ──
 
 function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme: Record<string, string>): MasterStyle {
@@ -214,28 +233,85 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
 
 // ── Extract decorative rects from layout XML ──
 
-function extractDecorations(layoutXml: string): DecoRect[] {
+/** solidFill color (srgbClr / theme schemeClr) of a fragment, or undefined. */
+function solidFillColor(fragment: string, theme: Record<string, string>): string | undefined {
+  const solid = fragment.match(/<a:solidFill>[\s\S]*?<\/a:solidFill>/)?.[0];
+  if (!solid) return undefined;
+  const srgb = solid.match(/<a:srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
+  if (srgb) return srgb.toUpperCase();
+  const token = solid.match(/<a:schemeClr val="(\w+)"/)?.[1];
+  return token ? theme[token] : undefined;
+}
+
+/** The shape's OWN fill color — scoped to the fill region BEFORE <a:ln>, so a noFill shape's LINE
+ *  color (or a text run's color) is never mistaken for the fill. undefined = noFill / no fill. */
+function shapeFillColor(spPr: string, theme: Record<string, string>): string | undefined {
+  const fillRegion = spPr.split(/<a:ln\b/)[0];
+  if (/<a:noFill\s*\/>/.test(fillRegion)) return undefined;
+  return solidFillColor(fillRegion, theme);
+}
+
+/** The shape's outline color (inside <a:ln>), or undefined for noFill / no line. */
+function shapeLineColor(spPr: string, theme: Record<string, string>): string | undefined {
+  const ln = spPr.match(/<a:ln\b[^>]*>[\s\S]*?<\/a:ln>/)?.[0];
+  if (!ln) return undefined;
+  return solidFillColor(ln, theme);
+}
+
+/** Corner radius (inches) for the preview: ellipse → half the min side; roundRect → ~12% of it. */
+function cornerRadius(spPr: string, w: number, h: number): number | undefined {
+  const prst = spPr.match(/<a:prstGeom prst="(\w+)"/)?.[1];
+  if (prst === "ellipse") return Math.min(w, h) / 2;
+  if (prst === "roundRect") return Math.min(w, h) * 0.12;
+  return undefined;
+}
+
+function extractDecorations(layoutXml: string, theme: Record<string, string>): DecoRect[] {
   const normalized = normalizeNs(layoutXml);
-  const shapes = normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
   const decos: DecoRect[] = [];
 
-  for (const sp of shapes) {
-    // Skip placeholder shapes
-    if (sp.includes("<p:ph")) continue;
+  // ── Panels / bars / cards (<p:sp>) ──
+  for (const sp of normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
+    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
+    const spPr = sp.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? "";
+    const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
+    const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+    if (!offMatch || !extMatch) continue;
 
-    const offMatch = sp.match(/<a:off x="(\d+)" y="(\d+)"/);
-    const extMatch = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
-    const colorMatch = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/);
+    const fill = shapeFillColor(spPr, theme);
+    const border = shapeLineColor(spPr, theme);
+    if (!fill && !border) continue; // a noFill text box with no outline is not decoration
 
-    if (offMatch && extMatch && colorMatch) {
-      decos.push({
-        x: emuToInch(offMatch[1]),
-        y: emuToInch(offMatch[2]),
-        w: emuToInch(extMatch[1]),
-        h: emuToInch(extMatch[2]),
-        color: colorMatch[1],
-      });
-    }
+    const w = emuToInch(extMatch[1]);
+    const h = emuToInch(extMatch[2]);
+    decos.push({
+      x: emuToInch(offMatch[1]),
+      y: emuToInch(offMatch[2]),
+      w,
+      h,
+      color: fill ?? "FFFFFF", // border-only card → white fill so its outline still frames content
+      radius: cornerRadius(spPr, w, h),
+      border,
+    });
+  }
+
+  // ── Connector lines (<p:cxnSp>) — title/footer rules etc. A horizontal line has cy=0, so give it
+  // a visible thickness from <a:ln w>. Colored by the LINE fill, not a shape fill. ──
+  for (const cx of normalized.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || []) {
+    const spPr = cx.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? cx;
+    const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
+    const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+    const color = shapeLineColor(spPr, theme);
+    if (!offMatch || !extMatch || !color) continue;
+    const lnW = spPr.match(/<a:ln\b[^>]*\bw="(\d+)"/)?.[1];
+    const thick = lnW ? emuToInch(lnW) : 0.02; // EMU→in (fallback ≈ 1.5px at preview scale)
+    decos.push({
+      x: emuToInch(offMatch[1]),
+      y: emuToInch(offMatch[2]),
+      w: Math.max(emuToInch(extMatch[1]), thick),
+      h: Math.max(emuToInch(extMatch[2]), thick),
+      color,
+    });
   }
 
   return decos;
@@ -322,9 +398,10 @@ export async function loadTemplate(
     const nameMatch = xml.match(/name="([^"]+)"/);
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
     const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle, themeColors);
-    const decorations = extractDecorations(xml);
+    const decorations = extractDecorations(xml, themeColors);
+    const background = extractBackground(xml, themeColors);
 
-    layouts.push({ index: i, name, placeholders, decorations });
+    layouts.push({ index: i, name, placeholders, decorations, background });
   }
 
   const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
