@@ -193,17 +193,38 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
   };
 }
 
+// ── Master placeholder geometry (for inheritance) ──
+
+interface Geom { x: number; y: number; w: number; h: number; }
+
+/** The master's geometry per placeholder TYPE. A layout placeholder that omits its own xfrm inherits
+ *  position/size from the master placeholder of the SAME TYPE (the OOXML rule) — without this it
+ *  collapses to 0×0 in the preview, dropping footer/date/slide-number chrome. */
+function extractMasterPlaceholderGeometry(masterXml: string): Record<string, Geom> {
+  const out: Record<string, Geom> = {};
+  for (const sp of normalizeNs(masterXml).match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
+    const phTag = sp.match(/<p:ph([^/>]*)\/?>/);
+    if (!phTag) continue;
+    const type = phTag[1].match(/type="(\w+)"/)?.[1] ?? "body";
+    const off = sp.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
+    const ext = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+    if (off && ext) out[type] = { x: emuToInch(off[1]), y: emuToInch(off[2]), w: emuToInch(ext[1]), h: emuToInch(ext[2]) };
+  }
+  return out;
+}
+
 // ── Extract style from shape XML, merging with master defaults ──
 
-function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>): PlaceholderStyle {
+function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>, masterGeom: Record<string, Geom>): PlaceholderStyle {
   // Determine if this is a title-type placeholder
   const phType = sp.match(/<p:ph[^>]*type="(\w+)"/)?.[1] || "body";
   const isTitle = phType === "ctrTitle" || phType === "title";
   const master = isTitle ? masterTitle : masterBody;
 
-  // Position and size from xfrm
-  const offMatch = sp.match(/<a:off x="(\d+)" y="(\d+)"/);
+  // Position and size from xfrm; when absent, INHERIT the master placeholder's box (by type).
+  const offMatch = sp.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
   const extMatch = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+  const inh = (!offMatch || !extMatch) ? (masterGeom[phType] ?? (isTitle ? masterGeom.title : undefined)) : undefined;
 
   // Font info: check layout lstStyle first, then rPr, then fall back to master
   const szMatch = sp.match(/defRPr[^>]*sz="(\d+)"/) || sp.match(/<a:rPr[^>]*sz="(\d+)"/);
@@ -218,10 +239,10 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const bulletChar = shapeBuChar ?? (/<a:buNone\/>/.test(sp) ? "" : isTitle ? "" : master.bulletChar);
 
   return {
-    x: emuToInch(offMatch?.[1]),
-    y: emuToInch(offMatch?.[2]),
-    w: emuToInch(extMatch?.[1]),
-    h: emuToInch(extMatch?.[2]),
+    x: offMatch ? emuToInch(offMatch[1]) : (inh?.x ?? 0),
+    y: offMatch ? emuToInch(offMatch[2]) : (inh?.y ?? 0),
+    w: extMatch ? emuToInch(extMatch[1]) : (inh?.w ?? 0),
+    h: extMatch ? emuToInch(extMatch[2]) : (inh?.h ?? 0),
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : master.fontSize,
     fontColor: textColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
@@ -324,6 +345,7 @@ function extractPlaceholders(
   masterTitle: MasterStyle,
   masterBody: MasterStyle,
   theme: Record<string, string>,
+  masterGeom: Record<string, Geom>,
 ): PlaceholderInfo[] {
   const normalized = normalizeNs(layoutXml);
   const shapes = normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
@@ -344,7 +366,7 @@ function extractPlaceholders(
     // placeholders omit type (see placeholderRole's recovery tiers + assessTemplateHealth).
     const type = typeMatch ? typeMatch[1] : "";
     const name = nameMatch ? nameMatch[1] : "";
-    const style = extractStyle(sp, masterTitle, masterBody, theme);
+    const style = extractStyle(sp, masterTitle, masterBody, theme, masterGeom);
 
     placeholders.push({ idx, type, name, shapeXml: sp, style });
   }
@@ -376,6 +398,7 @@ export async function loadTemplate(
     ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF",
   }, themeColors);
   const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle, themeColors);
+  const masterGeom = extractMasterPlaceholderGeometry(masterXml); // for inherited placeholder geometry
 
   // ── Extract layouts ──
   const layouts: LayoutInfo[] = [];
@@ -397,7 +420,7 @@ export async function loadTemplate(
     const xml = await readCappedString(file, ZIP_LIMITS.xmlEntry);
     const nameMatch = xml.match(/name="([^"]+)"/);
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
-    const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle, themeColors);
+    const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
     const decorations = extractDecorations(xml, themeColors);
     const background = extractBackground(xml, themeColors);
 

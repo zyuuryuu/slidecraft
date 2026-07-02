@@ -57,6 +57,19 @@ describe("preview fidelity: layout background + decorations", () => {
     expect(layout!.background).toBe("0A5A87"); // dark cover panel renders, not white
   });
 
+  it("inherits placeholder geometry from the master when a layout placeholder omits its xfrm", () => {
+    // The cover's date/footer/slideNumber placeholders carry NO own <a:off>/<a:ext> (they inherit
+    // from the master's footer band). Without inheritance they collapsed to 0×0 = invisible.
+    const cover = report.layouts.find((l) => l.name === "00_表紙")!;
+    const footerRow = cover.placeholders.filter((p) => ["dt", "ftr", "sldNum"].includes(p.type));
+    expect(footerRow.length).toBeGreaterThanOrEqual(2);
+    for (const p of footerRow) {
+      expect(p.style.w).toBeGreaterThan(0);
+      expect(p.style.h).toBeGreaterThan(0);
+      expect(p.style.y).toBeGreaterThan(5); // down in the footer band, not at the top-left origin
+    }
+  });
+
   it("keeps ONLY real solid-filled panels on the canonical master (no text-box ghosts)", () => {
     // 29 real spPr-solidFill panels; the 68 noFill text boxes must be dropped (were ghosted before).
     const total = canon.layouts.reduce((n, l) => n + l.decorations.length, 0);
