@@ -152,18 +152,30 @@ function buildThemeColors(themeXml: string, masterXml: string): Record<string, s
   return colors;
 }
 
+/** The <a:rPr>/<a:defRPr> blocks that carry a shape's LEVEL-1 text run properties (size/color/bold/
+ *  font): an actual paragraph run's rPr, then the lstStyle <a:lvl1pPr>'s defRPr. Scoping here is what
+ *  makes the read robust: a template may author deeper lvl2-9 defaults BEFORE lvl1, so a naive
+ *  "first defRPr / first color anywhere" grabs the wrong level. Returns { run, lvl1DefRPr, lvl1 }. */
+function level1TextSources(sp: string): { run: string; lvl1DefRPr: string; lvl1: string } {
+  const run = sp.match(/<a:rPr\b[\s\S]*?<\/a:rPr>|<a:rPr\b[^>]*\/>/)?.[0] ?? "";
+  const lvl1 = sp.match(/<a:lvl1pPr\b[\s\S]*?<\/a:lvl1pPr>/)?.[0] ?? "";
+  const lvl1DefRPr = lvl1.match(/<a:defRPr\b[\s\S]*?<\/a:defRPr>|<a:defRPr\b[^>]*\/>/)?.[0] ?? "";
+  return { run, lvl1DefRPr, lvl1 };
+}
+
 /**
- * A shape's TEXT color: an explicit srgbClr wins (canonical bakes these — unchanged); else a theme
- * `schemeClr` resolved via the clrScheme, read from the TEXT region only (the `<p:spPr>` fill/outline
- * is excluded so an accent-filled box doesn't hijack the text color); else undefined → the caller
- * falls back to the master/default color.
+ * A shape's TEXT color. Prefer the LEVEL-1 run color (an actual run's rPr, else the lvl1pPr defRPr) —
+ * scoped so a deeper lvl2-9 default or the shape's own fill can't hijack it. Falls back to the old
+ * "first srgb / first scheme outside spPr" for simple shapes (master placeholders, static labels)
+ * whose color isn't in a lvl1/run scope. undefined → the caller uses the master/default color.
  */
 function extractTextColor(sp: string, theme: Record<string, string>): string | undefined {
+  const { run, lvl1DefRPr } = level1TextSources(sp);
+  const scoped = resolveColor(parseColorRef(run), { theme }) ?? resolveColor(parseColorRef(lvl1DefRPr), { theme });
+  if (scoped) return scoped;
   const srgb = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
   if (srgb) return srgb;
-  // No explicit srgb anywhere → the text color is a theme schemeClr in the text region (spPr fill
-  // excluded so an accent-filled box doesn't hijack it). Resolve via the shared color resolver.
-  const txScope = sp.replace(/<p:spPr>[\s\S]*?<\/p:spPr>/, "");
+  const txScope = sp.replace(/<p:spPr>[\s\S]*?<\/p:spPr>/, ""); // exclude the shape fill/outline
   return resolveColor(parseColorRef(txScope), { theme });
 }
 
@@ -244,11 +256,15 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const extMatch = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
   const inh = (!offMatch || !extMatch) ? (masterGeom[phType] ?? (isTitle ? masterGeom.title : undefined)) : undefined;
 
-  // Font info: check layout lstStyle first, then rPr, then fall back to master
-  const szMatch = sp.match(/defRPr[^>]*sz="(\d+)"/) || sp.match(/<a:rPr[^>]*sz="(\d+)"/);
-  const boldMatch = sp.match(/defRPr[^>]*b="1"/) || sp.match(/<a:rPr[^>]*b="1"/);
-  const textColor = extractTextColor(sp, theme); // srgbClr → theme schemeClr → undefined
-  const fontMatch = sp.match(/<a:latin typeface="([^"]+)"/);
+  // Font run properties: prefer the LEVEL-1 sources (actual run rPr, then lvl1pPr defRPr) so a lvl2-9
+  // default authored BEFORE lvl1 can't be grabbed; then fall back to the shape's first defRPr/rPr
+  // (catches a size held outside a lvl1 block), then the master. The scoped-first order is the fix;
+  // the broad fallback preserves values the old code found.
+  const { run, lvl1DefRPr, lvl1 } = level1TextSources(sp);
+  const szMatch = run.match(/\bsz="(\d+)"/) || lvl1DefRPr.match(/\bsz="(\d+)"/) || sp.match(/<a:defRPr[^>]*\bsz="(\d+)"/) || sp.match(/<a:rPr[^>]*\bsz="(\d+)"/);
+  const boldMatch = run.match(/\bb="1"/) || lvl1DefRPr.match(/\bb="1"/) || sp.match(/<a:defRPr[^>]*\bb="1"/) || sp.match(/<a:rPr[^>]*\bb="1"/);
+  const textColor = extractTextColor(sp, theme);
+  const fontMatch = run.match(/<a:latin typeface="([^"]+)"/) || lvl1DefRPr.match(/<a:latin typeface="([^"]+)"/) || sp.match(/<a:latin typeface="([^"]+)"/);
   // Alignment for level-1 text: a paragraph's own <a:pPr>, else the lstStyle's <a:lvl1pPr>, else
   // <a:defPPr>. Deliberately NOT lvl2-9 (deeper list levels) — templates may author lvl2-9 BEFORE
   // lvl1, so a naive "first pPr-like" match grabbed a lvl2 center align for a left subtitle. The old
@@ -258,10 +274,11 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
     sp.match(/<a:lvl1pPr\b[^>]*algn="(\w+)"/) ||
     sp.match(/<a:defPPr\b[^>]*algn="(\w+)"/);
 
-  // Bullet: shape's own buChar/buNone wins, else inherit the master's body bullet
-  // (title placeholders never bullet). "" = no bullet.
-  const shapeBuChar = sp.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
-  const bulletChar = shapeBuChar ?? (/<a:buNone\/>/.test(sp) ? "" : isTitle ? "" : master.bulletChar);
+  // Bullet: the level-1 buChar/buNone wins, else inherit the master's body bullet (title placeholders
+  // never bullet). "" = no bullet. Scoped to lvl1 (fall back to the whole shape when there's no lstStyle).
+  const buScope = lvl1 || sp;
+  const shapeBuChar = buScope.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
+  const bulletChar = shapeBuChar ?? (/<a:buNone\s*\/>/.test(buScope) ? "" : isTitle ? "" : master.bulletChar);
 
   return {
     x: offMatch ? emuToInch(offMatch[1]) : (inh?.x ?? 0),
