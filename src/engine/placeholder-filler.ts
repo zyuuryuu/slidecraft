@@ -27,6 +27,11 @@ import { midnightExecutive } from "./theme";
  */
 export type SvgRasterizer = (svg: string) => Promise<Uint8Array>;
 
+/** Code/log text → paragraphs (one per source line, no bullets) so the body renders line-by-line. */
+function codeToParagraphs(content: string): PlaceholderContent["paragraphs"] {
+  return content.split("\n").map((line) => ({ segments: [{ text: line }] }));
+}
+
 // ── Replace text in a placeholder shape XML ──
 
 function replaceTextInShape(
@@ -131,12 +136,22 @@ async function buildSlideXml(
   const diagBodyIdx = slide.diagram ? visualBody(slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
+  const codeBodyIdx = slide.code ? visualBody(slide.code.placeholderIdx)?.idx : undefined;
 
   let shapes = "";
   let id = 2;
 
   for (const ph of layout.placeholders) {
     if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx) continue; // replaced by the visual
+    // A code/log block FILLS its body placeholder with monospace text (the placeholder's own
+    // lstStyle supplies the monospace font / code-box styling — we only swap the text).
+    if (ph.idx === codeBodyIdx) {
+      let shapeXml = replaceTextInShape(ph.shapeXml, { idx: ph.idx, paragraphs: codeToParagraphs(slide.code!.content) });
+      shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
+      shapes += shapeXml;
+      id++;
+      continue;
+    }
     const content = contentFor.get(ph.idx);
     if (!content) continue;
 

@@ -181,6 +181,10 @@ function serializeSlide(
         lines.push("```mermaid");
         lines.push(slide.mermaidBlock.mermaid);
         lines.push("```");
+      } else if (slide.code) {
+        lines.push("```" + (slide.code.lang ?? ""));
+        lines.push(slide.code.content);
+        lines.push("```");
       } else {
         const body = getPlaceholderText(slide, "1");
         if (body) lines.push(body);

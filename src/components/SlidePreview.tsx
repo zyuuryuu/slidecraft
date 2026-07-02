@@ -123,6 +123,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
+  const codeBodyIdx = slide.code ? nthBody(bodyPhs, slide.code.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
@@ -298,6 +299,30 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
                   })}
                 </tbody>
               </table>
+            </div>
+          );
+        }
+
+        // Code/log → monospace text at the code body box (matches the export's code-body fill).
+        if (slide.code && ph.idx === codeBodyIdx) {
+          return (
+            <div
+              key={`code-${ph.idx}`}
+              style={{
+                position: "absolute",
+                left: `${(s.x / SLIDE_W) * 100}%`,
+                top: `${(s.y / SLIDE_H) * 100}%`,
+                width: `${(s.w / SLIDE_W) * 100}%`,
+                height: `${(s.h / SLIDE_H) * 100}%`,
+                overflow: "hidden",
+                fontFamily: "ui-monospace, monospace",
+                fontSize: s.fontSize * (scale / 72),
+                color: `#${s.fontColor}`,
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.35,
+              }}
+            >
+              {slide.code.content}
             </div>
           );
         }

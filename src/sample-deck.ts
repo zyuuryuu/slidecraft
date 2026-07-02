@@ -571,6 +571,21 @@ edges: []
 
 ---
 
+# 検知ルールの実装例
+> コード / ログ（等幅ブロック）
+
+\`\`\`yaml
+title: 不審なプロセス生成
+detection:
+  selection:
+    EventID: 4688
+    NewProcessName|endswith: '\\powershell.exe'
+  condition: selection
+level: high
+\`\`\`
+
+---
+
 # 導入ロードマップ
 > Implementation Roadmap
 
