@@ -11,6 +11,7 @@ import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/
 import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
+import { applyFigureYaml } from "../engine/ai-apply";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, findLayout } from "../engine/template-loader";
@@ -359,6 +360,13 @@ export function useDeckController() {
     (raw: string) => {
       if (!deck) return;
       const old = deck.slides[activeSlide];
+      // ⓪ Figure edit: AI mode "diagram-edit" returns a BARE DiagramSpec YAML (not Markdown). Apply
+      // it straight to the slide's diagram — parsing it as Markdown yields no diagram, so the figure
+      // edit would be silently dropped and the OLD diagram kept ("採用しても反映されない").
+      if (old) {
+        const fig = applyFigureYaml(old, raw);
+        if (fig) { handleSlideUpdate(activeSlide, fig, "commit"); return; }
+      }
       // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
       // The engine maps it to clamped geometry on the current slide.
       const intent = parseDesignIntent(raw);
