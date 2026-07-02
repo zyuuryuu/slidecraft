@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
-import type { TemplateData, LayoutInfo, DecoRect } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { bindContentByRole, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
@@ -103,6 +103,7 @@ interface SlideCardProps {
   layout: LayoutInfo | undefined;
   masterBgColor: string; // hex without #
   masterDecorations?: DecoRect[]; // the master's own shapes — painted under the layout's
+  masterStaticTexts?: StaticText[]; // the master's own static text labels
   scale: number;
   isActive?: boolean;
   /** In the multi-selection set (highlighted) but not necessarily the focused slide. */
@@ -112,7 +113,7 @@ interface SlideCardProps {
   onDiagramChange?: (yaml: string) => void;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -162,6 +163,33 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
           }}
         />
       ))}
+
+      {/* Static (non-placeholder) text labels from the master, then the layout — e.g. a cover's
+          "日付 / 部署 / 作成者". PowerPoint renders these; they aren't placeholders or filled decos. */}
+      {[...(masterStaticTexts ?? []), ...(layout?.staticTexts ?? [])].map((st, i) => {
+        const s = st.style;
+        return (
+          <div
+            key={`static-${i}`}
+            style={{
+              position: "absolute",
+              left: `${(s.x / SLIDE_W) * 100}%`,
+              top: `${(s.y / SLIDE_H) * 100}%`,
+              width: `${(s.w / SLIDE_W) * 100}%`,
+              height: `${(s.h / SLIDE_H) * 100}%`,
+              fontSize: s.fontSize * (scale / 72),
+              color: `#${s.fontColor}`,
+              fontWeight: s.bold ? "bold" : "normal",
+              textAlign: s.align === "ctr" ? "center" : s.align === "r" ? "right" : "left",
+              overflow: "hidden",
+              lineHeight: 1.2,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {st.text}
+          </div>
+        );
+      })}
 
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {
@@ -392,6 +420,7 @@ export default function SlidePreview({
         layout={layout}
         masterBgColor={template?.masterBgColor ?? "FFFFFF"}
         masterDecorations={template?.masterDecorations}
+        masterStaticTexts={template?.masterStaticTexts}
         scale={scale}
         isActive={active}
         onClick={singleSlide ? undefined : () => onSlideClick?.(i)}

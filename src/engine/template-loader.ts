@@ -45,11 +45,20 @@ export interface DecoRect {
   border?: string; // outline color hex without # (a bordered/white card would otherwise vanish)
 }
 
+/** Static (non-placeholder) text on a layout/master — design labels like a cover's "日付 / 部署 /
+ *  作成者". PowerPoint renders these; the preview used to drop them (they're neither placeholders nor
+ *  filled decorations). */
+export interface StaticText {
+  text: string;
+  style: PlaceholderStyle;
+}
+
 export interface LayoutInfo {
   index: number; // 1-based (slideLayout1.xml)
   name: string; // layout name from cSld
   placeholders: PlaceholderInfo[];
   decorations: DecoRect[]; // decorative shapes (backgrounds, bars, panels)
+  staticTexts: StaticText[]; // non-placeholder text boxes (design labels)
   background?: string; // resolved layout <p:bg> fill (hex, no #); undefined = inherit master bg
 }
 
@@ -73,6 +82,7 @@ export interface TemplateData {
   masterBgColor: string; // hex without #, from theme bg1/lt1
   masterDecorations: DecoRect[]; // the master's OWN non-placeholder shapes (logos/bars) — a base layer
                                  // shown UNDER every layout (the preview never read these before)
+  masterStaticTexts: StaticText[]; // the master's own static text labels (base layer)
 }
 
 // ── Namespace normalization ──
@@ -342,6 +352,27 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
   return decos;
 }
 
+/** Non-placeholder shapes that carry TEXT (design labels like a cover's "日付 / 部署 / 作成者").
+ *  Their box + font resolve through the SAME extractStyle as placeholders (so inherited geometry/
+ *  font/color work), and the text is the concatenated runs. */
+function extractStaticTexts(
+  layoutXml: string,
+  masterTitle: MasterStyle,
+  masterBody: MasterStyle,
+  theme: Record<string, string>,
+  masterGeom: Record<string, Geom>,
+): StaticText[] {
+  const normalized = normalizeNs(layoutXml);
+  const out: StaticText[] = [];
+  for (const sp of normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
+    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
+    const text = (sp.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((m) => m.replace(/<\/?a:t>/g, "")).join("");
+    if (!text.trim()) continue; // a pure fill shape (no text) is a decoration, not static text
+    out.push({ text, style: extractStyle(sp, masterTitle, masterBody, theme, masterGeom) });
+  }
+  return out;
+}
+
 // ── Extract placeholders from layout XML ──
 
 function extractPlaceholders(
@@ -426,9 +457,10 @@ export async function loadTemplate(
     const name = nameMatch ? nameMatch[1] : `Layout${i}`;
     const placeholders = extractPlaceholders(xml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
     const decorations = extractDecorations(xml, themeColors);
+    const staticTexts = extractStaticTexts(xml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
     const background = extractBackground(xml, themeColors);
 
-    layouts.push({ index: i, name, placeholders, decorations, background });
+    layouts.push({ index: i, name, placeholders, decorations, staticTexts, background });
   }
 
   const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
@@ -440,10 +472,11 @@ export async function loadTemplate(
   // The master's OWN non-placeholder shapes (logos, header/footer bars) — the same extractor as the
   // layouts, run on the master. Shown as a base layer under every layout (previously never read).
   const masterDecorations = extractDecorations(masterXml, themeColors);
+  const masterStaticTexts = extractStaticTexts(masterXml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
 
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
-    masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations,
+    masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts,
   };
 }
 

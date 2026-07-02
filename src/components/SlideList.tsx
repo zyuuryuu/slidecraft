@@ -55,6 +55,7 @@ export default function SlideList({
               layout={layout}
               masterBgColor={template?.masterBgColor ?? "FFFFFF"}
               masterDecorations={template?.masterDecorations}
+              masterStaticTexts={template?.masterStaticTexts}
               scale={THUMB_SCALE}
               isActive={activeIndex === i}
               selected={selected?.has(i)}
