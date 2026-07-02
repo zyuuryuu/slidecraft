@@ -67,6 +67,9 @@ describe("preview fidelity: layout background + decorations", () => {
       expect(p.style.w).toBeGreaterThan(0);
       expect(p.style.h).toBeGreaterThan(0);
       expect(p.style.y).toBeGreaterThan(5); // down in the footer band, not at the top-left origin
+      // …and the master placeholder's own SMALL font (12pt), not the generic 32pt body font that
+      // would overflow the 0.4" footer box and get clipped.
+      expect(p.style.fontSize).toBeLessThan(20);
     }
   });
 
