@@ -245,6 +245,16 @@ export async function generatePptx(
   const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
   const zip = await JSZip.loadAsync(tplBuf);
 
+  // PURGE any slides baked into the template. A picked master may be a FULL deck (e.g. an
+  // "all-layouts sample" .pptx with 13 slides), not a slide-free TemplateOnly file. Our assembly
+  // writes the deck's slides as slide1.xml, slide2.xml… — which would collide with the template's
+  // existing slide parts and, worse, duplicate their [Content_Types] Overrides + presentation rels
+  // (invalid OOXML → PowerPoint shows 0 slides). Removing the template's slides makes the deck's
+  // slides the ONLY slides, so ANY .pptx works as a master. (Layouts/master/theme are untouched.)
+  for (const path of Object.keys(zip.files)) {
+    if (/^ppt\/slides\/(_rels\/)?slide\d+\.xml(\.rels)?$/.test(path)) zip.remove(path);
+  }
+
   // Find max rId in presentation.xml.rels
   const existingRIds = [
     ...template.presentationRels.matchAll(/Id="rId(\d+)"/g),
@@ -332,16 +342,27 @@ export async function generatePptx(
   );
   zip.file("ppt/presentation.xml", presXml);
 
-  // Update presentation.xml.rels
+  // Update presentation.xml.rels — first drop the template's own slide rels (purged above), then
+  // append the deck's, so no dangling/duplicate slide relationships remain.
   let presRels = template.presentationRels;
+  presRels = presRels.replace(
+    /<Relationship\b[^>]*Type="[^"]*\/relationships\/slide"[^>]*\/>/g,
+    "",
+  );
   presRels = presRels.replace(
     "</Relationships>",
     `${relEntries.join("")}</Relationships>`,
   );
   zip.file("ppt/_rels/presentation.xml.rels", presRels);
 
-  // Update [Content_Types].xml
+  // Update [Content_Types].xml — drop the template's own slide Overrides (purged above) first, so
+  // the deck's slide Overrides aren't DUPLICATED (duplicate PartName = invalid OOXML → 0 slides).
+  // Only /ppt/slides/slideN.xml is stripped; slideLayouts/slideMaster Overrides are left intact.
   let ct = template.contentTypes;
+  ct = ct.replace(
+    /<Override\b[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g,
+    "",
+  );
   ct = ct.replace(
     "</Types>",
     `${ctEntries.join("")}</Types>`,

@@ -304,13 +304,19 @@ export async function loadTemplate(
   // ── Extract layouts ──
   const layouts: LayoutInfo[] = [];
 
-  // Iterate until the slideLayout file is missing (PowerPoint numbers them 1..N
-  // contiguously across ALL masters). The 200 bound is just a runaway guard — the
-  // old hardcoded 30 silently dropped layouts 31+ on multi-master templates.
-  for (let i = 1; i <= 200; i++) {
-    const path = `ppt/slideLayouts/slideLayout${i}.xml`;
-    const file = zip.file(path);
-    if (!file) break;
+  // Enumerate the slideLayout parts that ACTUALLY exist, sorted by number. Do NOT assume contiguous
+  // numbering: some authoring tools (and Claude-generated templates) leave GAPS (e.g. 1-6,8,12-17),
+  // and the old "break on the first missing number" loop silently dropped every layout after the
+  // first gap (here 7 of 13). `index` must stay the real file number — buildSlideRels references
+  // ../slideLayouts/slideLayout${index}.xml.
+  const layoutIndices = Object.keys(zip.files)
+    .map((p) => p.match(/^ppt\/slideLayouts\/slideLayout(\d+)\.xml$/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => parseInt(m[1]))
+    .sort((a, b) => a - b);
+  for (const i of layoutIndices) {
+    const file = zip.file(`ppt/slideLayouts/slideLayout${i}.xml`);
+    if (!file) continue;
 
     const xml = await readCappedString(file, ZIP_LIMITS.xmlEntry);
     const nameMatch = xml.match(/name="([^"]+)"/);
