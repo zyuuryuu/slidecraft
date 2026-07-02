@@ -25,6 +25,11 @@ Footer: Confidential
 
 ---
 
+# 第 1 部：現状と課題
+> 現行 CRM の実態を確認し、論点を整理する
+
+---
+
 # 現状分析
 > Current State Analysis
 
@@ -71,6 +76,42 @@ edges:
     to: crm
   - from: crm
     to: db
+  - from: crm
+    to: ai
+\`\`\`
+
+---
+
+# 提案システムの構成
+> 図＋説明（箇条書きの横に図を配置）
+
+- フロントは SPA、API は Gateway 経由で疎結合
+- CRM コアは AI エンジンと連携
+- データは専用 DB に集約
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: 提案構成
+nodes:
+  - id: ui
+    label: SPA
+    shape: rounded_rect
+    icon: client
+  - id: api
+    label: API GW
+    icon: load_balancer
+  - id: crm
+    label: CRM Core
+    icon: server
+  - id: ai
+    label: AI Engine
+    icon: cloud
+edges:
+  - from: ui
+    to: api
+  - from: api
+    to: crm
   - from: crm
     to: ai
 \`\`\`
