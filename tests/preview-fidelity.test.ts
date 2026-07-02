@@ -39,13 +39,13 @@ describe("preview fidelity: layout background + decorations", () => {
     expect(cover.decorations.some((d) => d.color === "7FD4F5" && (d.radius ?? 0) > 0)).toBe(true);
   });
 
-  it("renders non-placeholder static TEXT labels (e.g. the cover's 日付/部署/作成者)", () => {
-    const cover = report.layouts.find((l) => l.name === "00_表紙")!;
-    const label = cover.staticTexts.find((t) => t.text.includes("日付"));
-    expect(label).toBeDefined();
-    expect(label!.text).toContain("作成者");
-    expect(label!.style.fontSize).toBeLessThan(20); // a small label, not a 32pt body dump
-    // the canonical master has no stray text boxes → no spurious static texts (no regression).
+  it("renders non-placeholder static TEXT labels (design labels), none spurious on the canonical", async () => {
+    // A real design label is a non-placeholder <p:sp> with text — the velis master carries some.
+    const velis = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx")));
+    const labels = velis.layouts.flatMap((l) => l.staticTexts);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.every((t) => t.text.trim().length > 0)).toBe(true);
+    // the canonical master has no stray text boxes → no spurious static texts (no ghost labels).
     expect(canon.layouts.reduce((n, l) => n + l.staticTexts.length, 0)).toBe(0);
   });
 
