@@ -329,17 +329,20 @@ export async function generatePptx(
     );
   }
 
-  // Update presentation.xml
+  // Update presentation.xml — replace the sldIdLst if present, else INSERT one. Some hand/generated
+  // templates OMIT <p:sldIdLst> entirely; without it the exported deck lists NO slides and PowerPoint/
+  // LibreOffice show a single blank default slide even though every slide part exists.
+  const sldIdLstXml = `<p:sldIdLst>${sldIdEntries.join("")}</p:sldIdLst>`;
   let presXml = template.presentationXml;
-  presXml = presXml.replace(
-    "<p:sldIdLst/>",
-    `<p:sldIdLst>${sldIdEntries.join("")}</p:sldIdLst>`,
-  );
-  // Also handle non-empty sldIdLst (if template had slides)
-  presXml = presXml.replace(
-    /<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/,
-    `<p:sldIdLst>${sldIdEntries.join("")}</p:sldIdLst>`,
-  );
+  const sldIdLstRe = /<p:sldIdLst\b[\s\S]*?<\/p:sldIdLst>|<p:sldIdLst\s*\/>/;
+  if (sldIdLstRe.test(presXml)) {
+    presXml = presXml.replace(sldIdLstRe, sldIdLstXml);
+  } else if (/<p:sldSz\b/.test(presXml)) {
+    // Schema order is …sldMasterIdLst, sldIdLst, sldSz… — insert right before the (required) sldSz.
+    presXml = presXml.replace(/<p:sldSz\b/, `${sldIdLstXml}<p:sldSz`);
+  } else {
+    presXml = presXml.replace("</p:presentation>", `${sldIdLstXml}</p:presentation>`);
+  }
   zip.file("ppt/presentation.xml", presXml);
 
   // Update presentation.xml.rels — first drop the template's own slide rels (purged above), then
