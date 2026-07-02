@@ -61,10 +61,15 @@ describe("preview fidelity: layout background + decorations", () => {
     const cover = report.layouts.find((l) => l.name === "00_表紙")!;
     const title = cover.placeholders.find((p) => p.type === "ctrTitle")!;
     expect(title.style.align).toBe("l");
-    // The subtitle authors lvl2-9 (algn="ctr") BEFORE lvl1 (algn="l") — align must come from lvl1
-    // (level-1 text), not the first lvl encountered, so it's left too (not centered).
+    // The subtitle authors lvl2-9 (algn="ctr", schemeClr) BEFORE lvl1 (algn="l", sz=1800, srgb) —
+    // EVERY text property (align/size/color) must come from lvl1, not the first level encountered.
     const sub = cover.placeholders.find((p) => p.type === "subTitle")!;
     expect(sub.style.align).toBe("l");
+    expect(sub.style.fontSize).toBe(18); // lvl1's 1800, not lvl2's (which has no sz → would fall to master)
+    expect(sub.style.fontColor).toBe("E8F4FA"); // lvl1's srgb, not lvl2's schemeClr tx1
+    // …and the canonical (size held outside a lvl1 block) keeps its real title/subtitle sizes.
+    const cTitle = canon.layouts[6].placeholders.find((p) => p.type === "title" || p.idx === "15");
+    expect(cTitle?.style.fontSize).toBe(28);
   });
 
   it("a canonical-pinned cover resolves to a REAL layout with its background (not blank)", () => {
