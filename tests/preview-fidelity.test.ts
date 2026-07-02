@@ -61,6 +61,10 @@ describe("preview fidelity: layout background + decorations", () => {
     const cover = report.layouts.find((l) => l.name === "00_表紙")!;
     const title = cover.placeholders.find((p) => p.type === "ctrTitle")!;
     expect(title.style.align).toBe("l");
+    // The subtitle authors lvl2-9 (algn="ctr") BEFORE lvl1 (algn="l") — align must come from lvl1
+    // (level-1 text), not the first lvl encountered, so it's left too (not centered).
+    const sub = cover.placeholders.find((p) => p.type === "subTitle")!;
+    expect(sub.style.align).toBe("l");
   });
 
   it("a canonical-pinned cover resolves to a REAL layout with its background (not blank)", () => {
