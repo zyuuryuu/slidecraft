@@ -13,6 +13,7 @@ import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validate
 import EdgeStyleControls from "./EdgeStyleControls";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
+import { buildFieldMap, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
 
 interface SlideEditorProps {
   slide: SlideIR;
@@ -147,10 +148,27 @@ export default function SlideEditor({ slide, layout, layoutNames, onChange }: Sl
     [slide, onChange],
   );
 
-  // Determine which placeholders to show
-  const editablePhs = layout
-    ? layout.placeholders.filter((ph) => ph.idx !== "50") // skip slide number
-    : slide.placeholders;
+  // The field map: a VERIFIED 1:1 between the layout's editable placeholders and the content idxs
+  // this editor reads/writes. Each field owns exactly one content slot, so editing one can NEVER
+  // touch another (no bleed), and what you type role-binds back to that placeholder (buildFieldMap
+  // proves both, for every bundled template). Auto slide-number placeholders are excluded. With no
+  // template loaded, fall back to the slide's own placeholders (identity map).
+  const fields = layout
+    ? buildFieldMap(slide, layout.placeholders)
+    : slide.placeholders.map((p) => ({ phIdx: p.idx, contentIdx: p.idx }));
+
+  // Which RAW placeholder idxs are occupied by a diagram/mermaid/table? Each rides the Nth BODY
+  // placeholder, and its placeholderIdx is a 1-based body ORDINAL — NOT a raw idx. Resolve it via
+  // nthBody (exactly as the preview + export do), else on a gapped-body layout (bodies at [1,3]) the
+  // editor would show a text field OVER the diagram's box and silently drop what you type on export.
+  const bodyPhs = layout ? bodyPlaceholders(layout.placeholders) : [];
+  const visualIdx = new Set(
+    [
+      slide.diagram && nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx,
+      slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
+      slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
+    ].filter((x): x is string => !!x),
+  );
 
   return (
     <div className="h-full overflow-auto p-3 flex flex-col gap-3">
@@ -173,28 +191,26 @@ export default function SlideEditor({ slide, layout, layoutNames, onChange }: Sl
         </select>
       </div>
 
-      {/* Placeholder fields */}
-      {editablePhs.map((ph) => {
-        const idx = "idx" in ph ? (ph as PlaceholderContent).idx : (ph as { idx: string }).idx;
-        const label = getLabel(idx, layout);
+      {/* Placeholder fields — one per field-map slot, reading/writing its own content idx (1:1). */}
+      {fields.map(({ phIdx, contentIdx }) => {
+        const label = getLabel(phIdx, layout);
         const currentText = paragraphsToText(
-          slide.placeholders.find((p) => p.idx === idx)?.paragraphs || [],
+          slide.placeholders.find((p) => p.idx === contentIdx)?.paragraphs || [],
         );
 
-        // Skip if this is the diagram/mermaid placeholder
-        if (slide.diagram && idx === slide.diagram.placeholderIdx) return null;
-        if (slide.mermaidBlock && idx === slide.mermaidBlock.placeholderIdx) return null;
+        // Skip the placeholder a diagram/mermaid/table occupies (edited in the block editor below).
+        if (visualIdx.has(phIdx)) return null;
 
         return (
-          <div key={idx}>
+          <div key={phIdx}>
             <label className="text-[10px] text-gray-500 uppercase tracking-wider">
               {label}
-              <span className="text-gray-600 ml-1">(idx {idx})</span>
+              <span className="text-gray-600 ml-1">(idx {phIdx})</span>
             </label>
             <textarea
               value={currentText}
-              onChange={(e) => updatePlaceholder(idx, e.target.value)}
-              rows={idx === "1" || idx === "2" ? 6 : 2}
+              onChange={(e) => updatePlaceholder(contentIdx, e.target.value)}
+              rows={phIdx === "1" || phIdx === "2" ? 6 : 2}
               className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white font-mono resize-y"
               placeholder={label}
             />

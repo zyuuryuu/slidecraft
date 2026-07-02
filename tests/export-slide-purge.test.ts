@@ -4,7 +4,7 @@
  * own slides so the deck's slides are the ONLY slides — otherwise slide parts collide and their
  * [Content_Types] Overrides / presentation rels DUPLICATE (invalid OOXML → PowerPoint shows 0 slides).
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
