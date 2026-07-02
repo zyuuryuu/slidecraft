@@ -41,10 +41,9 @@ export default function SlideList({
     // doesn't drag a blue text-selection highlight along with it.
     <div className="h-full overflow-auto p-2 flex flex-col gap-2 items-center select-none">
       {deck.slides.map((slide, i) => {
-        const layoutName =
-          slide.layout === "auto"
-            ? autoSelectLayout(slide, i, deck.slides.length, catalog)
-            : slide.layout;
+        // ALWAYS via autoSelectLayout — it honors a valid pinned name but degrades one this template
+        // lacks to a real layout (else a canonical-pinned cover on an alien master = blank thumbnail).
+        const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog);
         const layout = template ? findLayout(template, layoutName) : undefined;
 
         return (

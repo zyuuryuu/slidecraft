@@ -9,7 +9,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
+import { loadTemplate, autoSelectLayout, findLayout, type TemplateData } from "../src/engine/template-loader";
+import { buildCatalog } from "../src/engine/template-catalog";
+import { parseMd } from "../src/engine/md-parser";
 
 const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
 const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
@@ -40,6 +42,19 @@ describe("preview fidelity: layout background + decorations", () => {
   it("captures connector lines (<p:cxnSp>) as thin decorations", () => {
     const withLine = report.layouts.find((l) => l.decorations.some((d) => d.h < 0.05 && d.w > 5));
     expect(withLine).toBeDefined(); // e.g. the full-width title/footer rules
+  });
+
+  it("a canonical-pinned cover resolves to a REAL layout with its background (not blank)", () => {
+    // The sample cover is pinned `<!-- slide: Title.1Title.Single -->` — a name this template lacks.
+    // The preview/thumbnail must resolve it via autoSelectLayout (degrade → 00_表紙) so it isn't
+    // left layout-less (blank white). Regression: SlideList/SlidePreview used slide.layout directly.
+    const cat = buildCatalog(report);
+    const cover = parseMd("<!-- slide: Title.1Title.Single -->\n# 表紙\n## サブ").slides[0];
+    expect(cover.layout).toBe("Title.1Title.Single"); // pinned, absent from this template
+    const resolved = autoSelectLayout(cover, 0, 3, cat);
+    const layout = findLayout(report, resolved);
+    expect(layout).toBeDefined();
+    expect(layout!.background).toBe("0A5A87"); // dark cover panel renders, not white
   });
 
   it("keeps ONLY real solid-filled panels on the canonical master (no text-box ghosts)", () => {

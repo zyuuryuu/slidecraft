@@ -411,7 +411,9 @@ export function useDeckController() {
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
     if (!s) return undefined;
-    const resolved = s.layout === "auto" ? autoSelectLayout(s, activeSlide, deck!.slides.length, catalog) : s.layout;
+    // Resolve unconditionally: a pinned name this template lacks degrades to a real layout (so the
+    // cover's canonical pin doesn't leave the editor/preview layout-less on an alien master).
+    const resolved = autoSelectLayout(s, activeSlide, deck!.slides.length, catalog);
     return serializeMd({ slides: [{ ...s, layout: resolved }] });
   })();
 
@@ -430,9 +432,7 @@ export function useDeckController() {
   // Get current slide's layout info for editor
   const currentSlide = deck?.slides[activeSlide];
   const currentLayoutName = currentSlide
-    ? currentSlide.layout === "auto"
-      ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length, catalog)
-      : currentSlide.layout
+    ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length, catalog)
     : undefined;
   const currentLayout = currentLayoutName && templateData
     ? findLayout(templateData, currentLayoutName)
