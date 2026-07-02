@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
-import type { TemplateData, LayoutInfo } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { bindContentByRole, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
@@ -102,6 +102,7 @@ interface SlideCardProps {
   totalSlides: number;
   layout: LayoutInfo | undefined;
   masterBgColor: string; // hex without #
+  masterDecorations?: DecoRect[]; // the master's own shapes — painted under the layout's
   scale: number;
   isActive?: boolean;
   /** In the multi-selection set (highlighted) but not necessarily the focused slide. */
@@ -111,7 +112,7 @@ interface SlideCardProps {
   onDiagramChange?: (yaml: string) => void;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -144,10 +145,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         flexShrink: 0,
       }}
     >
-      {/* Decorative shapes from template (fill + optional rounded corners + outline) */}
-      {layout?.decorations.map((d, i) => (
+      {/* Decorative shapes: the MASTER's own shapes first (a base layer under every layout), then the
+          layout's — fill + optional rounded corners + outline. */}
+      {[...(masterDecorations ?? []).map((d) => ["m", d] as const), ...(layout?.decorations ?? []).map((d) => ["l", d] as const)].map(([src, d], i) => (
         <div
-          key={`deco-${i}`}
+          key={`deco-${src}-${i}`}
           style={{
             position: "absolute",
             left: `${(d.x / SLIDE_W) * 100}%`,
@@ -389,6 +391,7 @@ export default function SlidePreview({
         totalSlides={deck!.slides.length}
         layout={layout}
         masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+        masterDecorations={template?.masterDecorations}
         scale={scale}
         isActive={active}
         onClick={singleSlide ? undefined : () => onSlideClick?.(i)}
