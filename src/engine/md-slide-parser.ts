@@ -4,7 +4,7 @@
  * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
@@ -136,6 +136,7 @@ export function parseSlideBlock(
   const titleFields: Record<string, string> = {};
   let diagram: DiagramBlock | undefined;
   let mermaidBlock: MermaidBlock | undefined;
+  let code: CodeBlock | undefined;
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -243,6 +244,10 @@ export function parseSlideBlock(
           const f = mermaidToFigure(codeBlockLines.join("\n"), "1");
           if (f.diagram) diagram = f.diagram;
           else mermaidBlock = f.mermaidBlock;
+        } else if (codeBlockLines.length > 0) {
+          // Any OTHER fence (```yaml / ```python / ```log / ```) is CODE/LOG — capture it as a
+          // monospace body (previously the content was silently dropped).
+          code = { content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" };
         }
         inCodeBlock = false;
         codeBlockLang = "";
@@ -353,7 +358,7 @@ export function parseSlideBlock(
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
@@ -370,6 +375,7 @@ export function parseSlideBlock(
     diagram,
     mermaidBlock,
     ...(table ? { table } : {}),
+    ...(code ? { code } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + lines.length - 1,
   };

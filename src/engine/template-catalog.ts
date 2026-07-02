@@ -25,6 +25,7 @@ export type LayoutRole =
   | "process"
   | "summary"
   | "closing"
+  | "code"
   | "other";
 
 export type PlaceholderRole =
@@ -95,6 +96,7 @@ const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\b(?:two|three|four|2|3|4|multi)\b[\s\S]*\b(?:column|content|panel|box|option)\b|compar|versus|\bvs\b/i, "columns"],
   [/\bcolumn\b/i, "columns"],
   [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b|章扉|セクション|区切り|中扉/i, "section"],
+  [/\bcode\b|\blog\b|\bsource\b|コード|ログ|ソース/i, "code"],
   [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑/i, "closing"],
   [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
   [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b|表紙|タイトル|扉絵/i, "title"],
@@ -363,6 +365,7 @@ export function templateKinds(catalog: LayoutCatalog): string[] {
   if (maxCols >= 2) kinds.push("columns");
   if (roles.has("table")) kinds.push("table");
   if (catalog.some((e) => e.bodyCount >= 1)) kinds.push("diagram"); // a figure rides a content body
+  if (roles.has("code")) kinds.push("code");
   if (roles.has("closing")) kinds.push("closing");
   return kinds;
 }

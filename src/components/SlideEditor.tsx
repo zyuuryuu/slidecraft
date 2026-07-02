@@ -167,6 +167,7 @@ export default function SlideEditor({ slide, layout, layoutNames, onChange }: Sl
       slide.diagram && nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx,
       slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
       slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
+      slide.code && nthBody(bodyPhs, slide.code.placeholderIdx)?.idx,
     ].filter((x): x is string => !!x),
   );
 

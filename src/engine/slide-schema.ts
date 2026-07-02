@@ -100,6 +100,16 @@ export const TableBlockSchema = z.object({
 
 export type TableBlock = z.infer<typeof TableBlockSchema>;
 
+// ── Code / log block (embedded in a slide) ──
+
+export const CodeBlockSchema = z.object({
+  content: z.string(), // raw code/log text (newlines preserved), rendered monospace
+  lang: z.string().optional(), // fence language hint (yaml/python/log/…), for future highlighting
+  placeholderIdx: z.string().default("1"), // which BODY region the code fills
+});
+
+export type CodeBlock = z.infer<typeof CodeBlockSchema>;
+
 // ── Single slide IR ──
 
 export const SlideIRSchema = z.object({
@@ -108,6 +118,7 @@ export const SlideIRSchema = z.object({
   diagram: DiagramBlockSchema.optional(), // embedded diagram (DiagramSpec YAML → PptxGenJS shapes)
   mermaidBlock: MermaidBlockSchema.optional(), // embedded mermaid (raw syntax → SVG image in PPTX)
   table: TableBlockSchema.optional(), // embedded table (GFM Markdown → native OOXML table)
+  code: CodeBlockSchema.optional(), // embedded code/log (```lang fence → monospace body)
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });
