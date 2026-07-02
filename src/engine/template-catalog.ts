@@ -88,13 +88,16 @@ export function layoutRole(name: string): LayoutRole {
 // Real-world templates name layouts in plain language ("Title and Content",
 // "Two Columns", "Section Header") — NOT the canonical "Family.Detail" convention.
 // Recognize those keywords so the harness classifies ANY template, not just ours.
+// English AND Japanese keywords (real templates are often localized). Only title/section/closing get
+// keywords here — content vs columns is decided by STRUCTURE (body count/geometry), so e.g. a
+// 「本文（1カラム）」 vs 「本文（2カラム）」 isn't forced by the word カラム.
 const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\b(?:two|three|four|2|3|4|multi)\b[\s\S]*\b(?:column|content|panel|box|option)\b|compar|versus|\bvs\b/i, "columns"],
   [/\bcolumn\b/i, "columns"],
-  [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b/i, "section"],
-  [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b/i, "closing"],
+  [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b|章扉|セクション|区切り|中扉/i, "section"],
+  [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑/i, "closing"],
   [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
-  [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b/i, "title"],
+  [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b|表紙|タイトル|扉絵/i, "title"],
 ];
 
 function nameKeywordRole(name: string): LayoutRole {
