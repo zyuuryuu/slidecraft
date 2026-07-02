@@ -10,6 +10,7 @@ import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zi
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
 import { pickLayout, type LayoutCatalog, type LayoutRole } from "./template-catalog";
+import { parseColorRef, resolveColor } from "./ooxml-resolve";
 
 // ── Types ──
 
@@ -70,6 +71,8 @@ export interface TemplateData {
   masterTitleStyle: MasterStyle;
   masterBodyStyle: MasterStyle;
   masterBgColor: string; // hex without #, from theme bg1/lt1
+  masterDecorations: DecoRect[]; // the master's OWN non-placeholder shapes (logos/bars) — a base layer
+                                 // shown UNDER every layout (the preview never read these before)
 }
 
 // ── Namespace normalization ──
@@ -148,9 +151,10 @@ function buildThemeColors(themeXml: string, masterXml: string): Record<string, s
 function extractTextColor(sp: string, theme: Record<string, string>): string | undefined {
   const srgb = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
   if (srgb) return srgb;
+  // No explicit srgb anywhere → the text color is a theme schemeClr in the text region (spPr fill
+  // excluded so an accent-filled box doesn't hijack it). Resolve via the shared color resolver.
   const txScope = sp.replace(/<p:spPr>[\s\S]*?<\/p:spPr>/, "");
-  const token = txScope.match(/schemeClr val="(\w+)"/)?.[1];
-  return token ? theme[token] : undefined;
+  return resolveColor(parseColorRef(txScope), { theme });
 }
 
 /**
@@ -162,11 +166,7 @@ function extractTextColor(sp: string, theme: Record<string, string>): string | u
  */
 function extractBackground(xml: string, theme: Record<string, string>): string | undefined {
   const bg = xml.match(/<p:bg>[\s\S]*?<\/p:bg>/)?.[0];
-  if (!bg) return undefined;
-  const srgb = bg.match(/<a:srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
-  if (srgb) return srgb.toUpperCase();
-  const token = bg.match(/<a:schemeClr val="(\w+)"/)?.[1];
-  return token ? theme[token] : undefined;
+  return bg ? resolveColor(parseColorRef(bg), { theme }) : undefined;
 }
 
 // ── Extract master style from titleStyle or bodyStyle XML ──
@@ -262,14 +262,10 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
 
 // ── Extract decorative rects from layout XML ──
 
-/** solidFill color (srgbClr / theme schemeClr) of a fragment, or undefined. */
+/** solidFill color (srgbClr / theme schemeClr) of a fragment, or undefined — via the shared resolver. */
 function solidFillColor(fragment: string, theme: Record<string, string>): string | undefined {
   const solid = fragment.match(/<a:solidFill>[\s\S]*?<\/a:solidFill>/)?.[0];
-  if (!solid) return undefined;
-  const srgb = solid.match(/<a:srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
-  if (srgb) return srgb.toUpperCase();
-  const token = solid.match(/<a:schemeClr val="(\w+)"/)?.[1];
-  return token ? theme[token] : undefined;
+  return solid ? resolveColor(parseColorRef(solid), { theme }) : undefined;
 }
 
 /** The shape's OWN fill color — scoped to the fill region BEFORE <a:ln>, so a noFill shape's LINE
@@ -441,10 +437,13 @@ export async function loadTemplate(
 
   // ── Master background color (bg1 via the clrMap, else the theme lt1) ──
   const masterBgColor = themeColors.bg1 ?? themeColors.lt1 ?? "FFFFFF";
+  // The master's OWN non-placeholder shapes (logos, header/footer bars) — the same extractor as the
+  // layouts, run on the master. Shown as a base layer under every layout (previously never read).
+  const masterDecorations = extractDecorations(masterXml, themeColors);
 
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
-    masterTitleStyle, masterBodyStyle, masterBgColor,
+    masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations,
   };
 }
 
