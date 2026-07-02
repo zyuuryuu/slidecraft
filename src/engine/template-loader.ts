@@ -193,14 +193,16 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
   };
 }
 
-// ── Master placeholder geometry (for inheritance) ──
+// ── Master placeholder style (for inheritance) ──
 
-interface Geom { x: number; y: number; w: number; h: number; }
+interface Geom { x: number; y: number; w: number; h: number; fontSize?: number; fontColor?: string; }
 
-/** The master's geometry per placeholder TYPE. A layout placeholder that omits its own xfrm inherits
- *  position/size from the master placeholder of the SAME TYPE (the OOXML rule) — without this it
- *  collapses to 0×0 in the preview, dropping footer/date/slide-number chrome. */
-function extractMasterPlaceholderGeometry(masterXml: string): Record<string, Geom> {
+/** The master's geometry + font per placeholder TYPE. A layout placeholder that omits its own xfrm
+ *  inherits position/size (and, when it also omits its own font, the size/color) from the master
+ *  placeholder of the SAME TYPE — the OOXML rule. Without this, footer/date/number chrome collapses
+ *  to 0×0 AND picks up the generic body font (e.g. 32pt in a 0.4" box → overflow) instead of the
+ *  master placeholder's real 12pt. */
+function extractMasterPlaceholderGeometry(masterXml: string, theme: Record<string, string>): Record<string, Geom> {
   const out: Record<string, Geom> = {};
   for (const sp of normalizeNs(masterXml).match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
     const phTag = sp.match(/<p:ph([^/>]*)\/?>/);
@@ -208,7 +210,13 @@ function extractMasterPlaceholderGeometry(masterXml: string): Record<string, Geo
     const type = phTag[1].match(/type="(\w+)"/)?.[1] ?? "body";
     const off = sp.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
     const ext = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
-    if (off && ext) out[type] = { x: emuToInch(off[1]), y: emuToInch(off[2]), w: emuToInch(ext[1]), h: emuToInch(ext[2]) };
+    if (!off || !ext) continue;
+    const sz = sp.match(/<a:(?:defRPr|rPr)[^>]*\bsz="(\d+)"/)?.[1];
+    out[type] = {
+      x: emuToInch(off[1]), y: emuToInch(off[2]), w: emuToInch(ext[1]), h: emuToInch(ext[2]),
+      fontSize: sz ? parseInt(sz) / 100 : undefined,
+      fontColor: extractTextColor(sp, theme),
+    };
   }
   return out;
 }
@@ -243,8 +251,8 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
     y: offMatch ? emuToInch(offMatch[2]) : (inh?.y ?? 0),
     w: extMatch ? emuToInch(extMatch[1]) : (inh?.w ?? 0),
     h: extMatch ? emuToInch(extMatch[2]) : (inh?.h ?? 0),
-    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : master.fontSize,
-    fontColor: textColor ?? master.fontColor,
+    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize),
+    fontColor: textColor ?? inh?.fontColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
     bold: boldMatch ? true : master.bold,
     align: alignMatch ? alignMatch[1] : master.align,
@@ -398,7 +406,7 @@ export async function loadTemplate(
     ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF",
   }, themeColors);
   const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle, themeColors);
-  const masterGeom = extractMasterPlaceholderGeometry(masterXml); // for inherited placeholder geometry
+  const masterGeom = extractMasterPlaceholderGeometry(masterXml, themeColors); // inherited geometry + font
 
   // ── Extract layouts ──
   const layouts: LayoutInfo[] = [];
