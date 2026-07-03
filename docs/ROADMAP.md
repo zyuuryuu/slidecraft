@@ -49,9 +49,18 @@
 >   **本文を別カラムへ退避＋図をもう片方へ（coexist、Column.2Body.Equal に自動解決）**＝箇条書きを破壊しない（#12 と同じ
 >   preservation 思想）。本文が空なら図が本文枠（Content.1Body.Single）。mermaid スライドも図に昇格。既存の 2 アサーション
 >   （図無し→null）を新挙動へ更新（ユーザ許可済）。`applyRegionSplit` を design-intent から export して単一源で再利用。
+> - **図生成の二段構え → 完了（旧「diagram プロンプトの type 不一致」を再設計、ユーザ選択）**：単体図モードは
+>   flowchart/network/orgchart の3型しか教えず schema の12型と不一致だった。全型を1プロンプトに詰めず、**Stage1で型を
+>   決め（UI選択 or AIルーティング=hybrid）→ Stage2でその1型の shape のみ送る**方式へ。`diagram-type-prompts.ts` の
+>   `DIAGRAM_TYPES` レジストリ（図型追加＝1エントリ）＋`diagramRoutePrompt`/`parseDiagramType`、`ipc/ai.ts` の
+>   `diagram-route` mode、`useAiGeneration.runTask` の自動ルーティング、`LlmAssist` の型ドロップダウン。開発メモリ
+>   `diagram_type_negotiation`。commits: エンジン＋フロー/UI。
+> - **#3 生成 closing 同期 → 完了**：#12-1 で closing に subtitle/bullets をスキーマ追加したのに生成プロンプトが
+>   「タイトルのみ」と説明していた不整合を解消（`deckPlanSystemPrompt` の closing 形状を更新）。
 > - **残 NEXT（次セッション引き継ぎ）**：
->   - **その他プロンプト**：`slideSystemPrompt`（手動コピー用）のレイアウト名を catalog から動的化（alien 対応、
->     [[guardrail_any_template]]）／diagram プロンプトの type 許容集合の不一致／生成 `deckPlanSystemPrompt` 底上げ。
+>   - **#1 `slideSystemPrompt`（手動コピー用）の catalog 動的化**：レイアウト名を canonical 固定 → 入力マスターの
+>     実レイアウトへ（alien 対応、[[guardrail_any_template]]）。手動コピー経路のみ（下流 autoSelectLayout は role 縮退
+>     済＝ハード失敗はしない・プロンプト精度の問題）。catalog を App→LlmAssist へ prop 配線が要る。
 >   - **仕様メモ（バグではない）**：表セル文字・図ノード文字は独立図形でスライドマスター body 書式に非追従（継承対象外）。
 
 > **テーマ2「HTML 出力」（大マイルストーン）**：
