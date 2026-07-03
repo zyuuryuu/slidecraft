@@ -30,6 +30,7 @@ interface InitializeModalProps {
   masters: MasterEntry[];
   activeMasterId: string;
   onSelectMaster: (id: string) => void;
+  onImportMaster: () => void;
   deck: DeckIR | null;
   templateData: TemplateData | null;
   parseError: string | null;
@@ -46,7 +47,7 @@ const action = "px-2.5 py-1 rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6
 
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
-  masters, activeMasterId, onSelectMaster,
+  masters, activeMasterId, onSelectMaster, onImportMaster,
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
   onFixDeterministic, onCursorLine, gotoLine,
 }: InitializeModalProps) {
@@ -68,7 +69,7 @@ export default function InitializeModal({
         {/* Header + input methods (one tidy row) */}
         <div className="flex items-center gap-2 px-4 py-2 border-b border-[#2D3A6E] text-xs shrink-0">
           <span className="text-sm text-[#93C5FD] font-medium mr-1">📝 Draft</span>
-          <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} />
+          <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} />
           <span className="w-px h-4 bg-[#2D3A6E] mx-1" />
           <button onClick={onOpenFile} className={action} title=".md / .yaml を取り込む">📄 Markdown を取込む</button>
           <button onClick={onGenerateAI} className={action} title="AI でデッキを生成">✨ AIで生成</button>
