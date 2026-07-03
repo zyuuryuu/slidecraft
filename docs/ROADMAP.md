@@ -19,16 +19,24 @@
 | 2 | **HTML 出力**（大マイルストーン） | 磨き込んだ Web preview をスタンダロン HTML プレゼンとして出力 | L |
 | 3 | **テンプレ作成補助** | 新テンプレの作成/登録支援。原稿→マスター整形と重なる最大機能 | L |
 
-> **テーマ1「プロンプト磨き込み」の状況**：
+> **テーマ1「プロンプト磨き込み」の状況（2026-07-03 大幅前進）**：
 >
 > - **構造ヘッダー保全 → 完了**（[ADR-0012](adr/0012-ai-edit-structure-preservation.md)）。決定論ハーネス
->   `reconcileEdit`＋`validateStructure` を前景/batch/refine の全経路に配線し、AI が落とした layout/title/
->   meta/図/表/コードを復元。プロンプト側は不変条件ブロック＋A/B 決定木＋few-shot（保証は決定論ゲート側）。
-> - **残課題（プロンプト/生成品質）**：(1) 前景/batch で数値改変・言語ドリフトを止める決定論ガードが無い（プロンプト
->   抑止のみ／前景に SOFT 数値警告を足す余地）。(2) `slideSystemPrompt`（手動コピー用）のレイアウト名ハードコード
->   → カタログから動的化（alien master 対応、guardrail_any_template）。(3) diagram/diagram-edit プロンプトの出力
->   純度・ノード id 保全・type 許容集合の不一致。(4) 空 section 連発・closing 過長を `deck-diagnostics` の受け皿で
->   回収。(5) 生成プロンプト `deckPlanSystemPrompt` の底上げ（現状は温存）。
+>   `reconcileEdit`＋`validateStructure`（+ 単一の源 `slide-roles.ts`）を前景/batch/refine の全経路に配線。
+> - **敵対検証ハードニング → 大半完了**。6方向の実 probe 敵対検証で 14 バグ確定 → **11 修正済**（決定論ゲート
+>   精度=全角数字/言語判定/本文全消し/titleText、グループ往復、reconcile グループ列、適用経路の誤ルーティング
+>   #3A/#3C/#14、前景/batch の数値・言語ドリフト**告知**配線 #6、生成 template-capability 降格ゲート #11）。
+> - **マスターフォント不整合 → 完了**（`9c26b0f`）。生成スライドが layout の lstStyle をコピーして font を
+>   スライド側に固定し master/layout 編集を無効化していた不具合を、空 `<a:lstStyle/>` で継承復活。全充填経路×
+>   per-placeholder の再発ゲート（`tests/master-font-inherit.test.ts`、負制御で実証）。
+> - **残 NEXT（次セッション引き継ぎ）**：
+>   - **#12 生成 payload drop 群**（closing の subtitle/bullets 欠落・unknown-kind 消失・空 section 連発・
+>     ragged table・salvage 文字化けの5サブ課題）を deckPlanToDeck/coerceSlide/json-salvage で保全。
+>   - **#13 diagram-edit の id 保全通知**（ノード id 総入替→後続 emphasize が silent no-op。通知チャネル設計要）。
+>   - **#3B テキストスライドへ図を追加**（`applyFigureYaml` の「図無し→null」契約変更＝既存テスト更新。**ユーザ許可済**）。
+>   - **その他プロンプト**：`slideSystemPrompt`（手動コピー用）のレイアウト名を catalog から動的化（alien 対応、
+>     [[guardrail_any_template]]）／diagram プロンプトの type 許容集合の不一致／生成 `deckPlanSystemPrompt` 底上げ。
+>   - **仕様メモ（バグではない）**：表セル文字・図ノード文字は独立図形でスライドマスター body 書式に非追従（継承対象外）。
 
 > **テーマ2「HTML 出力」（大マイルストーン）**：
 >
@@ -73,5 +81,8 @@
 
 - **#34** — ブロッカー解消待ち。
 - **#13 / js-yaml5** — 依存更新待ち（YAML パーサ）。
-- **#2〜#4 / GitHub Actions** — **CI 再有効化後**に再着手（請求枠リセット 2026-07-01 → 3-OS マトリクスは release-only へ軽量化、開発メモリ ci_actions_billing）。
+- **GitHub Actions（NEXT・要対応）** — 請求枠リセット日 2026-07-01 は**経過済**だが、2026-07-03 時点でも
+  `actions/permissions` は `{"enabled": false}` の**まま**。**軽量化してから再有効化**する（3-OS マトリクスは
+  release-only、push は Linux のみ、docs は paths-ignore、npm/build キャッシュ、concurrency）。再有効化まで
+  #2〜#4 と mac 署名 P6 実機検証（[[llamafile_runtime_design]]）はブロック。開発メモリ `ci_actions_billing`。
 - **実験用一時ファイルの後始末** — テンプレ検証・headless 生成で散らかった temp 出力を整理。
