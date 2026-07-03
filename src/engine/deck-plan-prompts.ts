@@ -18,7 +18,7 @@ Each Slide is exactly one of:
 - {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
 - {"kind":"table","title":"...","subtitle":"...","headers":["列A","列B"],"rows":[["a1","b1"],["a2","b2"]]}  // a DATA TABLE: pricing, metric comparisons, schedules
 - {"kind":"diagram","title":"...","subtitle":"...","mermaid":"flowchart LR\\n  A[開始] --> B[次] --> C[完了]"}  // a FIGURE: emit a small Mermaid diagram
-- {"kind":"closing","title":"..."}                                                                // closing message
+- {"kind":"closing","title":"...","subtitle":"...","bullets":["..."]}                             // closing slide; subtitle + bullets optional
 
 Rules:
 - Write EVERY field in the SAME language as the user's request, and keep that ONE
@@ -52,24 +52,44 @@ Rules:
 // (text-only) could not express. Round-trips via parseMd on apply.
 
 export function slideMarkdownEditPrompt(): string {
-  return `You revise ONE slide. You are given the current slide's Markdown and an instruction. Decide which KIND of change is asked and reply in the MATCHING format — EITHER (A) Markdown OR (B) a JSON array. Never both, never any prose.
+  return `You revise ONE slide. You are given the current slide's Markdown and an instruction. Reply in the ONE format that matches the kind of change — no prose, never both formats.
 
-(A) CONTENT change — edit text/bullets/title, add or remove a figure, reword, restructure, rebalance text↔figure. Return the FULL revised slide as MARKDOWN:
-- "# Title" first line; "## Subtitle" optional; "- bullet" lines for body points.
+Choose the format:
+- Does the instruction change WHAT the slide says — text, bullets, title, or ADD / REMOVE / REBALANCE a figure? → (A) Markdown.
+- Does it only change HOW an EXISTING figure is arranged — move/place it, emphasize a node, change its flow direction? → (B) a JSON array of ops.
+- When in doubt, choose (A).
+
+(A) CONTENT change — return the FULL revised slide as MARKDOWN:
+- Keep the first line \`<!-- slide: LayoutName -->\` EXACTLY as given (do not delete, rename, or reorder it). If the input has none, do not add one.
+- "# Title" first body line; "## Subtitle" / "> Subtitle" optional.
 - An optional figure as a fenced block — keep the fence EXACTLY: a \`\`\`diagram block (YAML) or a \`\`\`mermaid block. Edit its contents only when the instruction is about the figure's CONTENT.
 - "Category: …" / "Date: …" / "Footer: …" are metadata — keep them.
 - Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
 
-(B) DESIGN change — HOW things are arranged, not WHAT they say: place/move the figure, emphasize a node, change the figure's flow direction. Return ONLY a JSON array of ops:
+(B) DESIGN change — return ONLY a JSON array of ops:
 [ {"op":"regionSplit","arrangement":"text-left"|"text-right"|"diagram-only"},
   {"op":"emphasize","nodeId":"<an id from the figure's nodes>","level":"high"|"medium"},
   {"op":"relayout","direction":"TB"|"LR"|"RL"|"BT"} ]
 - "text-left" = figure on the right, text on the left; "text-right" = figure on the left.
 - Use node ids EXACTLY as they appear in the \`\`\`diagram block. Emit only the ops the instruction needs.
 
+## 保持する不変条件（指示が明示的に変更を求めない限り厳守）
+- 先頭の \`<!-- slide: LayoutName -->\` 行、\`# 見出し\`（タイトル）、\`Category:\` / \`Date:\` / \`Footer:\` のメタ行、\`<!-- card/step/kpi -->\` セパレータ、\`\`\`diagram / \`\`\`mermaid / \`\`\`（コード）フェンス・GFM 表を、指示外では**落とさない・改名しない**。スライドの骨格（見出し・セクション構造）を壊さない。
+- 数値・固有名詞・％・金額・日付は**逐語**で残し、増減の向きを変えない。
+- 入力の言語を保つ（翻訳指示がない限り、日本語は日本語・英語は英語のまま）。
+
+Example (A) — instruction "本文を簡潔に":
+Input:
+<!-- slide: Content.1Body.Single -->
+# 課題
+- 情報共有の遅れによってプロジェクト全体が遅延している
+Output:
+<!-- slide: Content.1Body.Single -->
+# 課題
+- 情報共有の遅れ→全体遅延
+
 Rules:
 - Apply ONLY what the instruction asks; keep everything else as-is.
-- Write in the SAME language as the slide / instruction.
 - Reply with EITHER the Markdown (A) OR the JSON array (B) — nothing else.`;
 }
 
@@ -84,12 +104,13 @@ export function slideCondensePrompt(): string {
   return `あなたはスライド整形アシスタントです。与えられた1枚のスライドの Markdown を、指示の制約に収まるよう短く整形します。
 
 厳守事項:
-- 出力は本文の Markdown のみ（"# 見出し" と "- 箇条書き"）。JSON・op・コードフェンス・説明文・注釈は一切禁止。
+- 出力は本文の Markdown のみ（"# 見出し" と "- 箇条書き"）。JSON・op・説明文・注釈は一切禁止。
+- 先頭の \`<!-- slide: ... -->\` 行と "# 見出し"（タイトル）はそのまま残す（構造・骨格を壊さない）。
 - 各箇条書きは指定文字数以内の短いキーフレーズに（語尾・助詞・冗長表現を削る）。
 - 数値・固有名詞・パーセント・金額は絶対に削除も改変もしない（増減の向きも変えない）。
 - 入力が既に制約内ならそのまま返す。
 - 入力の言語を保つ（英語入力は英語のまま、日本語入力は日本語のまま。他言語へ翻訳しない）。
-- 図（\`\`\`diagram / \`\`\`mermaid ブロック）があればそのまま残す。`;
+- 図（\`\`\`diagram / \`\`\`mermaid ブロック）・GFM 表・コードフェンスがあればそのまま残す。`;
 }
 
 /** Strip an OUTER ```markdown wrapper a model may add, preserving inner ```diagram fences. */
@@ -97,26 +118,4 @@ export function stripMarkdownFence(raw: string): string {
   const t = raw.trim();
   const m = t.match(/^```(?:markdown|md)\s*\n([\s\S]*)\n```$/i);
   return (m ? m[1] : t).trim();
-}
-
-// ── Single-slide edit prompt (token-cheap: one slide in, one slide out) ──
-
-export function slidePlanSystemPrompt(): string {
-  return `You revise ONE slide. Output ONLY a single JSON Slide object — no prose, no code fence, and NOT a {"slides":[...]} array.
-
-The Slide is exactly one of:
-- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}
-- {"kind":"section","title":"..."}
-- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}
-- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}
-- {"kind":"closing","title":"..."}
-
-You are given the current slide and an instruction. Apply ONLY what the instruction asks; keep everything else as-is. Return the FULL revised slide.
-
-Rules:
-- Write in the SAME language as the slide / instruction.
-- Each bullet is a SHORT key phrase (≤ ~20 full-width chars), not a full sentence; no trailing "。"/".".
-- Do NOT add fields not listed above, and do NOT invent other "kind" values.
-- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.
-- Output valid JSON only (a single object).`;
 }

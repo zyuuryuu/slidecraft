@@ -10,10 +10,14 @@ import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
-import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
+import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
+import { applyFigureYaml } from "../engine/ai-apply";
+import { reconcileEdit } from "../engine/ai-reconcile";
+import { validateStructure, validateCondense } from "../engine/ai-validate";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { loadTemplate, autoSelectLayout, findLayout } from "../engine/template-loader";
+import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
+import { applyTemplateBytes } from "./apply-template";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
@@ -172,27 +176,20 @@ export function useDeckController() {
     }
   }, [catalog, setDeck]);
 
+  // Apply .pptx bytes as the active document's template, through the shared acceptance gate
+  // (apply-template.ts). Reused by the top-bar loader AND the draft master picker (registry).
+  const applyMasterBytes = useCallback(
+    (buf: ArrayBuffer | Uint8Array, name: string) => applyTemplateBytes(buf, name, { setTemplateData, setTemplateName, setParseError }),
+    [setTemplateData, setTemplateName, setParseError],
+  );
+
   // Load a custom template (.pptx) — native Open dialog on desktop, file picker in browser
   const handleLoadTemplate = useCallback(async () => {
     if (editLockedRef.current) return; // observe-only: changing template would diverge from host
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
-    try {
-      const tpl = await loadTemplate(picked.bytes.buffer as ArrayBuffer);
-      // Acceptance gate: reject a structurally-unusable master (no title/body role even
-      // after recovery) instead of silently producing title-less slides — never-silent.
-      const health = assessTemplateHealth(buildCatalog(tpl));
-      if (health.status === "rejected") {
-        const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
-        setParseError(`このテンプレートは使用できません: ${reason}`);
-        return;
-      }
-      setTemplateData(tpl);
-      setTemplateName(picked.name.replace(/\.pptx$/i, ""));
-    } catch (err) {
-      setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [setTemplateData, setTemplateName, setParseError]);
+    await applyMasterBytes(picked.bytes.buffer as ArrayBuffer, picked.name);
+  }, [applyMasterBytes]);
 
   // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
   const { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject } = useDeckIO({
@@ -365,35 +362,50 @@ export function useDeckController() {
     (raw: string) => {
       if (!deck) return;
       const old = deck.slides[activeSlide];
+      // ⓪ Figure edit: AI mode "diagram-edit" returns a BARE DiagramSpec YAML (not Markdown). Apply
+      // it straight to the slide's diagram — parsing it as Markdown yields no diagram, so the figure
+      // edit would be silently dropped and the OLD diagram kept ("採用しても反映されない").
+      if (old) {
+        const fig = applyFigureYaml(old, raw);
+        if (fig) { handleSlideUpdate(activeSlide, fig, "commit"); return; }
+      }
       // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
-      // The engine maps it to clamped geometry on the current slide.
+      // The engine maps it to clamped geometry on the current slide, and reports any op that
+      // couldn't take effect (e.g. an emphasize whose node id the AI renamed away) so it's ANNOUNCED
+      // rather than a silent no-op (#13).
       const intent = parseDesignIntent(raw);
       if (intent && old) {
-        handleSlideUpdate(activeSlide, applyDesignIntent(old, intent), "commit");
+        const { slide, skipped } = applyDesignIntentReport(old, intent);
+        if (skipped.length > 0) setParseError(skipped.map((sk) => sk.message).join(" ｜ "));
+        handleSlideUpdate(activeSlide, slide, "commit");
         return;
       }
       // ① Content edit (Markdown).
       const newSlide = parseMd(raw).slides[0];
       if (!newSlide) return;
-      // Validate an edited figure (DiagramSpec YAML). If the model returned broken
-      // YAML, keep the previous valid diagram + warn instead of rendering a broken one.
-      let diagram = newSlide.diagram ?? old?.diagram;
-      if (newSlide.diagram) {
-        const err = validateDiagramSource(newSlide.diagram.yaml, "yaml");
-        if (err) {
-          diagram = old?.diagram;
-          setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${err}）`);
-        }
-      }
-      handleSlideUpdate(
-        activeSlide,
-        {
-          ...newSlide,
-          diagram,
-          mermaidBlock: newSlide.mermaidBlock ?? old?.mermaidBlock,
-        },
-        "commit", // AI edit = one discrete undo step
-      );
+      if (!old) { handleSlideUpdate(activeSlide, newSlide, "commit"); return; }
+      // If the edited figure YAML is broken, drop it so reconcile carries the OLD (valid) diagram
+      // instead of rendering a broken one.
+      const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
+      // Drop a broken edited diagram (set undefined) so reconcile carries the OLD valid one.
+      const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
+      if (figErr) setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${figErr}）`);
+      // HARNESS GUARD (構造ヘッダー保全): restore any structural scaffolding the AI dropped —
+      // layout pin / title / subtitle / meta / group hint / figure — from the previous slide. The
+      // front-facing path is synchronous (no retry), so we reconcile deterministically and ANNOUNCE
+      // what was restored rather than silently mangling the slide's structure.
+      const reconciled = reconcileEdit(old, edited);
+      const verdict = validateStructure(old, edited, "edit");
+      // The single-slide "適用" has NO review step, so a silent number-swap or language flip is worst
+      // here. Surface (don't reject — the edit may intend it) both the structure restore and any
+      // fact/language change as a one-line notice.
+      const cond = validateCondense(serializeMd({ slides: [old] }), raw);
+      const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
+      const notices: string[] = [];
+      if (verdict.violations.length > 0) notices.push(`構造を元から復元しました（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
+      if (factMsgs.length > 0) notices.push(`⚠ 数値/言語が変化しています（${factMsgs.join(" / ")}）— 確認してください`);
+      if (notices.length > 0) setParseError(notices.join(" ｜ "));
+      handleSlideUpdate(activeSlide, reconciled, "commit"); // AI edit = one discrete undo step
     },
     [deck, activeSlide, handleSlideUpdate, setParseError],
   );
@@ -417,7 +429,9 @@ export function useDeckController() {
   const currentSlideMd = (() => {
     const s = deck?.slides[activeSlide];
     if (!s) return undefined;
-    const resolved = s.layout === "auto" ? autoSelectLayout(s, activeSlide, deck!.slides.length, catalog) : s.layout;
+    // Resolve unconditionally: a pinned name this template lacks degrades to a real layout (so the
+    // cover's canonical pin doesn't leave the editor/preview layout-less on an alien master).
+    const resolved = autoSelectLayout(s, activeSlide, deck!.slides.length, catalog);
     return serializeMd({ slides: [{ ...s, layout: resolved }] });
   })();
 
@@ -436,13 +450,15 @@ export function useDeckController() {
   // Get current slide's layout info for editor
   const currentSlide = deck?.slides[activeSlide];
   const currentLayoutName = currentSlide
-    ? currentSlide.layout === "auto"
-      ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length, catalog)
-      : currentSlide.layout
+    ? autoSelectLayout(currentSlide, activeSlide, deck!.slides.length, catalog)
     : undefined;
   const currentLayout = currentLayoutName && templateData
     ? findLayout(templateData, currentLayoutName)
     : undefined;
+  // Ranked layout candidates for the editor's "Auto → X, also try:" chips (auto pick first).
+  const layoutSuggestions = currentSlide && catalog
+    ? suggestLayouts(currentSlide, activeSlide, deck!.slides.length, catalog, 4)
+    : [];
 
   // ── Cursor line → active slide ──
   const handleCursorLine = useCallback(
@@ -503,11 +519,11 @@ export function useDeckController() {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes,
     handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
-    currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
+    currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
     editLockedRef, // App syncs this from collab.status to drive observe-only locking

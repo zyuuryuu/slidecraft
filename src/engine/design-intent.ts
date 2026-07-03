@@ -40,7 +40,14 @@ export type DesignOp = DesignIntent[number];
  * the intent when the output is the latter, else null (→ treat as Markdown).
  */
 export function parseDesignIntent(raw: string): DesignIntent | null {
-  const r = parseJsonLoose(raw);
+  // Only fire on a WHOLE-STRING JSON ops array (optionally ```json-fenced). A Markdown edit that merely
+  // QUOTES an example array in prose ("…例: [{op:…}]") must NOT be hijacked into the design path — that
+  // would discard the Markdown. So unwrap a fence, then require the content to be a bare [ … ] array.
+  let t = raw.trim();
+  const fence = t.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
+  if (fence) t = fence[1].trim();
+  if (!(t.startsWith("[") && t.endsWith("]"))) return null;
+  const r = parseJsonLoose(t);
   if (!r.ok || !Array.isArray(r.value) || r.value.length === 0) return null;
   const d = DesignIntentSchema.safeParse(r.value);
   return d.success ? d.data : null;
@@ -110,17 +117,34 @@ function applyToFigure(slide: SlideIR, mutate: (spec: DiagramSpec, raw: RawDiagr
   return { ...rest, diagram: { yaml: dumpDiagramLikeSource(raw, baseYaml), placeholderIdx } };
 }
 
-function emphasizeFigure(slide: SlideIR, nodeId: string, level: "high" | "medium"): SlideIR {
-  return applyToFigure(slide, (spec, raw) => {
-    const pos = computeLayout(spec).find((p) => p.nodeId === nodeId);
-    if (!pos) return; // unknown node id → no-op
+/** Emphasize a node. Reports whether it applied — and, when a figure IS present but the id is unknown,
+ *  the available ids — so the caller can announce the miss instead of it vanishing (#13). On a miss the
+ *  ORIGINAL slide is returned (no spurious YAML re-dump). `available === undefined` ⇒ the slide has no
+ *  figure at all (distinct from "figure exists but this id isn't in it"). */
+function emphasizeFigure(
+  slide: SlideIR,
+  nodeId: string,
+  level: "high" | "medium",
+): { slide: SlideIR; ok: boolean; available?: string[] } {
+  let ok = false;
+  let available: string[] | undefined;
+  const out = applyToFigure(slide, (spec, raw) => {
+    const positions = computeLayout(spec);
+    available = positions.map((p) => p.nodeId);
+    const pos = positions.find((p) => p.nodeId === nodeId);
+    if (!pos) return; // unknown node id
     const node = raw.nodes?.find((n) => n.id === nodeId);
-    if (node) node.override = emphasisOverride(pos, level);
+    if (node) {
+      node.override = emphasisOverride(pos, level);
+      ok = true;
+    }
   });
+  return { slide: ok ? out : slide, ok, available };
 }
 
-/** regionSplit: put the figure in a column and the text in the other (template fills the geometry). */
-function applyRegionSplit(slide: SlideIR, arrangement: "text-left" | "text-right" | "diagram-only"): SlideIR {
+/** regionSplit: put the figure in a column and the text in the other (template fills the geometry).
+ *  Exported so the add-a-figure-to-a-text-slide path (ai-apply) can reuse the SAME coexist arrangement. */
+export function applyRegionSplit(slide: SlideIR, arrangement: "text-left" | "text-right" | "diagram-only"): SlideIR {
   const hasFigure = !!slide.diagram || !!slide.mermaidBlock;
   if (!hasFigure) return slide;
 
@@ -146,23 +170,58 @@ function withFigureIdx(slide: SlideIR, idx: string): SlideIR {
   return next;
 }
 
+/** One design op that DIDN'T take effect — surfaced (not hidden) so the user learns their emphasize /
+ *  relayout did nothing and why. `unknown-node` carries the ids that DO exist so they can retry. */
+export interface SkippedOp {
+  op: DesignOp["op"];
+  reason: "no-figure" | "unknown-node";
+  nodeId?: string;
+  available?: string[];
+  message: string; // human, Japanese — ready to show as a notice
+}
+
 /**
- * Apply a sequence of design intents to a slide. Each op is mapped to concrete,
- * clamped geometry by the engine; the slide stays valid (template-driven layout,
- * in-bounds node overrides). Unknown node ids / missing figures are no-ops.
+ * Apply a sequence of design intents AND report which ops were skipped. Each applied op is mapped to
+ * concrete, clamped geometry by the engine; the slide stays valid. An op that can't take effect —
+ * a figureless slide, or an emphasize whose nodeId isn't in the (possibly AI-renamed) diagram — is
+ * NOT silently dropped: it's collected in `skipped` so the caller can announce it (#13). The batch is
+ * never aborted: a good op still applies even if a sibling op is skipped.
  */
-export function applyDesignIntent(slide: SlideIR, intents: DesignIntent): SlideIR {
+export function applyDesignIntentReport(slide: SlideIR, intents: DesignIntent): { slide: SlideIR; skipped: SkippedOp[] } {
   let next = slide;
+  const skipped: SkippedOp[] = [];
   for (const intent of intents) {
-    if (intent.op === "regionSplit") {
+    const hasFigure = !!next.diagram || !!next.mermaidBlock;
+    if (intent.op === "emphasize") {
+      const r = emphasizeFigure(next, intent.nodeId, intent.level);
+      next = r.slide;
+      if (!r.ok) {
+        skipped.push(
+          r.available === undefined
+            ? { op: "emphasize", reason: "no-figure", nodeId: intent.nodeId, message: "図がないため強調をスキップしました。" }
+            : {
+                op: "emphasize",
+                reason: "unknown-node",
+                nodeId: intent.nodeId,
+                available: r.available,
+                message: `ノード「${intent.nodeId}」が見つからないため強調をスキップしました（候補: ${r.available.join(", ") || "なし"}）。`,
+              },
+        );
+      }
+    } else if (intent.op === "regionSplit") {
+      if (!hasFigure) { skipped.push({ op: "regionSplit", reason: "no-figure", message: "図がないため配置変更をスキップしました。" }); continue; }
       next = applyRegionSplit(next, intent.arrangement);
-    } else if (intent.op === "emphasize") {
-      next = emphasizeFigure(next, intent.nodeId, intent.level);
     } else if (intent.op === "relayout") {
+      if (!hasFigure) { skipped.push({ op: "relayout", reason: "no-figure", message: "図がないため再配置をスキップしました。" }); continue; }
       next = applyToFigure(next, (_spec, raw) => {
         raw.direction = intent.direction;
       });
     }
   }
-  return next;
+  return { slide: next, skipped };
+}
+
+/** Backward-compatible bare-slide variant (drops the skip report). */
+export function applyDesignIntent(slide: SlideIR, intents: DesignIntent): SlideIR {
+  return applyDesignIntentReport(slide, intents).slide;
 }

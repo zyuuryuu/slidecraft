@@ -19,7 +19,8 @@ import type { LayoutCatalog } from "./template-catalog";
 import { diagnoseDeck, type DeckIssue, type Lever } from "./deck-diagnostics";
 import { contentBodyBox } from "./distill";
 import { buildSlideFix, slideFixRequest } from "./slide-fix";
-import { validateCondense } from "./ai-validate";
+import { validateCondense, validateStructure, mergeVerdicts } from "./ai-validate";
+import { reconcileEdit } from "./ai-reconcile";
 import { visualizeKeyValueMd } from "./slide-rewrite";
 import { serializeMd } from "./md-serializer";
 import { parseMd } from "./md-parser";
@@ -50,6 +51,9 @@ export interface RefineChange {
   kind: "deterministic" | "ai";
   beforeMd: string;
   afterMd: string;
+  /** Non-blocking notices (e.g. a free-form edit changed a number or the language) — shown for review,
+   *  never a rejection (ADR-0012: 棄却しない・沈黙しない). */
+  warnings?: string[];
 }
 
 export interface RefineResult {
@@ -141,17 +145,22 @@ export async function refineDeck(
           }
           if (outcome.ok) {
             const after = outcome.markdown.trim();
-            // GUARDRAIL: a small model occasionally drops a fact / drifts language / returns
-            // the wrong format. Validate before applying; a HARD violation is rejected and
-            // retried (never apply a fact-corrupting edit blind), keeping the original on
-            // exhaustion so the slide stays flagged-unconverged, not silently mangled.
-            const verdict = validateCondense(before, after, box);
+            const afterSlide = after ? parseMd(after).slides[0] : undefined;
+            // GUARDRAIL: a small model occasionally drops a fact / drifts language / returns the wrong
+            // format — AND it can drop the slide's structure (title/figure/group). A condense returns
+            // the FULL slide and must preserve both, so merge the fact/language guard with the
+            // structure guard ('condense' strictness = every structural loss is HARD). A HARD violation
+            // is rejected + retried; the original is kept on exhaustion (flagged-unconverged, not
+            // silently mangled). A clean candidate is reconciled before apply (restores any SOFT loss).
+            const verdict = afterSlide
+              ? mergeVerdicts(validateCondense(before, after, box), validateStructure(current.slides[idx], afterSlide, "condense"))
+              : validateCondense(before, after, box);
             if (verdict.hasHard && attempt < 1 + maxRetries) {
               pendingRetry = true; // re-submit this slide next pass (don't settle it)
               continue;
             }
             aiDone.add(idx); // succeeded (or retries exhausted) → settled
-            const newSlide = after && after !== before && !verdict.hasHard ? parseMd(after).slides[0] : undefined;
+            const newSlide = after && after !== before && !verdict.hasHard && afterSlide ? reconcileEdit(current.slides[idx], afterSlide) : undefined;
             if (newSlide) {
               current = replaceSlide(current, idx, newSlide);
               changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: after });
@@ -196,10 +205,17 @@ export async function batchEditDeck(
       const outcome = await opts.aiFix(`Current slide:\n${before}\n\nInstruction: ${opts.instruction}`, { slideIndex: idx, signal: opts.signal, attempt: 1, kind: "edit" });
       if (!outcome.ok) continue; // cancelled / failed → skip this slide
       const after = outcome.markdown.trim();
-      const newSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
+      const afterSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
+      // A batch instruction is FREE-FORM — it may legitimately change facts or language (e.g. "英語に
+      // して"), so we never fact/language-reject it. But it must not silently destroy the slide's
+      // STRUCTURE, so reconcile restores any layout pin / title / meta / figure the edit dropped.
+      const newSlide = afterSlide ? reconcileEdit(current.slides[idx], afterSlide) : undefined;
       if (newSlide) {
         current = replaceSlide(current, idx, newSlide);
-        changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after });
+        // Surface (don't reject) a fact/language change so a silent number-swap or translation is caught.
+        const cond = validateCondense(before, after);
+        const warnings = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
+        changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after, ...(warnings.length ? { warnings } : {}) });
       }
     } catch {
       continue;

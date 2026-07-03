@@ -4,10 +4,11 @@
  * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
+import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
 
 /** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line). */
 function findTableInLines(lines: string[]): string[][] | null {
@@ -37,14 +38,9 @@ function mermaidToFigure(
   return { mermaidBlock: { mermaid: mmd, placeholderIdx } };
 }
 
-// Real title-slide metadata regions in the master. (Meta/Summary were previously
-// mapped to "11" too — colliding with Date and dropping one — so they're no longer
-// special-cased; "Meta:"/"Summary:" lines fall through to body text and survive.)
-const TITLE_FIELD_MAP: Record<string, string> = {
-  category: "10",
-  date: "11",
-  footer: "12",
-};
+// Title-slide metadata (Category/Date/Footer) → idx is defined in slide-roles (metaFieldIdx), the
+// single source of truth. (Meta/Summary were previously mapped to "11" too — colliding with Date and
+// dropping one — so they're no longer special-cased; "Meta:"/"Summary:" lines fall through to body.)
 
 // ── Inline text parsing ──
 
@@ -85,6 +81,12 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
         continue;
       }
     }
+    // `### …` → a GROUP heading (card/step) — the group's title line.
+    const headingMatch = trimmed.match(/^###\s+(.*)/);
+    if (headingMatch) {
+      paragraphs.push({ segments: parseInline(headingMatch[1] || " "), heading: true });
+      continue;
+    }
     const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
     if (bulletMatch) {
       paragraphs.push({
@@ -96,12 +98,6 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
     }
   }
   return paragraphs;
-}
-
-// ── Check if layout is a title layout ──
-
-function isTitleLayout(layout: string): boolean {
-  return layout.startsWith("Title.") || layout.startsWith("Closing.");
 }
 
 /** First ```lang … ``` fenced block in a set of lines, or null. */
@@ -136,6 +132,7 @@ export function parseSlideBlock(
   const titleFields: Record<string, string> = {};
   let diagram: DiagramBlock | undefined;
   let mermaidBlock: MermaidBlock | undefined;
+  let code: CodeBlock | undefined;
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -211,6 +208,9 @@ export function parseSlideBlock(
       placeholders,
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
+      // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
+      // is plain columns and carries no hint.
+      ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
       sourceLineStart: startLine,
       sourceLineEnd: startLine + lines.length - 1,
     };
@@ -243,6 +243,10 @@ export function parseSlideBlock(
           const f = mermaidToFigure(codeBlockLines.join("\n"), "1");
           if (f.diagram) diagram = f.diagram;
           else mermaidBlock = f.mermaidBlock;
+        } else if (codeBlockLines.length > 0) {
+          // Any OTHER fence (```yaml / ```python / ```log / ```) is CODE/LOG — capture it as a
+          // monospace body (previously the content was silently dropped).
+          code = { content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" };
         }
         inCodeBlock = false;
         codeBlockLang = "";
@@ -292,46 +296,19 @@ export function parseSlideBlock(
     bodyLines.push(line);
   }
 
-  // Determine if this is a title layout
-  const isTitle = isTitleLayout(layout) || Object.keys(titleFields).length > 0;
+  // Determine the placeholder namespace (title vs content) — the SINGLE shared rule (slide-roles):
+  // a Title/Closing layout OR the presence of any meta field promotes the slide to the title namespace.
+  const isTitle = isTitleNamespace(layout, Object.keys(titleFields).length > 0);
+  const ns = isTitle ? TITLE_NS : CONTENT_NS;
 
-  // Build placeholders
+  // Build placeholders: # → title idx, ## / > → subtitle idx (namespace-dependent).
+  if (title) placeholders.push({ idx: ns.title, paragraphs: [{ segments: parseInline(title) }] });
+  if (subtitle) placeholders.push({ idx: ns.subtitle, paragraphs: [{ segments: parseInline(subtitle) }] });
   if (isTitle) {
-    // Title layouts: # → idx 0 (ctrTitle), ## → idx 1 (subTitle)
-    if (title) {
-      placeholders.push({
-        idx: "0",
-        paragraphs: [{ segments: parseInline(title) }],
-      });
-    }
-    if (subtitle) {
-      placeholders.push({
-        idx: "1",
-        paragraphs: [{ segments: parseInline(subtitle) }],
-      });
-    }
+    // Title-slide metadata (Category/Date/Footer) → its canonical meta idx.
     for (const [field, value] of Object.entries(titleFields)) {
-      const idx = TITLE_FIELD_MAP[field];
-      if (idx) {
-        placeholders.push({
-          idx,
-          paragraphs: [{ segments: parseInline(value) }],
-        });
-      }
-    }
-  } else {
-    // Content layouts: # → idx 15 (title), > → idx 16 (subtitle)
-    if (title) {
-      placeholders.push({
-        idx: "15",
-        paragraphs: [{ segments: parseInline(title) }],
-      });
-    }
-    if (subtitle) {
-      placeholders.push({
-        idx: "16",
-        paragraphs: [{ segments: parseInline(subtitle) }],
-      });
+      const idx = metaFieldIdx(field);
+      if (idx) placeholders.push({ idx, paragraphs: [{ segments: parseInline(value) }] });
     }
   }
 
@@ -353,7 +330,7 @@ export function parseSlideBlock(
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
@@ -370,6 +347,7 @@ export function parseSlideBlock(
     diagram,
     mermaidBlock,
     ...(table ? { table } : {}),
+    ...(code ? { code } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + lines.length - 1,
   };

@@ -15,12 +15,9 @@ import type {
 } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { tableToMarkdown } from "./md-table";
+import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
 
-// ── Title layout detection ──
-
-function isTitleLayout(layout: string): boolean {
-  return layout.startsWith("Title.") || layout.startsWith("Closing.");
-}
+// ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
 function isColumnLayout(layout: string): boolean {
   return layout.startsWith("Column.");
@@ -33,14 +30,6 @@ function isKpiLayout(layout: string): boolean {
 function isProcessLayout(layout: string): boolean {
   return layout.startsWith("Process.");
 }
-
-// ── Placeholder idx → title field name (reverse of TITLE_FIELD_MAP) ──
-
-const IDX_TO_FIELD: Record<string, string> = {
-  "10": "Category",
-  "11": "Date",
-  "12": "Footer",
-};
 
 // ── Inline segments → Markdown text ──
 
@@ -61,6 +50,7 @@ function serializeParagraphs(paragraphs: Paragraph[]): string {
   return paragraphs
     .map((p) => {
       const text = serializeSegments(p.segments);
+      if (p.heading) return `### ${text}`;
       if (p.bullet) return `- ${text}`;
       return text;
     })
@@ -80,6 +70,20 @@ function getPlaceholderText(slide: SlideIR, idx: string): string | undefined {
   const ph = getPlaceholder(slide, idx);
   if (!ph) return undefined;
   return serializeParagraphs(ph.paragraphs);
+}
+
+// ── Single-body FIGURE (table / diagram / mermaid / code) → its fenced Markdown block ──
+// A table/diagram/mermaid/code is a slide-level, single-body figure — it is NOT tied to the layout
+// name. Emitting it must happen in EVERY layout branch (title / separator / single-body), else a
+// figure slide mis-pinned to a Title or a Column/KPI/Process layout serializes to nothing (silent
+// data loss that also blinds the AI to the figure it must preserve). Column-scoped diagrams/mermaid
+// in a separator layout are handled per-column separately; this is only the single-body form.
+function figureBlock(slide: SlideIR): string | null {
+  if (slide.table) return tableToMarkdown(slide.table.rows);
+  if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
+  if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
+  if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
+  return null;
 }
 
 // ── Determine separator type for multi-section layouts ──
@@ -114,30 +118,51 @@ function serializeSlide(
     lines.push(`<!-- slide: ${layout} -->`);
   }
 
-  if (isTitleLayout(layout)) {
-    // Title layouts: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = fields
-    const title = getPlaceholderText(slide, "0");
-    const subtitle = getPlaceholderText(slide, "1");
+  // Choose the namespace with the SAME rule the parser uses (slide-roles): a Title/Closing layout OR
+  // the presence of meta placeholders means the title/subtitle live at idx 0/1 (else 15/16). Deriving
+  // this from isTitleNamespace (not the layout name alone) round-trips an auto-layout slide that carries
+  // Category/Date/Footer — otherwise its title + meta would be read from the empty content idxs and lost.
+  // A grouped slide (card/step/kpi) is NEVER a title slide — even if autoSelectLayout resolves it to a
+  // Title layout — so it must not take the title branch (which would read the title from the empty
+  // title-namespace idx and drop the columns + groupKind). Gate the title branch on !groupKind.
+  const hasMeta = META_IDXS.some((idx) => getPlaceholderText(slide, idx));
+  if (!slide.groupKind && isTitleNamespace(layout, hasMeta)) {
+    // Title namespace: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = meta fields.
+    const title = getPlaceholderText(slide, TITLE_NS.title);
+    const subtitle = getPlaceholderText(slide, TITLE_NS.subtitle);
     if (title) lines.push(`# ${title}`);
     if (subtitle) lines.push(`## ${subtitle}`);
     lines.push("");
 
     // Fields
-    for (const [idx, fieldName] of Object.entries(IDX_TO_FIELD)) {
+    for (const { name, idx } of META_FIELDS) {
       const text = getPlaceholderText(slide, idx);
-      if (text) lines.push(`${fieldName}: ${text}`);
+      if (text) lines.push(`${name}: ${text}`);
+    }
+
+    // A figure mis-pinned to a Title/Closing layout must still round-trip (not vanish).
+    const fig = figureBlock(slide);
+    if (fig) {
+      lines.push("");
+      lines.push(fig);
     }
   } else {
-    // Content layouts: idx 15 = title, idx 16 = subtitle
-    const title = getPlaceholderText(slide, "15");
-    const subtitle = getPlaceholderText(slide, "16");
+    // Content namespace: idx 15 = title, idx 16 = subtitle
+    const title = getPlaceholderText(slide, CONTENT_NS.title);
+    const subtitle = getPlaceholderText(slide, CONTENT_NS.subtitle);
     if (title) lines.push(`# ${title}`);
     if (subtitle) lines.push(`> ${subtitle}`);
     lines.push("");
 
-    const sepType = getSeparatorType(layout);
+    // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
+    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
+    // single-body table/code is NEVER column-scoped: a figure slide that merely RESOLVED to a
+    // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
+    // trailing table/code into the last column). So the separator branch requires no single-body figure.
+    const sepType = slide.groupKind ?? getSeparatorType(layout);
+    const singleBodyFigure = !!(slide.table || slide.code);
 
-    if (sepType) {
+    if (sepType && !singleBodyFigure) {
       // Multi-section: each numbered region (column) becomes a section. A region may
       // hold TEXT or a FIGURE (diagram/mermaid) — emit the figure's fenced block in
       // its own column so text+figure COEXISTENCE round-trips (the figure sits beside
@@ -170,17 +195,10 @@ function serializeSlide(
         lines.push("");
       }
     } else {
-      // Single body: idx 1
-      if (slide.table) {
-        lines.push(tableToMarkdown(slide.table.rows));
-      } else if (slide.diagram) {
-        lines.push("```diagram");
-        lines.push(slide.diagram.yaml);
-        lines.push("```");
-      } else if (slide.mermaidBlock) {
-        lines.push("```mermaid");
-        lines.push(slide.mermaidBlock.mermaid);
-        lines.push("```");
+      // Single body: idx 1 (table / code / diagram / mermaid all serialize here).
+      const fig = figureBlock(slide);
+      if (fig) {
+        lines.push(fig);
       } else {
         const body = getPlaceholderText(slide, "1");
         if (body) lines.push(body);

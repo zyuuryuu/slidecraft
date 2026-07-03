@@ -12,7 +12,9 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { buildCatalog, placeholderRole, slideIdxRole, type PlaceholderRole } from "./template-catalog";
+import { buildCatalog } from "./template-catalog";
+import { bindContentByRole, bodyPlaceholders, nthBody } from "./placeholder-binding";
+import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
@@ -25,6 +27,11 @@ import { midnightExecutive } from "./theme";
  * browser/WebView provides a canvas-based implementation that matches the preview.
  */
 export type SvgRasterizer = (svg: string) => Promise<Uint8Array>;
+
+/** Code/log text → paragraphs (one per source line, no bullets) so the body renders line-by-line. */
+function codeToParagraphs(content: string): PlaceholderContent["paragraphs"] {
+  return content.split("\n").map((line) => ({ segments: [{ text: line }] }));
+}
 
 // ── Replace text in a placeholder shape XML ──
 
@@ -43,23 +50,15 @@ function replaceTextInShape(
     txEnd,
   );
 
-  // Find where lstStyle ends to preserve bodyPr + lstStyle
-  let cut: number;
-  const lstEnd = inner.lastIndexOf("</a:lstStyle>");
-  if (lstEnd !== -1) {
-    cut = lstEnd + "</a:lstStyle>".length;
-  } else {
-    const lstSelf = inner.indexOf("<a:lstStyle/>");
-    if (lstSelf !== -1) {
-      cut = lstSelf + "<a:lstStyle/>".length;
-    } else {
-      // Fallback: put paragraphs right after bodyPr
-      const bodyPrEnd = inner.indexOf("/>");
-      cut = bodyPrEnd !== -1 ? bodyPrEnd + 2 : 0;
-    }
-  }
-
-  const preserved = inner.substring(0, cut);
+  // Preserve the bodyPr (anchor / autofit) but DROP the layout's lstStyle: a slide placeholder must NOT
+  // carry its own lstStyle. It inherits font / size / color from the LAYOUT placeholder (which inherits
+  // from the MASTER) by matching type+idx. Copying the layout's lstStyle into the slide PINS the
+  // formatting at the slide level, so editing the master/layout font no longer propagates to generated
+  // slides ("スライドマスターでフォントサイズを変えても効かない"). An empty <a:lstStyle/> restores
+  // normal inheritance while looking identical, since the layout supplies exactly the same lstStyle.
+  // bodyPr is a required first child of txBody — keep the layout's (anchor/autofit) or a minimal one.
+  const bodyPr = inner.match(/<a:bodyPr\b[^>]*(?:\/>|>[\s\S]*?<\/a:bodyPr>)/)?.[0] ?? "<a:bodyPr/>";
+  const preserved = bodyPr + "<a:lstStyle/>";
   return (
     shapeXml.substring(0, txStart) +
     "<p:txBody>" +
@@ -119,44 +118,38 @@ async function buildSlideXml(
       };
     }
   }
-  // Bind content to placeholders BY ROLE (not idx), so any template's layout —
-  // whatever idxs it uses — gets the right content. For the canonical template
-  // (idx convention == roles) this is identical to the old idx matching.
-  const byIdx = <T extends { idx: string }>(a: T, b: T) =>
-    a.idx.length - b.idx.length || a.idx.localeCompare(b.idx);
-  const hasCtrTitle = slide.placeholders.some((p) => p.idx === "0");
+  // Bind content to placeholders BY ROLE (not idx) via the SHARED binding — the SAME function the
+  // live preview uses, so export and preview can't diverge (WYSIWYG), and any template's idx
+  // convention binds correctly (an alien master's title/body idxs match through their role).
+  // A grouped slide (card/step/kpi) fills the layout's per-group heading/body slots via the SEPARATE
+  // group path; everything else uses the canonical binder. Same Map shape → the loop below is unchanged.
+  const contentFor = slide.groupKind && isGroupedLayout(layout)
+    ? expandGroups(slide, layout)
+    : bindContentByRole(slide, layout.placeholders);
 
-  const contentByRole = new Map<PlaceholderRole, PlaceholderContent[]>();
-  for (const c of [...slide.placeholders].sort(byIdx)) {
-    const role = slideIdxRole(c.idx, hasCtrTitle);
-    const list = contentByRole.get(role);
-    if (list) list.push(c);
-    else contentByRole.set(role, [c]);
-  }
-
-  const layoutMeta = new Map<string, { role: PlaceholderRole; order: number }>();
-  const roleSeen: Record<string, number> = {};
-  for (const lph of [...layout.placeholders].sort(byIdx)) {
-    const role = placeholderRole(lph);
-    roleSeen[role] = (roleSeen[role] ?? 0) + 1;
-    layoutMeta.set(lph.idx, { role, order: roleSeen[role] });
-  }
-
-  // Diagram/mermaid occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
-  const bodyPhs = [...layout.placeholders].sort(byIdx).filter((p) => placeholderRole(p) === "body");
-  const visualBody = (pi?: string) => (pi ? bodyPhs[Math.max(1, parseInt(pi) || 1) - 1] : undefined);
+  // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
+  const bodyPhs = bodyPlaceholders(layout.placeholders);
+  const visualBody = (pi?: string) => nthBody(bodyPhs, pi);
   const diagBodyIdx = slide.diagram ? visualBody(slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
+  const codeBodyIdx = slide.code ? visualBody(slide.code.placeholderIdx)?.idx : undefined;
 
   let shapes = "";
   let id = 2;
 
   for (const ph of layout.placeholders) {
     if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx) continue; // replaced by the visual
-    const meta = layoutMeta.get(ph.idx);
-    if (!meta) continue;
-    const content = contentByRole.get(meta.role)?.[meta.order - 1];
+    // A code/log block FILLS its body placeholder with monospace text (the placeholder's own
+    // lstStyle supplies the monospace font / code-box styling — we only swap the text).
+    if (ph.idx === codeBodyIdx) {
+      let shapeXml = replaceTextInShape(ph.shapeXml, { idx: ph.idx, paragraphs: codeToParagraphs(slide.code!.content) });
+      shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
+      shapes += shapeXml;
+      id++;
+      continue;
+    }
+    const content = contentFor.get(ph.idx);
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content);
@@ -264,6 +257,16 @@ export async function generatePptx(
   const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
   const zip = await JSZip.loadAsync(tplBuf);
 
+  // PURGE any slides baked into the template. A picked master may be a FULL deck (e.g. an
+  // "all-layouts sample" .pptx with 13 slides), not a slide-free TemplateOnly file. Our assembly
+  // writes the deck's slides as slide1.xml, slide2.xml… — which would collide with the template's
+  // existing slide parts and, worse, duplicate their [Content_Types] Overrides + presentation rels
+  // (invalid OOXML → PowerPoint shows 0 slides). Removing the template's slides makes the deck's
+  // slides the ONLY slides, so ANY .pptx works as a master. (Layouts/master/theme are untouched.)
+  for (const path of Object.keys(zip.files)) {
+    if (/^ppt\/slides\/(_rels\/)?slide\d+\.xml(\.rels)?$/.test(path)) zip.remove(path);
+  }
+
   // Find max rId in presentation.xml.rels
   const existingRIds = [
     ...template.presentationRels.matchAll(/Id="rId(\d+)"/g),
@@ -338,29 +341,43 @@ export async function generatePptx(
     );
   }
 
-  // Update presentation.xml
+  // Update presentation.xml — replace the sldIdLst if present, else INSERT one. Some hand/generated
+  // templates OMIT <p:sldIdLst> entirely; without it the exported deck lists NO slides and PowerPoint/
+  // LibreOffice show a single blank default slide even though every slide part exists.
+  const sldIdLstXml = `<p:sldIdLst>${sldIdEntries.join("")}</p:sldIdLst>`;
   let presXml = template.presentationXml;
-  presXml = presXml.replace(
-    "<p:sldIdLst/>",
-    `<p:sldIdLst>${sldIdEntries.join("")}</p:sldIdLst>`,
-  );
-  // Also handle non-empty sldIdLst (if template had slides)
-  presXml = presXml.replace(
-    /<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/,
-    `<p:sldIdLst>${sldIdEntries.join("")}</p:sldIdLst>`,
-  );
+  const sldIdLstRe = /<p:sldIdLst\b[\s\S]*?<\/p:sldIdLst>|<p:sldIdLst\s*\/>/;
+  if (sldIdLstRe.test(presXml)) {
+    presXml = presXml.replace(sldIdLstRe, sldIdLstXml);
+  } else if (/<p:sldSz\b/.test(presXml)) {
+    // Schema order is …sldMasterIdLst, sldIdLst, sldSz… — insert right before the (required) sldSz.
+    presXml = presXml.replace(/<p:sldSz\b/, `${sldIdLstXml}<p:sldSz`);
+  } else {
+    presXml = presXml.replace("</p:presentation>", `${sldIdLstXml}</p:presentation>`);
+  }
   zip.file("ppt/presentation.xml", presXml);
 
-  // Update presentation.xml.rels
+  // Update presentation.xml.rels — first drop the template's own slide rels (purged above), then
+  // append the deck's, so no dangling/duplicate slide relationships remain.
   let presRels = template.presentationRels;
+  presRels = presRels.replace(
+    /<Relationship\b[^>]*Type="[^"]*\/relationships\/slide"[^>]*\/>/g,
+    "",
+  );
   presRels = presRels.replace(
     "</Relationships>",
     `${relEntries.join("")}</Relationships>`,
   );
   zip.file("ppt/_rels/presentation.xml.rels", presRels);
 
-  // Update [Content_Types].xml
+  // Update [Content_Types].xml — drop the template's own slide Overrides (purged above) first, so
+  // the deck's slide Overrides aren't DUPLICATED (duplicate PartName = invalid OOXML → 0 slides).
+  // Only /ppt/slides/slideN.xml is stripped; slideLayouts/slideMaster Overrides are left intact.
   let ct = template.contentTypes;
+  ct = ct.replace(
+    /<Override\b[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g,
+    "",
+  );
   ct = ct.replace(
     "</Types>",
     `${ctEntries.join("")}</Types>`,

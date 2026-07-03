@@ -7,11 +7,15 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence } from "../engine/deck-plan";
+import type { LayoutCatalog } from "../engine/template-catalog";
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import { parseJsonLoose } from "../engine/json-salvage";
 import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
+import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
+/** Diagram-mode type choice: a concrete shape, or "auto" → Stage-1 routing picks it. */
+export type DiagramTypeChoice = DiagramType | "auto";
 import { runningInTauri } from "../ipc/commands";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
@@ -41,6 +45,8 @@ export interface AiTask {
   status: AiTaskStatus;
   result: string; // streamed live, then post-processed on done
   error?: string;
+  notice?: string; // non-blocking 告知 (e.g. deterministic-repair dropped a corrupt unit)
+  diagramType?: DiagramTypeChoice; // diagram mode: chosen shape ("auto" → resolved by the route call)
   startedAt: number;
   finishedAt?: number;
 }
@@ -88,7 +94,7 @@ function loadSavedConfig(): { localOnly: boolean; provider?: ProviderId; configs
   }
 }
 
-export function useAiGeneration() {
+export function useAiGeneration(catalog?: LayoutCatalog) {
   const [saved] = useState(loadSavedConfig);
   // Default to the bundled offline model on desktop (the product's offline-first north star);
   // the browser/demo build can't spawn a runtime, so it falls back to Claude. A saved choice wins.
@@ -210,10 +216,14 @@ export function useAiGeneration() {
   // (slides → engine Markdown, slide → fenced Markdown, diagram-edit → validated YAML).
   // Returns either a result or a human error — same outcomes as before, centralised so
   // every task path (foreground + loop) treats responses identically.
-  const postProcess = useCallback((mode: AiMode, raw: string): { result?: string; error?: string } => {
+  const postProcess = useCallback((mode: AiMode, raw: string): { result?: string; error?: string; notice?: string } => {
     if (mode === "slides") {
       const parsed = extractDeckPlan(raw);
-      return parsed.ok ? { result: serializeMd(deckPlanToDeck(parsed.plan)) } : { error: `Couldn't read the generated plan: ${parsed.error}` };
+      // Pass the catalog so a kind the master can't express (table/columns/diagram) is degraded to
+      // content bullets deterministically, instead of emitting an unrenderable slide (#11).
+      if (!parsed.ok) return { error: `Couldn't read the generated plan: ${parsed.error}` };
+      const notice = parsed.notices?.length ? parsed.notices.join(" / ") : undefined;
+      return { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)), ...(notice ? { notice } : {}) };
     }
     if (mode === "slide" || mode === "condense") {
       const md = stripMarkdownFence(raw);
@@ -226,14 +236,14 @@ export function useAiGeneration() {
       return parsed.success ? { result: diagramSpecToYaml(parsed.data) } : { error: `Invalid diagram: ${parsed.error.issues[0]?.message}` };
     }
     return { result: raw }; // "diagram" → raw passthrough (unchanged from before)
-  }, []);
+  }, [catalog]);
 
   const patchTask = useCallback((id: string, patch: Partial<AiTask>) => {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
 
-  const enqueue = useCallback((prompt: string, mode: AiMode, label: string): AiTask => {
-    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
+  const enqueue = useCallback((prompt: string, mode: AiMode, label: string, diagramType?: DiagramTypeChoice): AiTask => {
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode, label, prompt, status: "running", result: "", startedAt: Date.now(), ...(diagramType ? { diagramType } : {}) };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     return task;
   }, []);
@@ -256,9 +266,26 @@ export function useAiGeneration() {
         if (provider === "builtin" && !baseURL.trim() && startBuiltinRef.current) {
           baseURL = await startBuiltinRef.current();
         }
+        // Stage 1 (diagram, おまかせ): resolve the TYPE with a quick route call so Stage 2 sends ONLY that
+        // type's shape prompt. A concrete user choice skips the call; a parse miss falls back to flowchart.
+        let diagramType: DiagramType | undefined;
+        if (task.mode === "diagram" && task.diagramType) {
+          if (task.diagramType === "auto") {
+            const routed = await generateWithAI({
+              provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
+              mode: "diagram-route", userRequest: task.prompt,
+              signal: controller.signal, localOnly: localModelOnly,
+            });
+            diagramType = parseDiagramType(routed) ?? "flowchart";
+            patchTask(task.id, { diagramType });
+          } else {
+            diagramType = task.diagramType;
+          }
+        }
         const raw = await generateWithAI({
           provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
           mode: task.mode, userRequest: task.prompt,
+          ...(diagramType ? { diagramType } : {}),
           onText: (t) => patchTask(task.id, { result: t }),
           signal: controller.signal,
           localOnly: localModelOnly, // hard egress block at the chokepoint
@@ -268,7 +295,7 @@ export function useAiGeneration() {
           patchTask(task.id, { status: "error", error: pp.error, finishedAt: Date.now() });
           throw new Error(pp.error);
         }
-        patchTask(task.id, { status: "done", result: pp.result ?? "", finishedAt: Date.now() });
+        patchTask(task.id, { status: "done", result: pp.result ?? "", ...(pp.notice ? { notice: pp.notice } : {}), finishedAt: Date.now() });
         return pp.result ?? "";
       } catch (e) {
         if (controller.signal.aborted) {
@@ -313,10 +340,10 @@ export function useAiGeneration() {
   // result/generating/error reflect it. No single-flight guard — extra clicks just add
   // tasks (all kept in history); the UI disables the button while generating.
   const generate = useCallback(
-    (userRequest: string, mode: AiMode) => {
+    (userRequest: string, mode: AiMode, diagramType?: DiagramTypeChoice) => {
       if (!canGenerate(userRequest)) return;
       persistConfig();
-      const task = enqueue(userRequest, mode, MODE_LABEL[mode]);
+      const task = enqueue(userRequest, mode, MODE_LABEL[mode], diagramType);
       setActiveTaskId(task.id);
       void runTask(task).catch(() => {});
     },
@@ -345,6 +372,8 @@ export function useAiGeneration() {
   const result = activeTask?.result ?? "";
   const generating = activeTask?.status === "running";
   const error = activeTask?.status === "error" ? (activeTask.error ?? "エラー") : null;
+  // Non-blocking 告知 for a completed task (e.g. a corrupt unit was dropped by deterministic repair).
+  const notice = activeTask?.status === "done" ? (activeTask.notice ?? null) : null;
 
   // One-click: switch to local Ollama, picking a valid installed model.
   const switchToOllama = useCallback(() => {
@@ -501,7 +530,7 @@ export function useAiGeneration() {
     provider, setProvider,
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
-    generating, result, setResult, error,
+    generating, result, setResult, error, notice,
     canGenerate, generate, cancel, reset,
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,

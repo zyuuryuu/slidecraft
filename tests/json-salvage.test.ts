@@ -30,7 +30,10 @@ describe("tolerantJsonParse", () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect((r.value as Record<string, string>).t).toBe("デ"); // valid one still decodes
-      expect((r.value as Record<string, string>).bad).toContain("u30c"); // bad one kept as literal, not lost
+      // The truncated escape's character is unrecoverable → U+FFFD (matches the lone-surrogate rule),
+      // NOT the literal "u30c" garbage that used to leak into slides (#12-5 文字化け fix).
+      expect((r.value as Record<string, string>).bad).toBe("�");
+      expect((r.value as Record<string, string>).bad).not.toContain("u30c");
     }
   });
 
@@ -49,10 +52,11 @@ describe("tolerantJsonParse", () => {
 });
 
 describe("repair helpers", () => {
-  it("repairEscapes preserves valid escapes, doubles bad ones", () => {
+  it("repairEscapes keeps valid escapes, doubles strays, drops truncated \\u to U+FFFD", () => {
     expect(repairEscapes(String.raw`デ`)).toBe(String.raw`デ`); // valid kept
     expect(repairEscapes(String.raw`\n\t\\`)).toBe(String.raw`\n\t\\`); // valid kept
-    expect(repairEscapes(String.raw`\u30c`)).toBe(String.raw`\\u30c`); // truncated → literal
+    expect(repairEscapes(String.raw`ツ`)).toBe(String.raw`ツ`); // valid 4-hex \uXXXX kept
+    expect(repairEscapes(String.raw`\u30c`)).toBe("�"); // truncated \u → U+FFFD (unrecoverable, no 文字化け)
     expect(repairEscapes(String.raw`\z`)).toBe(String.raw`\\z`); // stray → literal
   });
   it("removeTrailingCommas", () => {

@@ -51,12 +51,23 @@ function mapOutsideStrings(s: string, fn: (chunk: string) => string): string {
 
 // ── Individual repairs (each leaves valid JSON unchanged) ──
 
-/** Match a COMPLETE valid escape (\uXXXX or \", \\, \/, \b\f\n\r\t) OR a lone backslash. */
-const ESCAPE_OR_STRAY = /\\(?:u[0-9a-fA-F]{4}|["\\/bfnrt])|\\/g;
+// Ordered alternation (JS regex takes the FIRST matching alt at each position):
+//  1. a COMPLETE \uXXXX  2. a TRUNCATED/malformed \u (0–3 hex)  3. another valid escape  4. a lone backslash.
+const ESCAPE_OR_STRAY = /\\u[0-9a-fA-F]{4}|\\u[0-9a-fA-F]{0,3}|\\["\\/bfnrt]|\\/g;
 
-/** Double stray / truncated backslash escapes so "\u30c", "\uXYZ", lone "\" become literal. */
+/**
+ * Repair backslash faults so the string parses. A truncated `\uXXXX` (e.g. `\u30c`) names a character
+ * the model never finished emitting — it is UNRECOVERABLE, so it becomes U+FFFD (`�`), the same marker
+ * used for lone surrogates, instead of the literal "u30c" garbage it used to leave in slides (#12-5).
+ * Valid escapes are untouched; a lone stray backslash is doubled so it survives as literal.
+ */
 export function repairEscapes(s: string): string {
-  return s.replace(ESCAPE_OR_STRAY, (m) => (m.length > 1 ? m : "\\\\"));
+  return s.replace(ESCAPE_OR_STRAY, (m) => {
+    if (/^\\u[0-9a-fA-F]{4}$/.test(m)) return m; // complete \uXXXX — keep
+    if (m.startsWith("\\u")) return "�"; // truncated/malformed \u — unrecoverable
+    if (m.length > 1) return m; // \" \\ \/ \b\f\n\r\t — keep
+    return "\\\\"; // lone backslash — double it
+  });
 }
 
 /** Drop trailing commas before a closing } or ] (outside strings). */
