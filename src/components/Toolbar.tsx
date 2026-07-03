@@ -8,8 +8,10 @@ interface ToolbarProps {
   onOpenProject?: () => void;
   onLoadTemplate?: () => void;
   onAiAssist?: () => void;
-  /** Number of AI tasks currently running → a live badge on the AI Assist button. */
+  /** Number of AI tasks currently running → a live badge on the AI button. */
   aiRunning?: number;
+  /** A 協働 (live-collab) session is active → an emerald pulse on the AI button. */
+  aiCollabActive?: boolean;
   generating: boolean;
   hasSpec: boolean;
   templateName?: string;
@@ -27,6 +29,7 @@ export default function Toolbar({
   onLoadTemplate,
   onAiAssist,
   aiRunning = 0,
+  aiCollabActive = false,
   generating,
   hasSpec,
   templateName,
@@ -65,10 +68,15 @@ export default function Toolbar({
       {onAiAssist && (
         <button
           onClick={onAiAssist}
-          title={aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中` : "AI Assist（生成・整形・タスク履歴）"}
+          title={
+            aiCollabActive ? "AI（協働編集中） — アシスト / 協働 / タスク履歴"
+              : aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中`
+                : "AI（アシスト・協働・タスク履歴）"
+          }
           className="px-3 py-1.5 text-sm bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded transition-colors inline-flex items-center gap-1.5"
         >
-          ✨ AI Assist
+          ✨ AI
+          {aiCollabActive && <span className="text-emerald-300 leading-none animate-pulse" title="協働編集中">●</span>}
           {aiRunning > 0 && (
             <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-white/25 text-[10px] leading-none animate-pulse">
               {aiRunning}
