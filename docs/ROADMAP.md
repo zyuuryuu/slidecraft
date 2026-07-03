@@ -15,20 +15,18 @@
 
 | # | テーマ | 一行 | サイズ |
 |---|--------|------|-------|
-| 1 | **凝ったレイアウトの到達性**（着手中） | カード3列/プロセス/KPI/コードログ/比較が 2カラムに縮退・内容ドロップ → 到達可能に | L |
+| 1 | **凝ったレイアウトの到達性**（部分完了・残りは要設計） | code/ログ・図＋説明・章扉は到達可。カード/プロセスの styled 箱は 1:1 と衝突のため保留 | L |
 | 2 | **プロンプト磨き込み** | 旧「Release-B」。AI 生成品質の底上げ | M |
 | 3 | **テンプレ作成補助** | 新テンプレの作成/登録支援。原稿→マスター整形と重なる最大機能 | L |
 
-> **テーマ1「凝ったレイアウトの到達性」プラン**（2026-07 着手）：
+> **テーマ1「凝ったレイアウトの到達性」**（2026-07-03 時点）：
 >
-> - **症状**：`<!-- col/step/kpi -->` も 本文＋図 も、`autoSelectLayout` が全部 `03_本文（2カラム）`（columns/2）へ縮退し 3列目以降がドロップ。`` ```yaml `` 等のコードフェンスは中身が破棄される。→ `10_カード3列` / `11_プロセス` / `09_KPIハイライト` / `07_コード／ログ` / `05_比較表` / `12_課題と対策` に到達不能。
-> - **原因**：(A) `catalogEntry`（`template-catalog.ts`）が繰り返しグループ（カード=バッジ+見出し+本文）内の全 body 枠を数え、`bodyCount=7/10/7`・役割誤り → `pickLayout` の `|bodyCount − regions|` マッチが 2カラムに負ける。(B) `md-slide-parser.ts` が diagram/mermaid 以外のフェンスを捨てる。
-> - **アプローチ**：
->   1. **真の領域数**＝ body 枠の幾何クラスタ（x 位置で並ぶピアグループ数）を採用（既存 `peerBodyCount` を拡張）し、columns 系レイアウトの `regions` に使う。
->   2. **区切り種別ヒント**：col / step / kpi を SlideIR に保持し、autoSelect が process / kpi レイアウトを優先。
->   3. **グループ対応バインド**：k 番目の content を k 番目グループの主テキスト枠へ（`bindContentByRole` / `buildFieldMap` を拡張、**1:1 全単射不変条件＋sparse テストを維持**＝ [ADR-0011](adr/0011-placeholder-input-bijection.md)）。
->   4. **コード/ログ**：フェンス内容を code body（等幅・lang 保持）として取り込み `07_コード／ログ` へ（ほぼ独立・先行可）。
-> - **サイズ**：1–3 で L（分類/選択/バインド＋テスト、直近の 1:1 と干渉）／4 は M。詳細設計は着手時に `docs/design/`。
+> - **完了**：`07_コード／ログ`（コードフェンスを code body として取り込み、等幅描画・往復・[sample-deck]。commit 95fc398）／`04_図＋説明`（本文＋図の横並び＝既に実装済みと実測）／`01_章扉`（title-only→section）。
+> - **Slice A（土台・landed）**：`<!-- card -->` / `<!-- step -->` 区切り＋`### 見出し`（`Paragraph.heading`）＋`SlideIR.groupKind` ヒント。往復・プレビュー太字・エディタ対応。現状は「見出し付きの列」にデグレード。
+> - **KPI(09)**：サンプルの `type: kpi` 図が既にカバー → **スキップ**。
+> - **🔗 BLOCKER（保留＝要設計）— カード/プロセス/KPI の styled 箱到達**：`placeholderRole` の `idx15/16→body` 修正は **1:1 全単射を全テンプレで破壊**（field-map-bijection 6件・blast 18件、2026-07-03 検証済）。**根因**＝カードの `idx15/16=body` が正準規約 `idx15=title / 16=subtitle` と衝突。この規約は `slideIdxRole`（content 側）＋`placeholderRole`（layout 側）＋`buildFieldMap` の**3か所に焼き込まれ**、layout 側だけ変えると content"15"(title 扱い) が body@15 に round-trip せず全単射が壊れる。
+> - **将来アプローチ（壊さない設計）**：正準規約に**触らない別系統のグループ経路**——groupKind＋幾何(x クラスタ)/名前でカードレイアウトを検出 → `bindContentByRole` を経由しない**専用バインド**（グループN の見出し/本文 → カードN の 見出し/説明枠、番号/STEP ラベルは焼込みスキップ）→ エディタはグループ単位フィールド。**[ADR-0011](adr/0011-placeholder-input-bijection.md) の 1:1（full＋sparse）を green のまま**維持。ADR 級・詳細設計は着手時に `docs/design/`。
+> - **サイズ**：残り（styled 箱）は L＋（独立サブシステム新設）。
 
 > **完了除去**（履歴は ADR ＋ git）：
 >

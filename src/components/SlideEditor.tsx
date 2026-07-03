@@ -60,6 +60,7 @@ function paragraphsToText(paragraphs: Paragraph[]): string {
         if (s.italic) t = `*${t}*`;
         return t;
       }).join("");
+      if (p.heading) return `### ${text}`;
       return p.bullet ? `- ${text}` : text;
     })
     .join("\n");
@@ -69,8 +70,9 @@ function paragraphsToText(paragraphs: Paragraph[]): string {
 
 function textToParagraphs(text: string): Paragraph[] {
   return text.split("\n").map((line) => {
-    const bulletMatch = line.match(/^[-*]\s+(.*)/);
-    const content = bulletMatch ? bulletMatch[1] : line;
+    const headingMatch = line.match(/^###\s+(.*)/);
+    const bulletMatch = headingMatch ? null : line.match(/^[-*]\s+(.*)/);
+    const content = headingMatch ? headingMatch[1] : bulletMatch ? bulletMatch[1] : line;
 
     // Parse inline formatting
     const segments: { text: string; bold?: boolean; italic?: boolean }[] = [];
@@ -85,7 +87,7 @@ function textToParagraphs(text: string): Paragraph[] {
 
     return {
       segments,
-      ...(bulletMatch ? { bullet: true } : {}),
+      ...(headingMatch ? { heading: true } : bulletMatch ? { bullet: true } : {}),
     };
   });
 }

@@ -60,6 +60,7 @@ export type InlineSegment = z.infer<typeof InlineSegmentSchema>;
 export const ParagraphSchema = z.object({
   segments: z.array(InlineSegmentSchema).min(1),
   bullet: z.boolean().optional(),
+  heading: z.boolean().optional(), // a `### …` group heading (card/step) — the group's title line
 });
 
 export type Paragraph = z.infer<typeof ParagraphSchema>;
@@ -119,6 +120,7 @@ export const SlideIRSchema = z.object({
   mermaidBlock: MermaidBlockSchema.optional(), // embedded mermaid (raw syntax → SVG image in PPTX)
   table: TableBlockSchema.optional(), // embedded table (GFM Markdown → native OOXML table)
   code: CodeBlockSchema.optional(), // embedded code/log (```lang fence → monospace body)
+  groupKind: z.enum(["card", "step", "kpi"]).optional(), // `<!-- card/step/kpi -->` groups → layout hint
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });

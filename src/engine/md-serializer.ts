@@ -61,6 +61,7 @@ function serializeParagraphs(paragraphs: Paragraph[]): string {
   return paragraphs
     .map((p) => {
       const text = serializeSegments(p.segments);
+      if (p.heading) return `### ${text}`;
       if (p.bullet) return `- ${text}`;
       return text;
     })
@@ -135,7 +136,9 @@ function serializeSlide(
     if (subtitle) lines.push(`> ${subtitle}`);
     lines.push("");
 
-    const sepType = getSeparatorType(layout);
+    // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
+    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout.
+    const sepType = slide.groupKind ?? getSeparatorType(layout);
 
     if (sepType) {
       // Multi-section: each numbered region (column) becomes a section. A region may
