@@ -512,6 +512,14 @@ export async function loadTemplate(
 
 // ── Auto layout selection ──
 
+// Which catalog group kinds a slide.groupKind may fill. card→card only (compare/課題対策 stays
+// pin-only to avoid surprising routing; a future `<!-- compare -->` can add it here).
+const GROUP_MATCH: Record<NonNullable<SlideIR["groupKind"]>, Array<"card" | "step" | "kpi" | "compare">> = {
+  card: ["card"],
+  step: ["step"],
+  kpi: ["kpi"],
+};
+
 interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
 
 /** Classify a slide → the ideal layout ROLE + body-region count (+ a canonical fallback name).
@@ -555,6 +563,17 @@ export function autoSelectLayout(
     if (!catalog || catalog.some((e) => e.name === slide.layout)) {
       return slide.layout;
     }
+  }
+
+  // Group-aware: a `slide.groupKind` slide routes to the matching GROUP layout (card→card, step→step,
+  // kpi→kpi), preferring the group-count that fits (exact, then smallest overshoot). Only fires on
+  // groupKind — non-grouped selection is byte-identical. Falls through when the template has no such
+  // layout (degrades to columns-with-headings via the normal path below).
+  if (slide.groupKind && catalog && catalog.length > 0) {
+    const want = GROUP_MATCH[slide.groupKind];
+    const need = slide.placeholders.filter((p) => /^[1-9]$/.test(p.idx)).length;
+    const cands = catalog.filter((e) => e.groupKind && want.includes(e.groupKind) && (e.groupCount ?? 0) >= need);
+    if (cands.length > 0) return [...cands].sort((a, b) => (a.groupCount! - need) - (b.groupCount! - need))[0].name;
   }
 
   // Classify into a semantic role + number of body regions, then resolve a concrete layout. WITH a
