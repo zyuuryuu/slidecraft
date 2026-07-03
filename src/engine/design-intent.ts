@@ -40,7 +40,14 @@ export type DesignOp = DesignIntent[number];
  * the intent when the output is the latter, else null (→ treat as Markdown).
  */
 export function parseDesignIntent(raw: string): DesignIntent | null {
-  const r = parseJsonLoose(raw);
+  // Only fire on a WHOLE-STRING JSON ops array (optionally ```json-fenced). A Markdown edit that merely
+  // QUOTES an example array in prose ("…例: [{op:…}]") must NOT be hijacked into the design path — that
+  // would discard the Markdown. So unwrap a fence, then require the content to be a bare [ … ] array.
+  let t = raw.trim();
+  const fence = t.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
+  if (fence) t = fence[1].trim();
+  if (!(t.startsWith("[") && t.endsWith("]"))) return null;
+  const r = parseJsonLoose(t);
   if (!r.ok || !Array.isArray(r.value) || r.value.length === 0) return null;
   const d = DesignIntentSchema.safeParse(r.value);
   return d.success ? d.data : null;
