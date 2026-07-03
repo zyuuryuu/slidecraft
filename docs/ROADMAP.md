@@ -29,9 +29,17 @@
 > - **マスターフォント不整合 → 完了**（`9c26b0f`）。生成スライドが layout の lstStyle をコピーして font を
 >   スライド側に固定し master/layout 編集を無効化していた不具合を、空 `<a:lstStyle/>` で継承復活。全充填経路×
 >   per-placeholder の再発ゲート（`tests/master-font-inherit.test.ts`、負制御で実証）。
+> - **#12 生成 payload drop 群 → 完了**（5サブ課題を決定論保全、実 probe で再現→test-first）：
+>   closing の subtitle/bullets を idx 1 に保全（Markdown 往復ロスレス）／unknown-kind・非 `bullets` 本文
+>   フィールド（body/text/points…）を `coerceSlide` で保全し titleless スライドの消滅を停止／空・重複 section を
+>   `cleanupSlidePlans` で畳み込み／ragged table を `rectangularize` で矩形化（非破壊）。
+> - **#12-5 文字化け → 完了（方針 C＝違反破棄＋告知、ユーザ選択）**：これは encoding 問題ではなく「弱モデルが
+>   『生UTF-8・`\uXXXX`禁止』（[deck-plan-prompts.ts:44](../src/engine/deck-plan-prompts.ts)）に違反した不正 JSON エスケープ」。
+>   salvage は復元不能な `\uXXXX`/lone-surrogate を内部マーカー U+FFFD 化し、deck-plan 層 `stripViolations` が
+>   **書式違反として該当 bullet/field を最小粒度で破棄（scalar=空欄化・list=除去・cell=空欄化）＋件数を `notices` で告知**
+>   （`AiPanel`/`LlmAssist` に amber バナー）。`�` もゴミ文字も一切スライドに出ない。`tests/deck-plan-payload-preservation.test.ts`
+>   +14、json-salvage の意図的アサーション2箇所を更新（U+FFFD＝内部マーカーに再定義）。**根本抑止は D で別途**。
 > - **残 NEXT（次セッション引き継ぎ）**：
->   - **#12 生成 payload drop 群**（closing の subtitle/bullets 欠落・unknown-kind 消失・空 section 連発・
->     ragged table・salvage 文字化けの5サブ課題）を deckPlanToDeck/coerceSlide/json-salvage で保全。
 >   - **#13 diagram-edit の id 保全通知**（ノード id 総入替→後続 emphasize が silent no-op。通知チャネル設計要）。
 >   - **#3B テキストスライドへ図を追加**（`applyFigureYaml` の「図無し→null」契約変更＝既存テスト更新。**ユーザ許可済**）。
 >   - **その他プロンプト**：`slideSystemPrompt`（手動コピー用）のレイアウト名を catalog から動的化（alien 対応、
@@ -71,6 +79,7 @@
 | 画像・チャートの Markdown 埋め込み | `![alt](path)` / ```` ```chart ```` ブロック対応 | L |
 | テーマ切り替え / テンプレ管理 | 複数テンプレ PPTX の管理・切り替え。**あわせて UI 整理**：現在トップバー常設の「Load Template」は低頻度＆協働ロック時に消える不整合があるため、この機会にファイルメニュー等へ集約する（UI 再編セルフレビュー F5） | M |
 | ユーザ利用ガイド | 図 14 種・二段階編集・テンプレ流し込みを網羅したオンボーディング | M |
+| 生成の encoding 事故を構造で抑止（#12-D） | 弱モデルの `\uXXXX` 違反を**発生させない**根本抑止。案：(D-1) 生成を per-slide 分割し違反の被害半径を1枚に＋壊れた1枚だけ再試行（`extractSlidePlan` 既存）／(D-2) 本文を JSON 文字列から出しエスケープ不要な形式へ。現状は floor（違反破棄＋告知＝#12-5 C）で担保済。着手時に設計 | M |
 | 図編集 diff の見た目 | AI 図編集（diagram-edit）の変更プレビューが「フル Markdown vs 生 YAML」比較で見た目がズレる。図編集時は YAML 同士で diff（採用の動作は 6d036d1 で修正済・これは cosmetic） | S |
 | フィールドクリアで空 ph が残る | 欄をクリアすると空パラグラフの placeholder がモデルに残る（1:1 には無害・export cleanliness の観点で将来検討） | S |
 | serializer: 単独 content スライドが空出力 | index 0 の content スライドが autoSelect で Title 扱いになり、title(idx15) を idx0 として読むため空シリアライズ。`currentSlideMd` は解決済レイアウトをピンして回避済だが `serializeMd` 直呼びで露出 | S |

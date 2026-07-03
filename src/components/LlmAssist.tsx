@@ -305,6 +305,12 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             </div>
           )}
 
+          {ai.notice && (
+            <div className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/40 rounded px-3 py-2">
+              {ai.notice}
+            </div>
+          )}
+
           {/* Manual fallback: copy prompt to any LLM */}
           {showManual && (
             <div className="border border-[#2D3A6E] rounded p-3 flex flex-col gap-2">
