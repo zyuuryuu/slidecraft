@@ -3,6 +3,8 @@ import { useState } from "react";
 interface ToolbarProps {
   onSave: () => void;
   onGenerate: () => void;
+  /** Export a self-contained standalone HTML presentation (.html). */
+  onExportHtml?: () => void;
   /** Save / open the editable PROJECT (.slidecraft = deck + template). */
   onSaveProject?: () => void;
   onOpenProject?: () => void;
@@ -22,6 +24,7 @@ interface ToolbarProps {
 export default function Toolbar({
   onSave,
   onGenerate,
+  onExportHtml,
   onSaveProject,
   onOpenProject,
   onAiAssist,
@@ -123,6 +126,16 @@ export default function Toolbar({
                 <span>📊 PPTX</span>
                 <span className="text-gray-500 text-xs">.pptx</span>
               </button>
+              {onExportHtml && (
+                <button
+                  onClick={() => { setExportOpen(false); onExportHtml(); }}
+                  disabled={!hasSpec}
+                  className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                >
+                  <span>🌐 HTML</span>
+                  <span className="text-gray-500 text-xs">.html</span>
+                </button>
+              )}
               <button
                 onClick={() => { setExportOpen(false); onSave(); }}
                 className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"

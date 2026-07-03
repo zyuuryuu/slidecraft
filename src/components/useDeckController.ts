@@ -192,7 +192,7 @@ export function useDeckController() {
   }, [applyMasterBytes]);
 
   // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
-  const { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject } = useDeckIO({
+  const { generating, handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject } = useDeckIO({
     mdText, deck, templateData, parseMdText, setMdText, setParseError,
     templateName, filePath, setFilePath, openDoc,
   });
@@ -520,7 +520,7 @@ export function useDeckController() {
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes,
-    handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
+    handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,

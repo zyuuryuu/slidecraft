@@ -25,8 +25,11 @@ let mermaidIdCounter = 0;
 
 
 // ── Direct Mermaid syntax renderer (for ```mermaid blocks) ──
-function MermaidDirect({ mermaidSyntax, width, height, instanceId }: { mermaidSyntax: string; width: string; height: string; instanceId?: string }) {
-  const [svg, setSvg] = useState("");
+function MermaidDirect({ mermaidSyntax, width, height, instanceId, svgCache }: { mermaidSyntax: string; width: string; height: string; instanceId?: string; svgCache?: string }) {
+  // svgCache = an export-time pre-rendered SVG (deck-html-export). Seeding it as the initial
+  // state makes the SVG present SYNCHRONOUSLY, so SSR (react-dom/server, no effects) captures it
+  // instead of an empty box. In the live preview svgCache is absent and the effect renders it.
+  const [svg, setSvg] = useState(svgCache ?? "");
   const cancelRef = useRef(false);
 
   useEffect(() => {
@@ -67,9 +70,10 @@ function MermaidDirect({ mermaidSyntax, width, height, instanceId }: { mermaidSy
   );
 }
 
-// ── Slide dimensions (inches) ──
-const SLIDE_W = 13.33;
-const SLIDE_H = 7.5;
+// ── Slide dimensions (inches) — exported so the HTML exporter sizes its stage to the
+//    EXACT px the card renders at (SLIDE_W × scale), keeping the stage flush with the slide. ──
+export const SLIDE_W = 13.33;
+export const SLIDE_H = 7.5;
 
 // ── Render inline segments ──
 
@@ -112,9 +116,13 @@ interface SlideCardProps {
   onClick?: (e: React.MouseEvent) => void;
   /** When set, the embedded diagram is drag-editable and reports new YAML. */
   onDiagramChange?: (yaml: string) => void;
+  /** Static export mode (standalone HTML / SSR): strip all editor chrome — selection
+   *  border, hover cursor, click handler, and the synthetic slide-number — so the card
+   *  renders as a clean presentation slide. See docs/design/html-output.md (S1). */
+  exportMode?: boolean;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, exportMode }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -137,17 +145,20 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
 
   return (
     <div
-      onClick={onClick}
+      onClick={exportMode ? undefined : onClick}
       style={{
         width: pxW,
         height: pxH,
         backgroundColor: bgColor,
         position: "relative",
         overflow: "hidden",
-        borderRadius: 4,
-        border: isActive ? "2px solid #3B82F6" : selected ? "2px solid rgba(59,130,246,0.55)" : "1px solid #333",
-        boxShadow: selected && !isActive ? "0 0 0 2px rgba(59,130,246,0.2)" : undefined,
-        cursor: "pointer",
+        // Export = a clean full-bleed slide: no rounded corners, no editor border/selection chrome.
+        borderRadius: exportMode ? 0 : 4,
+        border: exportMode
+          ? "none"
+          : isActive ? "2px solid #3B82F6" : selected ? "2px solid rgba(59,130,246,0.55)" : "1px solid #333",
+        boxShadow: !exportMode && selected && !isActive ? "0 0 0 2px rgba(59,130,246,0.2)" : undefined,
+        cursor: exportMode ? "default" : "pointer",
         flexShrink: 0,
       }}
     >
@@ -255,6 +266,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
                 width="100%"
                 height="100%"
                 instanceId={`mmd-${slideIndex}-${scale}`}
+                svgCache={slide.mermaidBlock!.svgCache}
               />
             </div>
           );
@@ -363,18 +375,20 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
         );
       })}
 
-      {/* Slide number */}
-      <div
-        style={{
-          position: "absolute",
-          right: 6,
-          bottom: 4,
-          fontSize: 9 * (scale / 72),
-          color: "#94A3B8",
-        }}
-      >
-        {slideIndex + 1}
-      </div>
+      {/* Slide number — preview only; the standalone-HTML shell provides its own counter */}
+      {!exportMode && (
+        <div
+          style={{
+            position: "absolute",
+            right: 6,
+            bottom: 4,
+            fontSize: 9 * (scale / 72),
+            color: "#94A3B8",
+          }}
+        >
+          {slideIndex + 1}
+        </div>
+      )}
     </div>
   );
 }
