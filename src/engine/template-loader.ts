@@ -512,6 +512,36 @@ export async function loadTemplate(
 
 // ── Auto layout selection ──
 
+interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
+
+/** Classify a slide → the ideal layout ROLE + body-region count (+ a canonical fallback name).
+ *  Shared by autoSelectLayout (pick the single best) and suggestLayouts (rank candidates), so the
+ *  auto pick and the suggestion list can never disagree about the slide's intent. */
+function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: number): RolePick {
+  const idxs = new Set(slide.placeholders.map((p) => p.idx));
+  const hasTitle = idxs.has("15");
+  const hasCtrTitle = idxs.has("0");
+  // A diagram/mermaid/table/code occupies a body placeholder even though it isn't in `placeholders`.
+  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? slide.table?.placeholderIdx ?? slide.code?.placeholderIdx;
+  const hasBody = idxs.has("1") || visualIdx === "1";
+  const hasIdx2 = idxs.has("2") || visualIdx === "2";
+  const hasIdx3 = idxs.has("3") || visualIdx === "3";
+  const allText = slide.placeholders
+    .flatMap((p) => p.paragraphs.flatMap((pp) => pp.segments.map((s) => s.text)))
+    .join(" ")
+    .toLowerCase();
+  const isClosing = allText.includes("thank") || allText.includes("感謝") || allText.includes("ありがとう");
+
+  if (slideIndex === 0 && !visualIdx) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  if (isClosing && slideIndex === totalSlides - 1) return { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
+  if (slide.code) return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
+  if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };
+  if (hasTitle && hasBody && hasIdx2) return { role: "columns", regions: 2, fallback: LAYOUT_NAMES[10] };
+  if ((hasTitle || hasCtrTitle) && hasBody) return { role: "content", regions: 1, fallback: LAYOUT_NAMES[6] };
+  if (hasTitle && !hasBody) return { role: "section", regions: undefined, fallback: LAYOUT_NAMES[3] };
+  return { role: "content", regions: 1, fallback: LAYOUT_NAMES[6] };
+}
+
 export function autoSelectLayout(
   slide: SlideIR,
   slideIndex: number,
@@ -527,53 +557,10 @@ export function autoSelectLayout(
     }
   }
 
-  const idxs = new Set(slide.placeholders.map((p) => p.idx));
-  const hasTitle = idxs.has("15");
-  const hasCtrTitle = idxs.has("0");
-  // A diagram/mermaid occupies a body placeholder even though it isn't in
-  // `placeholders`. It lands at idx 1 (solo → Content) or idx 2 (beside body
-  // bullets → 2-column), so count it toward whichever region it targets.
-  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? slide.table?.placeholderIdx ?? slide.code?.placeholderIdx;
-  const hasBody = idxs.has("1") || visualIdx === "1";
-  const hasIdx2 = idxs.has("2") || visualIdx === "2";
-  const hasIdx3 = idxs.has("3") || visualIdx === "3";
-
-  // Check for closing keywords
-  const allText = slide.placeholders
-    .flatMap((p) => p.paragraphs.flatMap((pp) => pp.segments.map((s) => s.text)))
-    .join(" ")
-    .toLowerCase();
-  const isClosing =
-    allText.includes("thank") || allText.includes("感謝") || allText.includes("ありがとう");
-
-  // Classify into a semantic role + number of body regions, then resolve a
-  // concrete layout. WITH a catalog we pick from what the LOADED template
-  // actually offers (template-driven); WITHOUT one we fall back to the canonical
-  // layout names (so behavior is unchanged when no template is supplied).
-  let role: LayoutRole;
-  let regions: number | undefined;
-  let fallback: string;
-  if (slideIndex === 0 && !visualIdx) {
-    // A first slide that's a pure title → Title. But a first slide carrying a
-    // body VISUAL (diagram/table/mermaid) is content — a title layout can't hold it.
-    role = "title"; regions = undefined; fallback = LAYOUT_NAMES[0];
-  } else if (isClosing && slideIndex === totalSlides - 1) {
-    role = "closing"; regions = undefined; fallback = LAYOUT_NAMES[28];
-  } else if (slide.code) {
-    // A code/log slide → a dedicated code layout when the template has one; else it degrades to a
-    // content body (the code text still renders, just without the code-box chrome).
-    role = "code"; regions = 1; fallback = LAYOUT_NAMES[6];
-  } else if (hasTitle && hasBody && hasIdx2 && hasIdx3) {
-    role = "columns"; regions = 3; fallback = LAYOUT_NAMES[12];
-  } else if (hasTitle && hasBody && hasIdx2) {
-    role = "columns"; regions = 2; fallback = LAYOUT_NAMES[10];
-  } else if ((hasTitle || hasCtrTitle) && hasBody) {
-    role = "content"; regions = 1; fallback = LAYOUT_NAMES[6];
-  } else if (hasTitle && !hasBody) {
-    role = "section"; regions = undefined; fallback = LAYOUT_NAMES[3];
-  } else {
-    role = "content"; regions = 1; fallback = LAYOUT_NAMES[6];
-  }
+  // Classify into a semantic role + number of body regions, then resolve a concrete layout. WITH a
+  // catalog we pick from what the LOADED template actually offers (template-driven); WITHOUT one we
+  // fall back to the canonical layout names (so behavior is unchanged when no template is supplied).
+  const { role, regions, fallback } = slideRoleRegions(slide, slideIndex, totalSlides);
 
   if (catalog && catalog.length > 0) {
     // Degrade gracefully if THIS template lacks the ideal role (e.g. no columns):
@@ -586,6 +573,36 @@ export function autoSelectLayout(
     if (picked) return picked.name;
   }
   return fallback;
+}
+
+/**
+ * Ranked layout candidates for a slide, for the editor's "Auto → X, also try:" UI. The auto-resolved
+ * layout is ALWAYS first (so it matches autoSelectLayout); the rest are the best alternatives —
+ * same ROLE first, then closest body-region count, then simpler/usable ones. Computed as-if the slide
+ * were Auto, so a pinned slide still gets alternatives. [] when no template is loaded.
+ */
+export function suggestLayouts(
+  slide: SlideIR,
+  slideIndex: number,
+  totalSlides: number,
+  catalog: LayoutCatalog | undefined,
+  limit = 4,
+): string[] {
+  if (!catalog || catalog.length === 0) return [];
+  const asAuto = { ...slide, layout: "auto" };
+  const chosen = autoSelectLayout(asAuto, slideIndex, totalSlides, catalog);
+  const { role, regions } = slideRoleRegions(slide, slideIndex, totalSlides);
+  const usableBody = (e: LayoutCatalog[number]) =>
+    e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0);
+  const fit = (e: LayoutCatalog[number]): number => {
+    let s = e.role === role ? 0 : 50; // same role first
+    if (regions !== undefined) s += Math.abs(e.bodyCount - regions) * 5; // then region-count fit
+    s += e.name.match(/\+/g)?.length ?? 0; // prefer the simpler variant
+    if ((role === "content" || role === "columns") && !usableBody(e)) s += 200; // avoid degenerate/picture bodies
+    return s;
+  };
+  const rest = catalog.filter((e) => e.name !== chosen).sort((a, b) => fit(a) - fit(b)).map((e) => e.name);
+  return [chosen, ...rest].slice(0, limit);
 }
 
 // ── Find layout by name ──

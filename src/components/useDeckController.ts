@@ -14,7 +14,7 @@ import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { applyFigureYaml } from "../engine/ai-apply";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { loadTemplate, autoSelectLayout, findLayout } from "../engine/template-loader";
+import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes } from "./apply-template";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
@@ -445,6 +445,10 @@ export function useDeckController() {
   const currentLayout = currentLayoutName && templateData
     ? findLayout(templateData, currentLayoutName)
     : undefined;
+  // Ranked layout candidates for the editor's "Auto → X, also try:" chips (auto pick first).
+  const layoutSuggestions = currentSlide && catalog
+    ? suggestLayouts(currentSlide, activeSlide, deck!.slides.length, catalog, 4)
+    : [];
 
   // ── Cursor line → active slide ──
   const handleCursorLine = useCallback(
@@ -509,7 +513,7 @@ export function useDeckController() {
     handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
-    currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
+    currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
     editLockedRef, // App syncs this from collab.status to drive observe-only locking

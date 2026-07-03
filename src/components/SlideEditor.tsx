@@ -22,6 +22,10 @@ interface SlideEditorProps {
    *  when no template is loaded. (Offering canonical names for a non-canonical master made the picker
    *  a no-op: every pick was absent from the catalog and degraded to the same layout.) */
   layoutNames?: string[];
+  /** The layout `Auto` actually resolved to (so the UI can show "Auto → X"). */
+  resolvedLayout?: string;
+  /** Ranked layout candidates (auto pick first) — shown as one-click "also try" chips. */
+  suggestions?: string[];
   onChange: (updated: SlideIR) => void;
 }
 
@@ -92,7 +96,7 @@ function textToParagraphs(text: string): Paragraph[] {
   });
 }
 
-export default function SlideEditor({ slide, layout, layoutNames, onChange }: SlideEditorProps) {
+export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout, suggestions, onChange }: SlideEditorProps) {
   // ── Update a specific placeholder ──
   const updatePlaceholder = useCallback(
     (idx: string, text: string) => {
@@ -192,6 +196,46 @@ export default function SlideEditor({ slide, layout, layoutNames, onChange }: Sl
             </option>
           ))}
         </select>
+
+        {/* Auto → what it resolved to, so the user can SEE the pick (was invisible). */}
+        {slide.layout === "auto" && resolvedLayout && (
+          <div className="mt-1 text-[10px] text-gray-400">
+            自動選択: <span className="text-[#93C5FD]">{resolvedLayout}</span>
+          </div>
+        )}
+
+        {/* One-click alternative candidates (ranked; the active one is highlighted). "Auto" keeps the
+            slide adaptive; picking a chip pins that layout. */}
+        {suggestions && suggestions.length > 1 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => updateLayout("auto")}
+              title="自動選択に戻す"
+              className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+              }`}
+            >
+              Auto
+            </button>
+            {suggestions.map((name, i) => {
+              const active = slide.layout === name;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => updateLayout(name)}
+                  title={i === 0 ? "Auto の第一候補" : "候補レイアウト"}
+                  className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                    active ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+                  }`}
+                >
+                  {i === 0 && "★ "}{name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Placeholder fields — one per field-map slot, reading/writing its own content idx (1:1). */}

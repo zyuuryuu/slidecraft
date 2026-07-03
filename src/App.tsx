@@ -30,7 +30,7 @@ export default function App() {
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
-    handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, handleCursorLine, handleSlideClick,
+    handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef, collabRef,
   } = useDeckController();
 
@@ -255,7 +255,7 @@ export default function App() {
                   ) : slideEditView === "markdown" ? (
                     <SlideMarkdownEditor key={activeSlide} md={currentSlideMd ?? ""} onChange={handleSlideMdChange} />
                   ) : (
-                    <SlideEditor key={activeSlide} slide={currentSlide} layout={currentLayout} layoutNames={templateData?.layouts.map((l) => l.name)} onChange={(updated) => handleSlideUpdate(activeSlide, updated)} />
+                    <SlideEditor key={activeSlide} slide={currentSlide} layout={currentLayout} layoutNames={templateData?.layouts.map((l) => l.name)} resolvedLayout={currentLayoutName} suggestions={layoutSuggestions} onChange={(updated) => handleSlideUpdate(activeSlide, updated)} />
                   )}
                 </div>
               </>
