@@ -13,7 +13,7 @@ import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { applyFigureYaml } from "../engine/ai-apply";
 import { reconcileEdit } from "../engine/ai-reconcile";
-import { validateStructure } from "../engine/ai-validate";
+import { validateStructure, validateCondense } from "../engine/ai-validate";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -392,9 +392,15 @@ export function useDeckController() {
       // what was restored rather than silently mangling the slide's structure.
       const reconciled = reconcileEdit(old, edited);
       const verdict = validateStructure(old, edited, "edit");
-      if (verdict.violations.length > 0) {
-        setParseError(`レイアウト・タイトル等の構造を元から復元して適用しました（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
-      }
+      // The single-slide "適用" has NO review step, so a silent number-swap or language flip is worst
+      // here. Surface (don't reject — the edit may intend it) both the structure restore and any
+      // fact/language change as a one-line notice.
+      const cond = validateCondense(serializeMd({ slides: [old] }), raw);
+      const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
+      const notices: string[] = [];
+      if (verdict.violations.length > 0) notices.push(`構造を元から復元しました（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
+      if (factMsgs.length > 0) notices.push(`⚠ 数値/言語が変化しています（${factMsgs.join(" / ")}）— 確認してください`);
+      if (notices.length > 0) setParseError(notices.join(" ｜ "));
       handleSlideUpdate(activeSlide, reconciled, "commit"); // AI edit = one discrete undo step
     },
     [deck, activeSlide, handleSlideUpdate, setParseError],
