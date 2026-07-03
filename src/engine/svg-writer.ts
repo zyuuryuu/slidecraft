@@ -43,6 +43,58 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** CJK/fullwidth code-point test (via code point → no literal CJK glyphs / irregular-whitespace lint). */
+function isCjkCode(o: number): boolean {
+  return (o >= 0x3000 && o <= 0x9fff) || (o >= 0xac00 && o <= 0xd7a3) || (o >= 0xff00 && o <= 0xffef);
+}
+
+/** Estimated rendered width of a string at font size fs (px): CJK ≈ 1em, Latin ≈ 0.55em.
+ *  Errs slightly wide so shrink/wrap never leave text overflowing its box. */
+function estWidth(s: string, fs: number): number {
+  let w = 0;
+  for (const c of s) w += fs * (isCjkCode(c.charCodeAt(0)) ? 1.0 : 0.55);
+  return w;
+}
+
+/**
+ * Greedy width-based line wrap for opts.wrap labels (timeline event cards, quadrant cells,
+ * swimlane headers, journey steps). SVG <text> can't soft-wrap like the old foreignObject
+ * <div>; this approximates the browser: break on spaces, hard-break over-long tokens.
+ * Exported for unit testing.
+ */
+export function wrapToWidth(text: string, maxW: number, fs: number): string[] {
+  if (estWidth(text, fs) <= maxW) return [text];
+  const cw = (c: string) => fs * (isCjkCode(c.charCodeAt(0)) ? 1.0 : 0.55);
+
+  // Tokenize into words, spaces, and individual CJK chars (which may break anywhere).
+  const tokens: string[] = [];
+  let buf = "";
+  for (const c of [...text]) {
+    if (c === " ") { if (buf) { tokens.push(buf); buf = ""; } tokens.push(" "); }
+    else if (isCjkCode(c.charCodeAt(0))) { if (buf) { tokens.push(buf); buf = ""; } tokens.push(c); }
+    else buf += c;
+  }
+  if (buf) tokens.push(buf);
+
+  const lines: string[] = [];
+  let cur = "";
+  for (let tok of tokens) {
+    while (estWidth(tok, fs) > maxW) { // hard-break a single token wider than the line
+      const chars = [...tok];
+      let i = 0, acc = 0;
+      for (; i < chars.length; i++) { acc += cw(chars[i]); if (acc > maxW) break; }
+      i = Math.max(1, i);
+      if (cur.trim()) { lines.push(cur.trim()); cur = ""; }
+      lines.push(chars.slice(0, i).join(""));
+      tok = chars.slice(i).join("");
+    }
+    if (cur !== "" && estWidth(cur + tok, fs) > maxW) { lines.push(cur.trim()); cur = tok === " " ? "" : tok; }
+    else cur += tok;
+  }
+  if (cur.trim()) lines.push(cur.trim());
+  return lines.length ? lines : [text];
+}
+
 class SvgDrawTarget implements DrawTarget {
   private parts: string[] = [];
   private bg = "#0A0E27";
@@ -163,36 +215,69 @@ class SvgDrawTarget implements DrawTarget {
     }
   }
 
+  /**
+   * Native SVG <text>/<tspan> — survives <canvas> rasterization and WebKitGTK/headless
+   * print-to-PDF (both drop <foreignObject>). Each TextRun is one pre-split line
+   * (draw-target.ts), dy-stacked; opts.wrap labels are soft-wrapped via wrapToWidth so
+   * they don't overflow where the old <div> used to wrap. Preview + HTML export share
+   * this one output, so they stay WYSIWYG-identical and both print robustly.
+   */
   text(lines: TextRun[], box: Box, opts: TextOpts): void {
+    if (lines.length === 0) return;
     const x = px(box.x);
     const y = px(box.y);
     const w = px(box.w);
     const h = px(box.h);
+    const pad = 1; // matches the old foreignObject padding:1px
+    const LH = 1.15; // line-height (PPTX-parity metric)
+    const ASCENT = 0.875; // baseline below line top; absorbs the half-leading the old flex box added
 
-    const justify =
-      opts.align === "left" ? "flex-start" : opts.align === "right" ? "flex-end" : "center";
-    const alignItems = opts.valign === "top" ? "flex-start" : "center";
-    const textAlign = esc(opts.align ?? "center"); // trusted in practice, esc'd for depth
+    const anchor = opts.align === "left" ? "start" : opts.align === "right" ? "end" : "middle";
+    const tx = opts.align === "left" ? x + pad : opts.align === "right" ? x + w - pad : x + w / 2;
+    const maxW = Math.max(w - 2 * pad, 1);
 
-    const inner = lines
-      .map((r) => {
-        const fs = Math.round(r.fontSize * PT * 10) / 10;
-        const weight = r.bold ? "700" : "400";
+    // Expand runs into visual lines (soft-wrap only when opts.wrap is set), keeping each
+    // run's font size/weight/color/family so a bold label over a plain sublabel stays styled.
+    // Drop empty pieces so a blank run doesn't consume a phantom line and mis-centre the block.
+    const vlines: Array<{ text: string; fs: number; weight: string; fill: string; face: string }> = [];
+    for (const r of lines) {
+      const fs = Math.round(r.fontSize * PT * 10) / 10;
+      const weight = r.bold ? "700" : "400";
+      const fill = col(r.color);
+      const face = esc(r.fontFace);
+      const pieces = opts.wrap ? wrapToWidth(r.text, maxW, fs) : [r.text];
+      for (const p of pieces) if (p !== "") vlines.push({ text: p, fs, weight, fill, face });
+    }
+    if (vlines.length === 0) return;
+
+    // Shrink-to-fit width (honours opts.shrink; mirrors PowerPoint fit:"shrink"). SVG <text> has
+    // no overflow:hidden, so without this a too-long label would spill over neighbours — the old
+    // foreignObject clipped it. Scale every line's font size by the widest line's overflow ratio.
+    if (opts.shrink) {
+      let widest = 0;
+      for (const l of vlines) widest = Math.max(widest, estWidth(l.text, l.fs));
+      if (widest > maxW) {
+        const s = maxW / widest;
+        for (const l of vlines) l.fs = Math.round(l.fs * s * 100) / 100;
+      }
+    }
+
+    const lineHs = vlines.map((l) => l.fs * LH);
+    const blockH = lineHs.reduce((a, b) => a + b, 0);
+    let cursor = opts.valign === "top" ? y + pad : y + (h - blockH) / 2; // centre the block for middle
+
+    const tspans = vlines
+      .map((l, i) => {
+        const baseline = Math.round((cursor + l.fs * ASCENT) * 100) / 100;
+        cursor += lineHs[i];
         return (
-          `<div style="font-size:${fs}px;font-weight:${weight};color:${col(r.color)};` +
-          `font-family:${esc(r.fontFace)},sans-serif;line-height:1.15;width:100%;` +
-          `overflow:hidden;text-overflow:ellipsis;">${esc(r.text)}</div>`
+          `<tspan x="${tx}" y="${baseline}" font-size="${l.fs}px" font-weight="${l.weight}" ` +
+          `fill="${l.fill}" font-family="${l.face},sans-serif">${esc(l.text)}</tspan>`
         );
       })
       .join("");
 
-    this.parts.push(
-      `<foreignObject x="${x}" y="${y}" width="${w}" height="${h}">` +
-        `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px;` +
-        `display:flex;flex-direction:column;justify-content:${alignItems};align-items:${justify};` +
-        `text-align:${textAlign};overflow:hidden;box-sizing:border-box;padding:1px;">${inner}</div>` +
-        `</foreignObject>`,
-    );
+    this.parts.push(`<text text-anchor="${anchor}">${tspans}</text>`);
   }
 
   wedge(
