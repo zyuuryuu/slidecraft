@@ -17,7 +17,7 @@ import { MERMAID_CONFIG } from "./mermaid";
 import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
-import { assembleHtmlDeck } from "../engine/html-shell";
+import { assembleHtmlDeck, type Transition } from "../engine/html-shell";
 import type { DeckIR } from "../engine/slide-schema";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
@@ -49,7 +49,7 @@ async function preRenderNonNativeMermaid(deck: DeckIR): Promise<DeckIR> {
   return { ...deck, slides };
 }
 
-export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string } = {}): Promise<string> {
+export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string; transition?: Transition } = {}): Promise<string> {
   const prepared = await preRenderNonNativeMermaid(deck);
   const catalog = buildCatalog(template);
 
@@ -74,6 +74,7 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
 
   return assembleHtmlDeck(slideHtmls, {
     title: opts.title,
+    transition: opts.transition,
     stageW: SLIDE_W * SCALE,
     stageH: SLIDE_H * SCALE,
   });

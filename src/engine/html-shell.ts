@@ -1,26 +1,37 @@
 /**
- * html-shell.ts — Self-contained standalone-HTML presentation shell (S3 of
- * docs/design/html-output.md). Pure string assembly (R2: no DOM/Tauri).
+ * html-shell.ts — Self-contained standalone-HTML presentation shell (S3/expressiveness
+ * of docs/design/html-output.md). Pure string assembly (R2: no DOM/Tauri).
  *
  * Takes N pre-rendered slide-HTML strings (each a fixed `stageW×stageH` px block
- * produced by SSR-ing SlideCard at a fixed scale) and wraps them into ONE op-
- * enable `.html` document: inline CSS + inline nav JS, a fixed reference stage
- * that CSS `transform: scale()`s to fit any viewport (so the already-laid-out DOM
- * only scales — wrapping is frozen, matching the preview 1:1), keyboard/click/hash
- * navigation, a progress bar + counter, and print CSS for one-slide-per-page PDF.
+ * produced by SSR-ing SlideCard at a fixed scale) and wraps them into ONE openable
+ * `.html` document: inline CSS + inline nav JS, a fixed reference stage that CSS
+ * `transform: scale()`s to fit any viewport (the laid-out slide DOM only scales —
+ * wrapping is frozen, matching the preview 1:1).
  *
- * The slide HTML strings are trusted (React-escaped by the SSR step); only shell-
- * level values (the deck title) are escaped here.
+ * EXPRESSIVENESS (all transform/opacity only — the slide CONTENT DOM is never touched,
+ * so WYSIWYG holds; no reflow property is ever transitioned):
+ *  - slide transitions fade / slide / zoom / push, selected by <html data-transition>,
+ *    with a leaving-slide state machine so both slides animate; 't' cycles them live.
+ *  - an overview grid ('o'): all slides as fixed-scale thumbnails, ZERO DOM duplication.
+ *  - print CSS lays each slide one-per-page; motion/overview are @media screen only.
+ *
+ * The slide HTML strings are trusted (React-escaped by the SSR step); only shell-level
+ * values (the deck title, the transition token) are escaped/whitelisted here.
  */
 
+const TRANSITIONS = ["fade", "slide", "zoom", "push", "none"] as const;
+export type Transition = (typeof TRANSITIONS)[number];
+
+const THUMB_W = 240; // overview thumbnail width (px); height derived to keep the slide aspect
+
 export interface HtmlShellOptions {
-  /** Document <title> + shown nowhere else. Escaped. */
+  /** Document <title>. Escaped. */
   title?: string;
   /** Reference-stage size in px = the slide's rendered width/height (SLIDE_W×scale). */
   stageW: number;
   stageH: number;
-  /** Slide-to-slide transition. "none" disables the cross-fade. Default "fade". */
-  transition?: "fade" | "none";
+  /** Default slide transition (viewer can cycle with 't'). Default "slide". */
+  transition?: Transition;
 }
 
 function esc(s: string): string {
@@ -31,25 +42,70 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function shellCss(stageW: number, stageH: number, fade: boolean): string {
+function shellCss(stageW: number, stageH: number): string {
+  const thumbScale = (THUMB_W / stageW).toFixed(6);
+  const thumbH = Math.round(stageH * (THUMB_W / stageW));
   return `
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:#0a0e1a;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 .viewport{position:fixed;inset:0;overflow:hidden}
-/* The fixed reference stage: all slides stack here at native size; JS scales+centers
-   ONLY this element, so the slide DOM never re-lays-out (wrapping stays identical to the preview). */
+/* Fixed reference stage: slides stack here at native size; JS scales+centers ONLY this,
+   so slide DOM never re-lays-out (wrapping stays identical to the preview). */
 .stage{position:absolute;top:0;left:0;width:${stageW}px;height:${stageH}px;transform-origin:0 0}
-.slide{position:absolute;inset:0;opacity:0;visibility:hidden${fade ? ";transition:opacity .18s ease" : ""}}
-.slide.active{opacity:1;visibility:visible}
-/* Chrome — animated with transform/opacity only (never reflow properties). */
-.progress{position:fixed;left:0;bottom:0;width:100%;height:3px;background:#3B82F6;transform:scaleX(0);transform-origin:left;transition:transform .18s ease}
+/* Base slide: hidden, NO transition (so slide 0 doesn't animate on load; only .active/.leaving
+   animate, and only transform/opacity ever do). */
+.slide{position:absolute;inset:0;opacity:0;visibility:hidden}
+.slide.active{opacity:1;visibility:visible;z-index:2}
+.slide.leaving{visibility:visible;z-index:1}         /* outgoing — kept paintable for the transition */
 .counter{position:fixed;right:14px;bottom:10px;font:600 13px/1 system-ui,sans-serif;color:#8b96b0;user-select:none;letter-spacing:.02em}
-@media (prefers-reduced-motion:reduce){.slide{transition:none}.progress{transition:none}}
+.progress{position:fixed;left:0;bottom:0;width:100%;height:3px;background:#3B82F6;transform:scaleX(0);transform-origin:left}
+
+/* ── Motion + overview live in a screen-only block; print never inherits them ── */
+@media screen{
+  .progress{transition:transform .18s ease}
+
+  /* Transition modes — picked by <html data-transition>. Incoming uses a transient .entering
+     from-state (JS forces a reflow between it and .active); outgoing uses .leaving. */
+  html[data-transition="fade"] .slide.active{transition:opacity .18s ease}
+  html[data-transition="fade"] .slide.leaving{opacity:0;transition:opacity .18s ease}
+
+  html[data-transition="slide"] .slide.entering{opacity:0;transform:translateX(calc(var(--dir,1)*40px))}
+  html[data-transition="slide"] .slide.active{opacity:1;transform:translateX(0);transition:opacity .22s ease,transform .22s cubic-bezier(.22,.61,.36,1)}
+  html[data-transition="slide"] .slide.leaving{opacity:0;transition:opacity .18s ease}
+
+  html[data-transition="zoom"] .slide.entering{opacity:0;transform:scale(.92)}
+  html[data-transition="zoom"] .slide.active{opacity:1;transform:scale(1);transition:opacity .2s ease,transform .24s cubic-bezier(.22,.61,.36,1)}
+  html[data-transition="zoom"] .slide.leaving{opacity:0;transition:opacity .18s ease}
+
+  html[data-transition="push"] .slide.entering{opacity:1;transform:translateX(calc(var(--dir,1)*100%))}
+  html[data-transition="push"] .slide.active{opacity:1;transform:translateX(0);transition:transform .32s cubic-bezier(.4,0,.2,1)}
+  html[data-transition="push"] .slide.leaving{opacity:1;transform:translateX(calc(var(--dir,1)*-100%));transition:transform .32s cubic-bezier(.4,0,.2,1)}
+
+  /* Overview grid ('o'): fixed-scale thumbnails, NO DOM duplication. The stage's inline
+     transform (set by fit()) is beaten with !important; the SlideCard box stays full-size
+     so each .slide is a clipping slot and the child is scaled by a constant. */
+  body.ov .viewport{overflow:auto}
+  body.ov .stage{position:static;transform:none!important;display:grid;grid-template-columns:repeat(auto-fill,${THUMB_W}px);gap:16px;padding:24px;width:auto;height:auto;justify-content:center;align-content:start}
+  body.ov .slide{position:static;inset:auto;width:${THUMB_W}px;height:${thumbH}px;overflow:hidden;opacity:1!important;visibility:visible!important;transform:none!important;transition:none;cursor:pointer;border:2px solid transparent;border-radius:6px;background:#0f1524}
+  body.ov .slide>*{transform:scale(${thumbScale});transform-origin:top left;pointer-events:none}
+  body.ov .slide.ovsel{border-color:#3B82F6}
+  body.ov .slide:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
+  body.ov .progress,body.ov .counter{display:none}
+}
+
+/* Reduced motion: kill ALL motion incl. the directional/scale transforms, instant settle. */
+@media (prefers-reduced-motion:reduce){
+  .slide,.slide.active,.slide.leaving,.slide.entering{transition:none!important;transform:none!important}
+  .progress{transition:none}
+}
+
+/* Print: one slide per page; motion + overview are screen-scoped above and never apply here. */
 @media print{
   html,body{background:#fff;overflow:visible}
   .progress,.counter{display:none}
   .stage{position:static;transform:none!important;width:${stageW}px;height:auto}
-  .slide{position:static;opacity:1!important;visibility:visible!important;width:${stageW}px;height:${stageH}px;break-after:page;page-break-after:always}
+  .slide{position:static;inset:auto;opacity:1!important;visibility:visible!important;transform:none!important;width:${stageW}px;height:${stageH}px;break-after:page;page-break-after:always}
+  .slide>*{transform:none!important}
   @page{size:${Math.round(stageW)}px ${Math.round(stageH)}px landscape;margin:0}
 }`;
 }
@@ -60,14 +116,68 @@ function shellJs(stageW: number, stageH: number): string {
 var SW=${stageW},SH=${stageH};
 var slides=[].slice.call(document.querySelectorAll('.slide'));
 var stage=document.querySelector('.stage'),counter=document.getElementById('counter'),bar=document.getElementById('progress');
-var n=slides.length,i=0;
-function fit(){var s=Math.min(innerWidth/SW,innerHeight/SH);stage.style.transform='translate('+((innerWidth-SW*s)/2)+'px,'+((innerHeight-SH*s)/2)+'px) scale('+s+')';}
-function show(k){i=Math.max(0,Math.min(n-1,k));for(var j=0;j<n;j++)slides[j].classList.toggle('active',j===i);counter.textContent=(i+1)+' / '+n;bar.style.transform='scaleX('+(n>1?i/(n-1):1)+')';var h='#'+(i+1);if(location.hash!==h)history.replaceState(null,'',h);}
-addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){show(i+1);e.preventDefault();}else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);e.preventDefault();}else if(e.key==='Home'){show(0);}else if(e.key==='End'){show(n-1);}else if(e.key==='f'){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen();}}});
-addEventListener('click',function(e){if(e.clientX<innerWidth/3)show(i-1);else show(i+1);});
+var root=document.documentElement,body=document.body;
+var n=slides.length,i=0,ov=false,gen=0,leaveTimers=[],pending=[];
+var reduce=matchMedia('(prefers-reduced-motion:reduce)');
+var MODES=['fade','slide','zoom','push'];
+function fit(){if(ov)return;var s=Math.min(innerWidth/SW,innerHeight/SH);stage.style.transform='translate('+((innerWidth-SW*s)/2)+'px,'+((innerHeight-SH*s)/2)+'px) scale('+s+')';}
+/* Hard-reset transient state so held-key nav never leaks a stuck 'leaving' slide, and DETACH any
+   pending transitionend listener from the superseded outgoing slide (its timeout is cleared here,
+   so it can't self-detach — track+remove it to avoid zombie listeners over a long presentation). */
+function resetSlides(){for(var t=0;t<leaveTimers.length;t++)clearTimeout(leaveTimers[t]);leaveTimers.length=0;for(var p=0;p<pending.length;p++)pending[p].el.removeEventListener('transitionend',pending[p].fn);pending.length=0;for(var j=0;j<n;j++){slides[j].classList.remove('leaving','entering');slides[j].style.transition='';slides[j].style.transform='';}}
+function markSel(){for(var j=0;j<n;j++)slides[j].classList.toggle('ovsel',j===i);}
+function chrome(k){counter.textContent=(k+1)+' / '+n;bar.style.transform='scaleX('+(n>1?k/(n-1):1)+')';var h='#'+(k+1);if(location.hash!==h)history.replaceState(null,'',h);}
+function show(k){
+  var prev=i;k=Math.max(0,Math.min(n-1,k));gen++;resetSlides();chrome(k);
+  var mode=root.getAttribute('data-transition');
+  /* Instant settle: same slide, overview open, reduced motion, or a non-animating mode. */
+  if(k===prev||ov||reduce.matches||MODES.indexOf(mode)<0){
+    for(var a=0;a<n;a++)slides[a].classList.toggle('active',a===k);i=k;
+    if(ov){markSel();if(slides[i])slides[i].scrollIntoView({block:'nearest'});}
+    return;
+  }
+  var dir=k>prev?1:-1;root.style.setProperty('--dir',String(dir));
+  var incoming=slides[k],outgoing=slides[prev];
+  outgoing.classList.remove('active');outgoing.classList.add('leaving');
+  /* Apply the from-state with transitions OFF, force a reflow to commit the start frame,
+     then flip to .active so the CSS transition has two distinct values to interpolate. */
+  incoming.style.transition='none';incoming.classList.add('entering');void incoming.offsetWidth;
+  incoming.style.transition='';incoming.classList.remove('entering');incoming.classList.add('active');
+  var thisGen=gen,out=outgoing;
+  /* e is absent when called by the timeout; ignore transitionend bubbling up from slide content
+     (only the outgoing slide's own leave animation should trigger cleanup). Detach unconditionally. */
+  function done(e){if(e&&e.target!==out)return;out.removeEventListener('transitionend',done);if(thisGen!==gen)return;out.classList.remove('leaving');out.style.transform='';out.style.transition='';}
+  out.addEventListener('transitionend',done);pending.push({el:out,fn:done});leaveTimers.push(setTimeout(done,440));/* safety net for interrupted transitionend */
+  i=k;
+}
+/* ── Overview ── */
+function enterOv(){if(ov||n<1)return;ov=true;body.classList.add('ov');for(var j=0;j<n;j++){var s=slides[j];s.setAttribute('role','button');s.setAttribute('tabindex','0');s.setAttribute('aria-label','スライド '+(j+1));}markSel();var t=slides[i];if(t){t.scrollIntoView({block:'center'});t.focus&&t.focus();}}
+function exitOv(){if(!ov)return;ov=false;body.classList.remove('ov');for(var j=0;j<n;j++){var s=slides[j];s.removeAttribute('role');s.removeAttribute('tabindex');s.removeAttribute('aria-label');s.classList.remove('ovsel');}fit();}
+function toggleOv(){ov?exitOv():enterOv();}
+function cycleMode(){var x=MODES.indexOf(root.getAttribute('data-transition'));root.setAttribute('data-transition',MODES[(x+1)%MODES.length]);}
+addEventListener('keydown',function(e){
+  if(ov){
+    if(e.key==='Escape'||e.key==='o'||e.key==='O'){toggleOv();e.preventDefault();return;}
+    if(e.key==='Enter'||e.key===' '){var t=e.target;if(t&&t.classList&&t.classList.contains('slide')){var idx=slides.indexOf(t);if(idx>=0){show(idx);exitOv();}e.preventDefault();}return;}
+    return;/* swallow nav keys while the grid owns the screen */
+  }
+  if(e.key==='o'||e.key==='O'){toggleOv();e.preventDefault();return;}
+  if(e.key==='t'||e.key==='T'){cycleMode();e.preventDefault();return;}
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){show(i+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);e.preventDefault();}
+  else if(e.key==='Home'){show(0);}
+  else if(e.key==='End'){show(n-1);}
+  else if(e.key==='f'){if(!document.fullscreenElement){root.requestFullscreen&&root.requestFullscreen();}else{document.exitFullscreen();}}
+});
+addEventListener('click',function(e){
+  if(ov){var s=e.target&&e.target.closest?e.target.closest('.slide'):null;if(s){var idx=slides.indexOf(s);if(idx>=0){show(idx);exitOv();}}return;}
+  if(e.clientX<innerWidth/3)show(i-1);else show(i+1);
+});
 addEventListener('resize',fit);
 addEventListener('hashchange',function(){var k=parseInt(location.hash.slice(1),10);if(k)show(k-1);});
-fit();var st=parseInt((location.hash||'').slice(1),10);show(st?st-1:0);
+/* Init: activate the start slide with NO transition (deep-link or slide 0). */
+var start=parseInt((location.hash||'').slice(1),10);start=(start>=1&&start<=n)?start-1:0;
+for(var j=0;j<n;j++)slides[j].classList.toggle('active',j===start);i=start;chrome(start);fit();
 })();`;
 }
 
@@ -75,7 +185,8 @@ fit();var st=parseInt((location.hash||'').slice(1),10);show(st?st-1:0);
 export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): string {
   const { stageW, stageH } = opts;
   const title = esc(opts.title?.trim() || "SlideCraft");
-  const fade = opts.transition !== "none";
+  // Whitelist the transition token (it lands in an attribute; never trust the input value).
+  const transition: Transition = TRANSITIONS.indexOf(opts.transition as Transition) >= 0 ? opts.transition! : "slide";
   const n = slideHtmls.length;
 
   const sections = slideHtmls
@@ -83,12 +194,12 @@ export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): 
     .join("\n");
 
   return `<!doctype html>
-<html lang="ja">
+<html lang="ja" data-transition="${transition}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
-<style>${shellCss(stageW, stageH, fade)}</style>
+<style>${shellCss(stageW, stageH)}</style>
 </head>
 <body>
 <div class="viewport"><div class="stage">
