@@ -71,12 +71,8 @@ export default function InitializeModal({
           <span className="text-sm text-[#93C5FD] font-medium mr-1">📝 Draft</span>
           <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} />
           <span className="w-px h-4 bg-[#2D3A6E] mx-1" />
-          {/* Ways to put content into the editor: import a file, generate with AI, or just paste below. */}
-          <span className="text-gray-500 mr-0.5">中身を入れる:</span>
           <button onClick={onOpenFile} className={action} title=".md / .yaml を取り込む">📄 Markdown を取込む</button>
           <button onClick={onGenerateAI} className={action} title="AI でデッキを生成">✨ AIで生成</button>
-          <span className="text-gray-500">または、下のエディタに直接貼り付け</span>
-          <span className="w-px h-4 bg-[#2D3A6E] mx-1" />
           <button onClick={onStructure} className={action} title="生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）">🧹 原稿を整形</button>
           <div className="flex-1" />
           <button onClick={onCancel} title="キャンセル" className="text-gray-400 hover:text-white text-lg leading-none">×</button>
@@ -96,7 +92,10 @@ export default function InitializeModal({
           storageKey="slidecraft_split_init"
           left={
             <>
-              <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">Markdown Editor</div>
+              <div className="px-3 py-1 bg-[#141B41] text-xs border-b border-[#2D3A6E]">
+                <span className="text-gray-400">Markdown Editor</span>
+                <span className="text-gray-600"> ・ ここに直接貼り付け／入力してもOK</span>
+              </div>
               <div className="flex-1 min-h-0">
                 <Editor value={mdText} onChange={onMdChange} language="markdown" onCursorLine={onCursorLine} gotoLine={gotoLine} />
               </div>
