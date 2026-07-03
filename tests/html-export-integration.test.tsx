@@ -43,4 +43,9 @@ describe("HTML export S3: end-to-end orchestrator", () => {
     const out = process.env.HTML_EXPORT_SAMPLE;
     if (out) writeFileSync(out, html);
   });
+
+  it("threads the chosen transition through to the exported document", async () => {
+    const html = await renderDeckToHtml(parseMd("# A\n\n- x"), tpl, { transition: "push" });
+    expect(html).toMatch(/<html[^>]*data-transition="push"/);
+  });
 });
