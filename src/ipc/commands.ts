@@ -83,7 +83,12 @@ export async function saveBinaryFile(bytes: Uint8Array, defaultName: string, ext
   return true;
 }
 
-/** Save text (.md). */
-export async function saveTextFile(text: string, defaultName: string): Promise<boolean> {
-  return saveBinaryFile(new TextEncoder().encode(text), defaultName, ["md", "markdown", "txt"], "Markdown");
+/** Save a text file via the native Save dialog / browser download. Defaults to Markdown. */
+export async function saveTextFile(
+  text: string,
+  defaultName: string,
+  extensions: string[] = ["md", "markdown", "txt"],
+  label = "Markdown",
+): Promise<boolean> {
+  return saveBinaryFile(new TextEncoder().encode(text), defaultName, extensions, label);
 }
