@@ -101,12 +101,19 @@ html,body{width:100%;height:100%;background:#0a0e1a;overflow:hidden;font-family:
 
 /* Print: one slide per page; motion + overview are screen-scoped above and never apply here. */
 @media print{
-  html,body{background:#fff;overflow:visible}
+  /* print-color-adjust:exact forces slide backgrounds/decorations/table fills to PRINT even when
+     the browser's "Background graphics" toggle is off (its default). Inherited → covers all slides. */
+  html,body{background:#fff;overflow:visible;width:auto;height:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .progress,.counter{display:none}
+  /* The screen viewport is position:fixed;overflow:hidden — MUST be reset or it clips every
+     slide onto the first printed page (the "all slides on one sheet" bug). */
+  .viewport{position:static;overflow:visible;inset:auto}
   .stage{position:static;transform:none!important;width:${stageW}px;height:auto}
-  .slide{position:static;inset:auto;opacity:1!important;visibility:visible!important;transform:none!important;width:${stageW}px;height:${stageH}px;break-after:page;page-break-after:always}
+  .slide{position:static;inset:auto;opacity:1!important;visibility:visible!important;transform:none!important;width:${stageW}px;height:${stageH}px;break-after:page;page-break-after:always;break-inside:avoid}
   .slide>*{transform:none!important}
-  @page{size:${Math.round(stageW)}px ${Math.round(stageH)}px landscape;margin:0}
+  /* Explicit 1280x720 IS landscape-shaped; the landscape KEYWORD cannot be combined with
+     explicit lengths (invalid, ignored, defaults to portrait), so omit it. */
+  @page{size:${Math.round(stageW)}px ${Math.round(stageH)}px;margin:0}
 }`;
 }
 
