@@ -70,6 +70,8 @@ export const SlidePlanSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("closing"),
     title: z.string(),
+    subtitle: z.string().optional(),
+    bullets: z.array(z.string()).default([]),
   }),
 ]);
 export type SlidePlan = z.infer<typeof SlidePlanSchema>;
@@ -85,7 +87,7 @@ function textPh(idx: string, t: string): PlaceholderContent {
   return { idx, paragraphs: [{ segments: [{ text: t }] }] };
 }
 
-function bulletParagraphs(items: string[]): Paragraph[] {
+function bulletParagraphs(items: string[] = []): Paragraph[] {
   return items
     .filter((b) => b.trim().length > 0)
     .map((b) => ({ segments: [{ text: b }], bullet: true }));
@@ -133,7 +135,7 @@ export function slidePlanToSlide(s: SlidePlan): SlideIR {
       return {
         layout: "Content.1Body.Single",
         placeholders: ph,
-        table: { rows: [s.headers, ...s.rows], header: true, placeholderIdx: "1" },
+        table: { rows: rectangularize([s.headers, ...s.rows]), header: true, placeholderIdx: "1" },
       };
     }
     case "diagram": {
@@ -141,9 +143,25 @@ export function slidePlanToSlide(s: SlidePlan): SlideIR {
       if (s.subtitle) ph.push(textPh("16", s.subtitle));
       return { layout: "Content.1Body.Single", placeholders: ph, ...mermaidToFigure(s.mermaid) };
     }
-    case "closing":
-      return { layout: "Closing.1Message.Single", placeholders: [textPh("0", s.title)] };
+    case "closing": {
+      // Closing = ctrTitle namespace (title idx 0, subtitle idx 1). The message layout has no
+      // dedicated body, so a subtitle + any bullets are preserved together in idx 1 (subtitle
+      // paragraph first, then bullet paragraphs) — this round-trips through Markdown losslessly.
+      const ph: PlaceholderContent[] = [textPh("0", s.title)];
+      const secondary: Paragraph[] = [];
+      if (s.subtitle) secondary.push({ segments: [{ text: s.subtitle }] });
+      secondary.push(...bulletParagraphs(s.bullets));
+      if (secondary.length) ph.push({ idx: "1", paragraphs: secondary });
+      return { layout: "Closing.1Message.Single", placeholders: ph };
+    }
   }
+}
+
+/** Pad every row (headers included) to the widest row so a ragged model table becomes a valid
+ *  rectangle. Non-lossy: the width is the MAX row length, so no cell is ever truncated. */
+function rectangularize(rows: string[][]): string[][] {
+  const width = Math.max(1, ...rows.map((r) => r.length));
+  return rows.map((r) => (r.length === width ? r : [...r, ...Array(width - r.length).fill("")]));
 }
 
 /**
@@ -177,7 +195,7 @@ export function deckPlanToDeck(plan: DeckPlan, catalog?: LayoutCatalog): DeckIR 
 // ── Validation (for model output before we trust it) ──
 
 export type ParseResult =
-  | { ok: true; plan: DeckPlan }
+  | { ok: true; plan: DeckPlan; notices?: string[] }
   | { ok: false; error: string };
 
 export function parseDeckPlan(input: unknown): ParseResult {
@@ -220,8 +238,101 @@ export function extractDeckPlan(text: string): ParseResult {
     const title = rec2 && rec2.title != null ? String(rec2.title) : "";
     if (title) slides.push({ kind: "content", title, bullets: [] }); // keep the slide, drop the broken body
   }
-  if (slides.length === 0) return { ok: false, error: "No usable slides in the generated plan." };
-  return { ok: true, plan: { slides } };
+  // Reject text units poisoned by an unrecoverable character (violation-drop), THEN prune the noise.
+  let dropped = 0;
+  const stripped = slides.map((s) => {
+    const r = stripViolations(s);
+    dropped += r.dropped;
+    return r.slide;
+  });
+  const cleaned = cleanupSlidePlans(stripped);
+  if (cleaned.length === 0) return { ok: false, error: "No usable slides in the generated plan." };
+  const notices = dropped > 0 ? [`書式違反（復元不能な文字）により ${dropped} か所を除外しました。`] : undefined;
+  return { ok: true, plan: { slides: cleaned }, ...(notices ? { notices } : {}) };
+}
+
+// U+FFFD is json-salvage's marker for an unrecoverable character (a malformed \uXXXX or a lone
+// surrogate). It must NEVER reach a slide — treat any text carrying it as a format violation.
+const CORRUPT = "�";
+const hasCorrupt = (v: string | undefined): boolean => !!v && v.includes(CORRUPT);
+
+/**
+ * Drop, at the SMALLEST grain, any text unit poisoned by U+FFFD. A weak model that violated the
+ * "raw UTF-8, never \uXXXX" instruction produced untrustworthy text — reject the offending bullet /
+ * field (a scalar field is blanked; a list item is removed; a table cell is blanked to keep the grid)
+ * rather than ship a `�` marker or a silently-wrong word. Returns the cleaned slide + units dropped.
+ */
+function stripViolations(s: SlidePlan): { slide: SlidePlan; dropped: number } {
+  let dropped = 0;
+  const scalar = (v: string): string => {
+    if (hasCorrupt(v)) { dropped++; return ""; }
+    return v;
+  };
+  const opt = (v: string | undefined): string | undefined => (v === undefined ? undefined : scalar(v));
+  const list = (arr: string[]): string[] => {
+    const kept = arr.filter((x) => !hasCorrupt(x));
+    dropped += arr.length - kept.length;
+    return kept;
+  };
+  let slide: SlidePlan;
+  switch (s.kind) {
+    case "title":
+      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle), category: opt(s.category), date: opt(s.date), footer: opt(s.footer) };
+      break;
+    case "section":
+      slide = { ...s, title: scalar(s.title) };
+      break;
+    case "content":
+      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle), bullets: list(s.bullets) };
+      break;
+    case "columns":
+      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle),
+        columns: s.columns.map((c) => ({ heading: opt(c.heading), bullets: list(c.bullets) })) };
+      break;
+    case "table":
+      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle),
+        headers: s.headers.map(scalar), rows: s.rows.map((r) => r.map(scalar)) };
+      break;
+    case "diagram":
+      // mermaid is structural (a corrupt char can't be removed without breaking syntax) — left intact.
+      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle) };
+      break;
+    case "closing":
+      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle), bullets: list(s.bullets) };
+      break;
+  }
+  return { slide, dropped };
+}
+
+/** A slide carries no content — pure noise a weak model emitted. Title-only slides are NOT empty
+ *  (a title/section IS the content); this only catches slides with neither a title nor a body. */
+function isEmptyPlan(s: SlidePlan): boolean {
+  if (s.title.trim()) return false;
+  switch (s.kind) {
+    case "title": return !s.subtitle && !s.category && !s.date && !s.footer;
+    case "section": return true; // no title → an empty divider
+    case "content": return s.bullets.length === 0 && !s.subtitle;
+    case "columns": return s.columns.every((c) => !c.heading && c.bullets.length === 0);
+    case "table": return s.headers.length === 0 && s.rows.length === 0;
+    case "diagram": return !s.mermaid.trim();
+    case "closing": return !s.subtitle && s.bullets.length === 0;
+  }
+}
+
+/** Drop noise a weak model repeats: empty-title section dividers and slides with no content at all,
+ *  and collapse consecutive duplicate section titles (`第1部` / `第1部` → one). Preserves everything
+ *  that carries data. */
+function cleanupSlidePlans(slides: SlidePlan[]): SlidePlan[] {
+  const out: SlidePlan[] = [];
+  for (const s of slides) {
+    if (isEmptyPlan(s)) continue;
+    if (s.kind === "section") {
+      const prev = out[out.length - 1];
+      if (prev && prev.kind === "section" && prev.title.trim() === s.title.trim()) continue;
+    }
+    out.push(s);
+  }
+  return out;
 }
 
 export type SlideParseResult =
@@ -241,7 +352,7 @@ export function extractSlidePlan(text: string): SlideParseResult {
   const rec = asRecord(data);
   const candidate = rec && Array.isArray(rec.slides) ? rec.slides[0] : data;
   const r = SlidePlanSchema.safeParse(coerceSlide(candidate));
-  if (r.success) return { ok: true, slide: r.data };
+  if (r.success) return { ok: true, slide: stripViolations(r.data).slide };
   return {
     ok: false,
     error: r.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "),
@@ -276,8 +387,21 @@ function toStringArray(v: unknown): string[] {
   if (typeof v === "string") {
     return v
       .split(/\r?\n/)
-      .map((s) => s.replace(/^\s*[-*•]\s*/, "").trim())
+      .map((s) => s.replace(/^\s*[-*•・･‣]\s*/, "").trim())
       .filter((s) => s.length > 0);
+  }
+  return [];
+}
+
+// A weak model puts the body under any of these keys — read whichever it used so an
+// unknown-kind / off-schema slide keeps its content instead of coercing to an empty one.
+const BODY_FIELDS = ["bullets", "body", "content", "text", "points", "items", "lines", "notes"] as const;
+function bodyStringArray(s: Record<string, unknown>): string[] {
+  for (const k of BODY_FIELDS) {
+    if (s[k] != null) {
+      const a = toStringArray(s[k]);
+      if (a.length) return a;
+    }
   }
   return [];
 }
@@ -299,8 +423,12 @@ function coerceSlide(raw: unknown): unknown {
   }
   out.kind = kind;
 
-  if (s.title != null) out.title = String(s.title);
-  if (kind === "content") out.bullets = toStringArray(s.bullets);
+  // Always give a title (empty allowed by the schema) so a titleless-but-content-bearing slide
+  // VALIDATES and is kept — instead of failing validation and being dropped by the fallback below.
+  out.title = s.title != null ? String(s.title) : "";
+  if (s.subtitle != null) out.subtitle = String(s.subtitle);
+  if (kind === "content") out.bullets = bodyStringArray(s);
+  if (kind === "closing") out.bullets = bodyStringArray(s);
   if (kind === "table") {
     const rows2d = Array.isArray(s.rows) ? (s.rows as unknown[]).map(toStringArray) : [];
     if (Array.isArray(s.headers) && s.headers.length) {

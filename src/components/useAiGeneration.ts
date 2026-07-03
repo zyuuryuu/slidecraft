@@ -42,6 +42,7 @@ export interface AiTask {
   status: AiTaskStatus;
   result: string; // streamed live, then post-processed on done
   error?: string;
+  notice?: string; // non-blocking 告知 (e.g. deterministic-repair dropped a corrupt unit)
   startedAt: number;
   finishedAt?: number;
 }
@@ -211,12 +212,14 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   // (slides → engine Markdown, slide → fenced Markdown, diagram-edit → validated YAML).
   // Returns either a result or a human error — same outcomes as before, centralised so
   // every task path (foreground + loop) treats responses identically.
-  const postProcess = useCallback((mode: AiMode, raw: string): { result?: string; error?: string } => {
+  const postProcess = useCallback((mode: AiMode, raw: string): { result?: string; error?: string; notice?: string } => {
     if (mode === "slides") {
       const parsed = extractDeckPlan(raw);
       // Pass the catalog so a kind the master can't express (table/columns/diagram) is degraded to
       // content bullets deterministically, instead of emitting an unrenderable slide (#11).
-      return parsed.ok ? { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)) } : { error: `Couldn't read the generated plan: ${parsed.error}` };
+      if (!parsed.ok) return { error: `Couldn't read the generated plan: ${parsed.error}` };
+      const notice = parsed.notices?.length ? parsed.notices.join(" / ") : undefined;
+      return { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)), ...(notice ? { notice } : {}) };
     }
     if (mode === "slide" || mode === "condense") {
       const md = stripMarkdownFence(raw);
@@ -271,7 +274,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
           patchTask(task.id, { status: "error", error: pp.error, finishedAt: Date.now() });
           throw new Error(pp.error);
         }
-        patchTask(task.id, { status: "done", result: pp.result ?? "", finishedAt: Date.now() });
+        patchTask(task.id, { status: "done", result: pp.result ?? "", ...(pp.notice ? { notice: pp.notice } : {}), finishedAt: Date.now() });
         return pp.result ?? "";
       } catch (e) {
         if (controller.signal.aborted) {
@@ -348,6 +351,8 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   const result = activeTask?.result ?? "";
   const generating = activeTask?.status === "running";
   const error = activeTask?.status === "error" ? (activeTask.error ?? "エラー") : null;
+  // Non-blocking 告知 for a completed task (e.g. a corrupt unit was dropped by deterministic repair).
+  const notice = activeTask?.status === "done" ? (activeTask.notice ?? null) : null;
 
   // One-click: switch to local Ollama, picking a valid installed model.
   const switchToOllama = useCallback(() => {
@@ -504,7 +509,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     provider, setProvider,
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
-    generating, result, setResult, error,
+    generating, result, setResult, error, notice,
     canGenerate, generate, cancel, reset,
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,

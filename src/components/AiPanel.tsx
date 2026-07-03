@@ -333,6 +333,13 @@ export default function AiPanel({
         </div>
       )}
 
+      {/* 告知 — deterministic repair dropped a corrupt unit (non-blocking) */}
+      {ai.notice && (
+        <div className="mx-3 mb-2 px-2 py-1.5 bg-amber-900/30 border border-amber-500/40 rounded text-xs text-amber-200">
+          {ai.notice}
+        </div>
+      )}
+
       {/* Result — for a slide edit show before→after diff so it's never applied
           blind (you see what changed/was dropped) → 採用/却下. Deck gen keeps raw. */}
       {ai.result && (
