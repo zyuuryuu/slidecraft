@@ -26,8 +26,8 @@
 > - **Slice A（土台・landed）**：`<!-- card -->` / `<!-- step -->` 区切り＋`### 見出し`（`Paragraph.heading`）＋`SlideIR.groupKind` ヒント。往復・プレビュー太字・エディタ対応。現状は「見出し付きの列」にデグレード。
 > - **KPI(09)**：サンプルの `type: kpi` 図が既にカバー → **スキップ**。
 > - **🔗 BLOCKER（保留＝要設計）— カード/プロセス/KPI の styled 箱到達**：`placeholderRole` の `idx15/16→body` 修正は **1:1 全単射を全テンプレで破壊**（field-map-bijection 6件・blast 18件、2026-07-03 検証済）。**根因**＝カードの `idx15/16=body` が正準規約 `idx15=title / 16=subtitle` と衝突。この規約は `slideIdxRole`（content 側）＋`placeholderRole`（layout 側）＋`buildFieldMap` の**3か所に焼き込まれ**、layout 側だけ変えると content"15"(title 扱い) が body@15 に round-trip せず全単射が壊れる。
-> - **将来アプローチ（壊さない設計）**：正準規約に**触らない別系統のグループ経路**——groupKind＋幾何(x クラスタ)/名前でカードレイアウトを検出 → `bindContentByRole` を経由しない**専用バインド**（グループN の見出し/本文 → カードN の 見出し/説明枠、番号/STEP ラベルは焼込みスキップ）→ エディタはグループ単位フィールド。**[ADR-0011](adr/0011-placeholder-input-bijection.md) の 1:1（full＋sparse）を green のまま**維持。ADR 級・詳細設計は着手時に `docs/design/`。
-> - **サイズ**：残り（styled 箱）は L＋（独立サブシステム新設）。
+> - **将来アプローチ（壊さない設計）＝設計完了**：正準規約に**触らない別系統のグループ経路**（`slide.groupKind` ＋ 幾何(x クラスタ)検出 `detectGroups` → `bindContentByRole` を経由しない `expandGroups` → エディタはグループ単位フィールド、chrome/画像枠は継承）。**[ADR-0011](adr/0011-placeholder-input-bijection.md) の 1:1（full＋sparse）を green のまま**維持。➡ **詳細設計＋段階実装計画 S1–S6：[docs/design/grouped-layout-binding.md](design/grouped-layout-binding.md)**（設計ワークフローで全11テンプレ精査＋敵対批評済み）。
+> - **サイズ**：残り（styled 箱）は L＋（独立サブシステム新設）。次は S1（`detectGroups` 純検出）から test-first。
 
 > **テーマ2「プロンプト磨き込み」に追加する観点**：
 >
