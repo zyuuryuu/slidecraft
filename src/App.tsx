@@ -86,7 +86,6 @@ export default function App() {
   // mirror into the active deck live. A freshly adopted/seeded doc is applied 'silent' (replace the
   // view, no undo step — so seeding the user's own deck never clobbers it); subsequent AI edits are
   // 'commit' (undoable). Desktop-only.
-  const [showCollab, setShowCollab] = useState(false);
   const collab = useCollab({
     applyDeck: (d, isInitial) => setDeck(d, isInitial ? "silent" : "commit"),
     deck,
@@ -162,6 +161,7 @@ export default function App() {
           onLoadTemplate={editLocked ? undefined : handleLoadTemplate}
           onAiAssist={() => setShowAiPanel((v) => !v)}
           aiRunning={ai.tasks.filter((t) => t.status === "running").length}
+          aiCollabActive={editLocked}
           generating={generating}
           hasSpec={hasContent}
           templateName={templateName}
@@ -171,8 +171,8 @@ export default function App() {
           canRedo={editLocked ? true : canRedo}
         />
         <div className="flex items-center gap-2 px-3 py-2">
-          {/* Draft + 協働 = secondary actions; matched to the Toolbar's secondary button style so
-              the whole top bar reads as one tier (AI Assist / ファイル stay accent/primary). */}
+          {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
+              second tab — one AI entry point instead of two top-bar buttons. */}
           <button
             onClick={handleEnterImport}
             disabled={editLocked}
@@ -180,22 +180,6 @@ export default function App() {
             className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E]"
           >
             📝 Draft
-          </button>
-          {/* Single source of collab status: connected → the button itself becomes the emerald
-              "協働編集中" indicator (no separate chip). Click always opens/closes the panel. */}
-          <button
-            onClick={() => setShowCollab((v) => !v)}
-            title={editLocked
-              ? "協働編集中：あなたの編集は host（単一の真実）へ送られ AI とライブ共有されます。Undo もホスト側。クリックで接続パネルを開閉。"
-              : "AI と同じデッキをライブ共有（ローカル MCP サイドカー）"}
-            className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
-              editLocked
-                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
-                : "bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white"
-            }`}
-          >
-            {editLocked ? "✍️ 協働編集中" : "🔗 協働"}
-            {editLocked && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           </button>
         </div>
       </div>
@@ -283,6 +267,22 @@ export default function App() {
             batchRunning={refine.refining}
             seed={aiSeed}
             ai={ai}
+            collabConnected={editLocked}
+            collabTab={
+              <CollabPanel
+                embedded
+                onClose={() => setShowAiPanel(false)}
+                available={collab.available}
+                status={collab.status}
+                url={collab.url}
+                token={collab.token}
+                hostJsonPath={collab.hostJsonPath}
+                error={collab.error}
+                docCount={collab.docCount}
+                onStart={collab.start}
+                onStop={collab.stop}
+              />
+            }
           />
         )}
       </div>
@@ -330,21 +330,6 @@ export default function App() {
           proposal={refine.proposal}
           onAccept={editLocked ? () => {} : refine.acceptProposal}
           onCancel={refine.cancelProposal}
-        />
-      )}
-
-      {showCollab && (
-        <CollabPanel
-          onClose={() => setShowCollab(false)}
-          available={collab.available}
-          status={collab.status}
-          url={collab.url}
-          token={collab.token}
-          hostJsonPath={collab.hostJsonPath}
-          error={collab.error}
-          docCount={collab.docCount}
-          onStart={collab.start}
-          onStop={collab.stop}
         />
       )}
 

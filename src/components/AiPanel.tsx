@@ -6,7 +6,7 @@
  * generation logic with the AI dialog via useAiGeneration (no divergence).
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { PROVIDERS } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
 import LocalOnlyToggle from "./LocalOnlyToggle";
@@ -32,6 +32,10 @@ interface AiPanelProps {
   seed?: { prompt: string; ts: number };
   /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
   ai: AiGeneration;
+  /** The 協働 (live-collab) surface, folded into this hub as a second tab. Omit → no 協働 tab. */
+  collabTab?: ReactNode;
+  /** Whether a collab session is live (drives the 協働 tab's pulse + the initial tab). */
+  collabConnected?: boolean;
 }
 
 export default function AiPanel({
@@ -44,10 +48,14 @@ export default function AiPanel({
   batchRunning,
   seed,
   ai,
+  collabTab,
+  collabConnected,
 }: AiPanelProps) {
   const [userRequest, setUserRequest] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<"gen" | "tasks">("gen");
+  // Hub-level tab: this dock now houses both the AI assistant and the 協働 (live-collab) surface.
+  const [hubTab, setHubTab] = useState<"assist" | "collab">(collabConnected ? "collab" : "assist");
   const runningCount = ai.tasks.filter((t) => t.status === "running").length;
 
   // Pre-fill the instruction when handed off from the ReviewBar ("✨直す"). Keyed on
@@ -134,22 +142,39 @@ export default function AiPanel({
         title="ドラッグで高さ変更（ダブルクリックでリセット）"
         className="h-1.5 shrink-0 cursor-row-resize bg-[#2D3A6E] hover:bg-[#3B82F6] transition-colors"
       />
-      {/* Header — all config is folded behind the gear; its dot shows connection at a glance */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#2D3A6E]">
-        <span className="text-sm text-[#93C5FD] font-medium">✨ AI Assist</span>
-        <div className="flex-1" />
+      {/* Header — hub tabs (アシスト / 協働); gear (config) shows only on the assist tab */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[#2D3A6E]">
         <button
-          onClick={() => setShowSettings((v) => !v)}
-          title={`${ai.connection.label}${ai.connection.hint ? " — " + ai.connection.hint : ""}（クリックで設定）`}
-          className={`flex items-center gap-1 text-xs px-1.5 py-1 rounded hover:bg-[#2D3A6E] ${showSettings ? "bg-[#2D3A6E] text-white" : "text-gray-400"}`}
+          onClick={() => setHubTab("assist")}
+          className={`px-2 py-0.5 rounded text-sm ${hubTab === "assist" ? "bg-[#2D3A6E] text-[#93C5FD] font-medium" : "text-gray-400 hover:text-white"}`}
         >
-          <span className={toneColor}>●</span> ⚙
+          ✨ アシスト
         </button>
+        {collabTab && (
+          <button
+            onClick={() => setHubTab("collab")}
+            className={`px-2 py-0.5 rounded text-sm inline-flex items-center gap-1 ${hubTab === "collab" ? "bg-[#2D3A6E] text-white font-medium" : "text-gray-400 hover:text-white"}`}
+          >
+            🔗 協働{collabConnected && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
+          </button>
+        )}
+        <div className="flex-1" />
+        {hubTab === "assist" && (
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            title={`${ai.connection.label}${ai.connection.hint ? " — " + ai.connection.hint : ""}（クリックで設定）`}
+            className={`flex items-center gap-1 text-xs px-1.5 py-1 rounded hover:bg-[#2D3A6E] ${showSettings ? "bg-[#2D3A6E] text-white" : "text-gray-400"}`}
+          >
+            <span className={toneColor}>●</span> ⚙
+          </button>
+        )}
         <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none" title="閉じる">
           ×
         </button>
       </div>
 
+      {hubTab === "collab" ? collabTab : (
+      <>
       {/* Settings (folded): connection + provider + Ollama assist, then endpoint/model/key */}
       {showSettings && (
         <div className="flex flex-col gap-2 px-3 py-2 border-b border-[#2D3A6E] bg-[#0f1117]">
@@ -379,6 +404,8 @@ export default function AiPanel({
       </>
       )}
       </div>
+      </>
+      )}
     </div>
   );
 }
