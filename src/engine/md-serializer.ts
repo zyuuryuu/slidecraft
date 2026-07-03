@@ -15,12 +15,9 @@ import type {
 } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { tableToMarkdown } from "./md-table";
+import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
 
-// ── Title layout detection ──
-
-function isTitleLayout(layout: string): boolean {
-  return layout.startsWith("Title.") || layout.startsWith("Closing.");
-}
+// ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
 function isColumnLayout(layout: string): boolean {
   return layout.startsWith("Column.");
@@ -33,14 +30,6 @@ function isKpiLayout(layout: string): boolean {
 function isProcessLayout(layout: string): boolean {
   return layout.startsWith("Process.");
 }
-
-// ── Placeholder idx → title field name (reverse of TITLE_FIELD_MAP) ──
-
-const IDX_TO_FIELD: Record<string, string> = {
-  "10": "Category",
-  "11": "Date",
-  "12": "Footer",
-};
 
 // ── Inline segments → Markdown text ──
 
@@ -129,18 +118,23 @@ function serializeSlide(
     lines.push(`<!-- slide: ${layout} -->`);
   }
 
-  if (isTitleLayout(layout)) {
-    // Title layouts: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = fields
-    const title = getPlaceholderText(slide, "0");
-    const subtitle = getPlaceholderText(slide, "1");
+  // Choose the namespace with the SAME rule the parser uses (slide-roles): a Title/Closing layout OR
+  // the presence of meta placeholders means the title/subtitle live at idx 0/1 (else 15/16). Deriving
+  // this from isTitleNamespace (not the layout name alone) round-trips an auto-layout slide that carries
+  // Category/Date/Footer — otherwise its title + meta would be read from the empty content idxs and lost.
+  const hasMeta = META_IDXS.some((idx) => getPlaceholderText(slide, idx));
+  if (isTitleNamespace(layout, hasMeta)) {
+    // Title namespace: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = meta fields.
+    const title = getPlaceholderText(slide, TITLE_NS.title);
+    const subtitle = getPlaceholderText(slide, TITLE_NS.subtitle);
     if (title) lines.push(`# ${title}`);
     if (subtitle) lines.push(`## ${subtitle}`);
     lines.push("");
 
     // Fields
-    for (const [idx, fieldName] of Object.entries(IDX_TO_FIELD)) {
+    for (const { name, idx } of META_FIELDS) {
       const text = getPlaceholderText(slide, idx);
-      if (text) lines.push(`${fieldName}: ${text}`);
+      if (text) lines.push(`${name}: ${text}`);
     }
 
     // A figure mis-pinned to a Title/Closing layout must still round-trip (not vanish).
@@ -150,9 +144,9 @@ function serializeSlide(
       lines.push(fig);
     }
   } else {
-    // Content layouts: idx 15 = title, idx 16 = subtitle
-    const title = getPlaceholderText(slide, "15");
-    const subtitle = getPlaceholderText(slide, "16");
+    // Content namespace: idx 15 = title, idx 16 = subtitle
+    const title = getPlaceholderText(slide, CONTENT_NS.title);
+    const subtitle = getPlaceholderText(slide, CONTENT_NS.subtitle);
     if (title) lines.push(`# ${title}`);
     if (subtitle) lines.push(`> ${subtitle}`);
     lines.push("");

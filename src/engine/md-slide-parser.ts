@@ -8,6 +8,7 @@ import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, Placeh
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
+import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
 
 /** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line). */
 function findTableInLines(lines: string[]): string[][] | null {
@@ -37,14 +38,9 @@ function mermaidToFigure(
   return { mermaidBlock: { mermaid: mmd, placeholderIdx } };
 }
 
-// Real title-slide metadata regions in the master. (Meta/Summary were previously
-// mapped to "11" too — colliding with Date and dropping one — so they're no longer
-// special-cased; "Meta:"/"Summary:" lines fall through to body text and survive.)
-const TITLE_FIELD_MAP: Record<string, string> = {
-  category: "10",
-  date: "11",
-  footer: "12",
-};
+// Title-slide metadata (Category/Date/Footer) → idx is defined in slide-roles (metaFieldIdx), the
+// single source of truth. (Meta/Summary were previously mapped to "11" too — colliding with Date and
+// dropping one — so they're no longer special-cased; "Meta:"/"Summary:" lines fall through to body.)
 
 // ── Inline text parsing ──
 
@@ -102,12 +98,6 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
     }
   }
   return paragraphs;
-}
-
-// ── Check if layout is a title layout ──
-
-function isTitleLayout(layout: string): boolean {
-  return layout.startsWith("Title.") || layout.startsWith("Closing.");
 }
 
 /** First ```lang … ``` fenced block in a set of lines, or null. */
@@ -306,46 +296,19 @@ export function parseSlideBlock(
     bodyLines.push(line);
   }
 
-  // Determine if this is a title layout
-  const isTitle = isTitleLayout(layout) || Object.keys(titleFields).length > 0;
+  // Determine the placeholder namespace (title vs content) — the SINGLE shared rule (slide-roles):
+  // a Title/Closing layout OR the presence of any meta field promotes the slide to the title namespace.
+  const isTitle = isTitleNamespace(layout, Object.keys(titleFields).length > 0);
+  const ns = isTitle ? TITLE_NS : CONTENT_NS;
 
-  // Build placeholders
+  // Build placeholders: # → title idx, ## / > → subtitle idx (namespace-dependent).
+  if (title) placeholders.push({ idx: ns.title, paragraphs: [{ segments: parseInline(title) }] });
+  if (subtitle) placeholders.push({ idx: ns.subtitle, paragraphs: [{ segments: parseInline(subtitle) }] });
   if (isTitle) {
-    // Title layouts: # → idx 0 (ctrTitle), ## → idx 1 (subTitle)
-    if (title) {
-      placeholders.push({
-        idx: "0",
-        paragraphs: [{ segments: parseInline(title) }],
-      });
-    }
-    if (subtitle) {
-      placeholders.push({
-        idx: "1",
-        paragraphs: [{ segments: parseInline(subtitle) }],
-      });
-    }
+    // Title-slide metadata (Category/Date/Footer) → its canonical meta idx.
     for (const [field, value] of Object.entries(titleFields)) {
-      const idx = TITLE_FIELD_MAP[field];
-      if (idx) {
-        placeholders.push({
-          idx,
-          paragraphs: [{ segments: parseInline(value) }],
-        });
-      }
-    }
-  } else {
-    // Content layouts: # → idx 15 (title), > → idx 16 (subtitle)
-    if (title) {
-      placeholders.push({
-        idx: "15",
-        paragraphs: [{ segments: parseInline(title) }],
-      });
-    }
-    if (subtitle) {
-      placeholders.push({
-        idx: "16",
-        paragraphs: [{ segments: parseInline(subtitle) }],
-      });
+      const idx = metaFieldIdx(field);
+      if (idx) placeholders.push({ idx, paragraphs: [{ segments: parseInline(value) }] });
     }
   }
 
