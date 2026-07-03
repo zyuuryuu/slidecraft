@@ -173,6 +173,13 @@ export default function AiPanel({
         </button>
       </div>
 
+      {/* Plain-language description of the active tab — so it's obvious what each does (non-IT friendly) */}
+      <div className="px-3 py-1.5 text-[11px] text-gray-400 border-b border-[#2D3A6E] bg-[#0f1117] leading-relaxed shrink-0">
+        {hubTab === "assist"
+          ? "🖊️ AI にお願いして、このアプリの中でスライドを作る・直します。"
+          : "🤝 あなたが使っている別の AI（例：Claude Code）をこの画面につなぎ、同じ資料を一緒に編集します。（上級者向け）"}
+      </div>
+
       {hubTab === "collab" ? collabTab : (
       <>
       {/* Settings (folded): connection + provider + Ollama assist, then endpoint/model/key */}
