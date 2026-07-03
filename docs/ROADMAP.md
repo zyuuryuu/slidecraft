@@ -23,7 +23,7 @@
 >
 > - 磨き込んだ **Web preview（`SlidePreview` の CSS 忠実描画）をスタンダロン HTML プレゼンとして出力**。PowerPoint 離れ・HTML プレゼンの潮流に対応。
 > - 自己完結（インライン CSS/JS・スライド送りナビゲーション）。図/表/コード/プレースホルダ描画を HTML に写像（既存の共有描画モデルを HTML レンダラに）。PPTX 出力と併存。
-> - サイズ L〜XL。詳細設計は着手時に `docs/design/`（ADR 級）。
+> - **詳細設計＝[docs/design/html-output.md](design/html-output.md)**（2026-07-04・設計調査ワークフロー由来）。方針確定：**①スライドは `SlideCard` を SSR 再利用**（preview↔html はズレ構造的に不可能）、**②v1 は MVP 優先＝サイズ L**（印刷 `<text>` フォールバック・@font-face 埋め込み・オーバービューは後続の XL）、**③体験層は Web 流に磨く**（遷移アニメ・上品なシェル／ただしスライド DOM は不変・reflow 禁止）。図は `renderDiagramToSvg` を直接再利用。着手は S1（`SlideCard` の `exportMode`）から。
 
 > **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）**：
 >
