@@ -26,6 +26,12 @@ export function bakedText(shapeXml: string): string {
 
 const CHROME_BAKED = /^(step\s*)?\d+$/i; // "1", "STEP 1"
 const CHROME_NAME = /番号|step|no\.?$/i; // NOT /ラベル/: KPIラベル is a HEADING, only STEP/番号 are chrome
+// A chrome badge sits in the column's TOP BAND — at, or just below, its sibling heading (the 公文書
+// masters put the number ~0.06in below the heading top). Any candidate this far under the top slot is
+// still eligible; a mid-column KPI value box (≥0.45in below its label) is not, so it can't be mistaken
+// for chrome even when it bakes a bare number. Measured gap across all report/公文書 templates: chrome
+// ≤0.06in, KPI value ≥0.45in — 0.3 separates them with margin on both sides.
+const CHROME_TOP_BAND = 0.3;
 
 /**
  * Detect whether a layout is a repeated-GROUP layout (card/step/kpi/compare) purely from geometry, and
@@ -71,19 +77,32 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
   let chromeBaked = "";
   const groups: GroupSlot[][] = columns.map((col) => {
     const sorted = [...col].sort((a, b) => a.style.y - b.style.y);
+    const topY = sorted[0].style.y;
     let headingDone = false;
-    return sorted.map((p, i): GroupSlot => {
+    return sorted.map((p): GroupSlot => {
       const t = p.type.toLowerCase();
+      const baked = bakedText(p.shapeXml);
       let role: GroupSlotRole;
       if (t === "pic") role = "picture";
-      else if (i === 0 && (CHROME_BAKED.test(bakedText(p.shapeXml)) || CHROME_NAME.test(p.name))) {
+      // chrome = a number/STEP badge in the column's TOP BAND. Position-independent (the badge may sort
+      // just BELOW its sibling heading — see 公文書 masters), but the top-band gate keeps a mid-column
+      // KPI value box out of chrome even when it bakes a bare number.
+      else if ((CHROME_BAKED.test(baked) || CHROME_NAME.test(p.name)) && p.style.y <= topY + CHROME_TOP_BAND) {
         role = "chrome";
-        chromeBaked = bakedText(p.shapeXml);
+        chromeBaked = baked;
       } else if (!headingDone) { role = "heading"; headingDone = true; }
       else role = "body";
       return { phIdx: p.idx, role, y: p.style.y };
     });
   });
+
+  // 4b. Role-sequence uniform gate: a genuine repeated-GROUP layout has the SAME per-column role
+  // sequence in every column. Reject asymmetric layouts (e.g. a section divider whose left column is
+  // [chrome, heading] and right column is [heading, body]) that only coincidentally pass the slot-COUNT
+  // check in step 3 — otherwise expandGroups would pour group content into unrelated divider cells.
+  const sig = (col: GroupSlot[]) => col.map((s) => s.role).join("|");
+  const sig0 = sig(groups[0]);
+  if (groups.some((c) => sig(c) !== sig0)) return null;
 
   // 5. Kind inference (informational + used by selection to match slide.groupKind).
   const hasChrome = groups.some((c) => c.some((s) => s.role === "chrome"));
