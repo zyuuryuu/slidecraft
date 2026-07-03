@@ -14,6 +14,7 @@ import EdgeStyleControls from "./EdgeStyleControls";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 import { buildFieldMap, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
+import { groupEditorPlan } from "../engine/group-binding";
 
 interface SlideEditorProps {
   slide: SlideIR;
@@ -159,9 +160,22 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   // touch another (no bleed), and what you type role-binds back to that placeholder (buildFieldMap
   // proves both, for every bundled template). Auto slide-number placeholders are excluded. With no
   // template loaded, fall back to the slide's own placeholders (identity map).
-  const fields = layout
-    ? buildFieldMap(slide, layout.placeholders)
-    : slide.placeholders.map((p) => ({ phIdx: p.idx, contentIdx: p.idx }));
+  // A GROUPED slide (card/step/kpi) edits ONE field per group (content idx 1..N = the group's
+  // "### 見出し\n本文" markdown) instead of buildFieldMap over the layout's many per-group cells. Meta
+  // (title/date/…) still uses buildFieldMap on the NON-group placeholders. Non-grouped slides keep the
+  // full buildFieldMap 1:1 path unchanged.
+  const groupPlan = layout ? groupEditorPlan(slide, layout) : null;
+  const groupN = groupPlan
+    ? Math.max(groupPlan.columns, slide.placeholders.filter((c) => /^[1-9]$/.test(c.idx)).length)
+    : 0;
+  const fields = groupPlan
+    ? [
+        ...buildFieldMap(slide, groupPlan.metaPhs),
+        ...Array.from({ length: groupN }, (_, k) => ({ phIdx: String(k + 1), contentIdx: String(k + 1) })),
+      ]
+    : layout
+      ? buildFieldMap(slide, layout.placeholders)
+      : slide.placeholders.map((p) => ({ phIdx: p.idx, contentIdx: p.idx }));
 
   // Which RAW placeholder idxs are occupied by a diagram/mermaid/table? Each rides the Nth BODY
   // placeholder, and its placeholderIdx is a 1-based body ORDINAL — NOT a raw idx. Resolve it via
@@ -238,9 +252,12 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
         )}
       </div>
 
-      {/* Placeholder fields — one per field-map slot, reading/writing its own content idx (1:1). */}
+      {/* Placeholder fields — one per field-map slot, reading/writing its own content idx (1:1). For a
+          grouped slide, idx 1..N are GROUP fields (### 見出し + 本文); meta fields stay buildFieldMap. */}
       {fields.map(({ phIdx, contentIdx }) => {
-        const label = getLabel(phIdx, layout);
+        const isGroup = !!groupPlan && /^[1-9]$/.test(phIdx);
+        const over = isGroup && Number(phIdx) > groupPlan!.columns;
+        const label = isGroup ? `グループ ${phIdx}${over ? " ⚠超過（出力されません）" : ""}` : getLabel(phIdx, layout);
         const currentText = paragraphsToText(
           slide.placeholders.find((p) => p.idx === contentIdx)?.paragraphs || [],
         );
@@ -250,16 +267,16 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
 
         return (
           <div key={phIdx}>
-            <label className="text-[10px] text-gray-500 uppercase tracking-wider">
+            <label className={`text-[10px] uppercase tracking-wider ${over ? "text-[#F87171]" : "text-gray-500"}`}>
               {label}
-              <span className="text-gray-600 ml-1">(idx {phIdx})</span>
+              {!isGroup && <span className="text-gray-600 ml-1">(idx {phIdx})</span>}
             </label>
             <textarea
               value={currentText}
               onChange={(e) => updatePlaceholder(contentIdx, e.target.value)}
-              rows={phIdx === "1" || phIdx === "2" ? 6 : 2}
+              rows={isGroup ? 4 : phIdx === "1" || phIdx === "2" ? 6 : 2}
               className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white font-mono resize-y"
-              placeholder={label}
+              placeholder={isGroup ? "### 見出し\n本文…" : label}
             />
           </div>
         );

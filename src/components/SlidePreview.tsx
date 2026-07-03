@@ -12,6 +12,7 @@ import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/t
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { bindContentByRole, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
+import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -118,7 +119,10 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
   const layoutPhs = layout?.placeholders ?? [];
-  const contentFor = bindContentByRole(slide, layoutPhs);
+  // WYSIWYG: share the SAME contentFor as the export — a grouped slide fills via expandGroups.
+  const contentFor = slide.groupKind && layout && isGroupedLayout(layout)
+    ? expandGroups(slide, layout)
+    : bindContentByRole(slide, layoutPhs);
   const bodyPhs = bodyPlaceholders(layoutPhs);
   const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
