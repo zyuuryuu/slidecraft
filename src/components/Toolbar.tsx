@@ -69,14 +69,18 @@ export default function Toolbar({
         <button
           onClick={onAiAssist}
           title={
-            aiCollabActive ? "AI（協働編集中） — アシスト / 協働 / タスク履歴"
+            aiCollabActive ? "協働編集中：別の AI とライブ共有中（クリックで AI ドックを開閉）"
               : aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中`
                 : "AI（アシスト・協働・タスク履歴）"
           }
-          className="px-3 py-1.5 text-sm bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded transition-colors inline-flex items-center gap-1.5"
+          className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
+            aiCollabActive
+              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
+              : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+          }`}
         >
-          ✨ AI
-          {aiCollabActive && <span className="text-emerald-300 leading-none animate-pulse" title="協働編集中">●</span>}
+          {aiCollabActive ? "✨ AI・協働編集中" : "✨ AI"}
+          {aiCollabActive && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           {aiRunning > 0 && (
             <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-white/25 text-[10px] leading-none animate-pulse">
               {aiRunning}
