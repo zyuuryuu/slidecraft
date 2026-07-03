@@ -430,7 +430,13 @@ function extractPlaceholders(
     placeholders.push({ idx, type, name, shapeXml: sp, style });
   }
 
-  return placeholders;
+  // GUARDRAIL — a defective template may reuse a placeholder idx within one layout (OOXML requires
+  // idx unique per layout; PowerPoint itself mis-binds duplicates). Our binding assumes uniqueness —
+  // a duplicate makes buildFieldMap NON-injective (a 1:1 break). Keep the FIRST occurrence so the app
+  // stays 1:1-robust on such masters; the later duplicate is dropped in-app (still inherited on
+  // export). Deterministic by document order.
+  const seen = new Set<string>();
+  return placeholders.filter((p) => (seen.has(p.idx) ? false : (seen.add(p.idx), true)));
 }
 
 // ── Load template ──
