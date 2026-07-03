@@ -15,6 +15,7 @@ import RefineProposal from "./components/RefineProposal";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
+import MasterPicker from "./components/MasterPicker";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
@@ -170,8 +171,9 @@ export default function App() {
         />
         <div className="flex items-center gap-2 px-3 py-2">
           {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
-              second tab. Master IMPORT lives here now (was in the cramped Draft); master SELECT stays
-              in Draft. This 🎨 button supersedes the old one-shot "Load Template" (it registers + applies). */}
+              second tab. The master picker (select + import) lives here on the top bar now — the same
+              MasterPicker is also in Draft (select-only). It supersedes the old one-shot "Load Template"
+              (this registers the imported master + applies). Both are gated while collab-locked. */}
           <button
             onClick={handleEnterImport}
             disabled={editLocked}
@@ -180,14 +182,13 @@ export default function App() {
           >
             📝 Draft
           </button>
-          <button
-            onClick={handleImportMaster}
+          <MasterPicker
+            masters={masters}
+            activeId={masterId}
+            onSelect={handleSelectMaster}
+            onImport={handleImportMaster}
             disabled={editLocked}
-            title={editLocked ? "協働接続中は編集ロック中" : ".pptx をスライドマスターとして取り込む（マスター一覧に追加され、Draft の選択肢になります）"}
-            className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E]"
-          >
-            🎨 マスター取込
-          </button>
+          />
         </div>
       </div>
 
