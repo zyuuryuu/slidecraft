@@ -9,6 +9,7 @@ import { useState, useCallback } from "react";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
 import { renderDeckToHtml } from "./deck-html-export";
+import type { Transition } from "../engine/html-shell";
 import { serializeMd } from "../engine/md-serializer";
 import { bundleProject, openProject } from "../engine/project-io";
 import type { DeckIR } from "../engine/slide-schema";
@@ -63,10 +64,10 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
 
   // Export a self-contained standalone HTML presentation (docs/design/html-output.md).
   // Reuses the SAME SlideCard the preview mounts (SSR), so the .html matches the deck 1:1.
-  const handleExportHtml = useCallback(async () => {
+  const handleExportHtml = useCallback(async (transition?: Transition) => {
     if (!deck || !templateData) return;
     const base = (filePath ?? "slides").replace(/\.[^./\\]+$/, "");
-    const html = await renderDeckToHtml(deck, templateData, { title: base });
+    const html = await renderDeckToHtml(deck, templateData, { title: base, transition });
     await saveTextFile(html, `${base}.html`, ["html"], "HTML");
   }, [deck, templateData, filePath]);
 
