@@ -17,6 +17,7 @@ import { PROVIDERS, type ProviderId } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
 import LocalOnlyToggle from "./LocalOnlyToggle";
 import type { AiGeneration, DiagramTypeChoice } from "./useAiGeneration";
+import type { LayoutCatalog } from "../engine/template-catalog";
 
 interface LlmAssistProps {
   isOpen: boolean;
@@ -24,11 +25,14 @@ interface LlmAssistProps {
   onImportResult: (text: string) => void;
   /** Template capability summary prepended to whole-deck generation. */
   templateHint?: string;
+  /** The loaded template's layout catalog — so the manual-copy slide prompt advertises the REAL
+   *  layouts (alien-safe) instead of the canonical names (#1). */
+  catalog?: LayoutCatalog;
   /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
   ai: AiGeneration;
 }
 
-export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint, ai }: LlmAssistProps) {
+export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint, catalog, ai }: LlmAssistProps) {
   // The dialog only offers whole-deck or diagram generation (not single-slide).
   const [mode, setMode] = useState<"slides" | "diagram">("slides");
   // Diagram type (Stage 1 of the two-stage design): "auto" lets the AI route; a concrete type sends
@@ -54,9 +58,9 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
     if (!userRequest.trim()) return;
     // Manual copy has no routing step, so "auto" falls back to the flowchart shape (undefined).
     const dt = mode === "diagram" && diagramType !== "auto" ? diagramType : undefined;
-    setPrompt(generateCombinedPrompt(mode, userRequest, dt));
+    setPrompt(generateCombinedPrompt(mode, userRequest, dt, catalog));
     setCopied(false);
-  }, [mode, userRequest, diagramType]);
+  }, [mode, userRequest, diagramType, catalog]);
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(prompt);

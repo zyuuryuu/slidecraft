@@ -9,6 +9,7 @@
 import { LAYOUT_NAMES } from "./slide-schema";
 import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt } from "./deck-plan-prompts";
 import { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, type DiagramType } from "./diagram-type-prompts";
+import type { LayoutCatalog, LayoutRole } from "./template-catalog";
 
 // The diagram prompt surface moved to diagram-type-prompts.ts (two-stage per-type design); re-export so
 // existing importers of these names keep resolving them from here.
@@ -40,8 +41,25 @@ export function systemPromptForMode(
 
 // ── Slide deck prompt ──
 
-export function slideSystemPrompt(): string {
-  const layoutList = LAYOUT_NAMES.map((n, i) => `  ${i}. ${n}`).join("\n");
+export function slideSystemPrompt(catalog?: LayoutCatalog): string {
+  // Advertise the ACTUAL template's layouts when we have a catalog (alien-safe); else the canonical set
+  // (manual copy with no template loaded). Same rule for the role-based selection guidance below.
+  const names = catalog && catalog.length ? catalog.map((e) => e.name) : [...LAYOUT_NAMES];
+  const layoutList = names.map((n, i) => `  ${i}. ${n}`).join("\n");
+
+  const rule = (role: LayoutRole, canonical: string, desc: string, sep?: string): string | undefined => {
+    const name = catalog ? catalog.find((e) => e.role === role)?.name : canonical;
+    return name ? `- ${desc}: \`${name}\`${sep ? ` with \`${sep}\` separators` : ""}` : undefined;
+  };
+  const layoutRules = [
+    rule("title", "Title.1Title.Single", "First slide (opening)"),
+    rule("section", "Section.1Title.Single", "Section dividers"),
+    rule("content", "Content.1Body.Single", "Content with bullet points"),
+    rule("columns", "Column.2Body.Equal", "Two/three-column comparison", "<!-- col -->"),
+    rule("kpi", "KPI.*", "KPI / metrics", "<!-- kpi -->"),
+    rule("process", "Process.*", "Process steps", "<!-- step -->"),
+    rule("closing", "Closing.1Message.Single", "Last slide (closing)"),
+  ].filter(Boolean).join("\n");
 
   return `You are a presentation assistant. Generate a slide deck in SlideCraft Markdown format based on the user's request.
 
@@ -75,13 +93,7 @@ ${layoutList}
 
 ## Layout Selection Rules
 
-- First slide: use \`Title.1Title.Single\` or similar Title layout
-- Section dividers: use \`Section.1Title.Single\`
-- Content with bullet points: use \`Content.1Body.Single\`
-- Two-column comparison: use \`Column.2Body.Equal\` with \`<!-- col -->\` separators
-- KPI/metrics: use \`KPI.*\` layouts with \`<!-- kpi -->\` separators
-- Process steps: use \`Process.*\` layouts with \`<!-- step -->\` separators
-- Last slide: use \`Closing.1Message.Single\`
+${layoutRules}
 
 ## Embedded Diagrams
 
@@ -130,8 +142,8 @@ graph TD
 Output ONLY the SlideCraft Markdown — no preamble, no explanation, and do not wrap the whole document in a code fence.`;
 }
 
-export function generateSlidePrompt(userRequest: string): string {
-  return `${slideSystemPrompt()}\n\n## User Request\n\n${userRequest}`;
+export function generateSlidePrompt(userRequest: string, catalog?: LayoutCatalog): string {
+  return `${slideSystemPrompt(catalog)}\n\n## User Request\n\n${userRequest}`;
 }
 
 // ── Diagram prompt (manual-copy) — the SHAPE prompts moved to diagram-type-prompts.ts ──
@@ -146,8 +158,9 @@ export function generateCombinedPrompt(
   mode: "slides" | "diagram",
   userRequest: string,
   diagramType?: DiagramType,
+  catalog?: LayoutCatalog,
 ): string {
   return mode === "slides"
-    ? generateSlidePrompt(userRequest)
+    ? generateSlidePrompt(userRequest, catalog)
     : generateDiagramPrompt(userRequest, diagramType);
 }
