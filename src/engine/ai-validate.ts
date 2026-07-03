@@ -15,10 +15,11 @@
  */
 
 import type { FitBox } from "./distill";
+import type { SlideIR } from "./slide-schema";
 import { parseMd } from "./md-parser";
 
 export type CondenseViolation = {
-  kind: "parse" | "language" | "fact" | "budget";
+  kind: "parse" | "language" | "fact" | "budget" | "structure";
   severity: "hard" | "soft";
   detail: string;
 };
@@ -105,4 +106,51 @@ export function validateCondense(beforeRaw: string, afterRaw: string, box?: FitB
   }
 
   return { ok: v.length === 0, hasHard: v.some((x) => x.severity === "hard"), violations: v };
+}
+
+// ── Structure preservation (the 構造ヘッダー保全 guard) ──
+// Complements validateCondense: it checks FACTS/language, this checks the SlideIR's structural
+// scaffolding (layout pin, title, figure, group hint, meta). Drives the same retry policy — a HARD
+// violation is rejected + retried, and [[ai-reconcile]] restores the dropped scaffolding on apply.
+// strictness by `kind`: a `condense` never intends a structural change (all losses HARD), whereas a
+// free-form `edit` may legitimately restructure — only losing the LAYOUT PIN is HARD there.
+
+function phPlainText(s: SlideIR, idx: string): string {
+  const ph = s.placeholders.find((p) => p.idx === idx);
+  return ph ? ph.paragraphs.flatMap((p) => p.segments).map((x) => x.text).join("").trim() : "";
+}
+/** A slide's title lives at idx 0 (title layouts) or idx 15 (all others) — a slide fills one. */
+function titleText(s: SlideIR): string {
+  return phPlainText(s, "0") || phPlainText(s, "15");
+}
+function hasFigure(s: SlideIR): boolean {
+  return !!(s.diagram || s.mermaidBlock || s.table || s.code);
+}
+
+export function validateStructure(before: SlideIR, after: SlideIR, kind: "condense" | "edit"): CondenseVerdict {
+  const v: CondenseViolation[] = [];
+  const sev = (): "hard" | "soft" => (kind === "condense" ? "hard" : "soft");
+  const push = (severity: "hard" | "soft", detail: string) => v.push({ kind: "structure", severity, detail });
+
+  // layout pin loss — ALWAYS hard: dropping the `<!-- slide: ... -->` header re-selects the layout.
+  if (before.layout !== "auto" && after.layout === "auto") push("hard", "レイアウト指定(ヘッダー)が失われた");
+  // title loss — the slide had a title, the edit returned none.
+  if (titleText(before) && !titleText(after)) push(sev(), "タイトルが失われた");
+  // figure loss — flagged only for a `condense` (which returns the FULL slide and must not drop it).
+  // A free-form `edit` that returns text-only is NORMAL: reconcileEdit carries the figure, so flagging
+  // it would announce a "restore" on every routine text edit of a figure-bearing slide. Kept silent.
+  if (hasFigure(before) && !hasFigure(after) && kind === "condense") push("hard", "図/表/コードが失われた");
+  // group hint loss — a card/step/kpi slide lost its group kind.
+  if (before.groupKind && !after.groupKind) push(sev(), "グループ指定が失われた");
+  // meta loss (Category/Date/Footer) — always SOFT (reconcile restores; a real edit may drop one).
+  for (const idx of ["10", "11", "12"]) {
+    if (phPlainText(before, idx) && !phPlainText(after, idx)) push("soft", `メタ情報(idx${idx})が失われた`);
+  }
+
+  return { ok: v.length === 0, hasHard: v.some((x) => x.severity === "hard"), violations: v };
+}
+
+/** Combine two verdicts: ok when both ok, hard when either is hard, violations concatenated. */
+export function mergeVerdicts(a: CondenseVerdict, b: CondenseVerdict): CondenseVerdict {
+  return { ok: a.ok && b.ok, hasHard: a.hasHard || b.hasHard, violations: [...a.violations, ...b.violations] };
 }

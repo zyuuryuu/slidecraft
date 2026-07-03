@@ -83,6 +83,20 @@ function getPlaceholderText(slide: SlideIR, idx: string): string | undefined {
   return serializeParagraphs(ph.paragraphs);
 }
 
+// ── Single-body FIGURE (table / diagram / mermaid / code) → its fenced Markdown block ──
+// A table/diagram/mermaid/code is a slide-level, single-body figure — it is NOT tied to the layout
+// name. Emitting it must happen in EVERY layout branch (title / separator / single-body), else a
+// figure slide mis-pinned to a Title or a Column/KPI/Process layout serializes to nothing (silent
+// data loss that also blinds the AI to the figure it must preserve). Column-scoped diagrams/mermaid
+// in a separator layout are handled per-column separately; this is only the single-body form.
+function figureBlock(slide: SlideIR): string | null {
+  if (slide.table) return tableToMarkdown(slide.table.rows);
+  if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
+  if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
+  if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
+  return null;
+}
+
 // ── Determine separator type for multi-section layouts ──
 
 function getSeparatorType(
@@ -128,6 +142,13 @@ function serializeSlide(
       const text = getPlaceholderText(slide, idx);
       if (text) lines.push(`${fieldName}: ${text}`);
     }
+
+    // A figure mis-pinned to a Title/Closing layout must still round-trip (not vanish).
+    const fig = figureBlock(slide);
+    if (fig) {
+      lines.push("");
+      lines.push(fig);
+    }
   } else {
     // Content layouts: idx 15 = title, idx 16 = subtitle
     const title = getPlaceholderText(slide, "15");
@@ -172,22 +193,18 @@ function serializeSlide(
         }
         lines.push("");
       }
+
+      // table / code are inherently single-body (never column-scoped). A figure slide
+      // mis-resolved to a separator layout would otherwise lose them — emit if present.
+      if (slide.table || slide.code) {
+        const fig = figureBlock(slide);
+        if (fig) { lines.push(fig); lines.push(""); }
+      }
     } else {
       // Single body: idx 1
-      if (slide.table) {
-        lines.push(tableToMarkdown(slide.table.rows));
-      } else if (slide.diagram) {
-        lines.push("```diagram");
-        lines.push(slide.diagram.yaml);
-        lines.push("```");
-      } else if (slide.mermaidBlock) {
-        lines.push("```mermaid");
-        lines.push(slide.mermaidBlock.mermaid);
-        lines.push("```");
-      } else if (slide.code) {
-        lines.push("```" + (slide.code.lang ?? ""));
-        lines.push(slide.code.content);
-        lines.push("```");
+      const fig = figureBlock(slide);
+      if (fig) {
+        lines.push(fig);
       } else {
         const body = getPlaceholderText(slide, "1");
         if (body) lines.push(body);

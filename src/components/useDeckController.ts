@@ -12,6 +12,8 @@ import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
 import { applyFigureYaml } from "../engine/ai-apply";
+import { reconcileEdit } from "../engine/ai-reconcile";
+import { validateStructure } from "../engine/ai-validate";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -377,25 +379,23 @@ export function useDeckController() {
       // ① Content edit (Markdown).
       const newSlide = parseMd(raw).slides[0];
       if (!newSlide) return;
-      // Validate an edited figure (DiagramSpec YAML). If the model returned broken
-      // YAML, keep the previous valid diagram + warn instead of rendering a broken one.
-      let diagram = newSlide.diagram ?? old?.diagram;
-      if (newSlide.diagram) {
-        const err = validateDiagramSource(newSlide.diagram.yaml, "yaml");
-        if (err) {
-          diagram = old?.diagram;
-          setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${err}）`);
-        }
+      if (!old) { handleSlideUpdate(activeSlide, newSlide, "commit"); return; }
+      // If the edited figure YAML is broken, drop it so reconcile carries the OLD (valid) diagram
+      // instead of rendering a broken one.
+      const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
+      // Drop a broken edited diagram (set undefined) so reconcile carries the OLD valid one.
+      const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
+      if (figErr) setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${figErr}）`);
+      // HARNESS GUARD (構造ヘッダー保全): restore any structural scaffolding the AI dropped —
+      // layout pin / title / subtitle / meta / group hint / figure — from the previous slide. The
+      // front-facing path is synchronous (no retry), so we reconcile deterministically and ANNOUNCE
+      // what was restored rather than silently mangling the slide's structure.
+      const reconciled = reconcileEdit(old, edited);
+      const verdict = validateStructure(old, edited, "edit");
+      if (verdict.violations.length > 0) {
+        setParseError(`レイアウト・タイトル等の構造を元から復元して適用しました（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
       }
-      handleSlideUpdate(
-        activeSlide,
-        {
-          ...newSlide,
-          diagram,
-          mermaidBlock: newSlide.mermaidBlock ?? old?.mermaidBlock,
-        },
-        "commit", // AI edit = one discrete undo step
-      );
+      handleSlideUpdate(activeSlide, reconciled, "commit"); // AI edit = one discrete undo step
     },
     [deck, activeSlide, handleSlideUpdate, setParseError],
   );

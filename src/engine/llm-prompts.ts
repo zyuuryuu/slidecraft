@@ -235,8 +235,3 @@ export function generateCombinedPrompt(
     ? generateSlidePrompt(userRequest)
     : generateDiagramPrompt(userRequest);
 }
-
-/** System prompt (instructions only) for direct Claude API calls. */
-export function systemPromptFor(mode: "slides" | "diagram"): string {
-  return mode === "slides" ? slideSystemPrompt() : diagramSystemPrompt();
-}
