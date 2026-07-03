@@ -12,6 +12,7 @@
  */
 
 import type { LayoutInfo, PlaceholderInfo, TemplateData } from "./template-loader";
+import { detectGroups } from "./group-layout";
 
 export type LayoutRole =
   | "title"
@@ -58,6 +59,10 @@ export interface CatalogEntry {
   hasTitle: boolean;
   hasSubtitle: boolean;
   placeholders: CatalogPlaceholder[];
+  // Repeated-GROUP layout (card/step/kpi/compare) — for routing a slide.groupKind slide. Additive:
+  // does NOT affect role/bodyCount/placeholders, so buildFieldMap / the 1:1 bijection are untouched.
+  groupKind?: "card" | "step" | "kpi" | "compare";
+  groupCount?: number; // number of groups (columns)
 }
 
 export type LayoutCatalog = CatalogEntry[];
@@ -318,6 +323,7 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
   const bodyBoxes = layout.placeholders
     .filter((ph) => placeholderRole(ph) === "body")
     .map((ph) => ({ x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h }));
+  const shape = detectGroups(layout); // geometric group detection (on-demand; never mutates the above)
   return {
     name: layout.name,
     role: classifyLayout(layout.name, { hasTitle, hasSubtitle, bodyCount, bodyBoxes }),
@@ -325,6 +331,7 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     hasTitle,
     hasSubtitle,
     placeholders,
+    ...(shape ? { groupKind: shape.kind, groupCount: shape.groups.length } : {}),
   };
 }
 
