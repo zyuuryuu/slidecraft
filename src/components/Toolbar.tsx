@@ -1,10 +1,19 @@
 import { useState } from "react";
+import type { Transition } from "../engine/html-shell";
+
+/** HTML export transition choices offered in the File menu submenu (slide = default). */
+const HTML_TRANSITIONS: Array<{ v: Transition; label: string }> = [
+  { v: "slide", label: "スライド" },
+  { v: "fade", label: "フェード" },
+  { v: "zoom", label: "ズーム" },
+  { v: "push", label: "プッシュ" },
+];
 
 interface ToolbarProps {
   onSave: () => void;
   onGenerate: () => void;
-  /** Export a self-contained standalone HTML presentation (.html). */
-  onExportHtml?: () => void;
+  /** Export a self-contained standalone HTML presentation (.html) with the chosen transition. */
+  onExportHtml?: (transition?: Transition) => void;
   /** Save / open the editable PROJECT (.slidecraft = deck + template). */
   onSaveProject?: () => void;
   onOpenProject?: () => void;
@@ -38,6 +47,7 @@ export default function Toolbar({
   canRedo,
 }: ToolbarProps) {
   const [exportOpen, setExportOpen] = useState(false);
+  const [htmlSub, setHtmlSub] = useState(false); // HTML export → transition flyout
   const btn = "px-3 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded transition-colors";
 
   return (
@@ -87,7 +97,7 @@ export default function Toolbar({
       {/* File menu — project save/open (.slidecraft = editable) + export (PPTX / Markdown). */}
       <div className="relative">
         <button
-          onClick={() => setExportOpen((v) => !v)}
+          onClick={() => { setExportOpen((v) => !v); setHtmlSub(false); }}
           className="px-4 py-1.5 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white font-medium rounded transition-colors inline-flex items-center gap-1.5"
         >
           {generating ? "書き出し中…" : "ファイル"}
@@ -95,7 +105,7 @@ export default function Toolbar({
         </button>
         {exportOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
+            <div className="fixed inset-0 z-40" onClick={() => { setExportOpen(false); setHtmlSub(false); }} />
             <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1 text-sm">
               {onOpenProject && (
                 <button
@@ -127,14 +137,35 @@ export default function Toolbar({
                 <span className="text-gray-500 text-xs">.pptx</span>
               </button>
               {onExportHtml && (
-                <button
-                  onClick={() => { setExportOpen(false); onExportHtml(); }}
-                  disabled={!hasSpec}
-                  className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                <div
+                  className="relative"
+                  onMouseEnter={() => hasSpec && setHtmlSub(true)}
+                  onMouseLeave={() => setHtmlSub(false)}
                 >
-                  <span>🌐 HTML</span>
-                  <span className="text-gray-500 text-xs">.html</span>
-                </button>
+                  {/* Click = export with the default (slide); hover = pick a transition. */}
+                  <button
+                    onClick={() => { setExportOpen(false); onExportHtml("slide"); }}
+                    disabled={!hasSpec}
+                    className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                  >
+                    <span>🌐 HTML</span>
+                    <span className="text-gray-500 text-xs">遷移 ▸</span>
+                  </button>
+                  {htmlSub && hasSpec && (
+                    <div className="absolute right-full top-0 w-36 bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1">
+                      {HTML_TRANSITIONS.map(({ v, label }) => (
+                        <button
+                          key={v}
+                          onClick={() => { setExportOpen(false); setHtmlSub(false); onExportHtml(v); }}
+                          className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"
+                        >
+                          <span>{label}</span>
+                          {v === "slide" && <span className="text-gray-500 text-[10px]">既定</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
               <button
                 onClick={() => { setExportOpen(false); onSave(); }}
