@@ -153,16 +153,15 @@ single JSON object.`;
 
 // ── Stage 1: route a request to ONE type ──
 
-/** A tiny prompt that asks the model to pick the single best diagram type. The reply is parsed by
- *  `parseDiagramType`; on failure the caller falls back (e.g. flowchart, or asks the user). */
-export function diagramRoutePrompt(request: string): string {
+/** The SYSTEM prompt for Stage 1: asks the model to pick the single best diagram type for the user's
+ *  request (sent as the user message). The reply is parsed by `parseDiagramType`; on failure the caller
+ *  falls back (e.g. flowchart). Kept request-free so it slots into the standard system/user split. */
+export function diagramRoutePrompt(): string {
   const menu = VALID_TYPES.map((t) => `- ${t}: ${DIAGRAM_TYPES[t].hint}`).join("\n");
-  return `Choose the SINGLE best diagram type for the request below. Reply with ONLY the type name (one word), nothing else.
+  return `Choose the SINGLE best diagram type for the user's request. Reply with ONLY the type name (one word from the list), nothing else.
 
 Types:
-${menu}
-
-Request: ${request}`;
+${menu}`;
 }
 
 /** Parse a router reply into a valid DiagramType, tolerating surrounding whitespace / quotes / a

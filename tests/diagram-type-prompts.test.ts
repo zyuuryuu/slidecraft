@@ -77,10 +77,10 @@ describe("diagramSystemPrompt(type) — base + ONLY that type's fragment", () =>
 });
 
 describe("Stage 1 — route prompt + parse", () => {
-  it("route prompt lists every type with its hint + the request", () => {
-    const p = diagramRoutePrompt("プロジェクトのスケジュールを図にして");
+  it("route prompt (system) lists every type with its hint + asks for a one-word answer", () => {
+    const p = diagramRoutePrompt();
     for (const t of VALID_TYPES) expect(p).toContain(t);
-    expect(p).toContain("プロジェクトのスケジュールを図にして");
+    expect(p.toLowerCase()).toContain("type name");
   });
 
   it("parseDiagramType accepts a valid type (tolerating whitespace / case / punctuation)", () => {
