@@ -48,4 +48,19 @@ describe("HTML export S3: shell assembler", () => {
     // The <html> element carries the selected mode (CSS selectors mention every mode).
     expect(doc).toMatch(/<html[^>]*data-transition="none"/);
   });
+
+  it("print CSS paginates one slide per landscape page (verified: 3 slides → 3 pages)", () => {
+    // Regression guard for the shipped bug where every slide printed onto ONE portrait sheet:
+    //  (1) the fixed screen .viewport (overflow:hidden) MUST be reset in print or it clips
+    //      everything onto page 1; (2) @page must use explicit landscape-shaped lengths, NOT
+    //      the `landscape` keyword combined with lengths (invalid → ignored → portrait).
+    // The real Chromium render is checked in scratchpad (page.pdf → 3 pages, 960×540pt landscape).
+    const doc = assembleHtmlDeck(["<div>A</div>", "<div>B</div>"], STAGE);
+    const print = doc.slice(doc.indexOf("@media print{"), doc.indexOf("</style>"));
+    expect(print).toMatch(/\.viewport\{[^}]*position:static/);
+    expect(print).toMatch(/\.viewport\{[^}]*overflow:visible/);
+    expect(print).toContain("break-after:page");
+    expect(print).toMatch(/@page\{size:\d+px \d+px;margin:0\}/); // explicit landscape-shaped page
+    expect(print).not.toMatch(/@page\{[^}]*landscape/); // the invalid keyword combo is gone
+  });
 });
