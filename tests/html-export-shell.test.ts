@@ -41,8 +41,11 @@ describe("HTML export S3: shell assembler", () => {
     expect(doc).not.toMatch(/transition:[^;}"]*(?:width|height|top|left|margin|padding|inset)/);
   });
 
-  it("transition:'none' disables the cross-fade", () => {
+  it("transition:'none' selects the non-animating mode (data-transition=none)", () => {
+    // NOTE: transition CSS for every mode is now always emitted and selected by the
+    // <html data-transition> attribute, so "none" is expressed by the attribute value.
     const doc = assembleHtmlDeck(["<div>x</div>"], { ...STAGE, transition: "none" });
-    expect(doc).not.toContain("transition:opacity");
+    // The <html> element carries the selected mode (CSS selectors mention every mode).
+    expect(doc).toMatch(/<html[^>]*data-transition="none"/);
   });
 });
