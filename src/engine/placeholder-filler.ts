@@ -14,6 +14,7 @@ import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog } from "./template-catalog";
 import { bindContentByRole, bodyPlaceholders, nthBody } from "./placeholder-binding";
+import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
@@ -128,7 +129,11 @@ async function buildSlideXml(
   // Bind content to placeholders BY ROLE (not idx) via the SHARED binding — the SAME function the
   // live preview uses, so export and preview can't diverge (WYSIWYG), and any template's idx
   // convention binds correctly (an alien master's title/body idxs match through their role).
-  const contentFor = bindContentByRole(slide, layout.placeholders);
+  // A grouped slide (card/step/kpi) fills the layout's per-group heading/body slots via the SEPARATE
+  // group path; everything else uses the canonical binder. Same Map shape → the loop below is unchanged.
+  const contentFor = slide.groupKind && isGroupedLayout(layout)
+    ? expandGroups(slide, layout)
+    : bindContentByRole(slide, layout.placeholders);
 
   // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
   const bodyPhs = bodyPlaceholders(layout.placeholders);

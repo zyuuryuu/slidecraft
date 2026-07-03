@@ -8,13 +8,26 @@
  * when slide.groupKind is set AND the layout is grouped — non-grouped slides go through
  * bindContentByRole exactly as before (ADR-0011 1:1 preserved). Pure logic (R2).
  */
-import type { LayoutInfo } from "./template-loader";
+import type { LayoutInfo, PlaceholderInfo } from "./template-loader";
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { bindContentByRole } from "./placeholder-binding";
 import { detectGroups, bakedText } from "./group-layout";
 
 export { detectGroups, isGroupedLayout } from "./group-layout";
 export type { GroupSlot, GroupSlotRole, GroupLayoutShape } from "./group-layout";
+
+/**
+ * Editor plan for a grouped slide: the META placeholders (title/date/… — still edited via buildFieldMap)
+ * and the layout's column count. The editor shows one GROUP field (content idx 1..N) per column instead
+ * of buildFieldMap over the per-group cells. Null when the slide isn't grouped or the layout isn't a
+ * group layout → the editor keeps its normal buildFieldMap path (1:1 untouched).
+ */
+export function groupEditorPlan(slide: SlideIR, layout: LayoutInfo): { metaPhs: PlaceholderInfo[]; columns: number } | null {
+  const shape = detectGroups(layout);
+  if (!shape || !slide.groupKind) return null;
+  const groupPhIdxs = new Set(shape.groups.flat().map((s) => s.phIdx));
+  return { metaPhs: layout.placeholders.filter((p) => !groupPhIdxs.has(p.idx)), columns: shape.groups.length };
+}
 
 /**
  * Fill a grouped layout from a Slice-A SlideIR (groupKind + placeholders idx 1..N, each = [heading] +
