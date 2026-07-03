@@ -44,8 +44,12 @@
 >   適用できなかった op（figureなし／id 不一致）を**候補ノード id つきで報告**（`applyDesignIntent` は後方互換の bare 版）。
 >   GUI（`useDeckController` → `setParseError`）と MCP（`session.applyDesignIntent` の戻りに `skipped`）へ配線。
 >   `tests/design-intent-report.test.ts` +5。batch は中断しない（正常 op は適用）。
+> - **#3B テキストスライドへ図を追加 → 完了（本文の扱い＝共存、ユーザ選択）**：`applyFigureYaml` の「図無し→null」
+>   契約を変更し、図の無いスライドにも図を追加できるように。本文がある場合は既存の `applyRegionSplit` を再利用して
+>   **本文を別カラムへ退避＋図をもう片方へ（coexist、Column.2Body.Equal に自動解決）**＝箇条書きを破壊しない（#12 と同じ
+>   preservation 思想）。本文が空なら図が本文枠（Content.1Body.Single）。mermaid スライドも図に昇格。既存の 2 アサーション
+>   （図無し→null）を新挙動へ更新（ユーザ許可済）。`applyRegionSplit` を design-intent から export して単一源で再利用。
 > - **残 NEXT（次セッション引き継ぎ）**：
->   - **#3B テキストスライドへ図を追加**（`applyFigureYaml` の「図無し→null」契約変更＝既存テスト更新。**ユーザ許可済**）。
 >   - **その他プロンプト**：`slideSystemPrompt`（手動コピー用）のレイアウト名を catalog から動的化（alien 対応、
 >     [[guardrail_any_template]]）／diagram プロンプトの type 許容集合の不一致／生成 `deckPlanSystemPrompt` 底上げ。
 >   - **仕様メモ（バグではない）**：表セル文字・図ノード文字は独立図形でスライドマスター body 書式に非追従（継承対象外）。

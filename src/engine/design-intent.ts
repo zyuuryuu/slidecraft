@@ -142,8 +142,9 @@ function emphasizeFigure(
   return { slide: ok ? out : slide, ok, available };
 }
 
-/** regionSplit: put the figure in a column and the text in the other (template fills the geometry). */
-function applyRegionSplit(slide: SlideIR, arrangement: "text-left" | "text-right" | "diagram-only"): SlideIR {
+/** regionSplit: put the figure in a column and the text in the other (template fills the geometry).
+ *  Exported so the add-a-figure-to-a-text-slide path (ai-apply) can reuse the SAME coexist arrangement. */
+export function applyRegionSplit(slide: SlideIR, arrangement: "text-left" | "text-right" | "diagram-only"): SlideIR {
   const hasFigure = !!slide.diagram || !!slide.mermaidBlock;
   if (!hasFigure) return slide;
 
