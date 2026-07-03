@@ -17,7 +17,7 @@
 import type { FitBox } from "./distill";
 import type { SlideIR } from "./slide-schema";
 import { parseMd } from "./md-parser";
-import { META_IDXS } from "./slide-roles";
+import { META_IDXS, titleSubtitleIdx } from "./slide-roles";
 
 export type CondenseViolation = {
   kind: "parse" | "language" | "fact" | "budget" | "structure";
@@ -38,12 +38,35 @@ const HAN = /[一-鿿]/; // CJK unified ideographs
 // detect Chinese by these glyphs instead of by "kana is missing" (which a valid all-kanji
 // condense also is). Conservative set of high-frequency simplified-only characters.
 const SIMPLIFIED = /[们这个时间说话运过进还让给经现实总应该务动单关门问题见长车业产每稳营张龙图书购买卖]/;
+
+/** Count of CJK (kana + han) characters — "how Japanese is this string". */
+function jaCount(s: string): number {
+  return (s.match(/[぀-ヿ一-鿿]/g) ?? []).length;
+}
+/** Count of Latin letters, and of Latin WORDS (≥2 letters) — "how English is this string". */
+function latinCount(s: string): number {
+  return (s.match(/[A-Za-z]/g) ?? []).length;
+}
+function latinWords(s: string): number {
+  return (s.match(/[A-Za-z]{2,}/g) ?? []).length;
+}
+
+/** Normalize 全角 digits (U+FF10–19) → ASCII and 全角 comma → "," so number extraction sees them. */
+function normalizeDigits(s: string): string {
+  return s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/，/g, ",");
+}
 /** Distinct numeric tokens (with decimals), commas stripped — the facts a condense must keep. */
 function numbers(s: string): Set<string> {
-  return new Set((s.match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map((n) => n.replace(/,/g, "")));
+  return new Set((normalizeDigits(s).match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map((n) => n.replace(/,/g, "")));
 }
 function bullets(md: string): string[] {
   return md.split("\n").filter((l) => /^\s*[-*]\s/.test(l)).map((l) => l.replace(/^\s*[-*]\s/, "").trim());
+}
+/** Non-heading, non-directive body text — used to tell a body WIPE from a prose merge. */
+function bodyText(md: string): string {
+  return md.split("\n").map((l) => l.trim())
+    .filter((t) => t && !t.startsWith("#") && !t.startsWith(">") && !t.startsWith("<!--"))
+    .join(" ").trim();
 }
 
 /** Drop `<!-- slide: Layout.Name -->` scaffolding (md-serializer emits it) — it is not
@@ -72,17 +95,23 @@ export function validateCondense(beforeRaw: string, afterRaw: string, box?: FitB
   }
 
   // ── language (HARD): JA input doesn't drift to 中文 / English; ASCII input isn't translated.
-  // All-kanji condensed Japanese is valid + kana-free, so detect 中文 by simplified glyphs (not
-  // by "kana missing") and English-ization by "all CJK gone". ──
+  // Judge by DOMINANT script, not "any CJK gone": a valid condense keeps most JA nouns and may leave a
+  // few Latin acronyms; a translation replaces the script. So English-drift needs a real English
+  // SENTENCE (≥3 Latin words) with JA collapsed (or gone), and a digit/emoji-only result is not a
+  // translation at all. 中文 is still detected by simplified glyphs. ──
   const beforeJA = KANA.test(before);
   const beforeEN = !KANA.test(before) && !HAN.test(before);
   if (beforeJA) {
     if (SIMPLIFIED.test(after)) {
       v.push({ kind: "language", severity: "hard", detail: "中国語に drift した" });
-    } else if (!KANA.test(after) && !HAN.test(after)) {
+    } else if (
+      (jaCount(after) === 0 && latinCount(after) > 0) || // wholly de-Japanized into Latin
+      (latinWords(after) >= 3 && jaCount(after) < jaCount(before) * 0.4) // English sentence, JA collapsed
+    ) {
       v.push({ kind: "language", severity: "hard", detail: "日本語が英語に翻訳された" });
     }
-  } else if (beforeEN && (KANA.test(after) || HAN.test(after))) {
+  } else if (beforeEN && jaCount(after) > latinCount(after)) {
+    // English input turned dominantly Japanese (a stray place-name kanji alone doesn't count).
     v.push({ kind: "language", severity: "hard", detail: "英語入力が翻訳された" });
   }
 
@@ -92,6 +121,13 @@ export function validateCondense(beforeRaw: string, afterRaw: string, box?: FitB
   const lost = [...beforeNums].filter((n) => !afterNums.has(n));
   if (lost.length > 0) {
     v.push({ kind: "fact", severity: "hard", detail: `数値の欠落: ${lost.join(", ")}` });
+  }
+
+  // ── content wipe (HARD): a condense must SHORTEN, not delete — if the input carried ≥2 bullets and
+  // the output has no bullets AND no body text at all, the body was wiped (a merge into prose or one
+  // bullet keeps body text, so this only fires on a true deletion). ──
+  if (bullets(before).length >= 2 && bullets(after).length === 0 && bodyText(after) === "") {
+    v.push({ kind: "fact", severity: "hard", detail: "本文（箇条書き）が全て失われた" });
   }
 
   // ── budget (SOFT): fits the template's content box — still an improvement if slightly over ──
@@ -120,12 +156,19 @@ function phPlainText(s: SlideIR, idx: string): string {
   const ph = s.placeholders.find((p) => p.idx === idx);
   return ph ? ph.paragraphs.flatMap((p) => p.segments).map((x) => x.text).join("").trim() : "";
 }
-/** A slide's title lives at idx 0 (title layouts) or idx 15 (all others) — a slide fills one. */
+/** A slide's title lives at its OWN namespace idx (0 for title-namespace, 15 for content) — judged by
+ *  the same rule the parser uses (slide-roles), so unrelated text in the other idx isn't mistaken for
+ *  a surviving title across a namespace boundary. */
 function titleText(s: SlideIR): string {
-  return phPlainText(s, "0") || phPlainText(s, "15");
+  const hasMeta = META_IDXS.some((idx) => phPlainText(s, idx).length > 0);
+  return phPlainText(s, titleSubtitleIdx(s.layout, hasMeta).title);
 }
 function hasFigure(s: SlideIR): boolean {
   return !!(s.diagram || s.mermaidBlock || s.table || s.code);
+}
+/** How many non-empty group columns (idx 1..9) a slide has — a dropped column = a lost card/step/kpi. */
+function groupColCount(s: SlideIR): number {
+  return s.placeholders.filter((p) => /^[1-9]$/.test(p.idx) && p.paragraphs.some((pp) => pp.segments.some((x) => x.text.trim()))).length;
 }
 
 export function validateStructure(before: SlideIR, after: SlideIR, kind: "condense" | "edit"): CondenseVerdict {
@@ -143,6 +186,8 @@ export function validateStructure(before: SlideIR, after: SlideIR, kind: "conden
   if (hasFigure(before) && !hasFigure(after) && kind === "condense") push("hard", "図/表/コードが失われた");
   // group hint loss — a card/step/kpi slide lost its group kind.
   if (before.groupKind && !after.groupKind) push(sev(), "グループ指定が失われた");
+  // group column loss — a grouped slide came back with fewer columns (a whole card/step/kpi dropped).
+  if (before.groupKind && groupColCount(after) < groupColCount(before)) push(sev(), "グループの列が失われた");
   // meta loss (Category/Date/Footer) — always SOFT (reconcile restores; a real edit may drop one).
   for (const idx of META_IDXS) {
     if (phPlainText(before, idx) && !phPlainText(after, idx)) push("soft", `メタ情報(idx${idx})が失われた`);
