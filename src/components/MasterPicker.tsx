@@ -9,7 +9,8 @@ interface MasterPickerProps {
   masters: MasterEntry[];
   activeId: string;
   onSelect: (id: string) => void;
-  onImport: () => void;
+  /** Import a new master (.pptx). Omit to render the SELECT only — import now lives on the top bar. */
+  onImport?: () => void;
   disabled?: boolean;
 }
 
@@ -29,14 +30,16 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, di
           </option>
         ))}
       </select>
-      <button
-        onClick={onImport}
-        disabled={disabled}
-        title=".pptx をスライドマスターとして取り込む"
-        className="px-2 py-1 text-xs rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40"
-      >
-        ＋ 取込
-      </button>
+      {onImport && (
+        <button
+          onClick={onImport}
+          disabled={disabled}
+          title=".pptx をスライドマスターとして取り込む"
+          className="px-2 py-1 text-xs rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40"
+        >
+          ＋ 取込
+        </button>
+      )}
     </div>
   );
 }

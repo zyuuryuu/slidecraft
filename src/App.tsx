@@ -25,7 +25,7 @@ export default function App() {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes,
     handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
@@ -158,13 +158,11 @@ export default function App() {
           onGenerate={handleGenerate}
           onSaveProject={handleSaveProject}
           onOpenProject={editLocked ? undefined : handleOpenProject}
-          onLoadTemplate={editLocked ? undefined : handleLoadTemplate}
           onAiAssist={() => setShowAiPanel((v) => !v)}
           aiRunning={ai.tasks.filter((t) => t.status === "running").length}
           aiCollabActive={editLocked}
           generating={generating}
           hasSpec={hasContent}
-          templateName={templateName}
           onUndo={editLocked ? handleCollabUndo : undoDeck}
           onRedo={editLocked ? handleCollabRedo : redoDeck}
           canUndo={editLocked ? true : canUndo}
@@ -172,7 +170,8 @@ export default function App() {
         />
         <div className="flex items-center gap-2 px-3 py-2">
           {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
-              second tab — one AI entry point instead of two top-bar buttons. */}
+              second tab. Master IMPORT lives here now (was in the cramped Draft); master SELECT stays
+              in Draft. This 🎨 button supersedes the old one-shot "Load Template" (it registers + applies). */}
           <button
             onClick={handleEnterImport}
             disabled={editLocked}
@@ -180,6 +179,14 @@ export default function App() {
             className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E]"
           >
             📝 Draft
+          </button>
+          <button
+            onClick={handleImportMaster}
+            disabled={editLocked}
+            title={editLocked ? "協働接続中は編集ロック中" : ".pptx をスライドマスターとして取り込む（マスター一覧に追加され、Draft の選択肢になります）"}
+            className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E]"
+          >
+            🎨 マスター取込
           </button>
         </div>
       </div>
@@ -302,7 +309,6 @@ export default function App() {
         masters={masters}
         activeMasterId={masterId}
         onSelectMaster={handleSelectMaster}
-        onImportMaster={handleImportMaster}
         deck={deck}
         templateData={templateData}
         parseError={parseError}
