@@ -121,6 +121,9 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
     [slide, onChange],
   );
 
+  // The ranked candidates are the primary picker; the full layout list is a collapsible escape hatch.
+  const [showAllLayouts, setShowAllLayouts] = useState(false);
+
   // ── Update layout ──
   const updateLayout = useCallback(
     (newLayout: string) => {
@@ -193,45 +196,28 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
 
   return (
     <div className="h-full overflow-auto p-3 flex flex-col gap-3">
-      {/* Layout selector */}
+      {/* Layout selector — the field shows the SELECTED (auto-resolved or pinned) layout; the ranked
+          candidates are the primary picker; the full list is a collapsible escape hatch. */}
       <div>
-        <label className="text-[10px] text-gray-500 uppercase tracking-wider">
-          Layout
-        </label>
-        <select
-          value={slide.layout}
-          onChange={(e) => updateLayout(e.target.value)}
-          className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">Layout</label>
+          {slide.layout === "auto" && (
+            <span className="text-[9px] px-1 py-px rounded bg-[#3B82F6]/20 text-[#93C5FD] border border-[#3B82F6]/40">自動</span>
+          )}
+        </div>
+        {/* The concrete layout in effect (resolved name when auto — no longer a hidden "Auto"). */}
+        <div
+          className="mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white truncate"
+          title={slide.layout === "auto" ? (resolvedLayout ?? "Auto") : slide.layout}
         >
-          <option value="auto">Auto</option>
-          {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+          {slide.layout === "auto" ? (resolvedLayout ?? "Auto") : slide.layout}
+        </div>
 
-        {/* Auto → what it resolved to, so the user can SEE the pick (was invisible). */}
-        {slide.layout === "auto" && resolvedLayout && (
-          <div className="mt-1 text-[10px] text-gray-400">
-            自動選択: <span className="text-[#93C5FD]">{resolvedLayout}</span>
-          </div>
-        )}
-
-        {/* One-click alternative candidates (ranked; the active one is highlighted). "Auto" keeps the
-            slide adaptive; picking a chip pins that layout. */}
+        {/* Ranked candidates (★ = Auto's top pick; the rest are the next-best) + an Auto toggle.
+            Picking a candidate PINS it; ⟳Auto re-adapts (keeps slide.layout === "auto"). */}
         {suggestions && suggestions.length > 1 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={() => updateLayout("auto")}
-              title="自動選択に戻す"
-              className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
-              }`}
-            >
-              Auto
-            </button>
+          <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+            <span className="text-[10px] text-gray-500">候補:</span>
             {suggestions.map((name, i) => {
               const active = slide.layout === name;
               return (
@@ -239,7 +225,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                   key={name}
                   type="button"
                   onClick={() => updateLayout(name)}
-                  title={i === 0 ? "Auto の第一候補" : "候補レイアウト"}
+                  title={i === 0 ? "Auto の第一候補（最良評価）" : "次点の候補レイアウト"}
                   className={`px-1.5 py-0.5 rounded text-[10px] border ${
                     active ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
                   }`}
@@ -248,7 +234,38 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => updateLayout("auto")}
+              title="自動選択に戻す（常に最良評価を選ぶ）"
+              className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+              }`}
+            >
+              ⟳ Auto
+            </button>
           </div>
+        )}
+
+        {/* Escape hatch: the full layout list (for a layout that scored below the ranked candidates). */}
+        <button
+          type="button"
+          onClick={() => setShowAllLayouts((v) => !v)}
+          className="mt-1 text-[10px] text-gray-500 hover:text-gray-300"
+        >
+          すべてのレイアウト {showAllLayouts ? "▴" : "▾"}
+        </button>
+        {showAllLayouts && (
+          <select
+            value={slide.layout}
+            onChange={(e) => updateLayout(e.target.value)}
+            className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
+          >
+            <option value="auto">Auto（自動選択）</option>
+            {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
         )}
       </div>
 
