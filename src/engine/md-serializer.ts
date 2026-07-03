@@ -122,8 +122,11 @@ function serializeSlide(
   // the presence of meta placeholders means the title/subtitle live at idx 0/1 (else 15/16). Deriving
   // this from isTitleNamespace (not the layout name alone) round-trips an auto-layout slide that carries
   // Category/Date/Footer — otherwise its title + meta would be read from the empty content idxs and lost.
+  // A grouped slide (card/step/kpi) is NEVER a title slide — even if autoSelectLayout resolves it to a
+  // Title layout — so it must not take the title branch (which would read the title from the empty
+  // title-namespace idx and drop the columns + groupKind). Gate the title branch on !groupKind.
   const hasMeta = META_IDXS.some((idx) => getPlaceholderText(slide, idx));
-  if (isTitleNamespace(layout, hasMeta)) {
+  if (!slide.groupKind && isTitleNamespace(layout, hasMeta)) {
     // Title namespace: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = meta fields.
     const title = getPlaceholderText(slide, TITLE_NS.title);
     const subtitle = getPlaceholderText(slide, TITLE_NS.subtitle);
@@ -152,10 +155,14 @@ function serializeSlide(
     lines.push("");
 
     // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
-    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout.
+    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
+    // single-body table/code is NEVER column-scoped: a figure slide that merely RESOLVED to a
+    // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
+    // trailing table/code into the last column). So the separator branch requires no single-body figure.
     const sepType = slide.groupKind ?? getSeparatorType(layout);
+    const singleBodyFigure = !!(slide.table || slide.code);
 
-    if (sepType) {
+    if (sepType && !singleBodyFigure) {
       // Multi-section: each numbered region (column) becomes a section. A region may
       // hold TEXT or a FIGURE (diagram/mermaid) — emit the figure's fenced block in
       // its own column so text+figure COEXISTENCE round-trips (the figure sits beside
@@ -187,15 +194,8 @@ function serializeSlide(
         }
         lines.push("");
       }
-
-      // table / code are inherently single-body (never column-scoped). A figure slide
-      // mis-resolved to a separator layout would otherwise lose them — emit if present.
-      if (slide.table || slide.code) {
-        const fig = figureBlock(slide);
-        if (fig) { lines.push(fig); lines.push(""); }
-      }
     } else {
-      // Single body: idx 1
+      // Single body: idx 1 (table / code / diagram / mermaid all serialize here).
       const fig = figureBlock(slide);
       if (fig) {
         lines.push(fig);

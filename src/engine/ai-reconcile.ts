@@ -21,6 +21,17 @@ export function hasText(ph: PlaceholderContent | undefined): boolean {
   return !!ph && ph.paragraphs.some((p) => p.segments.some((s) => s.text.trim().length > 0));
 }
 
+/** Group column idxs are the single-digit body/column indices 1..9. */
+const GROUP_IDX = /^[1-9]$/;
+/** How many non-empty group columns (idx 1..9) a slide has. */
+function groupColCount(s: SlideIR): number {
+  return s.placeholders.filter((p) => GROUP_IDX.test(p.idx) && hasText(p)).length;
+}
+/** True when any group column carries a per-column heading paragraph (the card/step structure). */
+function hasHeadingColumn(s: SlideIR): boolean {
+  return s.placeholders.some((p) => GROUP_IDX.test(p.idx) && p.paragraphs.some((pp) => pp.heading));
+}
+
 /** True when the slide carries ANY content — placeholder text or an embedded figure. */
 function hasAnyContent(s: SlideIR): boolean {
   return s.placeholders.some((p) => hasText(p)) || !!s.diagram || !!s.mermaidBlock || !!s.table || !!s.code;
@@ -49,7 +60,20 @@ export function reconcileEdit(old: SlideIR, edited: SlideIR): SlideIR {
   //    keyed by idx → never a duplicate idx (injective, ADR-0011).
   const oldHasMeta = META_IDXS.some((idx) => hasText(old.placeholders.find((p) => p.idx === idx)));
   const { title, subtitle } = titleSubtitleIdx(layout, oldHasMeta);
-  const structuralIdxs = [title, subtitle, ...META_IDXS];
+
+  // A FLATTENING edit — old was a multi-column group but the edit collapsed it to fewer columns with
+  // NO per-column heading and no group hint — is the user turning cards into a plain list. Respect it:
+  // don't force the group back on, and don't restore the removed columns. (A card-shaped edit that
+  // merely dropped the `<!-- card -->` marker keeps its headings/columns, so it is NOT flat.)
+  const editedFlat = !edited.groupKind && !hasHeadingColumn(edited) && groupColCount(edited) < groupColCount(old);
+
+  // ③ group columns (idx 1..N) — for a grouped slide, the columns ARE its structure. Restore a dropped
+  //    column respect-if-present (idx-keyed → injective), unless the edit is a deliberate flattening.
+  const groupColIdxs = old.groupKind && !editedFlat
+    ? old.placeholders.filter((p) => GROUP_IDX.test(p.idx) && hasText(p)).map((p) => p.idx)
+    : [];
+
+  const structuralIdxs = [title, subtitle, ...META_IDXS, ...groupColIdxs];
   const byIdx = new Map<string, PlaceholderContent>(edited.placeholders.map((p) => [p.idx, p]));
   for (const idx of structuralIdxs) {
     if (hasText(byIdx.get(idx))) continue; // edit kept it → respect
@@ -67,10 +91,9 @@ export function reconcileEdit(old: SlideIR, edited: SlideIR): SlideIR {
     mermaidBlock: edited.mermaidBlock ?? old.mermaidBlock,
     table: edited.table ?? old.table,
     code: edited.code ?? old.code,
-    // groupKind rides the SAME signal as the layout pin: if the header was dropped (layout auto),
-    // the group hint was almost certainly dropped with it → restore. If the edit re-pinned a concrete
-    // layout, respect its structural choice and don't force the slide back into a group.
-    groupKind: edited.groupKind ?? (edited.layout === "auto" ? old.groupKind : undefined),
+    // groupKind rides the SAME signal as the layout pin (a dropped header → restore), but never on a
+    // deliberate flattening (editedFlat) — else a cards→bullets edit would be forced back into a card.
+    groupKind: edited.groupKind ?? (edited.layout === "auto" && !editedFlat ? old.groupKind : undefined),
     sourceLineStart: edited.sourceLineStart ?? old.sourceLineStart,
     sourceLineEnd: edited.sourceLineEnd ?? old.sourceLineEnd,
   };
