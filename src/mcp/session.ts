@@ -21,7 +21,7 @@ import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from 
 import { diagramSpecToYaml } from "../engine/diagram-serialize";
 import { DiagramSpecSchema } from "../engine/schema";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
-import { parseDesignIntent, applyDesignIntent as applyIntentToSlide } from "../engine/design-intent";
+import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
 
 export interface Session {
@@ -266,13 +266,16 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
   }
   const before = slideToMarkdown(deck, i, catalog);
   const slides = [...deck.slides];
-  slides[i] = applyIntentToSlide(slide, intent);
+  const { slide: applied, skipped } = applyDesignIntentReport(slide, intent);
+  slides[i] = applied;
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
   const afterMd = slideToMarkdown(s.deck, i, catalog);
   s.dirty = s.dirty || afterMd !== before;
-  return { ok: true as const, changed: afterMd !== before, beforeMd: before, afterMd, diagnostics: diagnoseDeck(s.deck, catalog) };
+  // `skipped` names ops that took no effect (e.g. an emphasize whose nodeId the AI renamed away) so the
+  // agent gets a precise, actionable reason + the ids that DO exist, not just changed=false (#13).
+  return { ok: true as const, changed: afterMd !== before, skipped, beforeMd: before, afterMd, diagnostics: diagnoseDeck(s.deck, catalog) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis

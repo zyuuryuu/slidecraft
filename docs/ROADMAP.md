@@ -39,8 +39,12 @@
 >   **書式違反として該当 bullet/field を最小粒度で破棄（scalar=空欄化・list=除去・cell=空欄化）＋件数を `notices` で告知**
 >   （`AiPanel`/`LlmAssist` に amber バナー）。`�` もゴミ文字も一切スライドに出ない。`tests/deck-plan-payload-preservation.test.ts`
 >   +14、json-salvage の意図的アサーション2箇所を更新（U+FFFD＝内部マーカーに再定義）。**根本抑止は D で別途**。
+> - **#13 diagram-edit の id 保全通知 → 完了**：ノード id を総入替した図に対し後続の `emphasize` が id 不一致で
+>   silent no-op になっていた問題。`design-intent.ts` に `applyDesignIntentReport`（`{slide, skipped[]}`）を追加し、
+>   適用できなかった op（figureなし／id 不一致）を**候補ノード id つきで報告**（`applyDesignIntent` は後方互換の bare 版）。
+>   GUI（`useDeckController` → `setParseError`）と MCP（`session.applyDesignIntent` の戻りに `skipped`）へ配線。
+>   `tests/design-intent-report.test.ts` +5。batch は中断しない（正常 op は適用）。
 > - **残 NEXT（次セッション引き継ぎ）**：
->   - **#13 diagram-edit の id 保全通知**（ノード id 総入替→後続 emphasize が silent no-op。通知チャネル設計要）。
 >   - **#3B テキストスライドへ図を追加**（`applyFigureYaml` の「図無し→null」契約変更＝既存テスト更新。**ユーザ許可済**）。
 >   - **その他プロンプト**：`slideSystemPrompt`（手動コピー用）のレイアウト名を catalog から動的化（alien 対応、
 >     [[guardrail_any_template]]）／diagram プロンプトの type 許容集合の不一致／生成 `deckPlanSystemPrompt` 底上げ。
