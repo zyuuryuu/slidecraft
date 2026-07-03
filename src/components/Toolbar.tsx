@@ -6,13 +6,13 @@ interface ToolbarProps {
   /** Save / open the editable PROJECT (.slidecraft = deck + template). */
   onSaveProject?: () => void;
   onOpenProject?: () => void;
-  onLoadTemplate?: () => void;
   onAiAssist?: () => void;
-  /** Number of AI tasks currently running → a live badge on the AI Assist button. */
+  /** Number of AI tasks currently running → a live badge on the AI button. */
   aiRunning?: number;
+  /** A 協働 (live-collab) session is active → an emerald pulse on the AI button. */
+  aiCollabActive?: boolean;
   generating: boolean;
   hasSpec: boolean;
-  templateName?: string;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
@@ -24,12 +24,11 @@ export default function Toolbar({
   onGenerate,
   onSaveProject,
   onOpenProject,
-  onLoadTemplate,
   onAiAssist,
   aiRunning = 0,
+  aiCollabActive = false,
   generating,
   hasSpec,
-  templateName,
   onUndo,
   onRedo,
   canUndo,
@@ -56,19 +55,22 @@ export default function Toolbar({
         </div>
       )}
 
-      {onLoadTemplate && (
-        <button onClick={onLoadTemplate} className={btn} title={templateName ? `Template: ${templateName}` : "Load template"}>
-          {templateName ? `Template: ${templateName}` : "Load Template"}
-        </button>
-      )}
-
       {onAiAssist && (
         <button
           onClick={onAiAssist}
-          title={aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中` : "AI Assist（生成・整形・タスク履歴）"}
-          className="px-3 py-1.5 text-sm bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded transition-colors inline-flex items-center gap-1.5"
+          title={
+            aiCollabActive ? "協働編集中：別の AI とライブ共有中（クリックで AI ドックを開閉）"
+              : aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中`
+                : "AI（アシスト・協働・タスク履歴）"
+          }
+          className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
+            aiCollabActive
+              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
+              : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+          }`}
         >
-          ✨ AI Assist
+          {aiCollabActive ? "✨ AI・協働編集中" : "✨ AI"}
+          {aiCollabActive && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           {aiRunning > 0 && (
             <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-white/25 text-[10px] leading-none animate-pulse">
               {aiRunning}

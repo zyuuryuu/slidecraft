@@ -7,6 +7,8 @@ import { useState } from "react";
 import type { CollabStatus } from "../ipc/collab-projection";
 
 interface CollabPanelProps {
+  /** When embedded in the AI hub's 協働 tab: render body-only (no floating card, no own header/close). */
+  embedded?: boolean;
   onClose: () => void;
   available: boolean;
   status: CollabStatus;
@@ -57,7 +59,7 @@ function Field({ label, value, mono = true }: { label: string; value: string; mo
 }
 
 export default function CollabPanel({
-  onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop,
+  embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop,
 }: CollabPanelProps) {
   const connected = status === "connected";
   const snippet =
@@ -67,16 +69,18 @@ export default function CollabPanel({
   const statusLabel = connected ? "接続中" : status === "connecting" ? "接続中…" : status === "error" ? "エラー" : "未接続";
 
   return (
-    <div className="fixed bottom-2 right-2 z-50 w-[420px] max-w-[calc(100vw-1rem)] bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl text-sm">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2D3A6E]">
-        <div className="flex items-center gap-2">
-          <span role="img" aria-label={statusLabel} className={`w-2 h-2 rounded-full ${dot}`} />
-          <span className="text-white font-medium">🔗 協働（AI ライブ編集）</span>
+    <div className={embedded ? "flex-1 min-h-0 overflow-auto text-sm" : "fixed bottom-2 right-2 z-50 w-[420px] max-w-[calc(100vw-1rem)] bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl text-sm"}>
+      {!embedded && (
+        <div className="flex items-center justify-between px-3 py-2 border-b border-[#2D3A6E]">
+          <div className="flex items-center gap-2">
+            <span role="img" aria-label={statusLabel} className={`w-2 h-2 rounded-full ${dot}`} />
+            <span className="text-white font-medium">🔗 協働（AI ライブ編集）</span>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white px-1" title="閉じる">
+            ✕
+          </button>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-white px-1" title="閉じる">
-          ✕
-        </button>
-      </div>
+      )}
 
       <div className="p-3 space-y-3">
         {!available ? (
