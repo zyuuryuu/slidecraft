@@ -78,3 +78,57 @@ describe("detectGroups — real template variance", () => {
     if (s) expect(s.groups.some((g) => g.some((slot) => slot.role === "picture"))).toBe(true);
   });
 });
+
+// Adversarial regressions (grouped-feature verification, task wicr5yp5h): the confirmed detectGroups
+// defects. (1)(2) chrome must be found by baked/name on ANY top-band slot, not only i===0 — in the
+// 公文書 masters the number badge sorts BELOW its heading, so an i===0-only gate mis-classifies card→kpi.
+// (3) the uniform gate must require columns' role SEQUENCES to agree, else the asymmetric SectionNav
+// divider (col0=[chrome,heading] vs col1=[heading,body]) false-positives as a 2-group card.
+describe("detectGroups — chrome position independence (公文書 number-below-heading cards)", () => {
+  const roleSet = (shape: NonNullable<ReturnType<typeof detectGroups>>, col = 0) =>
+    [...shape.groups[col].map((s) => s.role)].sort();
+
+  it("報告書_公文書_白紺 10_カード3列 → card (番号 y=1.46 sorts below 見出し y=1.40, still chrome)", async () => {
+    const tpl = await load("報告書テンプレート_公文書_白紺_全レイアウト見本.pptx");
+    const s = detectGroups(find(tpl, /^10_カード/)!)!;
+    expect(s).toBeTruthy();
+    expect(s.kind).toBe("card"); // was mis-detected as 'kpi'
+    expect(s.groups.length).toBe(3);
+    expect(roleSet(s)).toEqual(["body", "chrome", "heading"]); // order [heading, chrome, body] by y
+    expect(roles(s)).toEqual(["heading", "chrome", "body"]);
+  });
+
+  it("配布資料_公文書高密度 10_カード3列 → card (same number-below-heading geometry)", async () => {
+    const tpl = await load("配布資料_公文書高密度_全レイアウト見本.pptx");
+    const s = detectGroups(find(tpl, /^10_カード/)!)!;
+    expect(s).toBeTruthy();
+    expect(s.kind).toBe("card");
+    expect(s.groups.length).toBe(3);
+    expect(roleSet(s)).toEqual(["body", "chrome", "heading"]);
+  });
+
+  it("公文書_白紺 09_KPI stays kpi (数値 sits mid-column, outside the chrome top-band)", async () => {
+    const tpl = await load("報告書テンプレート_公文書_白紺_全レイアウト見本.pptx");
+    const s = detectGroups(find(tpl, /KPI/)!)!;
+    expect(s.kind).toBe("kpi"); // must NOT flip to card via a mid-column value box
+    expect(roles(s)).toEqual(["heading", "body", "body"]);
+  });
+});
+
+describe("detectGroups — role-sequence uniform gate (reject asymmetric divider layouts)", () => {
+  it("Midnight SectionNav.1Title.Single → null (col0=[chrome,heading] ≠ col1=[heading,body])", async () => {
+    const tpl = await load("Midnight_Executive_30_Template.pptx");
+    const l = find(tpl, /SectionNav/)!;
+    expect(l).toBeTruthy();
+    expect(detectGroups(l)).toBeNull(); // was a false-positive card, 2 groups
+  });
+
+  it("report 10_カード still passes the gate (all 3 columns share one role sequence)", async () => {
+    const tpl = await load("報告書テンプレート_全レイアウト見本.pptx");
+    const s = detectGroups(find(tpl, /^10_カード/)!)!;
+    expect(s).toBeTruthy();
+    const sig = (c: number) => s.groups[c].map((x) => x.role).join("|");
+    expect(sig(0)).toBe(sig(1));
+    expect(sig(1)).toBe(sig(2));
+  });
+});
