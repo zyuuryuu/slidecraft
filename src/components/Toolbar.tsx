@@ -6,7 +6,6 @@ interface ToolbarProps {
   /** Save / open the editable PROJECT (.slidecraft = deck + template). */
   onSaveProject?: () => void;
   onOpenProject?: () => void;
-  onLoadTemplate?: () => void;
   onAiAssist?: () => void;
   /** Number of AI tasks currently running → a live badge on the AI button. */
   aiRunning?: number;
@@ -14,7 +13,6 @@ interface ToolbarProps {
   aiCollabActive?: boolean;
   generating: boolean;
   hasSpec: boolean;
-  templateName?: string;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
@@ -26,13 +24,11 @@ export default function Toolbar({
   onGenerate,
   onSaveProject,
   onOpenProject,
-  onLoadTemplate,
   onAiAssist,
   aiRunning = 0,
   aiCollabActive = false,
   generating,
   hasSpec,
-  templateName,
   onUndo,
   onRedo,
   canUndo,
@@ -57,12 +53,6 @@ export default function Toolbar({
             ↷
           </button>
         </div>
-      )}
-
-      {onLoadTemplate && (
-        <button onClick={onLoadTemplate} className={btn} title={templateName ? `Template: ${templateName}` : "Load template"}>
-          {templateName ? `Template: ${templateName}` : "Load Template"}
-        </button>
       )}
 
       {onAiAssist && (
