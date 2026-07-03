@@ -139,7 +139,7 @@ Toolbar「書き出す ▸ 🌐 HTML」
 - **S3 シェル assembler**: 固定ステージ＋CSS `transform:scale` フィット＋ナビ JS（矢印/space/Home/End/`f`/クリック領域/`#hash`/カウンタ）＋印刷 CSS。test: `html-export-shell` + `html-export-injection`。
 - **S4 体験層**: フェード遷移・進捗バー・`prefers-reduced-motion`。test: `html-export-transition`。
 - **S5 配線**: `deck-html-export.ts` オーケストレータ ＋ Toolbar「🌐 HTML」項目 ＋ `useDeckIO.handleExportHtml` ＋ `saveTextFile`。App→useDeckController→useDeckIO を `handleGenerate` と並置。**手動/e2e 検証**：クリック→`.html`保存→ブラウザで開く→矢印で送り→Ctrl-P で 1 枚 1 ページ PDF。
-- **S6 印刷堅牢化（後続）**: `svg-writer.text()` に `<text>`/`<tspan>` フォールバック分岐（レンダーフラグ）。全角≒1em/半角≒0.5em の自前折返し（`placeholderFitBox` 流儀）。効果 S–M。→ 全エンジン/Linux/PDF での図テキスト保証。
+- **S6 印刷堅牢化（✅ 完了・[ADR-0013](../adr/0013-svg-native-text.md)）**: `svg-writer.text()` を `<text>`/`<tspan>` に**全面統一し foreignObject を廃止**（フラグではなく統一＝preview/HTML/print/canvas が同一 SVG）。CJK≒1em/Latin≒0.55em の自前折返し（`wrapToWidth`）＋ `opts.shrink` の縮小（PPTX `fit:shrink` 準拠）で溢れ防止。→ 全エンジン/Linux/PDF で図テキスト保証。
 - **S7 フォント埋め込み（後続）**: `<a:ea>` フォント抽出＋明朝/ゴシック分類、@font-face WOFF2 **サブセット**埋め込みの opt-in（数十 KB）。
 
 ---
