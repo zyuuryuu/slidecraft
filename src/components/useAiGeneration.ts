@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence } from "../engine/deck-plan";
+import type { LayoutCatalog } from "../engine/template-catalog";
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -88,7 +89,7 @@ function loadSavedConfig(): { localOnly: boolean; provider?: ProviderId; configs
   }
 }
 
-export function useAiGeneration() {
+export function useAiGeneration(catalog?: LayoutCatalog) {
   const [saved] = useState(loadSavedConfig);
   // Default to the bundled offline model on desktop (the product's offline-first north star);
   // the browser/demo build can't spawn a runtime, so it falls back to Claude. A saved choice wins.
@@ -213,7 +214,9 @@ export function useAiGeneration() {
   const postProcess = useCallback((mode: AiMode, raw: string): { result?: string; error?: string } => {
     if (mode === "slides") {
       const parsed = extractDeckPlan(raw);
-      return parsed.ok ? { result: serializeMd(deckPlanToDeck(parsed.plan)) } : { error: `Couldn't read the generated plan: ${parsed.error}` };
+      // Pass the catalog so a kind the master can't express (table/columns/diagram) is degraded to
+      // content bullets deterministically, instead of emitting an unrenderable slide (#11).
+      return parsed.ok ? { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)) } : { error: `Couldn't read the generated plan: ${parsed.error}` };
     }
     if (mode === "slide" || mode === "condense") {
       const md = stripMarkdownFence(raw);
@@ -226,7 +229,7 @@ export function useAiGeneration() {
       return parsed.success ? { result: diagramSpecToYaml(parsed.data) } : { error: `Invalid diagram: ${parsed.error.issues[0]?.message}` };
     }
     return { result: raw }; // "diagram" → raw passthrough (unchanged from before)
-  }, []);
+  }, [catalog]);
 
   const patchTask = useCallback((id: string, patch: Partial<AiTask>) => {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));

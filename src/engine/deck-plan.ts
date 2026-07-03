@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { DeckIR, SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { parseJsonLoose } from "./json-salvage";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
+import { templateKinds, type LayoutCatalog } from "./template-catalog";
 
 /** A Mermaid string → a native diagram block (if it parses) or an image fallback. */
 function mermaidToFigure(mmd: string): Pick<SlideIR, "diagram" | "mermaidBlock"> {
@@ -145,8 +146,32 @@ export function slidePlanToSlide(s: SlidePlan): SlideIR {
   }
 }
 
-export function deckPlanToDeck(plan: DeckPlan): DeckIR {
-  return { slides: plan.slides.map(slidePlanToSlide) };
+/**
+ * Degrade a slide the TEMPLATE can't express into content bullets (harness over model): a `table` on a
+ * table-less master, `columns` on a columns-less one, or a `diagram` where no body can host a figure,
+ * would otherwise be emitted blindly. The DATA is preserved as bullets so nothing is lost.
+ */
+function degradeForCatalog(s: SlidePlan, kinds: Set<string>): SlidePlan {
+  if (s.kind === "table" && !kinds.has("table")) {
+    return { kind: "content", title: s.title, ...(s.subtitle ? { subtitle: s.subtitle } : {}),
+      bullets: s.rows.map((row) => row.join("：")) };
+  }
+  if (s.kind === "columns" && !kinds.has("columns")) {
+    return { kind: "content", title: s.title, ...(s.subtitle ? { subtitle: s.subtitle } : {}),
+      bullets: s.columns.flatMap((c) => (c.heading ? [c.heading, ...c.bullets] : c.bullets)) };
+  }
+  if (s.kind === "diagram" && !kinds.has("diagram")) {
+    return { kind: "content", title: s.title, ...(s.subtitle ? { subtitle: s.subtitle } : {}), bullets: [] };
+  }
+  return s;
+}
+
+/** Turn a DeckPlan into SlideIR. With a catalog, unsupported kinds are degraded to what the master can
+ *  actually express (deterministic capability gate); without one, every kind is emitted as-is. */
+export function deckPlanToDeck(plan: DeckPlan, catalog?: LayoutCatalog): DeckIR {
+  const kinds = catalog ? new Set(templateKinds(catalog)) : null;
+  const slides = plan.slides.map((s) => slidePlanToSlide(kinds ? degradeForCatalog(s, kinds) : s));
+  return { slides };
 }
 
 // ── Validation (for model output before we trust it) ──

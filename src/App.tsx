@@ -56,7 +56,7 @@ export default function App() {
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
-  const ai = useAiGeneration();
+  const ai = useAiGeneration(catalog);
   // Scope the AI task list/history to the active document (no cross-project bleed).
   const { setActiveDocId } = ai;
   useEffect(() => {

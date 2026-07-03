@@ -51,6 +51,9 @@ export interface RefineChange {
   kind: "deterministic" | "ai";
   beforeMd: string;
   afterMd: string;
+  /** Non-blocking notices (e.g. a free-form edit changed a number or the language) — shown for review,
+   *  never a rejection (ADR-0012: 棄却しない・沈黙しない). */
+  warnings?: string[];
 }
 
 export interface RefineResult {
@@ -209,7 +212,10 @@ export async function batchEditDeck(
       const newSlide = afterSlide ? reconcileEdit(current.slides[idx], afterSlide) : undefined;
       if (newSlide) {
         current = replaceSlide(current, idx, newSlide);
-        changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after });
+        // Surface (don't reject) a fact/language change so a silent number-swap or translation is caught.
+        const cond = validateCondense(before, after);
+        const warnings = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
+        changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after, ...(warnings.length ? { warnings } : {}) });
       }
     } catch {
       continue;
