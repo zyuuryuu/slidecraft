@@ -27,9 +27,9 @@ describe("HTML export S3: end-to-end orchestrator", () => {
     tpl = await loadTemplate(readFileSync(CANON));
   });
 
-  it("renders a whole deck to one openable, self-contained HTML document", () => {
+  it("renders a whole deck to one openable, self-contained HTML document", async () => {
     const deck = parseMd(DECK_MD);
-    const html = renderDeckToHtml(deck, tpl, { title: "四半期レビュー" });
+    const html = await renderDeckToHtml(deck, tpl, { title: "四半期レビュー" });
 
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect((html.match(/<section class="slide/g) ?? []).length).toBe(deck.slides.length);

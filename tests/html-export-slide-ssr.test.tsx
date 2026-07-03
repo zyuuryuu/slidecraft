@@ -82,4 +82,31 @@ describe("HTML export S1: SlideCard exportMode (SSR)", () => {
     expect(html).toContain("<svg");
     expect(html).toContain("ブラウザ"); // node label text is present in the embedded SVG
   });
+
+  // S2: a NON-native ```mermaid (gitGraph/sankey/C4) can't render synchronously, so the export
+  // pre-renders it to svgCache; MermaidDirect must then inline that cache under SSR (not an empty
+  // box). This tests the inline path (the async mermaid.render itself is DOM-bound → browser-only).
+  it("SSR inlines a pre-rendered non-native mermaid svgCache", () => {
+    const deck = parseMd("# 履歴\n\n```mermaid\ngitGraph\n  commit\n  commit\n```");
+    const slide = deck.slides[0];
+    expect(slide.mermaidBlock).toBeDefined();
+    // Simulate deck-html-export's pre-render step having filled svgCache.
+    const cached = { ...slide, mermaidBlock: { ...slide.mermaidBlock!, svgCache: '<svg id="cachedgit"><text>COMMIT</text></svg>' } };
+    const layout = findLayout(tpl, autoSelectLayout(cached, 0, 1, cat));
+    const html = renderToStaticMarkup(
+      <SlideCard
+        slide={cached}
+        slideIndex={0}
+        totalSlides={1}
+        layout={layout}
+        masterBgColor={tpl.masterBgColor}
+        masterDecorations={tpl.masterDecorations}
+        masterStaticTexts={tpl.masterStaticTexts}
+        scale={96}
+        exportMode
+      />,
+    );
+    expect(html).toContain("cachedgit"); // the pre-rendered SVG is inlined synchronously
+    expect(html).toContain("COMMIT");
+  });
 });
