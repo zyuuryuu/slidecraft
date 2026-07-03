@@ -10,7 +10,7 @@ import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { validateDiagramSource } from "../engine/mermaid-to-diagram";
-import { parseDesignIntent, applyDesignIntent } from "../engine/design-intent";
+import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { applyFigureYaml } from "../engine/ai-apply";
 import { reconcileEdit } from "../engine/ai-reconcile";
 import { validateStructure, validateCondense } from "../engine/ai-validate";
@@ -370,10 +370,14 @@ export function useDeckController() {
         if (fig) { handleSlideUpdate(activeSlide, fig, "commit"); return; }
       }
       // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
-      // The engine maps it to clamped geometry on the current slide.
+      // The engine maps it to clamped geometry on the current slide, and reports any op that
+      // couldn't take effect (e.g. an emphasize whose node id the AI renamed away) so it's ANNOUNCED
+      // rather than a silent no-op (#13).
       const intent = parseDesignIntent(raw);
       if (intent && old) {
-        handleSlideUpdate(activeSlide, applyDesignIntent(old, intent), "commit");
+        const { slide, skipped } = applyDesignIntentReport(old, intent);
+        if (skipped.length > 0) setParseError(skipped.map((sk) => sk.message).join(" ｜ "));
+        handleSlideUpdate(activeSlide, slide, "commit");
         return;
       }
       // ① Content edit (Markdown).
