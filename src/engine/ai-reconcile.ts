@@ -14,19 +14,7 @@
  */
 
 import type { SlideIR, PlaceholderContent } from "./slide-schema";
-
-/** Title/Closing layouts put the title at idx 0; every other layout uses idx 15. */
-export function isTitleLayout(layout: string): boolean {
-  return layout.startsWith("Title.") || layout.startsWith("Closing.");
-}
-
-/** The title / subtitle placeholder idx for a layout (namespace differs by layout family). */
-function titleSubtitleIdx(layout: string): { title: string; subtitle: string } {
-  return isTitleLayout(layout) ? { title: "0", subtitle: "1" } : { title: "15", subtitle: "16" };
-}
-
-/** idx 10/11/12 = Category / Date / Footer — title-slide metadata that must never be silently dropped. */
-const META_IDXS = ["10", "11", "12"] as const;
+import { titleSubtitleIdx, META_IDXS } from "./slide-roles";
 
 /** True when a placeholder carries any non-whitespace text. */
 export function hasText(ph: PlaceholderContent | undefined): boolean {
@@ -55,8 +43,12 @@ export function reconcileEdit(old: SlideIR, edited: SlideIR): SlideIR {
   const layout = edited.layout === "auto" && old.layout !== "auto" ? old.layout : edited.layout;
 
   // ② title / subtitle / meta — restore per-idx (interpreted under the RESTORED layout) when the edit
-  //    dropped/emptied them. Merge through a Map keyed by idx → never a duplicate idx (injective).
-  const { title, subtitle } = titleSubtitleIdx(layout);
+  //    dropped/emptied them. The title namespace mirrors the PARSER exactly: a slide is title-namespace
+  //    when its layout is Title/Closing OR it carries meta fields — so we judge it from OLD's meta
+  //    presence (the authoritative prior structure), not the layout name alone. Merge through a Map
+  //    keyed by idx → never a duplicate idx (injective, ADR-0011).
+  const oldHasMeta = META_IDXS.some((idx) => hasText(old.placeholders.find((p) => p.idx === idx)));
+  const { title, subtitle } = titleSubtitleIdx(layout, oldHasMeta);
   const structuralIdxs = [title, subtitle, ...META_IDXS];
   const byIdx = new Map<string, PlaceholderContent>(edited.placeholders.map((p) => [p.idx, p]));
   for (const idx of structuralIdxs) {

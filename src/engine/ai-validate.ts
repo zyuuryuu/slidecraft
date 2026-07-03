@@ -17,6 +17,7 @@
 import type { FitBox } from "./distill";
 import type { SlideIR } from "./slide-schema";
 import { parseMd } from "./md-parser";
+import { META_IDXS } from "./slide-roles";
 
 export type CondenseViolation = {
   kind: "parse" | "language" | "fact" | "budget" | "structure";
@@ -143,7 +144,7 @@ export function validateStructure(before: SlideIR, after: SlideIR, kind: "conden
   // group hint loss — a card/step/kpi slide lost its group kind.
   if (before.groupKind && !after.groupKind) push(sev(), "グループ指定が失われた");
   // meta loss (Category/Date/Footer) — always SOFT (reconcile restores; a real edit may drop one).
-  for (const idx of ["10", "11", "12"]) {
+  for (const idx of META_IDXS) {
     if (phPlainText(before, idx) && !phPlainText(after, idx)) push("soft", `メタ情報(idx${idx})が失われた`);
   }
 
