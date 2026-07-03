@@ -15,25 +15,15 @@
 
 | # | テーマ | 一行 | サイズ |
 |---|--------|------|-------|
-| 1 | **凝ったレイアウトの到達性**（部分完了・残りは要設計） | code/ログ・図＋説明・章扉は到達可。カード/プロセスの styled 箱は 1:1 と衝突のため保留 | L |
-| 2 | **プロンプト磨き込み** | 旧「Release-B」。AI 生成品質の底上げ。**構造ヘッダー保全**の観点を含む（下記） | M |
-| 3 | **HTML 出力**（大マイルストーン） | 磨き込んだ Web preview をスタンダロン HTML プレゼンとして出力 | L |
-| 4 | **テンプレ作成補助** | 新テンプレの作成/登録支援。原稿→マスター整形と重なる最大機能 | L |
+| 1 | **プロンプト磨き込み** | 旧「Release-B」。AI 生成品質の底上げ。**構造ヘッダー保全**の観点を含む（下記） | M |
+| 2 | **HTML 出力**（大マイルストーン） | 磨き込んだ Web preview をスタンダロン HTML プレゼンとして出力 | L |
+| 3 | **テンプレ作成補助** | 新テンプレの作成/登録支援。原稿→マスター整形と重なる最大機能 | L |
 
-> **テーマ1「凝ったレイアウトの到達性」**（2026-07-03 時点）：
->
-> - **完了**：`07_コード／ログ`（コードフェンスを code body として取り込み、等幅描画・往復・[sample-deck]。commit 95fc398）／`04_図＋説明`（本文＋図の横並び＝既に実装済みと実測）／`01_章扉`（title-only→section）。
-> - **Slice A（土台・landed）**：`<!-- card -->` / `<!-- step -->` 区切り＋`### 見出し`（`Paragraph.heading`）＋`SlideIR.groupKind` ヒント。往復・プレビュー太字・エディタ対応。現状は「見出し付きの列」にデグレード。
-> - **KPI(09)**：サンプルの `type: kpi` 図が既にカバー → **スキップ**。
-> - **🔗 BLOCKER（保留＝要設計）— カード/プロセス/KPI の styled 箱到達**：`placeholderRole` の `idx15/16→body` 修正は **1:1 全単射を全テンプレで破壊**（field-map-bijection 6件・blast 18件、2026-07-03 検証済）。**根因**＝カードの `idx15/16=body` が正準規約 `idx15=title / 16=subtitle` と衝突。この規約は `slideIdxRole`（content 側）＋`placeholderRole`（layout 側）＋`buildFieldMap` の**3か所に焼き込まれ**、layout 側だけ変えると content"15"(title 扱い) が body@15 に round-trip せず全単射が壊れる。
-> - **将来アプローチ（壊さない設計）＝設計完了**：正準規約に**触らない別系統のグループ経路**（`slide.groupKind` ＋ 幾何(x クラスタ)検出 `detectGroups` → `bindContentByRole` を経由しない `expandGroups` → エディタはグループ単位フィールド、chrome/画像枠は継承）。**[ADR-0011](adr/0011-placeholder-input-bijection.md) の 1:1（full＋sparse）を green のまま**維持。➡ **詳細設計＋段階実装計画 S1–S6：[docs/design/grouped-layout-binding.md](design/grouped-layout-binding.md)**（設計ワークフローで全11テンプレ精査＋敵対批評済み）。
-> - **サイズ**：残り（styled 箱）は L＋（独立サブシステム新設）。次は S1（`detectGroups` 純検出）から test-first。
-
-> **テーマ2「プロンプト磨き込み」に追加する観点**：
+> **テーマ1「プロンプト磨き込み」に追加する観点**：
 >
 > - **構造ヘッダー保全**：AI Assist のスライド編集で、**レイアウトヘッダー/タイトルヘッダーを単に削除**してしまい構造が破壊される事象がある。編集プロンプトに「タイトル・構造ヘッダーは**保持**し、指示外で落とさない／スライドの骨格（見出し・セクション構造）を壊さない」ガードを追加する。
 
-> **テーマ3「HTML 出力」（大マイルストーン）**：
+> **テーマ2「HTML 出力」（大マイルストーン）**：
 >
 > - 磨き込んだ **Web preview（`SlidePreview` の CSS 忠実描画）をスタンダロン HTML プレゼンとして出力**。PowerPoint 離れ・HTML プレゼンの潮流に対応。
 > - 自己完結（インライン CSS/JS・スライド送りナビゲーション）。図/表/コード/プレースホルダ描画を HTML に写像（既存の共有描画モデルを HTML レンダラに）。PPTX 出力と併存。
@@ -41,6 +31,12 @@
 
 > **完了除去**（履歴は ADR ＋ git）：
 >
+> - 旧「凝ったレイアウトの到達性」→ **完了**（2026-07-03）。`07_コード／ログ`・`04_図＋説明`・`01_章扉`
+>   ＋カード/プロセス/KPI の styled 箱到達を **1:1 非破壊の別系統グループ経路**で実装（`slide.groupKind` で分岐、
+>   `group-layout.ts` `detectGroups`（幾何検出）→ `group-binding.ts` `expandGroups`（`bindContentByRole` 非経由）
+>   → エディタはグループ単位フィールド、chrome 番号は編集可能スライド content・画像枠は継承。S1–S6 test-first、
+>   [design/grouped-layout-binding.md](design/grouped-layout-binding.md)、field-map-bijection 全緑＝ADR-0011 の 1:1 維持）。
+>   compare（課題と対策）は pin 専用（将来 `<!-- compare -->` で自動化余地）。
 > - 旧「テンプレ差し替えの堅牢性を検証」→ #41 で完了（`autoSelectLayout` の role ベース縮退で
 >   任意マスターに追従、`tests/template-swap.test.ts` が回帰を担保）。
 > - 旧「アプリ内蔵 AI のアーキ設計」→ llamafile 同梱ランタイムで P1〜P6 実装済み（env-free 配布、
