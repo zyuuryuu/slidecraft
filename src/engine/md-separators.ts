@@ -5,11 +5,11 @@
  */
 // ── Detect separator type in lines ──
 
-export type SeparatorType = "col" | "kpi" | "step";
+export type SeparatorType = "col" | "kpi" | "step" | "card";
 
 export function detectSeparator(lines: string[]): SeparatorType | null {
   for (const line of lines) {
-    const m = line.trim().match(/^<!--\s*(col|kpi|step)\s*-->$/);
+    const m = line.trim().match(/^<!--\s*(col|kpi|step|card)\s*-->$/);
     if (m) return m[1] as SeparatorType;
   }
   return null;

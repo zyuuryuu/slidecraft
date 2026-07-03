@@ -87,7 +87,7 @@ function renderSegments(segments: InlineSegment[]) {
 
 function renderParagraph(para: Paragraph, idx: number, bulletChar: string) {
   return (
-    <div key={idx} style={{ marginBottom: "0.15em" }}>
+    <div key={idx} style={{ marginBottom: "0.15em", ...(para.heading ? { fontWeight: "bold" } : {}) }}>
       {para.bullet && bulletChar && <span style={{ marginRight: "0.4em" }}>{bulletChar}</span>}
       {renderSegments(para.segments)}
     </div>

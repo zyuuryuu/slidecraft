@@ -85,6 +85,12 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
         continue;
       }
     }
+    // `### …` → a GROUP heading (card/step) — the group's title line.
+    const headingMatch = trimmed.match(/^###\s+(.*)/);
+    if (headingMatch) {
+      paragraphs.push({ segments: parseInline(headingMatch[1] || " "), heading: true });
+      continue;
+    }
     const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
     if (bulletMatch) {
       paragraphs.push({
@@ -212,6 +218,9 @@ export function parseSlideBlock(
       placeholders,
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
+      // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
+      // is plain columns and carries no hint.
+      ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
       sourceLineStart: startLine,
       sourceLineEnd: startLine + lines.length - 1,
     };
