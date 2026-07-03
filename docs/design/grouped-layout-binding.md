@@ -1,6 +1,6 @@
 # グループレイアウト充填パス設計（card / step / kpi / compare）
 
-- **Status**: Draft（設計・未実装）／ROADMAP テーマ1「凝ったレイアウトの到達性」の styled 箱到達
+- **Status**: **Implemented**（S1–S6 完了・2026-07-03）。`group-layout.ts`（detectGroups）＋ `group-binding.ts`（expandGroups / groupEditorPlan）、`autoSelectLayout` の groupKind ゲート、preview/export の contentFor 統合、SlideEditor のグループ単位フィールド。field-map-bijection 全緑＝ADR-0011 の 1:1 維持。
 - **Date**: 2026-07-03
 - **Related**: [ADR-0011](../adr/0011-placeholder-input-bijection.md)（1:1 全単射・**絶対非破壊**）／Slice A（`<!-- card -->` / `### 見出し` パーサ土台 landed, commit 425573c）
 - **由来**: 設計ワークフロー（全11テンプレのグループ系レイアウトを幾何精査 → 検出/選択・バインド・エディタ/1:1非破壊を設計 → 敵対批評で統合）
