@@ -310,6 +310,7 @@ export default function App() {
         masters={masters}
         activeMasterId={masterId}
         onSelectMaster={handleSelectMaster}
+        onImportMaster={handleImportMaster}
         deck={deck}
         templateData={templateData}
         parseError={parseError}
