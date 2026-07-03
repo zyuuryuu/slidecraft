@@ -13,6 +13,11 @@
 import { VALID_TYPES, type DiagramType } from "./schema-constants";
 import { iconCatalogPromptList } from "./icon-catalog";
 
+// This module is the single facade for the diagram-type surface (llm-prompts.ts re-exports
+// DiagramType from here). The type identifier lives in schema-constants; re-export it so
+// importers of the facade resolve it without reaching into schema-constants directly.
+export type { DiagramType } from "./schema-constants";
+
 /** One diagram type: its human label (UI dropdown), a one-line routing hint (Stage 1), and the SHAPE
  *  fragment — the fields + a tiny example the model needs to emit THIS type (Stage 2). */
 export interface DiagramTypeInfo {
