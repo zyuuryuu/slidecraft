@@ -50,23 +50,15 @@ function replaceTextInShape(
     txEnd,
   );
 
-  // Find where lstStyle ends to preserve bodyPr + lstStyle
-  let cut: number;
-  const lstEnd = inner.lastIndexOf("</a:lstStyle>");
-  if (lstEnd !== -1) {
-    cut = lstEnd + "</a:lstStyle>".length;
-  } else {
-    const lstSelf = inner.indexOf("<a:lstStyle/>");
-    if (lstSelf !== -1) {
-      cut = lstSelf + "<a:lstStyle/>".length;
-    } else {
-      // Fallback: put paragraphs right after bodyPr
-      const bodyPrEnd = inner.indexOf("/>");
-      cut = bodyPrEnd !== -1 ? bodyPrEnd + 2 : 0;
-    }
-  }
-
-  const preserved = inner.substring(0, cut);
+  // Preserve the bodyPr (anchor / autofit) but DROP the layout's lstStyle: a slide placeholder must NOT
+  // carry its own lstStyle. It inherits font / size / color from the LAYOUT placeholder (which inherits
+  // from the MASTER) by matching type+idx. Copying the layout's lstStyle into the slide PINS the
+  // formatting at the slide level, so editing the master/layout font no longer propagates to generated
+  // slides ("スライドマスターでフォントサイズを変えても効かない"). An empty <a:lstStyle/> restores
+  // normal inheritance while looking identical, since the layout supplies exactly the same lstStyle.
+  // bodyPr is a required first child of txBody — keep the layout's (anchor/autofit) or a minimal one.
+  const bodyPr = inner.match(/<a:bodyPr\b[^>]*(?:\/>|>[\s\S]*?<\/a:bodyPr>)/)?.[0] ?? "<a:bodyPr/>";
+  const preserved = bodyPr + "<a:lstStyle/>";
   return (
     shapeXml.substring(0, txStart) +
     "<p:txBody>" +
