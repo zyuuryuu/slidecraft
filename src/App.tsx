@@ -320,6 +320,7 @@ export default function App() {
         onClose={() => setShowLlmAssist(false)}
         onImportResult={handleLlmImport}
         templateHint={deckHint}
+        catalog={catalog}
         ai={ai}
       />
 
