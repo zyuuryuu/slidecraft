@@ -8,9 +8,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
-import type { TemplateData, LayoutInfo } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
+import { bindContentByRole, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
+import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -86,7 +88,7 @@ function renderSegments(segments: InlineSegment[]) {
 
 function renderParagraph(para: Paragraph, idx: number, bulletChar: string) {
   return (
-    <div key={idx} style={{ marginBottom: "0.15em" }}>
+    <div key={idx} style={{ marginBottom: "0.15em", ...(para.heading ? { fontWeight: "bold" } : {}) }}>
       {para.bullet && bulletChar && <span style={{ marginRight: "0.4em" }}>{bulletChar}</span>}
       {renderSegments(para.segments)}
     </div>
@@ -101,6 +103,8 @@ interface SlideCardProps {
   totalSlides: number;
   layout: LayoutInfo | undefined;
   masterBgColor: string; // hex without #
+  masterDecorations?: DecoRect[]; // the master's own shapes — painted under the layout's
+  masterStaticTexts?: StaticText[]; // the master's own static text labels
   scale: number;
   isActive?: boolean;
   /** In the multi-selection set (highlighted) but not necessarily the focused slide. */
@@ -110,13 +114,26 @@ interface SlideCardProps {
   onDiagramChange?: (yaml: string) => void;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
-  const contentMap = new Map(slide.placeholders.map((p) => [p.idx, p]));
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange }: SlideCardProps) {
+  // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
+  // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
+  // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
+  const layoutPhs = layout?.placeholders ?? [];
+  // WYSIWYG: share the SAME contentFor as the export — a grouped slide fills via expandGroups.
+  const contentFor = slide.groupKind && layout && isGroupedLayout(layout)
+    ? expandGroups(slide, layout)
+    : bindContentByRole(slide, layoutPhs);
+  const bodyPhs = bodyPlaceholders(layoutPhs);
+  const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
+  const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
+  const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
+  const codeBodyIdx = slide.code ? nthBody(bodyPhs, slide.code.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
-  // Background = master bg color. Decorative shapes are painted on top.
-  const bgColor = `#${masterBgColor}`;
+  // Background = the LAYOUT's own <p:bg> fill if it has one (e.g. a full-bleed cover panel),
+  // else the master bg color. Decorative shapes are painted on top.
+  const bgColor = `#${layout?.background ?? masterBgColor}`;
 
   return (
     <div
@@ -134,10 +151,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         flexShrink: 0,
       }}
     >
-      {/* Decorative shapes from template */}
-      {layout?.decorations.map((d, i) => (
+      {/* Decorative shapes: the MASTER's own shapes first (a base layer under every layout), then the
+          layout's — fill + optional rounded corners + outline. */}
+      {[...(masterDecorations ?? []).map((d) => ["m", d] as const), ...(layout?.decorations ?? []).map((d) => ["l", d] as const)].map(([src, d], i) => (
         <div
-          key={`deco-${i}`}
+          key={`deco-${src}-${i}`}
           style={{
             position: "absolute",
             left: `${(d.x / SLIDE_W) * 100}%`,
@@ -145,17 +163,46 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
             width: `${(d.w / SLIDE_W) * 100}%`,
             height: `${(d.h / SLIDE_H) * 100}%`,
             backgroundColor: `#${d.color}`,
+            ...(d.radius ? { borderRadius: d.radius * scale } : {}),
+            ...(d.border ? { border: `${Math.max(1, 0.014 * scale)}px solid #${d.border}` } : {}),
           }}
         />
       ))}
+
+      {/* Static (non-placeholder) text labels from the master, then the layout — e.g. a cover's
+          "日付 / 部署 / 作成者". PowerPoint renders these; they aren't placeholders or filled decos. */}
+      {[...(masterStaticTexts ?? []), ...(layout?.staticTexts ?? [])].map((st, i) => {
+        const s = st.style;
+        return (
+          <div
+            key={`static-${i}`}
+            style={{
+              position: "absolute",
+              left: `${(s.x / SLIDE_W) * 100}%`,
+              top: `${(s.y / SLIDE_H) * 100}%`,
+              width: `${(s.w / SLIDE_W) * 100}%`,
+              height: `${(s.h / SLIDE_H) * 100}%`,
+              fontSize: s.fontSize * (scale / 72),
+              color: `#${s.fontColor}`,
+              fontWeight: s.bold ? "bold" : "normal",
+              textAlign: s.align === "ctr" ? "center" : s.align === "r" ? "right" : "left",
+              overflow: "hidden",
+              lineHeight: 1.2,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {st.text}
+          </div>
+        );
+      })}
 
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {
         const s = ph.style;
 
-        // If this placeholder is replaced by a diagram or mermaid, render it
-        const isDiagramPh = slide.diagram && ph.idx === slide.diagram.placeholderIdx;
-        const isMermaidPh = slide.mermaidBlock && ph.idx === slide.mermaidBlock.placeholderIdx;
+        // If this placeholder is replaced by a diagram or mermaid, render it (role-resolved body idx)
+        const isDiagramPh = slide.diagram && ph.idx === diagBodyIdx;
+        const isMermaidPh = slide.mermaidBlock && ph.idx === mermBodyIdx;
 
         // Diagram: full-slide transparent SVG overlay (matches how the export
         // embeds diagram shapes at absolute slide coordinates).
@@ -214,7 +261,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
         }
 
         // Native table → an HTML <table> at the placeholder box (matches the export).
-        if (slide.table && ph.idx === slide.table.placeholderIdx) {
+        if (slide.table && ph.idx === tableBodyIdx) {
           const t = slide.table;
           return (
             <div
@@ -260,7 +307,31 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, scale, isActive, 
           );
         }
 
-        const content = contentMap.get(ph.idx);
+        // Code/log → monospace text at the code body box (matches the export's code-body fill).
+        if (slide.code && ph.idx === codeBodyIdx) {
+          return (
+            <div
+              key={`code-${ph.idx}`}
+              style={{
+                position: "absolute",
+                left: `${(s.x / SLIDE_W) * 100}%`,
+                top: `${(s.y / SLIDE_H) * 100}%`,
+                width: `${(s.w / SLIDE_W) * 100}%`,
+                height: `${(s.h / SLIDE_H) * 100}%`,
+                overflow: "hidden",
+                fontFamily: "ui-monospace, monospace",
+                fontSize: s.fontSize * (scale / 72),
+                color: `#${s.fontColor}`,
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.35,
+              }}
+            >
+              {slide.code.content}
+            </div>
+          );
+        }
+
+        const content = contentFor.get(ph.idx);
         if (!content) return null;
 
         return (
@@ -364,7 +435,10 @@ export default function SlidePreview({
   const hasSlides = !!deck && deck.slides.length > 0;
 
   const slideCard = (slide: SlideIR, i: number, active: boolean) => {
-    const layoutName = slide.layout === "auto" ? autoSelectLayout(slide, i, deck!.slides.length, catalog) : slide.layout;
+    // ALWAYS resolve through autoSelectLayout: it honors a valid pinned name but DEGRADES a name this
+    // template lacks (e.g. a canonical "Title.1Title.Single" pin on an alien master) to a real layout
+    // — matching the export path. Using slide.layout directly left the cover with no layout = blank.
+    const layoutName = autoSelectLayout(slide, i, deck!.slides.length, catalog);
     const layout = template ? findLayout(template, layoutName) : undefined;
     return (
       <SlideCard
@@ -374,6 +448,8 @@ export default function SlidePreview({
         totalSlides={deck!.slides.length}
         layout={layout}
         masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+        masterDecorations={template?.masterDecorations}
+        masterStaticTexts={template?.masterStaticTexts}
         scale={scale}
         isActive={active}
         onClick={singleSlide ? undefined : () => onSlideClick?.(i)}

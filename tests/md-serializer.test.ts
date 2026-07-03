@@ -392,3 +392,49 @@ Footer: Confidential
     expect(txt).toContain("補足情報"); // Meta survives (as body, no longer colliding with Date)
   });
 });
+
+// Slice 0 of the AI-quality theme: a single-body FIGURE (table / diagram / mermaid / code) must
+// round-trip regardless of the slide's RESOLVED layout. The single-body emitter was gated inside the
+// content-layout `else` branch, so a table/code slide PINNED to a Title/Closing or a Column/KPI/Process
+// layout (a mis-pin, or the AI editing the header) serialized to nothing — a silent data loss that also
+// blinds the AI to the figure it must preserve. Fixed by emitting the figure block in every branch.
+describe("single-body figure survives serialize round-trip on any resolved layout (slice 0)", () => {
+  const rtLayout = (md: string, layout: string) => {
+    const s = parseMd(md).slides[0];
+    return parseMd(serializeMd({ slides: [{ ...s, layout }] })).slides[0];
+  };
+
+  it("code block survives on a Title layout (was dropped)", () => {
+    const back = rtLayout("# コード例\n\n```ts\nconst x = 1;\n```", "Title.1Title.Single");
+    expect(back.code?.content).toContain("const x = 1;");
+    expect(back.code?.lang).toBe("ts");
+  });
+
+  it("code block survives on a Closing layout", () => {
+    const back = rtLayout("# ログ\n\n```\nERROR: boom\n```", "Closing.1Message.Single");
+    expect(back.code?.content).toContain("ERROR: boom");
+  });
+
+  it("table survives on a KPI (separator) layout (was dropped)", () => {
+    const back = rtLayout("# 価格\n\n| 項目 | 値 |\n|---|---|\n| A | 100 |", "KPI.3Value.Equal");
+    expect(back.table?.rows).toEqual([["項目", "値"], ["A", "100"]]);
+  });
+
+  it("table survives on a Title layout", () => {
+    const back = rtLayout("# 価格\n\n| 項目 | 値 |\n|---|---|\n| A | 100 |", "Title.1Title.Single");
+    expect(back.table?.rows).toEqual([["項目", "値"], ["A", "100"]]);
+  });
+
+  it("diagram survives on a Title layout", () => {
+    const back = rtLayout(
+      "# 構成図\n\n```diagram\ntype: flowchart\nnodes:\n  - id: A\n    label: 入力\nedges: []\n```",
+      "Title.1Title.Single",
+    );
+    expect(back.diagram?.yaml).toContain("flowchart");
+  });
+
+  it("still round-trips on the normal single-body content layout (no regression)", () => {
+    const back = rtLayout("# コード例\n\n```ts\nconst x = 1;\n```", "Content.1Body.Single");
+    expect(back.code?.content).toContain("const x = 1;");
+  });
+});

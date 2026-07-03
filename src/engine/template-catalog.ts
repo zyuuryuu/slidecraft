@@ -12,6 +12,7 @@
  */
 
 import type { LayoutInfo, PlaceholderInfo, TemplateData } from "./template-loader";
+import { detectGroups } from "./group-layout";
 
 export type LayoutRole =
   | "title"
@@ -25,6 +26,7 @@ export type LayoutRole =
   | "process"
   | "summary"
   | "closing"
+  | "code"
   | "other";
 
 export type PlaceholderRole =
@@ -57,6 +59,10 @@ export interface CatalogEntry {
   hasTitle: boolean;
   hasSubtitle: boolean;
   placeholders: CatalogPlaceholder[];
+  // Repeated-GROUP layout (card/step/kpi/compare) — for routing a slide.groupKind slide. Additive:
+  // does NOT affect role/bodyCount/placeholders, so buildFieldMap / the 1:1 bijection are untouched.
+  groupKind?: "card" | "step" | "kpi" | "compare";
+  groupCount?: number; // number of groups (columns)
 }
 
 export type LayoutCatalog = CatalogEntry[];
@@ -88,13 +94,17 @@ export function layoutRole(name: string): LayoutRole {
 // Real-world templates name layouts in plain language ("Title and Content",
 // "Two Columns", "Section Header") — NOT the canonical "Family.Detail" convention.
 // Recognize those keywords so the harness classifies ANY template, not just ours.
+// English AND Japanese keywords (real templates are often localized). Only title/section/closing get
+// keywords here — content vs columns is decided by STRUCTURE (body count/geometry), so e.g. a
+// 「本文（1カラム）」 vs 「本文（2カラム）」 isn't forced by the word カラム.
 const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\b(?:two|three|four|2|3|4|multi)\b[\s\S]*\b(?:column|content|panel|box|option)\b|compar|versus|\bvs\b/i, "columns"],
   [/\bcolumn\b/i, "columns"],
-  [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b/i, "section"],
-  [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b/i, "closing"],
+  [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b|章扉|セクション|区切り|中扉/i, "section"],
+  [/\bcode\b|\blog\b|\bsource\b|コード|ログ|ソース/i, "code"],
+  [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑/i, "closing"],
   [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
-  [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b/i, "title"],
+  [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b|表紙|タイトル|扉絵/i, "title"],
 ];
 
 function nameKeywordRole(name: string): LayoutRole {
@@ -205,15 +215,23 @@ function nameRole(name: string): PlaceholderRole | null {
 export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   const t = ph.type.toLowerCase();
   const idx = ph.idx;
+  // Explicit placeholder TYPE is authoritative — it must win over the idx convention (a template
+  // whose footer is type="ftr" at idx 11 must be footer, not "date" from the idx-11 rule).
   if (t.includes("ctrtitle") || t === "title") return "title";
   if (t.includes("subtitle")) return "subtitle";
-  if (t === "sldnum" || idx === "50") return "slideNumber";
-  if (t === "dt" || idx === "11") return "date";
-  if (t === "ftr" || idx === "12") return "footer";
+  if (t === "sldnum") return "slideNumber";
+  if (t === "dt") return "date";
+  if (t === "ftr") return "footer";
   if (t === "pic") return "picture";
   if (t === "chart") return "chart";
   if (t === "tbl") return "table";
-  // Meta fields that are often a generic "body" type but at known idxs.
+  // idx CONVENTION — for a generic/typeless "body" placeholder at a known canonical idx (the SlideIR
+  // meta convention: canonical's category/date/footer/title/subtitle meta are typeless body at these
+  // idxs). Reached only when no authoritative type decided above; keep BEFORE the plain-body rule so
+  // a body-typed idx-10/15/16 meta placeholder still classifies as category/title/subtitle.
+  if (idx === "50") return "slideNumber";
+  if (idx === "11") return "date";
+  if (idx === "12") return "footer";
   if (idx === "10") return "category";
   if (idx === "15") return "title";
   if (idx === "16") return "subtitle";
@@ -305,6 +323,7 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
   const bodyBoxes = layout.placeholders
     .filter((ph) => placeholderRole(ph) === "body")
     .map((ph) => ({ x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h }));
+  const shape = detectGroups(layout); // geometric group detection (on-demand; never mutates the above)
   return {
     name: layout.name,
     role: classifyLayout(layout.name, { hasTitle, hasSubtitle, bodyCount, bodyBoxes }),
@@ -312,6 +331,7 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     hasTitle,
     hasSubtitle,
     placeholders,
+    ...(shape ? { groupKind: shape.kind, groupCount: shape.groups.length } : {}),
   };
 }
 
@@ -352,6 +372,7 @@ export function templateKinds(catalog: LayoutCatalog): string[] {
   if (maxCols >= 2) kinds.push("columns");
   if (roles.has("table")) kinds.push("table");
   if (catalog.some((e) => e.bodyCount >= 1)) kinds.push("diagram"); // a figure rides a content body
+  if (roles.has("code")) kinds.push("code");
   if (roles.has("closing")) kinds.push("closing");
   return kinds;
 }

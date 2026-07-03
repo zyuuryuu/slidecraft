@@ -13,10 +13,20 @@ import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validate
 import EdgeStyleControls from "./EdgeStyleControls";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
+import { buildFieldMap, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
+import { groupEditorPlan } from "../engine/group-binding";
 
 interface SlideEditorProps {
   slide: SlideIR;
   layout: LayoutInfo | undefined;
+  /** The LOADED template's actual layout names for the picker. Falls back to the canonical names
+   *  when no template is loaded. (Offering canonical names for a non-canonical master made the picker
+   *  a no-op: every pick was absent from the catalog and degraded to the same layout.) */
+  layoutNames?: string[];
+  /** The layout `Auto` actually resolved to (so the UI can show "Auto → X"). */
+  resolvedLayout?: string;
+  /** Ranked layout candidates (auto pick first) — shown as one-click "also try" chips. */
+  suggestions?: string[];
   onChange: (updated: SlideIR) => void;
 }
 
@@ -55,6 +65,7 @@ function paragraphsToText(paragraphs: Paragraph[]): string {
         if (s.italic) t = `*${t}*`;
         return t;
       }).join("");
+      if (p.heading) return `### ${text}`;
       return p.bullet ? `- ${text}` : text;
     })
     .join("\n");
@@ -64,8 +75,9 @@ function paragraphsToText(paragraphs: Paragraph[]): string {
 
 function textToParagraphs(text: string): Paragraph[] {
   return text.split("\n").map((line) => {
-    const bulletMatch = line.match(/^[-*]\s+(.*)/);
-    const content = bulletMatch ? bulletMatch[1] : line;
+    const headingMatch = line.match(/^###\s+(.*)/);
+    const bulletMatch = headingMatch ? null : line.match(/^[-*]\s+(.*)/);
+    const content = headingMatch ? headingMatch[1] : bulletMatch ? bulletMatch[1] : line;
 
     // Parse inline formatting
     const segments: { text: string; bold?: boolean; italic?: boolean }[] = [];
@@ -80,12 +92,12 @@ function textToParagraphs(text: string): Paragraph[] {
 
     return {
       segments,
-      ...(bulletMatch ? { bullet: true } : {}),
+      ...(headingMatch ? { heading: true } : bulletMatch ? { bullet: true } : {}),
     };
   });
 }
 
-export default function SlideEditor({ slide, layout, onChange }: SlideEditorProps) {
+export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout, suggestions, onChange }: SlideEditorProps) {
   // ── Update a specific placeholder ──
   const updatePlaceholder = useCallback(
     (idx: string, text: string) => {
@@ -143,56 +155,119 @@ export default function SlideEditor({ slide, layout, onChange }: SlideEditorProp
     [slide, onChange],
   );
 
-  // Determine which placeholders to show
-  const editablePhs = layout
-    ? layout.placeholders.filter((ph) => ph.idx !== "50") // skip slide number
-    : slide.placeholders;
+  // The field map: a VERIFIED 1:1 between the layout's editable placeholders and the content idxs
+  // this editor reads/writes. Each field owns exactly one content slot, so editing one can NEVER
+  // touch another (no bleed), and what you type role-binds back to that placeholder (buildFieldMap
+  // proves both, for every bundled template). Auto slide-number placeholders are excluded. With no
+  // template loaded, fall back to the slide's own placeholders (identity map).
+  // A GROUPED slide (card/step/kpi) edits ONE field per group (content idx 1..N = the group's
+  // "### 見出し\n本文" markdown) instead of buildFieldMap over the layout's many per-group cells. Meta
+  // (title/date/…) still uses buildFieldMap on the NON-group placeholders. Non-grouped slides keep the
+  // full buildFieldMap 1:1 path unchanged.
+  const groupPlan = layout ? groupEditorPlan(slide, layout) : null;
+  const groupN = groupPlan
+    ? Math.max(groupPlan.columns, slide.placeholders.filter((c) => /^[1-9]$/.test(c.idx)).length)
+    : 0;
+  const fields = groupPlan
+    ? [
+        ...buildFieldMap(slide, groupPlan.metaPhs),
+        ...Array.from({ length: groupN }, (_, k) => ({ phIdx: String(k + 1), contentIdx: String(k + 1) })),
+      ]
+    : layout
+      ? buildFieldMap(slide, layout.placeholders)
+      : slide.placeholders.map((p) => ({ phIdx: p.idx, contentIdx: p.idx }));
+
+  // Which RAW placeholder idxs are occupied by a diagram/mermaid/table? Each rides the Nth BODY
+  // placeholder, and its placeholderIdx is a 1-based body ORDINAL — NOT a raw idx. Resolve it via
+  // nthBody (exactly as the preview + export do), else on a gapped-body layout (bodies at [1,3]) the
+  // editor would show a text field OVER the diagram's box and silently drop what you type on export.
+  const bodyPhs = layout ? bodyPlaceholders(layout.placeholders) : [];
+  const visualIdx = new Set(
+    [
+      slide.diagram && nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx,
+      slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
+      slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
+      slide.code && nthBody(bodyPhs, slide.code.placeholderIdx)?.idx,
+    ].filter((x): x is string => !!x),
+  );
 
   return (
     <div className="h-full overflow-auto p-3 flex flex-col gap-3">
-      {/* Layout selector */}
+      {/* Layout selector — the full list stays freely selectable (as before); the only change is that
+          the "Auto" option shows what it RESOLVED to, and ranked candidates are one-click chips. */}
       <div>
-        <label className="text-[10px] text-gray-500 uppercase tracking-wider">
-          Layout
-        </label>
+        <label className="text-[10px] text-gray-500 uppercase tracking-wider">Layout</label>
         <select
           value={slide.layout}
           onChange={(e) => updateLayout(e.target.value)}
           className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
         >
-          <option value="auto">Auto</option>
-          {LAYOUT_NAMES.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
+          <option value="auto">{resolvedLayout ? `自動 → ${resolvedLayout}` : "自動"}</option>
+          {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
+            <option key={name} value={name}>{name}</option>
           ))}
         </select>
+
+        {/* Ranked candidates (★ = Auto's top pick = best score; the rest are the next-best) + an Auto
+            toggle. Picking a candidate PINS it; ⟳Auto re-adapts (keeps slide.layout === "auto"). */}
+        {suggestions && suggestions.length > 1 && (
+          <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+            <span className="text-[10px] text-gray-500">候補:</span>
+            {suggestions.map((name, i) => {
+              const active = slide.layout === name;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => updateLayout(name)}
+                  title={i === 0 ? "Auto の第一候補（最良評価）" : "次点の候補レイアウト"}
+                  className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                    active ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+                  }`}
+                >
+                  {i === 0 && "★ "}{name}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => updateLayout("auto")}
+              title="自動選択に戻す（常に最良評価を選ぶ）"
+              className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+              }`}
+            >
+              ⟳ Auto
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Placeholder fields */}
-      {editablePhs.map((ph) => {
-        const idx = "idx" in ph ? (ph as PlaceholderContent).idx : (ph as { idx: string }).idx;
-        const label = getLabel(idx, layout);
+      {/* Placeholder fields — one per field-map slot, reading/writing its own content idx (1:1). For a
+          grouped slide, idx 1..N are GROUP fields (### 見出し + 本文); meta fields stay buildFieldMap. */}
+      {fields.map(({ phIdx, contentIdx }) => {
+        const isGroup = !!groupPlan && /^[1-9]$/.test(phIdx);
+        const over = isGroup && Number(phIdx) > groupPlan!.columns;
+        const label = isGroup ? `グループ ${phIdx}${over ? " ⚠超過（出力されません）" : ""}` : getLabel(phIdx, layout);
         const currentText = paragraphsToText(
-          slide.placeholders.find((p) => p.idx === idx)?.paragraphs || [],
+          slide.placeholders.find((p) => p.idx === contentIdx)?.paragraphs || [],
         );
 
-        // Skip if this is the diagram/mermaid placeholder
-        if (slide.diagram && idx === slide.diagram.placeholderIdx) return null;
-        if (slide.mermaidBlock && idx === slide.mermaidBlock.placeholderIdx) return null;
+        // Skip the placeholder a diagram/mermaid/table occupies (edited in the block editor below).
+        if (visualIdx.has(phIdx)) return null;
 
         return (
-          <div key={idx}>
-            <label className="text-[10px] text-gray-500 uppercase tracking-wider">
+          <div key={phIdx}>
+            <label className={`text-[10px] uppercase tracking-wider ${over ? "text-[#F87171]" : "text-gray-500"}`}>
               {label}
-              <span className="text-gray-600 ml-1">(idx {idx})</span>
+              {!isGroup && <span className="text-gray-600 ml-1">(idx {phIdx})</span>}
             </label>
             <textarea
               value={currentText}
-              onChange={(e) => updatePlaceholder(idx, e.target.value)}
-              rows={idx === "1" || idx === "2" ? 6 : 2}
+              onChange={(e) => updatePlaceholder(contentIdx, e.target.value)}
+              rows={isGroup ? 4 : phIdx === "1" || phIdx === "2" ? 6 : 2}
               className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white font-mono resize-y"
-              placeholder={label}
+              placeholder={isGroup ? "### 見出し\n本文…" : label}
             />
           </div>
         );

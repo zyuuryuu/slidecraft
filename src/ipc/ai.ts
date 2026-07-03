@@ -9,7 +9,7 @@
 import { generateWithClaude } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
 import { appFetch } from "./app-fetch";
-import { systemPromptForMode } from "../engine/llm-prompts";
+import { systemPromptForMode, type DiagramType } from "../engine/llm-prompts";
 
 export type ProviderId = "claude" | "openai" | "openrouter" | "ollama" | "builtin" | "custom";
 
@@ -86,8 +86,10 @@ export interface AiRequest {
   apiKey: string;
   baseURL: string;
   model: string;
-  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit";
+  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route";
   userRequest: string;
+  /** For the diagram / diagram-edit modes: which of the 12 shapes to emit (Stage 2). Omitted → flowchart. */
+  diagramType?: DiagramType;
   onText?: (fullText: string) => void;
   signal?: AbortSignal;
   /** Local-model-only mode: hard-block any non-local target. */
@@ -110,7 +112,7 @@ export function generateWithAI(req: AiRequest): Promise<string> {
   // turns into correct layouts); "slide" edits one slide (token-cheap);
   // "diagram" generates / "diagram-edit" revises a DiagramSpec.
   const today = new Date().toISOString().slice(0, 10);
-  const system = systemPromptForMode(req.mode, today);
+  const system = systemPromptForMode(req.mode, today, req.diagramType);
 
   if (req.provider === "claude") {
     return generateWithClaude({

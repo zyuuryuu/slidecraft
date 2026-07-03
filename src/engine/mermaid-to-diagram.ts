@@ -29,6 +29,15 @@ export function validateDiagramSource(text: string, format: DiagramFormat): stri
     return `Parse error: ${e instanceof Error ? e.message : String(e)}`;
   }
 
+  // Reject an object carrying UNKNOWN top-level keys — a prose preamble ("はい、こちらが図です:") parses
+  // into a stray key, so Zod (which strips unknowns) would otherwise accept prose-contaminated YAML as a
+  // valid diagram. The allowed set is derived from the schema itself, so it can't drift.
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const allowed = new Set(Object.keys(DiagramSpecSchema.shape));
+    const unknown = Object.keys(data as Record<string, unknown>).filter((k) => !allowed.has(k));
+    if (unknown.length > 0) return `想定外のキー: ${unknown.slice(0, 3).join(", ")}（説明文の混入の可能性）`;
+  }
+
   const result = DiagramSpecSchema.safeParse(data);
   if (!result.success) {
     return (
