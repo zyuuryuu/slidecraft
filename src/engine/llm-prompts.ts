@@ -7,14 +7,24 @@
  */
 
 import { LAYOUT_NAMES } from "./slide-schema";
-import { iconCatalogPromptList } from "./icon-catalog";
 import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt } from "./deck-plan-prompts";
+import { diagramSystemPrompt, diagramEditSystemPrompt, type DiagramType } from "./diagram-type-prompts";
+
+// The diagram prompt surface moved to diagram-type-prompts.ts (two-stage per-type design); re-export so
+// existing importers of these names keep resolving them from here.
+export { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, parseDiagramType, DIAGRAM_TYPES } from "./diagram-type-prompts";
+export type { DiagramType, DiagramTypeInfo } from "./diagram-type-prompts";
 
 /** The SYSTEM prompt actually sent for a given AI mode — the SAME selection ipc/ai.ts
  *  uses, exported so the task panel can show exactly what was sent. `today` is only used
- *  by the "slides" (whole-deck generation) prompt. "condense" is the harness refine residue:
- *  a Markdown-ONLY sub-prompt (no design-ops branch) so a small in-app model stays on format. */
-export function systemPromptForMode(mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit", today: string): string {
+ *  by the "slides" (whole-deck generation) prompt; `diagramType` picks the ONE diagram shape
+ *  fragment for the diagram / diagram-edit modes (Stage 2 of the two-stage design). "condense" is the
+ *  harness refine residue: a Markdown-ONLY sub-prompt (no design-ops branch) so a small model stays on format. */
+export function systemPromptForMode(
+  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit",
+  today: string,
+  diagramType?: DiagramType,
+): string {
   return mode === "slides"
     ? deckPlanSystemPrompt(today)
     : mode === "slide"
@@ -22,8 +32,8 @@ export function systemPromptForMode(mode: "slides" | "slide" | "condense" | "dia
       : mode === "condense"
         ? slideCondensePrompt()
         : mode === "diagram-edit"
-          ? diagramEditSystemPrompt()
-          : diagramSystemPrompt();
+          ? diagramEditSystemPrompt(diagramType)
+          : diagramSystemPrompt(diagramType);
 }
 
 // ── Slide deck prompt ──
@@ -122,107 +132,10 @@ export function generateSlidePrompt(userRequest: string): string {
   return `${slideSystemPrompt()}\n\n## User Request\n\n${userRequest}`;
 }
 
-// ── Diagram prompt ──
+// ── Diagram prompt (manual-copy) — the SHAPE prompts moved to diagram-type-prompts.ts ──
 
-export function diagramSystemPrompt(): string {
-  return `You are a technical diagram assistant. Generate a DiagramSpec JSON for SlideCraft based on the user's description.
-
-## Output Format
-
-Return a single JSON object with this schema:
-
-\`\`\`json
-{
-  "type": "flowchart",       // "flowchart", "network", or "orgchart"
-  "direction": "TB",         // "TB", "LR", "BT", "RL"
-  "title": "Diagram Title",
-  "classDefs": {
-    "className": {
-      "fill": "#1E2761",     // background color (hex)
-      "border": "#3B82F6",   // border color (hex, optional)
-      "font_color": "#FFFFFF", // text color (hex)
-      "font_size": 10        // font size in pt
-    }
-  },
-  "nodes": [
-    {
-      "id": "unique_id",     // lowercase, no spaces
-      "label": "Display Name",
-      "shape": "rect",       // "rect", "rounded_rect", "diamond", "circle", "oval", "hexagon"
-      "icon": "server",      // optional, a built-in icon name (see "Available Icons")
-      "class": "className",  // references classDefs
-      "group": "groupId"     // optional, references groups
-    }
-  ],
-  "edges": [
-    {
-      "from": "node_id_1",
-      "to": "node_id_2",
-      "label": "optional label",
-      "style": { "dash": true }  // optional, for dashed lines
-    }
-  ],
-  "groups": [
-    {
-      "id": "groupId",
-      "label": "Group Display Name"
-    }
-  ],
-  "layout": {
-    "node_width": 2.0,       // inches
-    "node_height": 0.7,
-    "h_gap": 0.5,
-    "v_gap": 0.8
-  }
-}
-\`\`\`
-
-## Color Palette (Midnight Executive Theme)
-
-Use these colors for a professional look:
-- Navy: #1E2761 (primary dark)
-- Dark Navy: #141B41
-- Accent Blue: #3B82F6
-- Teal: #06B6D4
-- Amber: #F59E0B
-- White: #FFFFFF
-- Light Gray: #F5F7FA
-- Mid Gray: #94A3B8
-- Dark Text: #1E293B
-
-## Available Icons
-
-Set a node's "icon" to one of these built-in names to draw a small native glyph
-inside the node (ideal for network / system / infrastructure diagrams):
-
-${iconCatalogPromptList()}
-
-## Rules
-
-- Use meaningful, short IDs (lowercase, underscores OK)
-- Labels can include \\n for line breaks
-- Use classDefs to define reusable styles, then reference with "class"
-- Use groups to visually organize related nodes
-- For network diagrams, use type "network"
-- For org charts, use type "orgchart"
-- For network/system diagrams, add an "icon" to each node from the list above
-- Use ONLY icon names from "Available Icons"; omit "icon" if none fits
-- Keep the diagram focused — typically 5-20 nodes
-- Return ONLY the JSON object, no explanation`;
-}
-
-export function generateDiagramPrompt(userRequest: string): string {
-  return `${diagramSystemPrompt()}\n\n## User Request\n\n${userRequest}`;
-}
-
-/** Edit an EXISTING diagram: same schema, but apply one change and keep the rest. */
-export function diagramEditSystemPrompt(): string {
-  return `${diagramSystemPrompt()}
-
-## Editing mode
-You are given the CURRENT diagram (as YAML) and an instruction. Apply ONLY what the
-instruction asks, keep everything else (ids, labels, styles, layout) intact, and
-return the FULL updated DiagramSpec as a single JSON object.`;
+export function generateDiagramPrompt(userRequest: string, type?: DiagramType): string {
+  return `${diagramSystemPrompt(type)}\n\n## User Request\n\n${userRequest}`;
 }
 
 // ── Combined prompt (user can choose) ──
@@ -230,8 +143,9 @@ return the FULL updated DiagramSpec as a single JSON object.`;
 export function generateCombinedPrompt(
   mode: "slides" | "diagram",
   userRequest: string,
+  diagramType?: DiagramType,
 ): string {
   return mode === "slides"
     ? generateSlidePrompt(userRequest)
-    : generateDiagramPrompt(userRequest);
+    : generateDiagramPrompt(userRequest, diagramType);
 }
