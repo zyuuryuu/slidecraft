@@ -25,8 +25,11 @@ let mermaidIdCounter = 0;
 
 
 // ── Direct Mermaid syntax renderer (for ```mermaid blocks) ──
-function MermaidDirect({ mermaidSyntax, width, height, instanceId }: { mermaidSyntax: string; width: string; height: string; instanceId?: string }) {
-  const [svg, setSvg] = useState("");
+function MermaidDirect({ mermaidSyntax, width, height, instanceId, svgCache }: { mermaidSyntax: string; width: string; height: string; instanceId?: string; svgCache?: string }) {
+  // svgCache = an export-time pre-rendered SVG (deck-html-export). Seeding it as the initial
+  // state makes the SVG present SYNCHRONOUSLY, so SSR (react-dom/server, no effects) captures it
+  // instead of an empty box. In the live preview svgCache is absent and the effect renders it.
+  const [svg, setSvg] = useState(svgCache ?? "");
   const cancelRef = useRef(false);
 
   useEffect(() => {
@@ -263,6 +266,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
                 width="100%"
                 height="100%"
                 instanceId={`mmd-${slideIndex}-${scale}`}
+                svgCache={slide.mermaidBlock!.svgCache}
               />
             </div>
           );

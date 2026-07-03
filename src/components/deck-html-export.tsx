@@ -13,26 +13,55 @@
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
+import { MERMAID_CONFIG } from "./mermaid";
 import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
+import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
 import { assembleHtmlDeck } from "../engine/html-shell";
 import type { DeckIR } from "../engine/slide-schema";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
 const SCALE = 96;
 
-export function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string } = {}): string {
+/**
+ * Pre-render NON-native ```mermaid (gitGraph/sankey/C4) to a self-contained SVG so it inlines
+ * synchronously under SSR (mermaid.render is async + DOM-bound, so it can't run during the render
+ * pass — same approach deck-export.ts uses for PPTX). Native types are skipped: SlideCard renders
+ * them via DiagramSvgOverlay synchronously. Runs in the WebView where `document` exists.
+ */
+async function preRenderNonNativeMermaid(deck: DeckIR): Promise<DeckIR> {
+  const isNonNative = (s: DeckIR["slides"][number]) => s.mermaidBlock && !mermaidToDiagramSpec(s.mermaidBlock.mermaid);
+  if (!deck.slides.some(isNonNative)) return deck;
+
+  const { default: mermaidLib } = await import("mermaid");
+  mermaidLib.initialize(MERMAID_CONFIG);
+  const slides = await Promise.all(
+    deck.slides.map(async (slide, i) => {
+      if (!isNonNative(slide)) return slide;
+      try {
+        const { svg } = await mermaidLib.render(`html-mmd-${i}`, slide.mermaidBlock!.mermaid);
+        return { ...slide, mermaidBlock: { ...slide.mermaidBlock!, svgCache: svg } };
+      } catch {
+        return slide; // render failed → left without svgCache (empty box), but we tried
+      }
+    }),
+  );
+  return { ...deck, slides };
+}
+
+export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string } = {}): Promise<string> {
+  const prepared = await preRenderNonNativeMermaid(deck);
   const catalog = buildCatalog(template);
 
-  const slideHtmls = deck.slides.map((slide, i) => {
+  const slideHtmls = prepared.slides.map((slide, i) => {
     // Resolve the layout exactly as SlidePreview does (autoSelectLayout honors/degrades pins),
     // so slide→layout→placeholder binding matches the on-screen preview.
-    const layout = findLayout(template, autoSelectLayout(slide, i, deck.slides.length, catalog));
+    const layout = findLayout(template, autoSelectLayout(slide, i, prepared.slides.length, catalog));
     return renderToStaticMarkup(
       <SlideCard
         slide={slide}
         slideIndex={i}
-        totalSlides={deck.slides.length}
+        totalSlides={prepared.slides.length}
         layout={layout}
         masterBgColor={template.masterBgColor}
         masterDecorations={template.masterDecorations}

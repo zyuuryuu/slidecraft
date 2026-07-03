@@ -66,7 +66,7 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
   const handleExportHtml = useCallback(async () => {
     if (!deck || !templateData) return;
     const base = (filePath ?? "slides").replace(/\.[^./\\]+$/, "");
-    const html = renderDeckToHtml(deck, templateData, { title: base });
+    const html = await renderDeckToHtml(deck, templateData, { title: base });
     await saveTextFile(html, `${base}.html`, ["html"], "HTML");
   }, [deck, templateData, filePath]);
 
