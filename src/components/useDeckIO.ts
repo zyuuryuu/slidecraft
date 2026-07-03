@@ -8,6 +8,7 @@
 import { useState, useCallback } from "react";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
+import { renderDeckToHtml } from "./deck-html-export";
 import { serializeMd } from "../engine/md-serializer";
 import { bundleProject, openProject } from "../engine/project-io";
 import type { DeckIR } from "../engine/slide-schema";
@@ -60,6 +61,15 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     }
   }, [deck, templateData, setParseError]);
 
+  // Export a self-contained standalone HTML presentation (docs/design/html-output.md).
+  // Reuses the SAME SlideCard the preview mounts (SSR), so the .html matches the deck 1:1.
+  const handleExportHtml = useCallback(async () => {
+    if (!deck || !templateData) return;
+    const base = (filePath ?? "slides").replace(/\.[^./\\]+$/, "");
+    const html = renderDeckToHtml(deck, templateData, { title: base });
+    await saveTextFile(html, `${base}.html`, ["html"], "HTML");
+  }, [deck, templateData, filePath]);
+
   // Save the PROJECT — deck + template in one self-contained .slidecraft (reopen losslessly).
   const handleSaveProject = useCallback(async () => {
     if (!deck || !templateData) return;
@@ -87,5 +97,5 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     }
   }, [openDoc, setParseError]);
 
-  return { generating, handleOpen, handleSave, handleGenerate, handleSaveProject, handleOpenProject };
+  return { generating, handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject };
 }
