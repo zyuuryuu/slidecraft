@@ -51,8 +51,16 @@ describe("apply routing does not mistake Markdown/text for a figure", () => {
   it("a normal Markdown edit falls through (not mistaken for a figure)", () => {
     expect(applyFigureYaml(figSlide, "# 新見出し\n\n- 要点A\n- 要点B")).toBeNull();
   });
-  it("a diagram-less slide is left to the Markdown path (add-figure is out of scope here)", () => {
-    expect(applyFigureYaml(textSlide, YAML)).toBeNull();
+  it("ADDS a figure to a text slide and keeps the body via coexist (#3B)", () => {
+    const r = applyFigureYaml(textSlide, YAML);
+    expect(r).not.toBeNull();
+    expect(r!.diagram).toBeDefined();
+    // the existing body text SURVIVES (adding a figure must not destroy the bullets) …
+    const bodyText = r!.placeholders.flatMap((p) => p.paragraphs.flatMap((par) => par.segments.map((s) => s.text))).join("");
+    expect(bodyText).toContain("本文");
+    // … and text + figure sit in DIFFERENT regions (coexist, not the figure hiding the text)
+    const textPh = r!.placeholders.find((p) => p.paragraphs.some((par) => par.segments.some((s) => s.text.includes("本文"))))!;
+    expect(textPh.idx).not.toBe(r!.diagram!.placeholderIdx);
   });
 });
 

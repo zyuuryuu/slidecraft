@@ -25,9 +25,12 @@ describe("applyFigureYaml", () => {
     expect(applyFigureYaml(withDiagram, "# タイトル\n\n- 箇条書き")).toBeNull();
   });
 
-  it("returns null when the slide has no diagram (nothing to edit)", () => {
+  it("ADDS a figure to a body-less slide (図無し→図追加, #3B)", () => {
     const noDiagram: SlideIR = { layout: "auto", placeholders: [] };
-    expect(applyFigureYaml(noDiagram, "type: flowchart\nnodes: []\nedges: []")).toBeNull();
+    const r = applyFigureYaml(noDiagram, "type: flowchart\nnodes: []\nedges: []");
+    expect(r).not.toBeNull();
+    expect(r!.diagram).toBeDefined();
+    expect(r!.diagram!.placeholderIdx).toBe("1"); // body-less → the figure fills the body
   });
 
   it("returns null for invalid diagram YAML (keeps the previous figure)", () => {
