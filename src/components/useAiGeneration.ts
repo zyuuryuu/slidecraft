@@ -13,6 +13,9 @@ import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import { parseJsonLoose } from "../engine/json-salvage";
 import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
+import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
+/** Diagram-mode type choice: a concrete shape, or "auto" → Stage-1 routing picks it. */
+export type DiagramTypeChoice = DiagramType | "auto";
 import { runningInTauri } from "../ipc/commands";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
@@ -43,6 +46,7 @@ export interface AiTask {
   result: string; // streamed live, then post-processed on done
   error?: string;
   notice?: string; // non-blocking 告知 (e.g. deterministic-repair dropped a corrupt unit)
+  diagramType?: DiagramTypeChoice; // diagram mode: chosen shape ("auto" → resolved by the route call)
   startedAt: number;
   finishedAt?: number;
 }
@@ -238,8 +242,8 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
 
-  const enqueue = useCallback((prompt: string, mode: AiMode, label: string): AiTask => {
-    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode, label, prompt, status: "running", result: "", startedAt: Date.now() };
+  const enqueue = useCallback((prompt: string, mode: AiMode, label: string, diagramType?: DiagramTypeChoice): AiTask => {
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode, label, prompt, status: "running", result: "", startedAt: Date.now(), ...(diagramType ? { diagramType } : {}) };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     return task;
   }, []);
@@ -262,9 +266,26 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
         if (provider === "builtin" && !baseURL.trim() && startBuiltinRef.current) {
           baseURL = await startBuiltinRef.current();
         }
+        // Stage 1 (diagram, おまかせ): resolve the TYPE with a quick route call so Stage 2 sends ONLY that
+        // type's shape prompt. A concrete user choice skips the call; a parse miss falls back to flowchart.
+        let diagramType: DiagramType | undefined;
+        if (task.mode === "diagram" && task.diagramType) {
+          if (task.diagramType === "auto") {
+            const routed = await generateWithAI({
+              provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
+              mode: "diagram-route", userRequest: task.prompt,
+              signal: controller.signal, localOnly: localModelOnly,
+            });
+            diagramType = parseDiagramType(routed) ?? "flowchart";
+            patchTask(task.id, { diagramType });
+          } else {
+            diagramType = task.diagramType;
+          }
+        }
         const raw = await generateWithAI({
           provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
           mode: task.mode, userRequest: task.prompt,
+          ...(diagramType ? { diagramType } : {}),
           onText: (t) => patchTask(task.id, { result: t }),
           signal: controller.signal,
           localOnly: localModelOnly, // hard egress block at the chokepoint
@@ -319,10 +340,10 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   // result/generating/error reflect it. No single-flight guard — extra clicks just add
   // tasks (all kept in history); the UI disables the button while generating.
   const generate = useCallback(
-    (userRequest: string, mode: AiMode) => {
+    (userRequest: string, mode: AiMode, diagramType?: DiagramTypeChoice) => {
       if (!canGenerate(userRequest)) return;
       persistConfig();
-      const task = enqueue(userRequest, mode, MODE_LABEL[mode]);
+      const task = enqueue(userRequest, mode, MODE_LABEL[mode], diagramType);
       setActiveTaskId(task.id);
       void runTask(task).catch(() => {});
     },

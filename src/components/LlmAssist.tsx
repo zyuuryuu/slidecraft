@@ -12,11 +12,11 @@
  */
 
 import { useState, useCallback } from "react";
-import { generateCombinedPrompt } from "../engine/llm-prompts";
+import { generateCombinedPrompt, DIAGRAM_TYPES } from "../engine/llm-prompts";
 import { PROVIDERS, type ProviderId } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
 import LocalOnlyToggle from "./LocalOnlyToggle";
-import type { AiGeneration } from "./useAiGeneration";
+import type { AiGeneration, DiagramTypeChoice } from "./useAiGeneration";
 
 interface LlmAssistProps {
   isOpen: boolean;
@@ -31,6 +31,9 @@ interface LlmAssistProps {
 export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint, ai }: LlmAssistProps) {
   // The dialog only offers whole-deck or diagram generation (not single-slide).
   const [mode, setMode] = useState<"slides" | "diagram">("slides");
+  // Diagram type (Stage 1 of the two-stage design): "auto" lets the AI route; a concrete type sends
+  // only that shape's prompt (Stage 2). Ignored for slide-deck generation.
+  const [diagramType, setDiagramType] = useState<DiagramTypeChoice>("auto");
   const [userRequest, setUserRequest] = useState("");
 
   // Show/hide API key + manual copy/paste fallback (UI-only state).
@@ -44,14 +47,16 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   const handleGenerate = useCallback(() => {
     // Whole-deck generation gets the template's capabilities (kinds/columns/capacity).
     const req = mode === "slides" && templateHint ? `${templateHint}\n\n${userRequest}` : userRequest;
-    ai.generate(req, mode);
-  }, [ai, userRequest, mode, templateHint]);
+    ai.generate(req, mode, mode === "diagram" ? diagramType : undefined);
+  }, [ai, userRequest, mode, diagramType, templateHint]);
 
   const handleGeneratePrompt = useCallback(() => {
     if (!userRequest.trim()) return;
-    setPrompt(generateCombinedPrompt(mode, userRequest));
+    // Manual copy has no routing step, so "auto" falls back to the flowchart shape (undefined).
+    const dt = mode === "diagram" && diagramType !== "auto" ? diagramType : undefined;
+    setPrompt(generateCombinedPrompt(mode, userRequest, dt));
     setCopied(false);
-  }, [mode, userRequest]);
+  }, [mode, userRequest, diagramType]);
 
   const handleCopyPrompt = useCallback(async () => {
     await navigator.clipboard.writeText(prompt);
@@ -105,6 +110,21 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                 Diagram
               </button>
             </div>
+            {mode === "diagram" && (
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-xs text-gray-400 shrink-0">図の種類</label>
+                <select
+                  value={diagramType}
+                  onChange={(e) => setDiagramType(e.target.value as DiagramTypeChoice)}
+                  className="px-2 py-1 text-xs bg-[#1a1f3a] border border-[#2D3A6E] rounded text-white"
+                >
+                  <option value="auto">おまかせ（AIが選ぶ）</option>
+                  {Object.entries(DIAGRAM_TYPES).map(([t, info]) => (
+                    <option key={t} value={t}>{info.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <textarea
               value={userRequest}
               onChange={(e) => setUserRequest(e.target.value)}
