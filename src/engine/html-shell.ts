@@ -101,7 +101,9 @@ html,body{width:100%;height:100%;background:#0a0e1a;overflow:hidden;font-family:
 
 /* Print: one slide per page; motion + overview are screen-scoped above and never apply here. */
 @media print{
-  html,body{background:#fff;overflow:visible;width:auto;height:auto}
+  /* print-color-adjust:exact forces slide backgrounds/decorations/table fills to PRINT even when
+     the browser's "Background graphics" toggle is off (its default). Inherited → covers all slides. */
+  html,body{background:#fff;overflow:visible;width:auto;height:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .progress,.counter{display:none}
   /* The screen viewport is position:fixed;overflow:hidden — MUST be reset or it clips every
      slide onto the first printed page (the "all slides on one sheet" bug). */
