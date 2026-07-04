@@ -69,6 +69,15 @@ export async function pickBinaryFile(extensions: string[], label: string): Promi
   return file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null;
 }
 
+/** Yes/No confirmation — native dialog on desktop, window.confirm in a browser. */
+export async function confirmDialog(message: string, title?: string): Promise<boolean> {
+  if (isTauri) {
+    const { ask } = await import("@tauri-apps/plugin-dialog");
+    return ask(message, { title, kind: "warning" });
+  }
+  return window.confirm(message);
+}
+
 /** Save bytes via a native Save dialog (desktop) or a browser download. */
 export async function saveBinaryFile(bytes: Uint8Array, defaultName: string, extensions: string[], label: string): Promise<boolean> {
   if (isTauri) {

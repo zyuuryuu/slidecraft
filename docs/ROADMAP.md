@@ -25,6 +25,12 @@
 > - 自己完結（インライン CSS/JS・スライド送りナビゲーション）。図/表/コード/プレースホルダ描画を HTML に写像（既存の共有描画モデルを HTML レンダラに）。PPTX 出力と併存。
 > - **詳細設計＝[docs/design/html-output.md](design/html-output.md)**（2026-07-04・設計調査ワークフロー由来）。方針確定：**①スライドは `SlideCard` を SSR 再利用**（preview↔html はズレ構造的に不可能）、**②v1 は MVP 優先＝サイズ L**（印刷 `<text>` フォールバック・@font-face 埋め込み・オーバービューは後続の XL）、**③体験層は Web 流に磨く**（遷移アニメ・上品なシェル／ただしスライド DOM は不変・reflow 禁止）。図は `renderDiagramToSvg` を直接再利用。着手は S1（`SlideCard` の `exportMode`）から。
 
+> **テーマ2「テンプレ作成補助」**：
+>
+> - **詳細設計＝[docs/design/template-authoring.md](design/template-authoring.md)**（2026-07-04・ユーザ合意済み）。
+>   方針確定：**①スコープは登録支援＋新規生成の両方＋レジストリ永続化**、**②生成はゼロから（フル OOXML 生成）**、
+>   **③着手は登録支援（修復パイプライン）から**。読む側（`loadTemplate`→`assessTemplateHealth`）を検証ゲートとして再利用。
+
 > **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）**：
 >
 > 上流 AI（Claude Code 等）が MCP 経由でこのデッキを編集する体験を底上げする（北極星＝GUI ホスト・AI が Tools で編集・
