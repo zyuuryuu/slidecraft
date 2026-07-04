@@ -17,7 +17,8 @@ import { validateStructure, validateCondense } from "../engine/ai-validate";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair } from "./apply-template";
+import type { RepairPlan } from "../engine/template-repair";
 import type { DeckIR, SlideIR } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
@@ -180,6 +181,13 @@ export function useDeckController() {
   // (apply-template.ts). Reused by the top-bar loader AND the draft master picker (registry).
   const applyMasterBytes = useCallback(
     (buf: ArrayBuffer | Uint8Array, name: string) => applyTemplateBytes(buf, name, { setTemplateData, setTemplateName, setParseError }),
+    [setTemplateData, setTemplateName, setParseError],
+  );
+  // 修復オファーつき（テーマ2 スライス1）: rejected でも修復可能なら confirm に諮り「整形して取り込む」。
+  // インポート経路（新しい .pptx を取り込む時）だけが使う — レジストリ選択済みマスターは従来ゲートのまま。
+  const applyMasterBytesWithRepair = useCallback(
+    (buf: ArrayBuffer | Uint8Array, name: string, confirm: (plan: RepairPlan) => Promise<boolean>) =>
+      applyTemplateBytesWithRepair(buf, name, { setTemplateData, setTemplateName, setParseError }, confirm),
     [setTemplateData, setTemplateName, setParseError],
   );
 
@@ -519,7 +527,7 @@ export function useDeckController() {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
