@@ -97,11 +97,12 @@ end-to-end ループの手前半を実コードで検証した結果：
 MCP で AI が確実に見るのは (1) **tool description**（tool 一覧は常時 context）と (2) **編集ループで必ず呼ぶ tool の戻り値**
 のみ。resource は client 依存（Claude Code は @-mention で読めるので pull 経路としては有効）、prompt は人間 UI 前提で
 autonomous AI は自動起動しない → **push は前2者・resource/prompt は pull の floor**。
-- **契約ダイジェスト**（`contract` フィールド）を **セッション入口の全経路**に載せる：`open_project`/`new_project` の戻り
-  （stdio）＋ **`select_document` の戻り**（collab では AI は GUI が開いた doc を選ぶだけで open/new を呼ばない＝
-  red-team 修正3）。中身は**推測不能なアンカーに絞る**：`<!-- col/kpi/step -->` 区切り＋**このテンプレのレイアウト名**＋
+- **契約ダイジェスト**（`contract` フィールド）を **AI が doc に入る全経路**に載せる：`open_project`/`new_project` の戻り
+  （stdio）＋ **`select_document` の戻り**＋ **`list_documents` の各 doc 行**。最後が要るのは、collab で AI が GUI 開き doc に
+  `soleDocId` フォールバック（`entryOf`）で open/new/select を呼ばず着地しうるため（S1 増分2 の review 指摘）＝discovery の
+  list→operate 経路を塞ぐ。中身は**推測不能なアンカーに絞る**：`<!-- col/kpi/step -->` 区切り＋**このテンプレのレイアウト名**＋
   **budget**＋「**図は `get_diagram_types` を呼べ**／全文は `get_authoring_guide`」。汎用要約でなくアンカーだけにすることで
-  fat/thin ジレンマと「図が在ると気づかず text-only を書く」を同時に回避。
+  fat/thin ジレンマと「図が在ると気づかず text-only を書く」を同時に回避。belt＝`get_authoring_guide` の pull ＋ description アンカー。
 - **budget は `get_deck_issues` の戻りにも同梱**（編集ループが毎ターン呼ぶ tool＝`getDiagnostics` は既に budget を返す）。
 - `set_slide_markdown`/`new_project` の **description に短い書式アンカー**（区切りが在る・`get_authoring_guide` を呼べ）。
   ※description は静的でレイアウト名は載らない＝名前は戻り値ダイジェスト側で運ぶ。

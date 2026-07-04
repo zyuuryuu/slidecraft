@@ -131,7 +131,18 @@ export function getDiagnostics(s: Session): { budget: { maxBullets: number; char
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);
   const health = assessTemplateHealth(catalog);
-  return { summary: deckCapabilities(catalog, health.status), health, entries: catalog };
+  // Ship the body budget alongside the layout catalog so capabilities is actionable — the agent sees
+  // "this template holds ~N bullets/chars" without a separate get_deck_issues call.
+  return { summary: deckCapabilities(catalog, health.status), health, budget: budgetOf(catalog), entries: catalog };
+}
+
+/** Lean accessor for the authoring guides / contract digest: the loaded layout catalog + body budget
+ *  WITHOUT the capabilities summary + health assessment getCatalog computes (those ship only from
+ *  get_template_capabilities). The digest rides every session entry AND every list_documents row, so
+ *  it must not re-run deckCapabilities/assessTemplateHealth each time. requireLoaded → never-silent. */
+export function entriesAndBudget(s: Session): { entries: LayoutCatalog; budget: { maxBullets: number; charsPerBullet: number } | null } {
+  const { catalog } = requireLoaded(s);
+  return { entries: catalog, budget: budgetOf(catalog) };
 }
 
 /** Reject a structurally-unusable master (no title/body role even after recovery) at intake
