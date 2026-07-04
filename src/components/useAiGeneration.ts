@@ -18,6 +18,7 @@ import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
 /** Diagram-mode type choice: a concrete shape, or "auto" → Stage-1 routing picks it. */
 export type DiagramTypeChoice = DiagramType | "auto";
 import { runningInTauri } from "../ipc/commands";
+import { ensureEgressConsent } from "../ipc/egress-consent";
 
 export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
 /** Local-model-only toggle persists to its OWN key, UNCONDITIONALLY (a security setting
@@ -275,6 +276,10 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
         if (provider === "builtin" && !baseURL.trim() && startBuiltinRef.current) {
           baseURL = await startBuiltinRef.current();
         }
+        // Consent gate (ADR-0016 F1): the FIRST send to a non-preset cloud host prompts for an
+        // explicit OK (the request carries the API key); preset/local hosts pass silently, and a
+        // trusted host is remembered. Runs BEFORE any generateWithAI, so no key is sent unapproved.
+        await ensureEgressConsent(baseURL);
         // Stage 1 (diagram, おまかせ): resolve the TYPE with a quick route call so Stage 2 sends ONLY that
         // type's shape prompt. A concrete user choice skips the call; a parse miss falls back to flowchart.
         let diagramType: DiagramType | undefined;
