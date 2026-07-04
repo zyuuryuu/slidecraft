@@ -21,6 +21,8 @@ import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration
 import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog } from "./ipc/commands";
 import { describeRepairPlan } from "./components/apply-template";
+import TemplateCreator from "./components/TemplateCreator";
+import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 
 export default function App() {
   const {
@@ -59,6 +61,17 @@ export default function App() {
     const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
     setMasterId(entry.id);
   }, [registerMaster, applyMasterBytesWithRepair]);
+  // 新規テンプレ作成（テーマ2 S4）: スペック → template-writer で生成 → 通常のゲート経由で適用＋登録。
+  const [showTemplateCreator, setShowTemplateCreator] = useState(false);
+  const handleCreateTemplate = useCallback(async (spec: TemplateSpec) => {
+    const bytes = await writeTemplate(spec);
+    const r = await applyMasterBytes(bytes, spec.name);
+    if (r.ok) {
+      const entry = registerMaster(spec.name, bytes);
+      setMasterId(entry.id);
+    }
+    setShowTemplateCreator(false);
+  }, [registerMaster, applyMasterBytes]);
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
@@ -193,6 +206,7 @@ export default function App() {
             activeId={masterId}
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
+            onCreate={() => setShowTemplateCreator(true)}
             disabled={editLocked}
           />
         </div>
@@ -327,6 +341,12 @@ export default function App() {
         onFixDeterministic={handleFixIssue}
         onCursorLine={handleCursorLine}
         gotoLine={gotoLine}
+      />
+
+      <TemplateCreator
+        isOpen={showTemplateCreator}
+        onCancel={() => setShowTemplateCreator(false)}
+        onCreate={handleCreateTemplate}
       />
 
       <LlmAssist
