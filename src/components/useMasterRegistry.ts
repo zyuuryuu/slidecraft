@@ -4,10 +4,12 @@
  * this only tracks WHICH masters are available to choose.
  *
  * Slice 1a: in-memory backend — the bundled sample is always present, plus any master imported this
- * session. Slice 1b swaps the backend for desktop persistence (app-local-data via Rust) behind this
- * SAME interface (importMaster / getBytes / removeMaster), so the UI + wiring don't change.
+ * session. Slice 1b（テーマ2 S6）: デスクトップでは master-store（app-local-data）へ同じ
+ * インターフェースのまま永続化 — 起動時にハイドレートし、import/remove で書き添える。書込失敗や
+ * ブラウザ実行では in-memory 動作のみに縮退する（UI・配線は不変）。
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadPersistedMasters, persistMaster, unpersistMaster } from "../ipc/master-store";
 
 export interface MasterEntry {
   id: string;
@@ -38,6 +40,30 @@ export function useMasterRegistry() {
   const mastersRef = useRef<MasterEntry[]>([BUILTIN_MASTER]);
   const bytesRef = useRef<Map<string, Uint8Array>>(new Map());
 
+  // Slice 1b: 起動時に保存済みマスターをハイドレート（デスクトップのみ・ブラウザは即 []）。
+  // StrictMode の二重実行は ref でガード。採番 seq は保存 id の最大値まで進めて衝突を防ぐ。
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    loadPersistedMasters()
+      .then((persisted) => {
+        if (persisted.length === 0) return;
+        const entries: MasterEntry[] = [];
+        for (const m of persisted) {
+          if (mastersRef.current.some((e) => e.id === m.id)) continue;
+          const taken = [...mastersRef.current, ...entries].map((e) => e.name);
+          entries.push({ id: m.id, name: uniqueName(m.name, taken), builtin: false });
+          bytesRef.current.set(m.id, m.bytes);
+          seq = Math.max(seq, Number(m.id.slice(1)));
+        }
+        const next = [...mastersRef.current, ...entries];
+        mastersRef.current = next;
+        setMasters(next);
+      })
+      .catch(() => {}); // 読めなくても in-memory レジストリとして成立する
+  }, []);
+
   /** Register imported .pptx bytes as a new master and return its entry (already selectable). */
   const importMaster = useCallback((rawName: string, bytes: Uint8Array): MasterEntry => {
     const id = `m${++seq}`;
@@ -47,6 +73,7 @@ export function useMasterRegistry() {
     mastersRef.current = next;
     setMasters(next);
     bytesRef.current.set(id, bytes);
+    void persistMaster(id, name, bytes).catch(() => {}); // 書込失敗しても登録自体は有効（セッション内）
     return entry;
   }, []);
 
@@ -71,6 +98,7 @@ export function useMasterRegistry() {
     mastersRef.current = next;
     setMasters(next);
     bytesRef.current.delete(id);
+    void unpersistMaster(id).catch(() => {});
   }, []);
 
   return { masters, importMaster, getBytes, removeMaster };
