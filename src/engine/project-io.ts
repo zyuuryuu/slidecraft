@@ -33,6 +33,23 @@ function assertDeckBounds(deck: DeckIR): void {
   }
 }
 
+/** Drop the render-only `svgCache` from every mermaidBlock of an UNTRUSTED deck.
+ *  svgCache is a recomputable render cache (UI/export re-render it from `.mermaid`
+ *  via mermaid's securityLevel:"strict"). A value PERSISTED in a hand-crafted
+ *  deck.json is an XSS carrier: it reaches MermaidDirect's dangerouslySetInnerHTML
+ *  (and the CSP-less HTML export) WITHOUT that sanitizing render. Stripping it on
+ *  open forces a fresh, safe re-render. See ADR-0016 F2. */
+function stripSvgCache(deck: DeckIR): DeckIR {
+  return {
+    ...deck,
+    slides: deck.slides.map((s) =>
+      s.mermaidBlock?.svgCache
+        ? { ...s, mermaidBlock: { ...s.mermaidBlock, svgCache: undefined } }
+        : s,
+    ),
+  };
+}
+
 /** Bundle the deck + its template into a `.slidecraft` zip (Uint8Array). */
 export async function bundleProject(
   deck: DeckIR,
@@ -57,8 +74,9 @@ export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ de
     throw new Error("不正な .slidecraft ファイルです（deck.json / template.pptx が見つかりません）");
   }
   // Stream-capped decompression (zip-bomb safe) → schema validation → bounds.
-  const deck = DeckIRSchema.parse(JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson)));
-  assertDeckBounds(deck);
+  const parsed = DeckIRSchema.parse(JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson)));
+  assertDeckBounds(parsed);
+  const deck = stripSvgCache(parsed); // untrusted svgCache is an XSS carrier — force fresh re-render (ADR-0016 F2)
   const template = await loadTemplate(await readCappedBytes(tplFile, ZIP_LIMITS.templatePptx));
   // meta is non-critical — validate, but fall back to defaults rather than reject the file.
   let meta: ProjectMeta = { version: 0, templateName: "", savedAt: "" };

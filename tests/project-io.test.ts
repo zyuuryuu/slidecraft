@@ -38,4 +38,26 @@ describe("project-io (.slidecraft bundle)", () => {
     const empty = await new JSZip().generateAsync({ type: "uint8array" });
     await expect(openProject(empty)).rejects.toThrow(/slidecraft/);
   });
+
+  it("strips a persisted svgCache on open (F2 XSS carrier — ADR-0016)", async () => {
+    // A hand-crafted deck.json can smuggle a malicious pre-rendered svgCache that reaches
+    // MermaidDirect's dangerouslySetInnerHTML (and the CSP-less HTML export) WITHOUT passing
+    // through mermaid's securityLevel:"strict" render. svgCache is a recomputable render
+    // cache, so open MUST drop it and force a fresh, sanitized re-render.
+    const base = parseMd(DECK_MD);
+    const XSS = "<svg xmlns='http://www.w3.org/2000/svg'><image href='x' onerror='alert(document.domain)'/></svg>";
+    const poisoned = {
+      ...base,
+      slides: [
+        { ...base.slides[0], mermaidBlock: { mermaid: "gitGraph\n  commit", placeholderIdx: "1", svgCache: XSS } },
+        ...base.slides.slice(1),
+      ],
+    };
+    const opened = await openProject(await bundleProject(poisoned, template, { templateName: "T", savedAt: "x" }));
+    for (const s of opened.deck.slides) {
+      expect(s.mermaidBlock?.svgCache).toBeUndefined(); // no attacker SVG survives the load
+    }
+    // the mermaid SOURCE is preserved — only the render cache is dropped
+    expect(opened.deck.slides[0].mermaidBlock?.mermaid).toBe("gitGraph\n  commit");
+  });
 });

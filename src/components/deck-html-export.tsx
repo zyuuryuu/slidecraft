@@ -77,5 +77,18 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
     transition: opts.transition,
     stageW: SLIDE_W * SCALE,
     stageH: SLIDE_H * SCALE,
+    cspNonce: makeNonce(), // locks the exported .html under a CSP (ADR-0016 F2)
   });
+}
+
+/** Per-export random nonce for the exported document's CSP (the inline nav script gets it;
+ *  injected inline script won't). The WebView always has crypto; the fallback is dead code. */
+function makeNonce(): string {
+  const c = globalThis.crypto;
+  if (c?.getRandomValues) {
+    const b = new Uint8Array(16);
+    c.getRandomValues(b);
+    return btoa(String.fromCharCode(...b)).replace(/[+/=]/g, "");
+  }
+  return "nsc" + (c?.randomUUID ? c.randomUUID() : "fallback").replace(/-/g, "");
 }

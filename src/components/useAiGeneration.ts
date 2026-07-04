@@ -18,8 +18,9 @@ import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
 /** Diagram-mode type choice: a concrete shape, or "auto" → Stage-1 routing picks it. */
 export type DiagramTypeChoice = DiagramType | "auto";
 import { runningInTauri } from "../ipc/commands";
+import { ensureEgressConsent } from "../ipc/egress-consent";
+import { AI_CONFIG_STORAGE, saveAiConfig, loadAiConfig, clearAiConfig } from "../ipc/key-store";
 
-export const AI_CONFIG_STORAGE = "slidecraft_ai_config";
 /** Local-model-only toggle persists to its OWN key, UNCONDITIONALLY (a security setting
  *  must not depend on the "remember API key" opt-in that gates AI_CONFIG_STORAGE). */
 export const LOCAL_ONLY_STORAGE = "slidecraft_local_only";
@@ -131,6 +132,31 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   // Holds startBuiltin so runTask (defined earlier) can auto-start the runtime on first use
   // without a forward reference. Populated by an effect below.
   const startBuiltinRef = useRef<null | (() => Promise<string>)>(null);
+
+  // Reconcile the persisted AI config from the OS keychain (desktop). It's an ASYNC read, so it
+  // can't seed the sync initial state above — apply it on mount (and migrate any legacy localStorage
+  // blob up into the keychain; see key-store). On a box with no keychain backend this transparently
+  // reads the localStorage fallback instead. ADR-0016 F3.
+  useEffect(() => {
+    let cancelled = false;
+    void loadAiConfig().then((raw) => {
+      if (cancelled || !raw) return;
+      try {
+        const parsed = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<AiConfigMap> };
+        if (parsed.configs) {
+          setConfigs((c) => ({ ...c, ...parsed.configs }));
+          if (parsed.provider) setProvider(parsed.provider);
+          setRememberKey(true);
+          hadSavedConfig.current = true; // don't let the fresh-install auto-select clobber a saved choice
+        }
+      } catch {
+        /* malformed persisted config → keep current state */
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Probe local Ollama once, so the UI can surface it — and, on a fresh install
   // (no saved config), auto-select it so a local-AI user can generate immediately.
@@ -275,6 +301,10 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
         if (provider === "builtin" && !baseURL.trim() && startBuiltinRef.current) {
           baseURL = await startBuiltinRef.current();
         }
+        // Consent gate (ADR-0016 F1): the FIRST send to a non-preset cloud host prompts for an
+        // explicit OK (the request carries the API key); preset/local hosts pass silently, and a
+        // trusted host is remembered. Runs BEFORE any generateWithAI, so no key is sent unapproved.
+        await ensureEgressConsent(baseURL);
         // Stage 1 (diagram, おまかせ): resolve the TYPE with a quick route call so Stage 2 sends ONLY that
         // type's shape prompt. A concrete user choice skips the call; a parse miss falls back to flowchart.
         let diagramType: DiagramType | undefined;
@@ -322,8 +352,10 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   );
 
   const persistConfig = useCallback(() => {
-    if (rememberKey) localStorage.setItem(AI_CONFIG_STORAGE, JSON.stringify({ provider, configs }));
-    else localStorage.removeItem(AI_CONFIG_STORAGE);
+    // Persist the config (incl. the BYOK key) to the OS keychain on desktop, else localStorage
+    // (ADR-0016 F3). Fire-and-forget: a keychain write must not block the generate path.
+    if (rememberKey) void saveAiConfig(JSON.stringify({ provider, configs }));
+    else void clearAiConfig();
   }, [rememberKey, provider, configs]);
 
   // Background submit (no foreground tracking) → returns the task id. Errors are

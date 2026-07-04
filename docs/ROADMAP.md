@@ -8,16 +8,15 @@
 まで完了（PR #58）。**UI 磨き込み**（AI Assist＋協働を1つの ✨AI ドックにタブ統合・マスターピッカーを Top/Draft 共通の
 単一プルダウンに刷新・Draft ヘッダ整理）も反映（PR #59）。機能フェーズは **テーマ1「HTML 出力」**
 （MVP・表現力・印刷/PDF 堅牢化・図テキスト SVG `<text>` 統一 [ADR-0013](adr/0013-svg-native-text.md)・PR #60–#63）と
-**テーマ2「テンプレ作成補助」**（[ADR-0014](adr/0014-template-authoring.md)）が完了。詳細は開発メモリ
-`html_output_design` / `roadmap_post_p2`。
+**テーマ2「テンプレ作成補助」**（[ADR-0014](adr/0014-template-authoring.md)）・**テーマ3「MCP ブラッシュアップ」**
+（[ADR-0015](adr/0015-mcp-brushup.md)）・**テーマ4「セキュリティレビュー」**（監査完了・[ADR-0016](adr/0016-security-review-theme4.md)）が完了。
+**named 主要テーマ 1〜4 は全て完了**（テーマ4 の是正 F1〜F4 はバックログ）。詳細は開発メモリ `html_output_design` / `roadmap_post_p2`。
 
 ---
 
 ## 次の主要テーマ（優先順）
 
-| # | テーマ | 一行 | サイズ |
-| --- | --- | --- | --- |
-| 4 | **セキュリティレビュー** | 配布/自動化を前提に攻撃面を全面監査：MCP の認証/scope/egress・シークレット(BYOK)・依存/供給網・信頼モデル | M〜L |
+**named 主要テーマ（1〜4）は全て完了。** 残りは下記バックログ（＝テーマ4 監査で確定した是正 F1〜F4 を含む）と運用項目。
 
 > テーマ1「HTML 出力」（大マイルストーン）は **完了**（2026-07-04・[ADR-0013](adr/0013-svg-native-text.md)・
 > 設計＝[docs/design/html-output.md](design/html-output.md)）。MVP＋表現力（遷移/オーバービュー/選択UI）＋
@@ -34,17 +33,11 @@
 > `get_slide`＋text スライドへ図追加・決定論 hints＋split の changedSlides。各スライスを敵対レビュー通過（全 982 tests・
 > schema 変更なし）。後続の小粒（S2 増分2＝`list_/use_template`）はバックログ参照。
 
-> **テーマ4「セキュリティレビュー」（配布/自動化前提の全面監査）**：
->
-> 配布（Tauri デスクトップ）＋自動化（MCP 経由で上流 AI がデッキを編集）を前提に、攻撃面を全面監査。土台は
-> [ADR-0010](adr/0010-security-model.md)。**Tauri backend は既にスコープ済み fs プラグイン＋CSP 設定済み**
-> ＝旧「任意パス read/write」「csp:null」は解消済み（[[security_present_holes]] は要更新）。残る主なレビュー領域：
->
-> - **MCP surface**：per-launch トークン・path scope・egress（local-only モード）・OS ユーザ信頼モデルの再点検
->   （テーマ3 MCP ブラッシュアップと連動）。
-> - **シークレット / BYOK**：API キーの保存（localStorage）・ログ露出・組み込み AI ランタイムの egress。
-> - **依存 / 供給網**：`sbom.yml`・dependabot・`security.yml` の運用（Actions 再有効化と連動）。
-> - サイズ M〜L。`/security-review` skill ＋手動監査。結論は `docs/adr/`（ADR-0010 更新 or 追補）へ。
+> テーマ4「セキュリティレビュー」（配布/自動化前提の全面監査）は **監査完了**（2026-07-04・[ADR-0016](adr/0016-security-review-theme4.md)・
+> [ADR-0010](adr/0010-security-model.md) を supersede せず補追）。5 サーフェス並列 read-only 監査（MCP＋協働ホスト／BYOK＋egress／
+> Tauri backend＋モデルDL／供給網＋CI／XSS＋untrusted 入力）で **ADR-0010 の中核ガードは実挙動として成立を確認**（token 境界・
+> loopback・no-fs・zip 硬化・spawn 安全・モデルDL整合性・prototype 汚染不発）。検出した是正 **F1〜F4 はコード未実装＝下記バックログ**
+> に起票（ユーザ選択＝レポート＋ADR 記録に留め、実装は後続）。詳細は [ADR-0016](adr/0016-security-review-theme4.md)。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 
@@ -54,6 +47,11 @@
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
+| 🔒 セキュリティ F1（egress・右サイズ）｜**DONE** | **実装済**（PR #66）：`baseURL` https-only 検証（`assertValidBaseURL`＝`src/ipc/ai.ts`）＋**非プリセット cloud host への送信に明示同意ゲート**（`ensureEgressConsent`＝`src/ipc/egress-consent.ts`・`runTask` 挿入・承認済みは記憶）。F2 で XSS carrier が塞がり capability 縮小の限界価値が下がったため右サイズ版を採用。詳細＝[ADR-0016](adr/0016-security-review-theme4.md) F1 | — |
+| 🔒 セキュリティ F1'（egress hard boundary）｜LOW（保留） | 保留（F2 で前提縮小）：`http:default` の `https://**` を CSP 一致 allowlist（3 AI API＋`huggingface.co`＋`cdn-lfs*.huggingface.co`〔モデルDL の LFS CDN 302 先・含めないと DL 破綻〕＋loopback）に縮小し、承認済み custom host を **Rust 側 egress ゲート**（reqwest・host allowlist 強制）で通す実境界化。streaming fetch の Rust 越し再実装を要し大きめ。触点: `src-tauri/capabilities/default.json`・Rust command・`src/ipc/app-fetch.ts` | M |
+| 🔒 セキュリティ F2（svgCache XSS）｜HIGH | 永続 `mermaidBlock.svgCache`（untrusted `deck.json` 文字列）が `mermaid.render()` を経ず `dangerouslySetInnerHTML` へ直行（`SlidePreview.tsx:68`）＋**エクスポート HTML に CSP 無し**（`html-shell.ts`）で共有先発火。**root-cause＝open 時に svgCache 破棄/再計算**＋エクスポート shell に CSP `<meta>`＋SlideCard SVG sink を DOMPurify。[ADR-0016](adr/0016-security-review-theme4.md) F2 | S〜M |
+| 🔒 セキュリティ F3（キー at-rest）｜**DONE** | **実装済**（PR #66・best-effort keychain）：API キーを含む config を OS keychain（`keyring` crate＋`secret_store.rs`）へ保存し localStorage 平文を排除、backend 無しは localStorage フォールバック＋旧 blob 移行（`src/ipc/key-store.ts`）。**実 keychain 往復は WSL 開発機で未確認＝Windows/macOS 要検証**。完全な JS ヒープ切り離しは F1' 別途。[ADR-0016](adr/0016-security-review-theme4.md) F3 | — |
+| 🔒 セキュリティ F4（供給網・小粒）｜**大半 DONE** | **実装済**（PR #66）：`stage-node.mjs` に SHA256 ピン止め（6 ターゲット・展開前検証）＋`esc()`（`svg-writer.ts`）に `'`→`&#39;`。fs `allow-remove`/`allow-mkdir` は **master-store が使用中**（masters/ スコープ）＝削減不可。**残（運用・CI 依存）**：CI 再有効化時に npm audit high を required 化＋`continue-on-error` 見直し・npm high は `mermaid→chevrotain→lodash-es`（runtime 到達）優先。[ADR-0016](adr/0016-security-review-theme4.md) F4 | S |
 | MCP: テンプレ選択（S2 増分2） | `list_templates`/`use_template(id)` で登録済みテンプレを AI が選べるように。GUI の master レジストリ（`useMasterRegistry`/`src/ipc/master-store.ts`＝Tauri fs 裏）を `HostContext` に accessor 注入する host 機能で GUI 側実装と対。stdio は `create_template`／bytes 持参で代替可。[ADR-0015](adr/0015-mcp-brushup.md) の残タスク | S〜M |
 | MCP: エラー契約の完全統一 | ガード系 throw（範囲外 index・未オープン）を `{ok:false, error, code?}` に寄せ、`isError` を un-modeled crash 専用に。現状はドメイン拒否＝`{ok:false}`／呼び出し・クラッシュ＝`isError` の2カテゴリで運用（`docs/mcp-server.md` に明記済） | S |
 | HTML出力: 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。監査 harness は再利用可（`html_output_design`） | M |

@@ -5,7 +5,7 @@
  * deck to a cloud endpoint. These tests are network-free (the block rejects up front).
  */
 import { describe, it, expect } from "vitest";
-import { isLocalBaseURL, isLocalTarget, generateWithAI } from "../src/ipc/ai";
+import { isLocalBaseURL, isLocalTarget, generateWithAI, assertValidBaseURL } from "../src/ipc/ai";
 
 describe("isLocalBaseURL", () => {
   it("accepts loopback / localhost / LAN (RFC1918)", () => {
@@ -42,6 +42,38 @@ describe("isLocalTarget", () => {
     expect(isLocalTarget("openai", "https://api.openai.com/v1")).toBe(false);
     expect(isLocalTarget("custom", "http://localhost:1234/v1")).toBe(true);
     expect(isLocalTarget("custom", "https://my-cloud.example.com/v1")).toBe(false);
+  });
+});
+
+describe("assertValidBaseURL (F1 — reject insecure/invalid endpoints before the key is attached)", () => {
+  it("accepts https cloud + any local (loopback/LAN may stay http)", () => {
+    for (const u of [
+      "https://api.openai.com/v1",
+      "https://my-proxy.example.com/v1",
+      "http://localhost:11434/v1",
+      "http://127.0.0.1:1234",
+      "http://192.168.1.5:8080",
+    ]) {
+      expect(() => assertValidBaseURL(u)).not.toThrow();
+    }
+  });
+  it("rejects http:// (or bare host) to a NON-local target — the Bearer key would leak in cleartext", () => {
+    expect(() => assertValidBaseURL("http://evil.example.com/v1")).toThrow(/https/);
+    expect(() => assertValidBaseURL("http://api.openai.com/v1")).toThrow(/https/);
+    expect(() => assertValidBaseURL("evil.example.com")).toThrow(/https/); // bare host defaults to insecure http
+  });
+  it("rejects empty / malformed URLs", () => {
+    expect(() => assertValidBaseURL("")).toThrow();
+    expect(() => assertValidBaseURL("   ")).toThrow();
+    expect(() => assertValidBaseURL("ht!tp://%%%")).toThrow();
+  });
+});
+
+describe("generateWithAI — rejects an insecure custom endpoint before any network call", () => {
+  it("throws on http:// to a remote host (key would leak in cleartext), even when localOnly is off", async () => {
+    await expect(
+      generateWithAI({ apiKey: "k", model: "m", mode: "slide", userRequest: "hi", provider: "custom", baseURL: "http://evil.example.com/v1" }),
+    ).rejects.toThrow(/https/);
   });
 });
 
