@@ -15,8 +15,12 @@
  *  - an overview grid ('o'): all slides as fixed-scale thumbnails, ZERO DOM duplication.
  *  - print CSS lays each slide one-per-page; motion/overview are @media screen only.
  *
- * The slide HTML strings are trusted (React-escaped by the SSR step); only shell-level
- * values (the deck title, the transition token) are escaped/whitelisted here.
+ * The slide HTML strings are React-escaped by the SSR step; shell-level values (deck title,
+ * transition token) are escaped/whitelisted here. One SSR sink is raw (MermaidDirect's
+ * dangerouslySetInnerHTML), fed only by a fresh securityLevel:"strict" mermaid render — but a
+ * persisted svgCache is dropped on open (project-io) and, as belt-and-suspenders, the exported
+ * document is locked under a CSP via `opts.cspNonce` (default-src 'none', script only by nonce).
+ * See ADR-0016 F2.
  */
 
 const TRANSITIONS = ["fade", "slide", "zoom", "push", "none"] as const;
@@ -32,6 +36,11 @@ export interface HtmlShellOptions {
   stageH: number;
   /** Default slide transition (viewer can cycle with 't'). Default "slide". */
   transition?: Transition;
+  /** Per-export random nonce for the inline nav script. When set, the document gets a
+   *  restrictive CSP (`default-src 'none'`; scripts only via this nonce) so the exported
+   *  `.html` — which has no CSP otherwise — can't run injected inline script or phone home.
+   *  The orchestrator (deck-html-export) generates it; engine stays pure (R2). ADR-0016 F2. */
+  cspNonce?: string;
 }
 
 function esc(s: string): string {
@@ -200,11 +209,21 @@ export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): 
     .map((h, i) => `<section class="slide${i === 0 ? " active" : ""}" data-i="${i}">${h}</section>`)
     .join("\n");
 
+  // A per-export nonce turns the exported .html from "no CSP" into a locked-down document:
+  // default-src 'none' (no fetch/script/img/font from anywhere), scripts ONLY via this nonce
+  // (so an injected inline handler/script can't run), inline styles + data:/blob: images kept
+  // (the slides need them). The nonce is attribute-escaped defensively (ADR-0016 F2).
+  const nonce = opts.cspNonce ? esc(opts.cspNonce) : "";
+  const cspMeta = nonce
+    ? `\n<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'">`
+    : "";
+  const scriptTag = nonce ? `<script nonce="${nonce}">` : "<script>";
+
   return `<!doctype html>
 <html lang="ja" data-transition="${transition}">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">${cspMeta}
 <title>${title}</title>
 <style>${shellCss(stageW, stageH)}</style>
 </head>
@@ -214,7 +233,7 @@ ${sections}
 </div></div>
 <div class="progress" id="progress"></div>
 <div class="counter" id="counter">1 / ${n}</div>
-<script>${shellJs(stageW, stageH)}</script>
+${scriptTag}${shellJs(stageW, stageH)}</script>
 </body>
 </html>`;
 }
