@@ -15,6 +15,7 @@ import type { Session } from "./session";
 import * as S from "./session";
 import { registerResources } from "./resources";
 import * as G from "./guides";
+import * as T from "./templates";
 import { type HostContext, type DocEntry, commitMutation, undoDoc, redoDoc } from "./host-core";
 
 interface ToolResult {
@@ -142,7 +143,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   );
   server.registerTool(
     "new_project",
-    { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規作成（host では新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
+    { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規作成（host では新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types。テンプレ base64 が無ければ create_template で生成できる", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
     (a, extra) => (host ? openInHost(withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)), extra) : mutate(extra, undefined, "new_project", withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)))),
   );
 
@@ -160,6 +161,11 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("get_authoring_guide", { description: "スライド Markdown の書き方（このテンプレのレイアウト名に解決した書式・`<!-- col/kpi/step -->` 区切り・表(GFM)・コード）＋本文 budget＋図/テンプレ作成ガイドへの入口。スライドを書く前にまずこれを読む", inputSchema: doc }, (a, extra) => run(() => G.getAuthoringGuide(sessionOf(extra, a.docId))));
   server.registerTool("get_diagram_types", { description: "図の種類メニュー（authorable な12種＝type/label/hint）。図を入れるならまずここで種類を選ぶ（flowchart 以外に11種ある）" }, () => run(() => G.getDiagramTypes()));
   server.registerTool("get_diagram_guide", { description: "選んだ図タイプの構文＋JSON例（```diagram に書く DiagramSpec）。class/state/ER/mindmap は type ではなく ```mermaid で描く", inputSchema: { type: z.string().describe("get_diagram_types の type") } }, (a) => run(() => G.getDiagramGuide(a.type)));
+
+  // ── template provisioning (T3/S2) ── acquire a template with no bytes: create one from a spec (or the
+  // MIDNIGHT preset). Session-independent; hand the returned templateBase64 to new_project to start.
+  server.registerTool("create_template", { description: "TemplateSpec（name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し base64 で返す。欠落は MIDNIGHT preset で補完＋低コントラストは自動修正（notices で告知）。書式は get_template_spec_guide。返した templateBase64 を new_project に渡して着手", inputSchema: { spec: z.string().optional().describe("TemplateSpec JSON（部分可・省略で MIDNIGHT preset）") } }, (a) => run(() => T.createTemplate(a.spec)));
+  server.registerTool("get_template_spec_guide", { description: "create_template 用 TemplateSpec の書式ガイド＋MIDNIGHT preset 値（開始点）" }, () => run(() => T.getTemplateSpecGuide()));
 
   // ── deterministic mutations ──
   server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否。書式は get_authoring_guide（区切り・表/コード）", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
