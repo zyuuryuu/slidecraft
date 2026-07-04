@@ -17,7 +17,6 @@
 
 | # | テーマ | 一行 | サイズ |
 | --- | --- | --- | --- |
-| 3 | **MCP ブラッシュアップ** | 上流 AI が作業しやすくするエンハンス：適切な粒度の高品質フィードバック＋提供機能の全面見直し | M〜L |
 | 4 | **セキュリティレビュー** | 配布/自動化を前提に攻撃面を全面監査：MCP の認証/scope/egress・シークレット(BYOK)・依存/供給網・信頼モデル | M〜L |
 
 > テーマ1「HTML 出力」（大マイルストーン）は **完了**（2026-07-04・[ADR-0013](adr/0013-svg-native-text.md)・
@@ -28,17 +27,12 @@
 > テーマ2「テンプレ作成補助」は **完了**（2026-07-04・[ADR-0014](adr/0014-template-authoring.md)・
 > 設計＝[docs/design/template-authoring.md](design/template-authoring.md)）。後続の小粒タスクはバックログ参照。
 
-> **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）**：
->
-> 上流 AI（Claude Code 等）が MCP 経由でこのデッキを編集する体験を底上げする（北極星＝GUI ホスト・AI が Tools で編集・
-> 人はライブ確認、[[collab_host_model]]）。既存 surface（`src/mcp/server.ts` の 18+ tools＋`deck://` resources）を土台に全面見直し：
->
-> - **適切な粒度の高品質フィードバック**：mutation の戻りを「ok/error」から **「何が変わったか＋構造/溢れ/予算の診断
->   ＋次の一手ヒント」** へ。前景で作った違反 notices（#12）・skipped op を候補 id つきで報告（#13）の思想を MCP tool
->   全体へ横展開。read も AI が判断しやすい粒度に（per-slide 診断・確実な round-trip Markdown 等）。
-> - **提供機能の全面見直し**：上流 AI に必要な操作が過不足なく揃っているかを監査。構造操作（スライドの追加/削除/
->   並べ替え）・図/表/レイアウトの直接操作・十分な read が提供できているか。重複/紛らわしさの整理（[[mcp_surface_audit]]）。
-> - サイズ M〜L。着手時に現行 tool の入出力を1本ずつレビューし `docs/mcp-server.md` / `docs/adr/` に反映。
+> テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）は **完了**（2026-07-04・[ADR-0015](adr/0015-mcp-brushup.md)・
+> 設計＝[docs/design/mcp-brushup.md](design/mcp-brushup.md)・使い方＝[docs/mcp-server.md](mcp-server.md)）。監査（35 findings）
+> ＋ユーザ insight で手前半（自己記述オーサリング契約＋テンプレ調達）を最優先化し S1–S6 実装：`get_authoring_guide`/図の二段
+> ガイド・`create_template`・統一 mutation envelope＋collab no-op バグ修正・構造操作（insert/delete/move/duplicate）・
+> `get_slide`＋text スライドへ図追加・決定論 hints＋split の changedSlides。各スライスを敵対レビュー通過（全 982 tests・
+> schema 変更なし）。後続の小粒（S2 増分2＝`list_/use_template`）はバックログ参照。
 
 > **テーマ4「セキュリティレビュー」（配布/自動化前提の全面監査）**：
 >
@@ -60,10 +54,12 @@
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
+| MCP: テンプレ選択（S2 増分2） | `list_templates`/`use_template(id)` で登録済みテンプレを AI が選べるように。GUI の master レジストリ（`useMasterRegistry`/`src/ipc/master-store.ts`＝Tauri fs 裏）を `HostContext` に accessor 注入する host 機能で GUI 側実装と対。stdio は `create_template`／bytes 持参で代替可。[ADR-0015](adr/0015-mcp-brushup.md) の残タスク | S〜M |
+| MCP: エラー契約の完全統一 | ガード系 throw（範囲外 index・未オープン）を `{ok:false, error, code?}` に寄せ、`isError` を un-modeled crash 専用に。現状はドメイン拒否＝`{ok:false}`／呼び出し・クラッシュ＝`isError` の2カテゴリで運用（`docs/mcp-server.md` に明記済） | S |
 | HTML出力: 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。監査 harness は再利用可（`html_output_design`） | M |
 | HTML出力: @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
 | HTML出力: 印刷の恒久 e2e テスト | Playwright `page.pdf` でページ数/向き/背景を自動検証し実出力を仕組みで担保（[[feedback_verify_real_output]]） | S |
-| テンプレ生成の実機確認 | template-writer 生成 PPTX を PowerPoint 実機で開封確認（開発環境に PowerPoint/動作する LibreOffice が無く未実施・[ADR-0014](adr/0014-template-authoring.md)）。Tauri 実機でのレジストリ永続化 E2E も同時に | S |
+| テンプレ生成の実機確認（残り＝PowerPoint 開封のみ） | **2026-07-04 実施済み**: 多レンズ構造検証（expat 整形式・python-pptx 完全開封・rels/Content-Types 整合、`tests/pptx-wellformed.test.ts` / `template-writer-conventions.test.ts` で恒久ゲート化）＋実アプリ取り込みをユーザ確認。副産物として canonical の整形式破損を発見・根絶（`31c556e`）。**残り**: PowerPoint 実機での開封/見た目確認 — 開発機に PowerPoint 無し。PowerPoint for the web（OneDrive にファイルを置いて office.com で開く）か PowerPoint のある別マシンで。Tauri 実機のレジストリ永続化 E2E も同時に | S |
 | 内蔵 30 レイアウトのオミット | Midnight Executive 30 種は**開発用** — 主要テーマ（＋一部バックログ）完了後にビルトイン同梱をやめ、canonical .pptx は入力サンプルとしてリポジトリ内に残置。触点: `useMasterRegistry` の `BUILTIN_URL`＋起動 fetch（→ 残置サンプル参照 or `writeTemplate` で起動時生成）・`BUILTIN_LAYOUTS` の既定セット差し替え・`LAYOUT_NAMES` フォールバックの整理・テスト fixture パス・`scripts/rebuild-template.ts` 引退。ランタイムはロールベースで 30 種非依存（alien テストでゲート済み）のため作業はこの触点に閉じる | S〜M |
 | テンプレ作成の後続 UI | 作成モーダルの埋め込みライブプレビュー・レイアウトサブセット選択・カスタムレイアウト定義 | M |
 | useAiGeneration 分割 | 554 行（400 行ルール超過・テーマ2 S5 で +9）。config/接続まわりとタスク実行の分離 | S〜M |

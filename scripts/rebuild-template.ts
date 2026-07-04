@@ -366,7 +366,10 @@ async function rebuild() {
       .replace(/<p:off /g, "<a:off ").replace(/<p:ext /g, "<a:ext ")
       .replace(/<p:solidFill/g, "<a:solidFill").replace(/<\/p:solidFill/g, "</a:solidFill")
       .replace(/<p:srgbClr/g, "<a:srgbClr").replace(/<p:noFill/g, "<a:noFill")
-      .replace(/<p:prstGeom/g, "<a:prstGeom").replace(/<p:spLocks/g, "<a:spLocks")
+      // prstGeom は avLst 子要素を持つ非自己閉鎖形があるため閉じタグも置換する（置換漏れが
+      // </p:prstGeom> の整形式違反として canonical に混入していた — tests/pptx-wellformed.test.ts）
+      .replace(/<p:prstGeom/g, "<a:prstGeom").replace(/<\/p:prstGeom/g, "</a:prstGeom")
+      .replace(/<p:spLocks/g, "<a:spLocks")
       .replace(/<p:avLst/g, "<a:avLst").replace(/<\/p:avLst/g, "</a:avLst")
       .replace(/<p:gd /g, "<a:gd ").replace(/<p:ln/g, "<a:ln").replace(/<\/p:ln/g, "</a:ln");
 

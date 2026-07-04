@@ -14,14 +14,14 @@ import { buildCatalog, deckCapabilities, assessTemplateHealth, type LayoutCatalo
 import { openProject, bundleProject } from "../engine/project-io";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { distillDeck, contentBodyBox } from "../engine/distill";
+import { distillDeck, distillDeckReport, contentBodyBox } from "../engine/distill";
 import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
 import { diagramSpecToYaml } from "../engine/diagram-serialize";
 import { DiagramSpecSchema } from "../engine/schema";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
-import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
+import { parseDesignIntent, applyDesignIntentReport, applyRegionSplit } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
 
 export interface Session {
@@ -131,7 +131,18 @@ export function getDiagnostics(s: Session): { budget: { maxBullets: number; char
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);
   const health = assessTemplateHealth(catalog);
-  return { summary: deckCapabilities(catalog, health.status), health, entries: catalog };
+  // Ship the body budget alongside the layout catalog so capabilities is actionable — the agent sees
+  // "this template holds ~N bullets/chars" without a separate get_deck_issues call.
+  return { summary: deckCapabilities(catalog, health.status), health, budget: budgetOf(catalog), entries: catalog };
+}
+
+/** Lean accessor for the authoring guides / contract digest: the loaded layout catalog + body budget
+ *  WITHOUT the capabilities summary + health assessment getCatalog computes (those ship only from
+ *  get_template_capabilities). The digest rides every session entry AND every list_documents row, so
+ *  it must not re-run deckCapabilities/assessTemplateHealth each time. requireLoaded → never-silent. */
+export function entriesAndBudget(s: Session): { entries: LayoutCatalog; budget: { maxBullets: number; charsPerBullet: number } | null } {
+  const { catalog } = requireLoaded(s);
+  return { entries: catalog, budget: budgetOf(catalog) };
 }
 
 /** Reject a structurally-unusable master (no title/body role even after recovery) at intake
@@ -155,6 +166,15 @@ export function getProjectMeta(s: Session) {
 }
 
 // ── deterministic mutations (the agent supplies the content; the engine fits/validates) ──
+
+/** The uniform tail every deterministic mutation returns (Theme 3 / S3): post-edit diagnostics + this
+ *  template's body budget. Converging the 6 mutations onto ONE sibling shape lets the agent branch on
+ *  the same fields whichever lever it pulled, and gives commitMutation a `changed` flag to gate no-ops
+ *  on (a no-op mutation must not bump rev / push undo / fan out deckChanged). */
+function fitTail(deck: DeckIR, catalog: LayoutCatalog): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
+  return { diagnostics: diagnoseDeck(deck, catalog), budget: budgetOf(catalog) };
+}
+
 export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const { deck, catalog } = requireLoaded(s);
   assertIndex(deck, i);
@@ -173,57 +193,78 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
-  s.dirty = true;
-  return { ok: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), diagnostics: diagnoseDeck(s.deck, catalog) };
+  const afterMd = slideToMarkdown(s.deck, i, catalog);
+  const changed = afterMd !== before;
+  s.dirty = s.dirty || changed;
+  return { ok: true as const, changed, beforeMd: before, afterMd, ...fitTail(s.deck, catalog) };
 }
 
 export function applyDeckMarkdown(s: Session, markdown: string) {
-  const { catalog } = requireLoaded(s);
+  const { deck, catalog } = requireLoaded(s);
+  const before = serializeMd(deck);
   const check = DeckIRSchema.safeParse(parseMd(markdown));
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
+  const changed = serializeMd(check.data) !== before;
   s.deck = check.data;
-  s.dirty = true;
-  return { ok: true as const, slideCount: s.deck.slides.length, diagnostics: diagnoseDeck(s.deck, catalog) };
+  s.dirty = s.dirty || changed;
+  return { ok: true as const, changed, slideCount: s.deck.slides.length, ...fitTail(s.deck, catalog) };
 }
 
 /** Deterministic lever: split overflowing content slides across more slides WITHOUT
  *  shrinking fonts. The whole point of harness-over-model — never make the agent re-do it. */
 export function distill(s: Session) {
   const { deck, catalog } = requireLoaded(s);
-  const fitted = distillDeck(deck, catalog);
+  const { deck: fitted, newIndices } = distillDeckReport(deck, catalog);
   const changed = fitted.slides.length !== deck.slides.length;
   s.deck = fitted;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, before: deck.slides.length, after: fitted.slides.length, diagnostics: diagnoseDeck(fitted, catalog) };
+  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...fitTail(fitted, catalog) };
 }
 
-/** Deterministic lever: turn a key-value bullet run on one slide into a GFM table. */
+/** Deterministic lever: turn a key-value bullet run on one slide into a GFM table. When there is no
+ *  key-value run to convert, that is a legitimate NON-outcome (ok:true, changed:false,
+ *  status:"not-applicable") — NOT a failure (ADR-0015: don't let a no-op wear an error mask). */
 export function visualizeKeyValue(s: Session, i: number) {
   const { deck, catalog } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog);
+  const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(deck, catalog) });
   const fixed = visualizeKeyValueMd(before);
-  if (!fixed) return { ok: false as const, applicable: false as const };
+  if (!fixed) return notApplicable();
   const newSlide = parseMd(fixed).slides[0];
-  if (!newSlide) return { ok: false as const, applicable: false as const };
+  if (!newSlide) return notApplicable();
   const slides = [...deck.slides];
   slides[i] = newSlide;
   s.deck = { ...deck, slides };
   s.dirty = true;
-  return { ok: true as const, applicable: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog) };
+  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog) };
 }
 
-/** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates +
- *  canonicalizes to YAML, then writes it onto a slide that ALREADY has a figure slot — an
- *  existing diagram is replaced, a Mermaid block GRADUATES to a native diagram (same as the
- *  GUI). A slide with no figure placeholder is rejected (where would the diagram go?). */
-export function setDiagram(s: Session, i: number, source: string, format: DiagramFormat) {
+/** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
+ *  YAML. Replaces an existing diagram / GRADUATES a Mermaid block to a native diagram, OR — for a
+ *  text-only slide (S5) — ADDS a figure into a body region of the RESOLVED layout: the placeholder is a
+ *  1-based body ORDINAL resolved role-wise from the catalog (alien-safe, mirrors the GUI's nthBody),
+ *  defaulting to the 1st body region; `placeholderIdxArg` targets another region on a multi-body layout.
+ *  A layout with NO body region is rejected. `created` reports add (true) vs replace (false). */
+export function setDiagram(s: Session, i: number, source: string, format: DiagramFormat, placeholderIdxArg?: string) {
   const { deck, catalog } = requireLoaded(s);
   assertIndex(deck, i);
   const slide = deck.slides[i];
-  const placeholderIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
-  if (placeholderIdx === undefined) {
-    return { ok: false as const, error: "このスライドには図の配置先がありません（図 / mermaid を持つスライドにのみ set_diagram できます）。" };
+  const existingIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
+  const created = existingIdx === undefined;
+  // Resolve PLACEMENT first — a figureless slide with no body region rejects with 配置先 BEFORE any
+  // source-parse error (pre-S5 order). For created, require a body region on the resolved layout
+  // (role-based = alien-safe) and remember whether the body already holds text.
+  let ord = "1", hasBodyText = false;
+  if (created) {
+    const layoutName = slide.layout === "auto" ? autoSelectLayout(slide, i, deck.slides.length, catalog) : slide.layout;
+    const bodyCount = catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0;
+    const n = Number(placeholderIdxArg ?? "1");
+    if (bodyCount < 1 || !Number.isInteger(n) || n < 1 || n > bodyCount) {
+      return { ok: false as const, error: `このスライドのレイアウト（${layoutName}）に図の配置先（body 領域）がありません、または placeholderIdx が範囲外です（1..${bodyCount}）。` };
+    }
+    ord = String(n);
+    hasBodyText = slide.placeholders.some((p) => /^[1-9]$/.test(p.idx) && p.paragraphs.some((par) => par.segments.some((seg) => seg.text.trim())));
   }
   const verr = validateDiagramSource(source, format);
   if (verr) return { ok: false as const, error: verr };
@@ -238,13 +279,26 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
     diagramYaml = source; // already-valid YAML, stored verbatim (matches the GUI)
   }
   const before = slideToMarkdown(deck, i, catalog);
-  const next: SlideIR = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx } };
-  delete next.mermaidBlock; // a Mermaid slide graduates to a native diagram
+  let next: SlideIR;
+  if (!created) {
+    const placeholderIdx = placeholderIdxArg ?? existingIdx; // replace (optionally retarget to another region)
+    next = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx } };
+    delete next.mermaidBlock; // a Mermaid slide graduates to a native diagram
+  } else {
+    const withFigure: SlideIR = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx: ord } };
+    delete withFigure.mermaidBlock;
+    // COEXIST with existing body text: relocate it to the other column (regionSplit) rather than let the
+    // render clobber the bullets (the body placeholder at the figure's ordinal is skipped). Mirrors the
+    // GUI's applyFigureYaml (ai-apply.ts). A body region with no text just takes the figure directly.
+    next = hasBodyText ? applyRegionSplit(withFigure, "text-left") : withFigure;
+  }
   const slides = [...deck.slides];
   slides[i] = next;
   s.deck = { ...deck, slides };
-  s.dirty = true;
-  return { ok: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog) };
+  const afterMd = slideToMarkdown(s.deck, i, catalog);
+  const changed = afterMd !== before;
+  s.dirty = s.dirty || changed;
+  return { ok: true as const, changed, created, beforeMd: before, afterMd, ...fitTail(s.deck, catalog) };
 }
 
 /** Apply a DESIGN intent — the spatial half of two-stage editing — to a slide's figure.
@@ -265,17 +319,22 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
     return { ok: false as const, error: 'DesignIntent を解釈できませんでした（ops 配列の JSON。例: [{"op":"relayout","direction":"LR"}]）。' };
   }
   const before = slideToMarkdown(deck, i, catalog);
-  const slides = [...deck.slides];
   const { slide: applied, skipped } = applyDesignIntentReport(slide, intent);
+  // STRUCTURAL changed — a design op can move diagram.placeholderIdx / layout, which serializeMd DROPS
+  // (a single-body figure's diagram fence carries no idx, and slideToMarkdown re-resolves layout:"auto").
+  // Deriving `changed` from an afterMd diff would MISS such an edit → commitMutation's no-op re-sync would
+  // then silently revert it. Deep-compare the applied SlideIR instead so changed:false ⟺ content-unchanged.
+  const changed = JSON.stringify(applied) !== JSON.stringify(slide);
+  // `skipped` names ops that took no effect (e.g. an emphasize whose nodeId the AI renamed away) so the
+  // agent gets a precise, actionable reason + the ids that DO exist (#13).
+  if (!changed) return { ok: true as const, changed: false as const, skipped, beforeMd: before, afterMd: before, ...fitTail(deck, catalog) };
+  const slides = [...deck.slides];
   slides[i] = applied;
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
-  const afterMd = slideToMarkdown(s.deck, i, catalog);
-  s.dirty = s.dirty || afterMd !== before;
-  // `skipped` names ops that took no effect (e.g. an emphasize whose nodeId the AI renamed away) so the
-  // agent gets a precise, actionable reason + the ids that DO exist, not just changed=false (#13).
-  return { ok: true as const, changed: afterMd !== before, skipped, beforeMd: before, afterMd, diagnostics: diagnoseDeck(s.deck, catalog) };
+  s.dirty = true;
+  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis

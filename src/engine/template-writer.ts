@@ -95,11 +95,32 @@ function masterStyleXml(tag: string, base: typeof MASTER_TITLE, spec: TemplateSp
     `<a:latin typeface="${escXml(spec.fonts[base.font])}"/></a:defRPr></a:lvl1pPr></p:${tag}>`;
 }
 
+// マスターの標準 placeholder 5種（継承の祖先）。レイアウト側 ph は全て明示 xfrm を持つため
+// 幾何の継承には使われないが、sldNum/dt/ftr のフィールド挙動と「ヘッダーとフッター」対応、
+// および周辺ツール互換のため OOXML 慣習どおり置く（16:9 標準配置）。
+const MASTER_PLACEHOLDERS: Array<{ phAttrs: string; name: string; x: number; y: number; w: number; h: number }> = [
+  { phAttrs: `type="title"`, name: "Title Placeholder 1", x: 0.5, y: 0.35, w: 12.33, h: 1.2 },
+  { phAttrs: `type="body" idx="1"`, name: "Text Placeholder 2", x: 0.5, y: 1.75, w: 12.33, h: 4.9 },
+  { phAttrs: `type="dt" sz="half" idx="2"`, name: "Date Placeholder 3", x: 0.5, y: 6.98, w: 3.0, h: 0.38 },
+  { phAttrs: `type="ftr" sz="quarter" idx="3"`, name: "Footer Placeholder 4", x: 4.6, y: 6.98, w: 4.13, h: 0.38 },
+  { phAttrs: `type="sldNum" sz="quarter" idx="4"`, name: "Slide Number Placeholder 5", x: 10.33, y: 6.98, w: 2.5, h: 0.38 },
+];
+
+function masterPhShapeXml(i: number): string {
+  const ph = MASTER_PLACEHOLDERS[i];
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${i + 2}" name="${ph.name}"/>` +
+    `<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>` +
+    `<p:nvPr><p:ph ${ph.phAttrs}/></p:nvPr></p:nvSpPr>` +
+    `<p:spPr><a:xfrm><a:off x="${EMU(ph.x)}" y="${EMU(ph.y)}"/><a:ext cx="${EMU(ph.w)}" cy="${EMU(ph.h)}"/></a:xfrm></p:spPr>` +
+    `<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody></p:sp>`;
+}
+
 function masterXml(spec: TemplateSpec, layoutCount: number): string {
   const layoutIds = Array.from({ length: layoutCount }, (_v, i) =>
     `<p:sldLayoutId id="${2147483649 + i}" r:id="rId${i + 1}"/>`).join("");
+  const phs = MASTER_PLACEHOLDERS.map((_p, i) => masterPhShapeXml(i)).join("");
   return `${XML_DECL}<p:sldMaster ${NS_A} ${NS_P} ${NS_R}>` +
-    `<p:cSld>${bgXml(spec.palette.canvas)}<p:spTree>${emptySpTreeHeader}</p:spTree></p:cSld>` +
+    `<p:cSld>${bgXml(spec.palette.canvas)}<p:spTree>${emptySpTreeHeader}${phs}</p:spTree></p:cSld>` +
     `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2"` +
     ` accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>` +
     `<p:sldLayoutIdLst>${layoutIds}</p:sldLayoutIdLst>` +
@@ -166,6 +187,27 @@ const relationships = (entries: string[]) =>
   `${XML_DECL}<Relationships ${REL_NS}>${entries.join("")}</Relationships>`;
 const rel = (id: string, type: string, target: string) =>
   `<Relationship Id="${id}" Type="${REL_T}/${type}" Target="${target}"/>`;
+// docProps は officeDocument 系と関係型の名前空間が異なる（package / officeDocument）
+const relRaw = (id: string, type: string, target: string) =>
+  `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`;
+
+// ── 慣習パート（PowerPoint は欠落に寛容だが、周辺ツール互換と開封安全性のため canonical と揃える）──
+
+function corePropsXml(spec: TemplateSpec): string {
+  return `${XML_DECL}<cp:coreProperties` +
+    ` xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"` +
+    ` xmlns:dc="http://purl.org/dc/elements/1.1/">` +
+    `<dc:title>${escXml(spec.name)}</dc:title><dc:creator>SlideCraft</dc:creator></cp:coreProperties>`;
+}
+
+const APP_PROPS_XML =
+  `${XML_DECL}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">` +
+  `<Application>SlideCraft</Application></Properties>`;
+const PRES_PROPS_XML = `${XML_DECL}<p:presentationPr ${NS_A} ${NS_P}/>`;
+const VIEW_PROPS_XML = `${XML_DECL}<p:viewPr ${NS_A} ${NS_P}/>`;
+// PowerPoint 既定のテーブルスタイル GUID（空のスタイル一覧＝既定参照のみ）
+const TABLE_STYLES_XML =
+  `${XML_DECL}<a:tblStyleLst ${NS_A} def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`;
 
 function contentTypesXml(layoutCount: number): string {
   const layoutOverrides = Array.from({ length: layoutCount }, (_v, i) =>
@@ -178,6 +220,11 @@ function contentTypesXml(layoutCount: number): string {
     `<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>` +
     layoutOverrides +
     `<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>` +
+    `<Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/>` +
+    `<Override PartName="/ppt/viewProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"/>` +
+    `<Override PartName="/ppt/tableStyles.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"/>` +
+    `<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>` +
+    `<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>` +
     `</Types>`;
 }
 
@@ -201,12 +248,24 @@ export async function writeTemplate(spec: TemplateSpec): Promise<Uint8Array> {
   const zip = new JSZip();
 
   zip.file("[Content_Types].xml", contentTypesXml(layouts.length));
-  zip.file("_rels/.rels", relationships([rel("rId1", "officeDocument", "ppt/presentation.xml")]));
+  zip.file("_rels/.rels", relationships([
+    rel("rId1", "officeDocument", "ppt/presentation.xml"),
+    relRaw("rId2", "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", "docProps/core.xml"),
+    rel("rId3", "extended-properties", "docProps/app.xml"),
+  ]));
+  zip.file("docProps/core.xml", corePropsXml(spec));
+  zip.file("docProps/app.xml", APP_PROPS_XML);
   zip.file("ppt/presentation.xml", presentationXml);
   zip.file("ppt/_rels/presentation.xml.rels", relationships([
     rel("rId1", "slideMaster", "slideMasters/slideMaster1.xml"),
     rel("rId2", "theme", "theme/theme1.xml"),
+    rel("rId3", "presProps", "presProps.xml"),
+    rel("rId4", "viewProps", "viewProps.xml"),
+    rel("rId5", "tableStyles", "tableStyles.xml"),
   ]));
+  zip.file("ppt/presProps.xml", PRES_PROPS_XML);
+  zip.file("ppt/viewProps.xml", VIEW_PROPS_XML);
+  zip.file("ppt/tableStyles.xml", TABLE_STYLES_XML);
   zip.file("ppt/theme/theme1.xml", themeXml(spec));
   zip.file("ppt/slideMasters/slideMaster1.xml", masterXml(spec, layouts.length));
   zip.file("ppt/slideMasters/_rels/slideMaster1.xml.rels", relationships([
