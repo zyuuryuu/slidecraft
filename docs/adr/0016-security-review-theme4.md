@@ -1,0 +1,86 @@
+# ADR-0016: セキュリティレビュー（テーマ4）— 配布/自動化前提の全面監査と是正方針
+
+- **Status**: Accepted（**監査完了 2026-07-04**・是正はコード未実装＝ROADMAP バックログ／[ADR-0010](0010-security-model.md) を **supersede せず補追**）
+- **Date**: 2026-07-04
+
+## Context
+
+ROADMAP テーマ4「セキュリティレビュー」（サイズ M〜L）。土台は [ADR-0010](0010-security-model.md)（token 境界・loopback・no-fs/scoped-fs・zip 硬化）。配布（Tauri デスクトップ）＋自動化（MCP 経由で上流 AI がデッキを編集）を前提に、攻撃面を **5 サーフェス並列 read-only 監査**（実コードを `file:line` で追跡・敵対シナリオ付き・確証度ラベル付き）で全面点検した：
+
+1. **MCP＋協働ホスト**（token/scope/egress）
+2. **BYOK シークレット＋AI egress**
+3. **Tauri backend**（子プロセス spawn・モデル自動DL整合性・fs/http capability 幅）
+4. **供給網＋CI/CD**（`npm audit`・Action ピン止め・リリース署名・SBOM/dependabot）
+5. **XSS＋untrusted 入力**（SVG/Markdown injection・zip-slip/DoS・prototype 汚染）
+
+信頼境界は **OS ユーザ**（同一ユーザ権限のマルウェアはスコープ外＝ADR-0010 踏襲）。ただし **remote-content 由来の XSS→キー窃取**・**custom baseURL によるキー流出**は同一ユーザ malware を要しない＝スコープ内として扱う。
+
+### 監査で成立を確認した中核（ADR-0010 の主張は保持）
+
+- **MCP token 境界**：`checkRequest` が全リクエスト経路の先頭で、`safeEqual`（`crypto.timingSafeEqual`・長さ不一致でも early-return しない）による 256bit per-launch token 照合。pre-auth で到達可能なエンドポイント無し。Origin は belt（順に Host-loopback 421 → present-Origin allowlist 403 → token 401）で、絶対 Origin は token を代替しない。bind は厳密に `127.0.0.1`（ephemeral port・`0.0.0.0` 皆無）。`x-slidecraft-role` は advisory（token 後に読む・spoof 不可）。（`src/mcp/host.ts`, `host-security.ts`, `host-json.ts`）
+- **MCP ツール面の fs/shell 不在**：全ツールは base64 bytes / in-memory 文字列を取り、`create_template` はファイルを書かず base64 返却。`read_file`/`write_file` は**ツール非公開**。`--root` は `exit 2` で拒否・既定 `--no-fs`。path traversal 到達路無し。
+- **子プロセス spawn（llamafile / node collab）**：`Command::new(bin)` ＋ **per-arg `.arg()`**・shell 不使用・webview 由来 arg 無し・loopback bind。injection 無し。（`src-tauri/src/local_ai.rs`, `collab.rs`）
+- **モデル自動DL整合性**：pinned `WEIGHTS_SHA256` を stream 検証 → **一致時のみ atomic rename**（rename/実行の前に検証）・不一致は `.part` 削除。TLS は pure-rustls・検証 on・`danger_accept_invalid_certs` 皆無。DL 先ファイル名は compile-time 定数＝traversal 無し。（`local_ai.rs`）
+- **zip 硬化**：入力 bytes（100MB）＋entry 数（5000）を展開前に検査・per-entry stream 展開で上限超過の瞬間に中断・deck.json は zod 検証・スライド数 ≤2000。（`src/engine/zip-safe.ts`, `project-io.ts`）
+- **prototype 汚染は不発**（実測）：zod のオブジェクト構築が `__proto__` を own-key として落とすため `DiagramSpecSchema.parse`／`z.record` 経路で `Object.prototype` 汚染せず。js-yaml v4 の既定 `load` は `!!js/function` を**拒否**（実行確認）＝**dependabot PR #13 はセキュリティ的に非緊急**。
+- **供給網の健全部**：全 GitHub Action は **SHA ピン止め**・`claude-review.yml` は `pull_request`（危険な `pull_request_target` でない）で fork PR に secrets 非露出・lockfile 両方コミット済・`npm ci` 使用・dependabot は npm/cargo/actions 3 系統。
+- **XSS 封じ込め（アプリ内）**：本番/dev CSP とも `script-src 'self'`（`'unsafe-inline'` 無し）＝インラインハンドラ/`javascript:` を webview 内で無効化。ネイティブ図 SVG（`svg-writer.ts` の `esc()`/`col()`）と Markdown（React 子要素で自動エスケープ）は安全経路。
+
+## Decision
+
+監査で **1 系統の egress 穴（4/5 エージェントが独立指摘）** と **HTML エクスポート経路の XSS carrier** を検出。ユーザ合意（2026-07-04）は **①custom endpoint は opt-in で維持しつつ既定 egress を絞る／②本 ADR ではレポート＋記録に留め、コード是正は ROADMAP バックログ**。以下を「決定した是正方針」として確定し、実装は追跡項目とする。
+
+### F1〔HIGH〕webview egress の実ゲートが CSP でなく緩い `http:default` だった → **既定を絞り、custom は opt-in**
+
+`appFetch` は desktop で `@tauri-apps/plugin-http`（Rust）経由＝**webview CSP `connect-src` を迂回**する。CSP は3社+loopback に絞ってあるが、実ゲートである `http:default` capability が `{"url":"https://**"}`＝全 HTTPS 開放（`src-tauri/capabilities/default.json`）。加えて `baseURL` は無検証（`src/ipc/openai-compat.ts` / `ai.ts`）で、攻撃者 proxy を指させれば BYOK キーが `Authorization: Bearer` で流出（F1 と連鎖）。ADR-0010 は「connect-src は ipc・Ollama・指定 AI API のみ許可」と記すが、**plugin-http scope がそれを黙って広げていた**（実ゲート≠CSP）。
+
+**是正方針**：
+- `http:default` の `https://**` を **CSP と一致する固定 allowlist** に置換：`https://api.anthropic.com/**`・`https://api.openai.com/**`・`https://openrouter.ai/**`・**`https://huggingface.co/**`＋`https://cdn-lfs*.huggingface.co/**`（モデルDLは HF `resolve/main` が LFS CDN へ 302 する＝CDN を含めないと DL が壊れる）**・`http://127.0.0.1:*`・`http://localhost:*`。
+- `baseURL` は非 local に対し **https-only を強制**し、既定は上記既知ホスト/loopback のみ許可。
+- **任意 custom エンドポイントは明示 opt-in**（設定 UI で「信頼するエンドポイントを追加」→ユーザ確認 → http scope を**動的拡張**）。blanket `https://**` は撤廃。柔軟性を保ちつつ既定攻撃面を閉じる。
+
+### F2〔HIGH〕`svgCache` 経由の stored XSS ＋ エクスポート HTML の CSP 欠落
+
+永続化された `mermaidBlock.svgCache`（untrusted `deck.json` 文字列＝`src/engine/slide-schema.ts:89` の `z.string().optional()`）が `mermaid.render()`（`securityLevel:"strict"`）を**経ずに** `dangerouslySetInnerHTML` へ直行する fast-path（`src/components/SlidePreview.tsx:68`）。アプリ内は CSP で封じ込め済だが、**エクスポート HTML には CSP `<meta>` が無く**（`src/engine/html-shell.ts`・`deck-html-export.tsx:42` が svgCache を inline）、書き出した `.html` を共有先が開くと payload が発火＝**self-XSS-to-others**。キーは localStorage 平文のため XSS＝キー窃取に増幅。
+
+**是正方針**：
+- **root-cause**：永続 `svgCache` を**信頼しない**。`openProject` で全 `mermaidBlock.svgCache` を破棄し、描画時に再計算（cache であって source-of-truth でない）。
+- エクスポート shell（`html-shell.ts`）に制限的 CSP `<meta http-equiv>` を付与（インライン nav script は nonce/hash 化）。
+- `SlideCard` の SVG sink を DOMPurify で sanitize（SSR 単位でもあるため export も同時に守る）。
+
+### F3〔MEDIUM〕BYOK キーが localStorage 平文
+
+`src/components/useAiGeneration.ts:325`（`rememberKey` 時）。at-rest の同一ユーザ可読は信頼モデル上**受容**だが、XSS→キー窃取の増幅路を成す。OS keychain 選択肢はコード上に皆無。
+
+**是正方針**：中期的にキーを **JS 到達不能なストア**（Rust 側 IPC / `tauri-plugin-stronghold` / OS keychain）へ移し、XSS からのキー窃取を webview 侵害から切り離す。当面の最小手当てとして `rememberKey` の既定を off に寄せる検討。
+
+### F4〔LOW／運用〕供給網・その他
+
+- **`stage-node.mjs` に SHA256 チェック欠落**（`stage-llamafile.mjs` にはある）→ node dist の SHASUMS をピン止めする。
+- **`esc()`（`src/engine/svg-writer.ts:38`）が `'` を未エスケープ**（現状到達不能だが latent）→ `&#39;` を追加。
+- **fs capability の `allow-remove`/`allow-mkdir`** は webview が任意ファイル削除を要さないなら削減（Rust 内 remove は fs plugin 非経由）。
+- **CI 停止中**（Actions 課金ブロック・[[ci_actions_billing]]）＝`security.yml`（npm/cargo audit）・`sbom.yml`・`ci.yml` が未実行＝監査/SBOM/テストゲートが効いていない。かつ両 audit job は `continue-on-error: true`＝再有効化後も informational。再有効化時に **high 以上を required 化**。
+- **npm high 7 件**（全て breaking major）：`vite`/`esbuild` は dev-only（shipped bundle 非該当）・**`mermaid`→`chevrotain`→`lodash-es` のみ runtime 到達**＝優先。
+- **Homebrew cask の placeholder sha256** は設計どおり（`update-cask.mjs` が per-release で実 hash 埋め・`:no_check` へ退避しないこと）。
+- **Tauri updater は未設定**（現状リスク無し）＝将来 auto-update 追加時は **署名＋pubkey ピン止め必須**。
+
+## Consequences
+
+**良い点**
+- 配布/自動化を前提にした攻撃面を全面点検し、**ADR-0010 の中核ガードが実挙動として成立**することを実コード追跡で確証。最大の穴（実 egress ゲートが CSP でなく `https://**`）と XSS carrier（`svgCache`→エクスポート HTML）を特定し、是正方針を確定。
+- custom endpoint を opt-in に移すことで、**既定攻撃面（blanket https 開放）を閉じつつ BYOK の柔軟性を保つ**。
+
+**do-NOT-undo ガードレール（[ADR-0010](0010-security-model.md) を継承＋追加）**
+- 継承：任意パス `read_file`/`write_file` を再導入しない・`csp:null` に戻さない・リスナ bind を `0.0.0.0` にしない・token 照合を timing-safe から外さない・Origin allowlist を token の代替にしない・zip 上限を緩めない。
+- 追加：`http:default` を再び `https://**` に**広げない**（実ゲートは plugin-http scope＝CSP と一致させる）。永続 `svgCache` を**信頼しない**（open 時に破棄/再計算）・`dangerouslySetInnerHTML` に到達する SVG は sanitize 前提。エクスポート HTML から CSP を外さない。モデルDL/staging の SHA256 検証を外さない。
+
+**代償・限界（是正は未実装＝バックログ）**
+- ユーザ選択（レポート＋ADR のみ）により、F1〜F4 の**コード修正は本 ADR では未実施**。ROADMAP バックログに追跡項目として起票し、後続セッションで test-first（R3）で実装する。
+- **ADR-0010 の記述ドリフト**：ADR-0010 の「connect-src は…のみ許可」は CSP としては真だが plugin-http capability が広い、という不整合を本 ADR が記録（ADR-0010 は immutable のため書き換えず・本 ADR で補追）。F1 実装時に capability を CSP と一致させることで解消する。
+- CI 再有効化は課金ブロック依存（[[ci_actions_billing]]）。それまで `npm audit --audit-level=high` ＋ `cargo audit` をリリース前手動ゲートとする。
+
+## References
+
+- 監査対象コード: `src-tauri/capabilities/default.json`・`src-tauri/tauri.conf.json`・`src/ipc/{app-fetch,ai,openai-compat,claude}.ts`・`src/components/{useAiGeneration,SlidePreview,deck-html-export}.tsx`・`src/engine/{html-shell,svg-writer,slide-schema,zip-safe,project-io}.ts`・`src/mcp/{host,host-security,host-json}.ts`・`src-tauri/src/{local_ai,collab}.rs`・`scripts/{stage-node,stage-llamafile}.mjs`・`.github/workflows/*`・`.github/dependabot.yml`
+- 関連 ADR: [ADR-0010](0010-security-model.md)（セキュリティモデル＝土台・本 ADR が補追）・[ADR-0006](0006-ai-integration-architecture.md)（AI 統合）・[ADR-0009](0009-p2-collab-host.md)（協働ホスト）
+- 開発メモリ: `security_present_holes`（本監査で更新）・`ci_actions_billing`・`ai_integration_architecture`
