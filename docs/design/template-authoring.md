@@ -30,9 +30,9 @@
 | S1 | **登録支援（修復）エンジン** `template-repair.ts`：rejected テンプレの診断→修復提案→XML パッチ | M | 完了 |
 | S2 | 取り込み UI 配線：インポート時に健全性レポート＋「整形して取り込む」 | S | 完了 |
 | S3 | **template-writer エンジン**：`TemplateSpec` → フル OOXML 生成（マスター/レイアウト/テーマ/配管） | L | 完了（engine＋テスト。PowerPoint 実機確認は S4 マイルストーン時に手動） |
-| S4 | テンプレ作成 UI：スペック編集 → ライブプレビュー（SlidePreview 再利用）→ 命名して登録 | M | |
+| S4 | テンプレ作成 UI：スペック編集 → 生成して適用（メインプレビューが即時反映＝ライブ確認）→ 登録 | M | 完了（Playwright E2E 検証済。埋め込みプレビュー/レイアウトサブセット UI は後続） |
 | S5 | AI スペック提案：自然言語/原稿 → `TemplateSpec`（ADR-0005 準拠 = AI は提案のみ、書くのは決定論コード） | S〜M | |
-| S6 | レジストリ永続化（Slice 1b）：`useMasterRegistry` を同一インターフェースで Tauri app-local-data へ | M | |
+| S6 | レジストリ永続化（Slice 1b）：`useMasterRegistry` を同一インターフェースで Tauri app-local-data へ | M | 完了（`src/ipc/master-store.ts`。Tauri 実機 E2E はマイルストーン時に手動確認） |
 
 ## S1/S2 — 登録支援（修復パイプライン）
 
