@@ -61,6 +61,7 @@
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
 | テンプレ生成の実機確認 | template-writer 生成 PPTX を PowerPoint 実機で開封確認（開発環境に PowerPoint/動作する LibreOffice が無く未実施・[ADR-0014](adr/0014-template-authoring.md)）。Tauri 実機でのレジストリ永続化 E2E も同時に | S |
+| 内蔵 30 レイアウトのオミット | Midnight Executive 30 種は**開発用** — 主要テーマ（＋一部バックログ）完了後にビルトイン同梱をやめ、canonical .pptx は入力サンプルとしてリポジトリ内に残置。触点: `useMasterRegistry` の `BUILTIN_URL`＋起動 fetch（→ 残置サンプル参照 or `writeTemplate` で起動時生成）・`BUILTIN_LAYOUTS` の既定セット差し替え・`LAYOUT_NAMES` フォールバックの整理・テスト fixture パス・`scripts/rebuild-template.ts` 引退。ランタイムはロールベースで 30 種非依存（alien テストでゲート済み）のため作業はこの触点に閉じる | S〜M |
 | テンプレ作成の後続 UI | 作成モーダルの埋め込みライブプレビュー・レイアウトサブセット選択・カスタムレイアウト定義 | M |
 | useAiGeneration 分割 | 554 行（400 行ルール超過・テーマ2 S5 で +9）。config/接続まわりとタスク実行の分離 | S〜M |
 | 自動アップデート | Tauri Updater 経由（GitHub Releases） | M |
