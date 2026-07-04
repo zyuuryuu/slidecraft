@@ -9,6 +9,7 @@
 import { LAYOUT_NAMES } from "./slide-schema";
 import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt } from "./deck-plan-prompts";
 import { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, type DiagramType } from "./diagram-type-prompts";
+import { templateSpecSystemPrompt } from "./template-spec-prompts";
 import type { LayoutCatalog, LayoutRole } from "./template-catalog";
 
 // The diagram prompt surface moved to diagram-type-prompts.ts (two-stage per-type design); re-export so
@@ -22,7 +23,7 @@ export type { DiagramType, DiagramTypeInfo } from "./diagram-type-prompts";
  *  fragment for the diagram / diagram-edit modes (Stage 2 of the two-stage design). "condense" is the
  *  harness refine residue: a Markdown-ONLY sub-prompt (no design-ops branch) so a small model stays on format. */
 export function systemPromptForMode(
-  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route",
+  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec",
   today: string,
   diagramType?: DiagramType,
 ): string {
@@ -32,11 +33,13 @@ export function systemPromptForMode(
       ? slideMarkdownEditPrompt()
       : mode === "condense"
         ? slideCondensePrompt()
-        : mode === "diagram-route"
-          ? diagramRoutePrompt()
-          : mode === "diagram-edit"
-            ? diagramEditSystemPrompt(diagramType)
-            : diagramSystemPrompt(diagramType);
+        : mode === "template-spec"
+          ? templateSpecSystemPrompt()
+          : mode === "diagram-route"
+            ? diagramRoutePrompt()
+            : mode === "diagram-edit"
+              ? diagramEditSystemPrompt(diagramType)
+              : diagramSystemPrompt(diagramType);
 }
 
 // ── Slide deck prompt ──

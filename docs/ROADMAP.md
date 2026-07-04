@@ -6,7 +6,8 @@
 **プロンプト磨き込み**（構造ヘッダー保全 [ADR-0012](adr/0012-ai-edit-structure-preservation.md)、敵対検証ハードニング、
 生成 payload 保全 #12、design-op 告知 #13、テキストスライドへ図追加 #3B、図生成の二段構え、プロンプト整合 #3・#1）
 まで完了（PR #58）。**UI 磨き込み**（AI Assist＋協働を1つの ✨AI ドックにタブ統合・マスターピッカーを Top/Draft 共通の
-単一プルダウンに刷新・Draft ヘッダ整理）も反映（PR #59）。次は **機能フェーズ**。詳細は開発メモリ `roadmap_post_p2`。
+単一プルダウンに刷新・Draft ヘッダ整理）も反映（PR #59）。機能フェーズは **テーマ2「テンプレ作成補助」完了**
+（[ADR-0014](adr/0014-template-authoring.md)）。詳細は開発メモリ `roadmap_post_p2`。
 
 ---
 
@@ -15,21 +16,17 @@
 | # | テーマ | 一行 | サイズ |
 | --- | --- | --- | --- |
 | 1 | **HTML 出力**（大マイルストーン） | 磨き込んだ Web preview をスタンダロン HTML プレゼンとして出力 | L |
-| 2 | **テンプレ作成補助** | 新テンプレの作成/登録支援。原稿→マスター整形と重なる最大機能 | L |
 | 3 | **MCP ブラッシュアップ** | 上流 AI が作業しやすくするエンハンス：適切な粒度の高品質フィードバック＋提供機能の全面見直し | M〜L |
 | 4 | **セキュリティレビュー** | 配布/自動化を前提に攻撃面を全面監査：MCP の認証/scope/egress・シークレット(BYOK)・依存/供給網・信頼モデル | M〜L |
+
+> テーマ2「テンプレ作成補助」は **完了**（2026-07-04・[ADR-0014](adr/0014-template-authoring.md)・
+> 設計＝[docs/design/template-authoring.md](design/template-authoring.md)）。後続の小粒タスクはバックログ参照。
 
 > **テーマ1「HTML 出力」（大マイルストーン）**：
 >
 > - 磨き込んだ **Web preview（`SlidePreview` の CSS 忠実描画）をスタンダロン HTML プレゼンとして出力**。PowerPoint 離れ・HTML プレゼンの潮流に対応。
 > - 自己完結（インライン CSS/JS・スライド送りナビゲーション）。図/表/コード/プレースホルダ描画を HTML に写像（既存の共有描画モデルを HTML レンダラに）。PPTX 出力と併存。
 > - **詳細設計＝[docs/design/html-output.md](design/html-output.md)**（2026-07-04・設計調査ワークフロー由来）。方針確定：**①スライドは `SlideCard` を SSR 再利用**（preview↔html はズレ構造的に不可能）、**②v1 は MVP 優先＝サイズ L**（印刷 `<text>` フォールバック・@font-face 埋め込み・オーバービューは後続の XL）、**③体験層は Web 流に磨く**（遷移アニメ・上品なシェル／ただしスライド DOM は不変・reflow 禁止）。図は `renderDiagramToSvg` を直接再利用。着手は S1（`SlideCard` の `exportMode`）から。
-
-> **テーマ2「テンプレ作成補助」**：
->
-> - **詳細設計＝[docs/design/template-authoring.md](design/template-authoring.md)**（2026-07-04・ユーザ合意済み）。
->   方針確定：**①スコープは登録支援＋新規生成の両方＋レジストリ永続化**、**②生成はゼロから（フル OOXML 生成）**、
->   **③着手は登録支援（修復パイプライン）から**。読む側（`loadTemplate`→`assessTemplateHealth`）を検証ゲートとして再利用。
 
 > **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）**：
 >
@@ -63,6 +60,9 @@
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
+| テンプレ生成の実機確認 | template-writer 生成 PPTX を PowerPoint 実機で開封確認（開発環境に PowerPoint/動作する LibreOffice が無く未実施・[ADR-0014](adr/0014-template-authoring.md)）。Tauri 実機でのレジストリ永続化 E2E も同時に | S |
+| テンプレ作成の後続 UI | 作成モーダルの埋め込みライブプレビュー・レイアウトサブセット選択・カスタムレイアウト定義 | M |
+| useAiGeneration 分割 | 554 行（400 行ルール超過・テーマ2 S5 で +9）。config/接続まわりとタスク実行の分離 | S〜M |
 | 自動アップデート | Tauri Updater 経由（GitHub Releases） | M |
 | アプリアイコン正式デザイン | 仮アイコン（青背景 "S"）を正式版へ差し替え | S |
 | UI 日英表記切り替え（i18n） | UI 文言の 日本語⇄英語 トグル。現状は日本語ハードコード → 文字列を抽出し言語切替を提供（ユーザ要望） | M〜L |

@@ -81,6 +81,14 @@ export default function App() {
   useEffect(() => {
     setActiveDocId(activeId);
   }, [activeId, setActiveDocId]);
+  // テンプレ作成の AI 提案（テーマ2 S5）: postProcess("template-spec") が検証・正規化済みの
+  // TemplateSpec JSON を返すので、ここでは parse してフォームへ渡すだけ。
+  const { submitAndWait: aiSubmitAndWait } = ai;
+  const handleProposeTemplateSpec = useCallback(
+    async (description: string): Promise<TemplateSpec> =>
+      JSON.parse(await aiSubmitAndWait(description, "template-spec", "テンプレ提案")) as TemplateSpec,
+    [aiSubmitAndWait],
+  );
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -347,6 +355,8 @@ export default function App() {
         isOpen={showTemplateCreator}
         onCancel={() => setShowTemplateCreator(false)}
         onCreate={handleCreateTemplate}
+        onProposeSpec={handleProposeTemplateSpec}
+        aiReady={ai.connection.ok}
       />
 
       <LlmAssist

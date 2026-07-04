@@ -12,6 +12,7 @@ import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
 import { diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import { parseJsonLoose } from "../engine/json-salvage";
+import { parseTemplateSpecResponse } from "../engine/template-spec-prompts";
 import { generateWithAI, listProviderModels, PROVIDERS, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
 import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
 /** Diagram-mode type choice: a concrete shape, or "auto" → Stage-1 routing picks it. */
@@ -29,7 +30,7 @@ export interface AiProviderConfig {
   apiKey: string;
 }
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
-export type AiMode = "slides" | "slide" | "condense" | "diagram" | "diagram-edit";
+export type AiMode = "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "template-spec";
 
 export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
 /** One AI request as a tracked task — the unit of the central task store. Every
@@ -59,6 +60,7 @@ const MODE_LABEL: Record<AiMode, string> = {
   condense: "本文を要約",
   diagram: "図の生成",
   "diagram-edit": "図の編集",
+  "template-spec": "テンプレ提案",
 };
 
 /** Classify a failed AI call so the refine loop can decide whether to retry: a cancel
@@ -234,6 +236,13 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       if (!r.ok) return { error: "Couldn't find a diagram in the response." };
       const parsed = DiagramSpecSchema.safeParse(r.value);
       return parsed.success ? { result: diagramSpecToYaml(parsed.data) } : { error: `Invalid diagram: ${parsed.error.issues[0]?.message}` };
+    }
+    if (mode === "template-spec") {
+      // AI は提案のみ — 検証・フォールバック・コントラスト修正は決定論（ADR-0005）。result は
+      // 正規化済み TemplateSpec の JSON（TemplateCreator が parse してフォームに反映する）。
+      const r = parseTemplateSpecResponse(raw);
+      if (!r.ok) return { error: r.error };
+      return { result: JSON.stringify(r.spec), ...(r.notices.length ? { notice: r.notices.join(" / ") } : {}) };
     }
     return { result: raw }; // "diagram" → raw passthrough (unchanged from before)
   }, [catalog]);
