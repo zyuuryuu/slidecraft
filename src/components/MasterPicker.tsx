@@ -13,10 +13,12 @@ interface MasterPickerProps {
   onSelect: (id: string) => void;
   /** Import a new master (.pptx). Omit to render the SELECT only (no import item). */
   onImport?: () => void;
+  /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
+  onCreate?: () => void;
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onCreate, disabled }: MasterPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -69,18 +71,26 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, di
               </button>
             );
           })}
+          {(onImport || onCreate) && <div className="my-1 h-px bg-[#2D3A6E]" />}
           {onImport && (
-            <>
-              <div className="my-1 h-px bg-[#2D3A6E]" />
-              <button
-                onClick={() => { onImport(); setOpen(false); }}
-                title=".pptx をスライドマスターとして取り込む"
-                className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-gray-300 hover:bg-[#2D3A6E]"
-              >
-                <span className="w-3 shrink-0 text-center">＋</span>
-                <span>マスターを取り込む（.pptx）</span>
-              </button>
-            </>
+            <button
+              onClick={() => { onImport(); setOpen(false); }}
+              title=".pptx をスライドマスターとして取り込む"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-gray-300 hover:bg-[#2D3A6E]"
+            >
+              <span className="w-3 shrink-0 text-center">＋</span>
+              <span>マスターを取り込む（.pptx）</span>
+            </button>
+          )}
+          {onCreate && (
+            <button
+              onClick={() => { onCreate(); setOpen(false); }}
+              title="配色とフォントを選んで新しいテンプレを生成する"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-gray-300 hover:bg-[#2D3A6E]"
+            >
+              <span className="w-3 shrink-0 text-center">＋</span>
+              <span>テンプレを作成…</span>
+            </button>
           )}
         </div>
       )}

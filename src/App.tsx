@@ -19,14 +19,17 @@ import MasterPicker from "./components/MasterPicker";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
-import { pickBinaryFile } from "./ipc/commands";
+import { pickBinaryFile, confirmDialog } from "./ipc/commands";
+import { describeRepairPlan } from "./components/apply-template";
+import TemplateCreator from "./components/TemplateCreator";
+import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
@@ -50,9 +53,24 @@ export default function App() {
   const handleImportMaster = useCallback(async () => {
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
-    const entry = registerMaster(picked.name, picked.bytes);
-    const r = await applyMasterBytes(picked.bytes, entry.name);
-    if (r.ok) setMasterId(entry.id);
+    // rejected でも修復可能なら確認のうえ「整形して取り込む」（テーマ2 スライス1）。適用に成功した
+    // bytes（修復されていればそちら）だけをレジストリに登録する — 使えないマスターを選択肢に残さない。
+    const r = await applyMasterBytesWithRepair(picked.bytes, picked.name, (plan) =>
+      confirmDialog(describeRepairPlan(plan), "テンプレートの自動修復"));
+    if (!r.ok) return;
+    const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
+    setMasterId(entry.id);
+  }, [registerMaster, applyMasterBytesWithRepair]);
+  // 新規テンプレ作成（テーマ2 S4）: スペック → template-writer で生成 → 通常のゲート経由で適用＋登録。
+  const [showTemplateCreator, setShowTemplateCreator] = useState(false);
+  const handleCreateTemplate = useCallback(async (spec: TemplateSpec) => {
+    const bytes = await writeTemplate(spec);
+    const r = await applyMasterBytes(bytes, spec.name);
+    if (r.ok) {
+      const entry = registerMaster(spec.name, bytes);
+      setMasterId(entry.id);
+    }
+    setShowTemplateCreator(false);
   }, [registerMaster, applyMasterBytes]);
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
@@ -63,6 +81,14 @@ export default function App() {
   useEffect(() => {
     setActiveDocId(activeId);
   }, [activeId, setActiveDocId]);
+  // テンプレ作成の AI 提案（テーマ2 S5）: postProcess("template-spec") が検証・正規化済みの
+  // TemplateSpec JSON を返すので、ここでは parse してフォームへ渡すだけ。
+  const { submitAndWait: aiSubmitAndWait } = ai;
+  const handleProposeTemplateSpec = useCallback(
+    async (description: string): Promise<TemplateSpec> =>
+      JSON.parse(await aiSubmitAndWait(description, "template-spec", "テンプレ提案")) as TemplateSpec,
+    [aiSubmitAndWait],
+  );
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -188,6 +214,7 @@ export default function App() {
             activeId={masterId}
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
+            onCreate={() => setShowTemplateCreator(true)}
             disabled={editLocked}
           />
         </div>
@@ -322,6 +349,14 @@ export default function App() {
         onFixDeterministic={handleFixIssue}
         onCursorLine={handleCursorLine}
         gotoLine={gotoLine}
+      />
+
+      <TemplateCreator
+        isOpen={showTemplateCreator}
+        onCancel={() => setShowTemplateCreator(false)}
+        onCreate={handleCreateTemplate}
+        onProposeSpec={handleProposeTemplateSpec}
+        aiReady={ai.connection.ok}
       />
 
       <LlmAssist
