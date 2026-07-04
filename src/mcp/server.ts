@@ -17,6 +17,7 @@ import { registerResources } from "./resources";
 import * as G from "./guides";
 import * as T from "./templates";
 import * as St from "./structure";
+import * as R from "./reads";
 import { type HostContext, type DocEntry, commitMutation, undoDoc, redoDoc } from "./host-core";
 
 interface ToolResult {
@@ -152,6 +153,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("get_deck", { description: "現在の deck（DeckIR JSON）。resource `deck://current` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeck(sessionOf(extra, a.docId))));
   server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeckMarkdown(sessionOf(extra, a.docId))));
   server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）。`slide://{index}/markdown` の確実版", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideMarkdown(sessionOf(extra, a.docId), a.index)));
+  server.registerTool("get_slide", { description: "1スライドの構造化 read（1呼び出しで編集計画）：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・当該スライドの issues・markdown。素の Markdown だけなら get_slide_markdown", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => R.getSlide(sessionOf(extra, a.docId), a.index)));
   server.registerTool("get_deck_issues", { description: "deck の診断＝CONTENT レバー（split/condense/visualize/title）＋本文 budget。`deck://issues` のミラー。※ export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(() => S.getDiagnostics(sessionOf(extra, a.docId))));
   server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
   server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
@@ -175,8 +177,8 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
   server.registerTool(
     "set_slide_diagram",
-    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化。図/mermaid を持つスライドのみ）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]), ...doc, ...cc } },
-    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format), { opId: a.opId, expectedRev: a.expectedRev }),
+    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化）。図/mermaid を持つスライドは置換、text スライドは body 領域へ図を追加（created で判別）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body 領域の 1-based ordinal（multi-body 用・既定 1）"), ...doc, ...cc } },
+    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx), { opId: a.opId, expectedRev: a.expectedRev }),
   );
   server.registerTool(
     "apply_design_intent",
