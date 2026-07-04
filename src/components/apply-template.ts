@@ -3,9 +3,14 @@
  * gate. Extracted from useDeckController.handleLoadTemplate so EVERY "pick a master" path (the
  * top-bar loader AND the draft master picker) shares one gated apply — a rejected/unusable master is
  * never silently applied. Takes the doc-store setters (no DOM/Tauri here), so it's unit-testable.
+ *
+ * テーマ2 スライス1: rejected は即拒否ではなく修復プラン（template-repair.ts）を提示し、呼び出し側の
+ * confirm で同意されたら修復済み bytes を適用する（「整形して取り込む」）。同意 UI（Tauri ダイアログ等）
+ * はここに置かず confirm コールバックで注入 — このモジュールは unit-testable のまま。
  */
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
+import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
 
 export interface TemplateSetters {
   setTemplateData: (t: TemplateData) => void;
@@ -16,6 +21,8 @@ export interface TemplateSetters {
 export interface ApplyTemplateResult {
   ok: boolean;
   health?: TemplateHealth; // present whenever the bytes parsed (even if rejected), for the caller to surface
+  repair?: RepairPlan; // rejected 時の修復プラン（repairable でも同意が得られなかった場合も返す）
+  repairedBytes?: Uint8Array; // 修復を適用したときの登録用 bytes（レジストリにはこちらを保存する）
 }
 
 /**
@@ -28,19 +35,60 @@ export async function applyTemplateBytes(
   name: string,
   setters: TemplateSetters,
 ): Promise<ApplyTemplateResult> {
+  return applyTemplateBytesWithRepair(buf, name, setters, async () => false);
+}
+
+/**
+ * applyTemplateBytes の修復オファーつき版。rejected かつ修復可能なら confirm(plan) に諮り、
+ * 同意 → 修復済み bytes を適用して repairedBytes で返す（呼び出し側はレジストリにこれを登録する）。
+ * 拒否/修復不能 → 従来と同一の parseError で非適用。健全なマスターでは confirm は発火しない。
+ */
+export async function applyTemplateBytesWithRepair(
+  buf: ArrayBuffer | Uint8Array,
+  name: string,
+  setters: TemplateSetters,
+  confirmRepair: (plan: RepairPlan) => Promise<boolean>,
+): Promise<ApplyTemplateResult> {
   try {
     const tpl = await loadTemplate(buf);
     const health = assessTemplateHealth(buildCatalog(tpl));
-    if (health.status === "rejected") {
-      const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
-      setters.setParseError(`このテンプレートは使用できません: ${reason}`);
-      return { ok: false, health };
+    if (health.status !== "rejected") {
+      setters.setTemplateData(tpl);
+      setters.setTemplateName(name.replace(/\.pptx$/i, ""));
+      return { ok: true, health };
     }
-    setters.setTemplateData(tpl);
-    setters.setTemplateName(name.replace(/\.pptx$/i, ""));
-    return { ok: true, health };
+
+    const plan = planRepairs(tpl);
+    if (plan.repairable && (await confirmRepair(plan))) {
+      const r = await repairTemplate(buf);
+      if (r.healthAfter.status !== "rejected") {
+        setters.setTemplateData(await loadTemplate(r.bytes));
+        setters.setTemplateName(name.replace(/\.pptx$/i, ""));
+        return { ok: true, health: r.healthAfter, repair: plan, repairedBytes: r.bytes };
+      }
+    }
+
+    const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
+    setters.setParseError(`このテンプレートは使用できません: ${reason}`);
+    return { ok: false, health, repair: plan };
   } catch (err) {
     setters.setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false };
   }
+}
+
+/** 修復プランを確認ダイアログ向けの短い日本語に要約する（純粋・UI 非依存）。 */
+export function describeRepairPlan(plan: RepairPlan): string {
+  const blocks = plan.health.findings.filter((f) => f.level === "block").map((f) => f.message);
+  const titles = plan.ops.filter((o) => o.setType === "title").length;
+  const bodies = plan.ops.filter((o) => o.setType === "body").length;
+  const parts = [
+    titles > 0 ? `タイトル枠 ${titles} 件` : "",
+    bodies > 0 ? `本文枠 ${bodies} 件` : "",
+  ].filter(Boolean).join("・");
+  return (
+    `このテンプレートはそのままでは使用できません:\n${blocks.join("\n")}\n\n` +
+    `自動修復の提案: 計 ${plan.ops.length} 件（${parts}）のプレースホルダに種別を付与します。\n` +
+    `整形して取り込みますか？`
+  );
 }

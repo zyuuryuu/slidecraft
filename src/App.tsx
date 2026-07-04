@@ -19,14 +19,15 @@ import MasterPicker from "./components/MasterPicker";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
-import { pickBinaryFile } from "./ipc/commands";
+import { pickBinaryFile, confirmDialog } from "./ipc/commands";
+import { describeRepairPlan } from "./components/apply-template";
 
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
@@ -50,10 +51,14 @@ export default function App() {
   const handleImportMaster = useCallback(async () => {
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
-    const entry = registerMaster(picked.name, picked.bytes);
-    const r = await applyMasterBytes(picked.bytes, entry.name);
-    if (r.ok) setMasterId(entry.id);
-  }, [registerMaster, applyMasterBytes]);
+    // rejected でも修復可能なら確認のうえ「整形して取り込む」（テーマ2 スライス1）。適用に成功した
+    // bytes（修復されていればそちら）だけをレジストリに登録する — 使えないマスターを選択肢に残さない。
+    const r = await applyMasterBytesWithRepair(picked.bytes, picked.name, (plan) =>
+      confirmDialog(describeRepairPlan(plan), "テンプレートの自動修復"));
+    if (!r.ok) return;
+    const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
+    setMasterId(entry.id);
+  }, [registerMaster, applyMasterBytesWithRepair]);
 
   // One shared AI instance for every surface (AiPanel / LlmAssist) so provider + key
   // config can never diverge.
