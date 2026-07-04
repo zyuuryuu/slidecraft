@@ -106,12 +106,21 @@ export interface CommitResult {
 }
 
 /** Run a deck-MUTATING handler against an entry, then (only if it actually changed the deck)
- *  push the new deck onto the undo history and bump rev. A handler returning {ok:false} is a
- *  never-silent reject that changed nothing → no history push, no rev bump. NOT used for
- *  new/open_project, which mint a fresh DocEntry with its own seeded history. */
+ *  push the new deck onto the undo history and bump rev. A handler that reports it changed nothing —
+ *  a never-silent reject ({ok:false}) OR a real no-op ({changed:false}, e.g. an identical
+ *  set_slide_diagram write or a design intent whose ops all no-op'd) — must NOT push history / bump
+ *  rev / fan out deckChanged (Theme 3 S3: kills the spurious collab echo + undo-history pollution that
+ *  gating on {ok:false} alone let through). NOT used for new/open_project, which mint their own history. */
 export async function commitMutation(entry: DocEntry, mutate: (s: Session) => unknown | Promise<unknown>): Promise<CommitResult> {
   const result = await mutate(entry.session);
-  if (result && typeof result === "object" && (result as { ok?: unknown }).ok === false) {
+  const r = result as { ok?: unknown; changed?: unknown };
+  if (result && typeof result === "object" && (r.ok === false || r.changed === false)) {
+    // A no-op handler ({changed:false}) may still have reassigned session.deck to a CONTENT-EQUAL new
+    // object; re-sync it to history.present so the invariant (history.present === session.deck) holds
+    // without a commit. Safe: every mutation's `changed` is content-based (afterMd/serialize/split), so
+    // changed:false ⟺ content-unchanged — this discards a redundant object, never a real edit. A
+    // {ok:false} reject never reassigned session.deck, so this is idempotent there.
+    entry.session.deck = entry.history.present;
     return { result, changed: false, rev: entry.rev };
   }
   // history.present was the OLD deck (in sync pre-mutation); the handler swapped session.deck to
