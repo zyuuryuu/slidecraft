@@ -18,6 +18,8 @@ import * as G from "./guides";
 import * as T from "./templates";
 import * as St from "./structure";
 import * as R from "./reads";
+import * as N from "./next-steps";
+import type { DeckIssue } from "../engine/deck-diagnostics";
 import { type HostContext, type DocEntry, commitMutation, undoDoc, redoDoc } from "./host-core";
 
 interface ToolResult {
@@ -39,6 +41,13 @@ async function run(fn: () => unknown | Promise<unknown>): Promise<ToolResult> {
 }
 const b64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64");
 const unb64 = (s: string): Uint8Array => new Uint8Array(Buffer.from(s, "base64"));
+
+/** Attach deterministic next-step hints (MCP layer — references tool names) to any result carrying a
+ *  post-edit `diagnostics` array, so a mutation's envelope tells the AI which tool fixes what (S6). */
+const withHints = (v: unknown): unknown => {
+  const r = v as { diagnostics?: unknown };
+  return v && typeof v === "object" && Array.isArray(r.diagnostics) ? { ...(v as object), hints: N.nextStepHints(r.diagnostics as DeckIssue[]) } : v;
+};
 
 /** Build options. `onMutate` fires AFTER a mutating tool actually changed the deck — the seam the
  *  collab host uses to broadcast deckChanged. stdio passes nothing, so it's a no-op. `host` flips
@@ -87,7 +96,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       try {
         const v = await fn(session);
         if (!(v && typeof v === "object" && (v as { ok?: unknown }).ok === false)) opts.onMutate?.(tool);
-        return ok(v);
+        return ok(withHints(v));
       } catch (e) {
         return fail(e);
       }
@@ -105,8 +114,8 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         opts.onMutate?.(tool);
         host.onMutated?.(entry, tool, cc?.opId); // fan out deckChanged (opId lets the originator suppress its echo)
       }
-      if (changed && result && typeof result === "object") return ok({ ...(result as object), rev, docId: entry.docId, opId: cc?.opId });
-      return ok(result);
+      if (changed && result && typeof result === "object") return ok(withHints({ ...(result as object), rev, docId: entry.docId, opId: cc?.opId }));
+      return ok(withHints(result));
     } catch (e) {
       return fail(e);
     }
@@ -154,7 +163,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeckMarkdown(sessionOf(extra, a.docId))));
   server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）。`slide://{index}/markdown` の確実版", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideMarkdown(sessionOf(extra, a.docId), a.index)));
   server.registerTool("get_slide", { description: "1スライドの構造化 read（1呼び出しで編集計画）：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・当該スライドの issues・markdown。素の Markdown だけなら get_slide_markdown", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => R.getSlide(sessionOf(extra, a.docId), a.index)));
-  server.registerTool("get_deck_issues", { description: "deck の診断＝CONTENT レバー（split/condense/visualize/title）＋本文 budget。`deck://issues` のミラー。※ export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(() => S.getDiagnostics(sessionOf(extra, a.docId))));
+  server.registerTool("get_deck_issues", { description: "deck の診断＝CONTENT レバー（split/condense/visualize/title）＋本文 budget＋次の一手 hints。`deck://issues` のミラー。※ export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(() => { const d = S.getDiagnostics(sessionOf(extra, a.docId)); return { ...d, hints: N.nextStepHints(d.issues) }; }));
   server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
   server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
   server.registerTool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
