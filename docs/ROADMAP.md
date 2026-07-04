@@ -28,17 +28,23 @@
 > テーマ2「テンプレ作成補助」は **完了**（2026-07-04・[ADR-0014](adr/0014-template-authoring.md)・
 > 設計＝[docs/design/template-authoring.md](design/template-authoring.md)）。後続の小粒タスクはバックログ参照。
 
-> **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）**：
+> **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）— 着手済み（設計確定・実装 S1–S6 未着手・手前半優先）**：
 >
 > 上流 AI（Claude Code 等）が MCP 経由でこのデッキを編集する体験を底上げする（北極星＝GUI ホスト・AI が Tools で編集・
-> 人はライブ確認、[[collab_host_model]]）。既存 surface（`src/mcp/server.ts` の 18+ tools＋`deck://` resources）を土台に全面見直し：
+> 人はライブ確認、[[collab_host_model]]）。**2026-07-04 に現行 surface を 5レンズで監査（35 findings・7 P1）＋
+> ユーザ insight で手前半を最優先化 → 設計確定**：[ADR-0015](adr/0015-mcp-brushup.md)・
+> 設計＝[docs/design/mcp-brushup.md](design/mcp-brushup.md)。決定の骨子（手前半 T3 先頭）：
 >
-> - **適切な粒度の高品質フィードバック**：mutation の戻りを「ok/error」から **「何が変わったか＋構造/溢れ/予算の診断
->   ＋次の一手ヒント」** へ。前景で作った違反 notices（#12）・skipped op を候補 id つきで報告（#13）の思想を MCP tool
->   全体へ横展開。read も AI が判断しやすい粒度に（per-slide 診断・確実な round-trip Markdown 等）。
-> - **提供機能の全面見直し**：上流 AI に必要な操作が過不足なく揃っているかを監査。構造操作（スライドの追加/削除/
->   並べ替え）・図/表/レイアウトの直接操作・十分な read が提供できているか。重複/紛らわしさの整理（[[mcp_surface_audit]]）。
-> - サイズ M〜L。着手時に現行 tool の入出力を1本ずつレビューし `docs/mcp-server.md` / `docs/adr/` に反映。
+> - **T3 手前半（最優先）オーサリング契約＋テンプレ discovery**：上流 AI の end-to-end ループ（①調達→②書き方を知る
+>   →③提出→④feedback）の手前半を埋める。`get_authoring_guide`（既存 `slideSystemPrompt(catalog)` を露出＝書式・
+>   `<!-- col/kpi/step -->`・実レイアウト名解決）＋ actionable な capabilities ＋ `list_/use_/create_template`。
+>   **既存資産の露出が主で安価**。
+> - **T1 フィードバック**：mutation を1つの兄弟 envelope `{ok, changed, beforeMd?, afterMd?, diagnostics, budget?, skipped?}`
+>   に統一（#12/#13 横展開）＋ **collab の no-op スプリアス通知バグ**（`commitMutation`）を修正。
+> - **T2 構造操作**（最大の穴）：`insert_/delete_/move_/duplicate_slide`（schema 変更なし・alien-safe）＋ `get_slide` read
+>   ＋ `set_slide_diagram` を緩和して text スライドへ図追加＋エラー契約統一・決定論ヒント。
+> - サイズ M〜L。実装 S1 オーサリング契約 → S2 テンプレ discovery → S3 envelope＋バグ修正 → S4 構造操作 →
+>   S5 get_slide＋図追加 → S6 ヒント＋エラー契約＋docs 更新。
 
 > **テーマ4「セキュリティレビュー」（配布/自動化前提の全面監査）**：
 >
