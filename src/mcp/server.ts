@@ -16,6 +16,7 @@ import * as S from "./session";
 import { registerResources } from "./resources";
 import * as G from "./guides";
 import * as T from "./templates";
+import * as St from "./structure";
 import { type HostContext, type DocEntry, commitMutation, undoDoc, redoDoc } from "./host-core";
 
 interface ToolResult {
@@ -185,6 +186,14 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     },
     (a, extra) => mutate(extra, a.docId, "apply_design_intent", (s) => S.applyDesignIntent(s, a.index, a.intent), { opId: a.opId, expectedRev: a.expectedRev }),
   );
+  // ── structure ops (T2/S4) ── surgical add/remove/reorder/duplicate a slide; the SURVIVING slides'
+  // figures/layouts stay byte-identical (set_deck_markdown drops them). Prefix insert_/delete_/move_/
+  // duplicate_ = structure vs set_/apply_/convert_/split_ = content, so the verb alone routes the AI.
+  server.registerTool("insert_slide", { description: "新しいスライドを Markdown から index の前/後に挿入（他スライドの図は保持＝set_deck_markdown と違い surgical）。書式は get_authoring_guide", inputSchema: { ...index, markdown: z.string(), position: z.enum(["before", "after"]).optional().describe("index の前/後（既定 before）"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "insert_slide", (s) => St.insertSlide(s, a.index, a.markdown, a.position), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("delete_slide", { description: "index のスライドを削除（最後の1枚は never-silent 拒否・deletedMd を返す）", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "delete_slide", (s) => St.deleteSlide(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("move_slide", { description: "スライドを fromIndex から toIndex へ移動（純並べ替え・図/レイアウト保持。from===to は no-op）", inputSchema: { fromIndex: z.number().int().describe("移動元 0-based"), toIndex: z.number().int().describe("移動先 0-based"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "move_slide", (s) => St.moveSlide(s, a.fromIndex, a.toIndex), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("duplicate_slide", { description: "index のスライドを複製（structuredClone で図/表/コードを byte-identical に複製）。既定で後ろに挿入", inputSchema: { ...index, position: z.enum(["before", "after"]).optional().describe("複製の挿入位置（既定 after）"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "duplicate_slide", (s) => St.duplicateSlide(s, a.index, a.position), { opId: a.opId, expectedRev: a.expectedRev }));
+
   server.registerTool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues", inputSchema: doc }, (a, extra) => run(() => S.validate(sessionOf(extra, a.docId))));
 
   // ── persist / export (base64 over stdio) ──
