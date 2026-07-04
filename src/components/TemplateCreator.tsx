@@ -15,6 +15,10 @@ interface TemplateCreatorProps {
   onCancel: () => void;
   /** 生成・登録・適用は呼び出し側（App）が行う。resolve 後にモーダルは閉じられる。 */
   onCreate: (spec: TemplateSpec) => Promise<void>;
+  /** AI スペック提案（テーマ2 S5）: 説明 → 検証済み TemplateSpec。省略時は AI 行を出さない。 */
+  onProposeSpec?: (description: string) => Promise<TemplateSpec>;
+  /** AI 接続が生成可能な状態か（未設定なら提案ボタンを無効化して案内を出す）。 */
+  aiReady?: boolean;
 }
 
 const PALETTE_LABELS: Record<PaletteKey, string> = {
@@ -32,14 +36,35 @@ const PALETTE_LABELS: Record<PaletteKey, string> = {
 const inputCls =
   "w-full px-2 py-1 rounded bg-[#0f1117] border border-[#2D3A6E] text-sm text-gray-100 focus:border-[#3B82F6] outline-none";
 
-export default function TemplateCreator({ isOpen, onCancel, onCreate }: TemplateCreatorProps) {
+export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeSpec, aiReady }: TemplateCreatorProps) {
   const [name, setName] = useState("マイテンプレート");
   const [majorFont, setMajorFont] = useState("Georgia");
   const [minorFont, setMinorFont] = useState("Calibri");
   const [palette, setPalette] = useState<Record<PaletteKey, string>>({ ...MIDNIGHT_PALETTE });
   const [busy, setBusy] = useState(false);
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  // AI は提案のみ（フォームに反映するだけ）— 生成・適用は従来どおりユーザの「生成して適用」で。
+  const propose = async () => {
+    if (!onProposeSpec || !aiDesc.trim() || aiBusy) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const spec = await onProposeSpec(aiDesc.trim());
+      setName(spec.name);
+      setMajorFont(spec.fonts.major);
+      setMinorFont(spec.fonts.minor);
+      setPalette({ ...spec.palette });
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const setColor = (key: PaletteKey, hex: string) =>
     setPalette((p) => ({ ...p, [key]: hex.replace(/^#/, "").toUpperCase() }));
@@ -71,6 +96,29 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate }: Template
         </div>
 
         <div className="p-4 flex flex-col gap-3 text-xs text-gray-300 overflow-y-auto" style={{ maxHeight: "70vh" }}>
+          {onProposeSpec && (
+            <div className="flex flex-col gap-1.5 pb-3 border-b border-[#2D3A6E]">
+              <span className="text-gray-400">✨ AI におまかせ（雰囲気・用途を書くと下のフォームに提案を反映）</span>
+              <div className="flex gap-2">
+                <input
+                  value={aiDesc}
+                  onChange={(e) => setAiDesc(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void propose(); }}
+                  className={inputCls}
+                  placeholder="例: 官公庁向けの落ち着いた報告書、緑基調"
+                />
+                <button
+                  onClick={() => void propose()}
+                  disabled={!aiReady || !aiDesc.trim() || aiBusy}
+                  title={aiReady ? "AI に配色とフォントを提案させる" : "AI 接続が未設定です（✨AI ドックで設定）"}
+                  className="px-3 py-1 shrink-0 rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white disabled:opacity-40"
+                >
+                  {aiBusy ? "提案中…" : "提案"}
+                </button>
+              </div>
+              {aiError && <span className="text-red-400">{aiError}</span>}
+            </div>
+          )}
           <label className="flex flex-col gap-1">
             <span>テンプレ名</span>
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
