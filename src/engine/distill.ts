@@ -118,7 +118,22 @@ export function contentBodyBox(catalog: LayoutCatalog): FitBox | undefined {
  * consume the distilled deck, so what you see is what's exported (WYSIWYG).
  */
 export function distillDeck(deck: DeckIR, catalog: LayoutCatalog): DeckIR {
+  return distillDeckReport(deck, catalog).deck;
+}
+
+/** As distillDeck, but ALSO report the NEW slide indices produced by splitting — a source slide that
+ *  splits into N parts inserts continuation slides mid-deck, shifting all downstream indices, so an
+ *  index-addressed follow-up (get_slide_markdown, set_slide_markdown…) would otherwise target a stale
+ *  slide. `newIndices` are those post-split positions (Theme 3 S6: split's changedSlides). */
+export function distillDeckReport(deck: DeckIR, catalog: LayoutCatalog): { deck: DeckIR; newIndices: number[] } {
   const box = contentBodyBox(catalog);
-  if (!box) return deck;
-  return { ...deck, slides: deck.slides.flatMap((s) => splitSlideToFit(s, box)) };
+  if (!box) return { deck, newIndices: [] };
+  const slides: SlideIR[] = [];
+  const newIndices: number[] = [];
+  for (const s of deck.slides) {
+    const parts = splitSlideToFit(s, box);
+    if (parts.length > 1) for (let k = 0; k < parts.length; k++) newIndices.push(slides.length + k);
+    slides.push(...parts);
+  }
+  return { deck: { ...deck, slides }, newIndices };
 }

@@ -14,7 +14,7 @@ import { buildCatalog, deckCapabilities, assessTemplateHealth, type LayoutCatalo
 import { openProject, bundleProject } from "../engine/project-io";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { distillDeck, contentBodyBox } from "../engine/distill";
+import { distillDeck, distillDeckReport, contentBodyBox } from "../engine/distill";
 import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
@@ -214,11 +214,11 @@ export function applyDeckMarkdown(s: Session, markdown: string) {
  *  shrinking fonts. The whole point of harness-over-model — never make the agent re-do it. */
 export function distill(s: Session) {
   const { deck, catalog } = requireLoaded(s);
-  const fitted = distillDeck(deck, catalog);
+  const { deck: fitted, newIndices } = distillDeckReport(deck, catalog);
   const changed = fitted.slides.length !== deck.slides.length;
   s.deck = fitted;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, before: deck.slides.length, after: fitted.slides.length, ...fitTail(fitted, catalog) };
+  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...fitTail(fitted, catalog) };
 }
 
 /** Deterministic lever: turn a key-value bullet run on one slide into a GFM table. When there is no
