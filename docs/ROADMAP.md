@@ -17,7 +17,6 @@
 
 | # | テーマ | 一行 | サイズ |
 | --- | --- | --- | --- |
-| 3 | **MCP ブラッシュアップ** | 上流 AI が作業しやすくするエンハンス：適切な粒度の高品質フィードバック＋提供機能の全面見直し | M〜L |
 | 4 | **セキュリティレビュー** | 配布/自動化を前提に攻撃面を全面監査：MCP の認証/scope/egress・シークレット(BYOK)・依存/供給網・信頼モデル | M〜L |
 
 > テーマ1「HTML 出力」（大マイルストーン）は **完了**（2026-07-04・[ADR-0013](adr/0013-svg-native-text.md)・
@@ -28,23 +27,12 @@
 > テーマ2「テンプレ作成補助」は **完了**（2026-07-04・[ADR-0014](adr/0014-template-authoring.md)・
 > 設計＝[docs/design/template-authoring.md](design/template-authoring.md)）。後続の小粒タスクはバックログ参照。
 
-> **テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）— 着手済み（設計確定・実装 S1–S6 未着手・手前半優先）**：
->
-> 上流 AI（Claude Code 等）が MCP 経由でこのデッキを編集する体験を底上げする（北極星＝GUI ホスト・AI が Tools で編集・
-> 人はライブ確認、[[collab_host_model]]）。**2026-07-04 に現行 surface を 5レンズで監査（35 findings・7 P1）＋
-> ユーザ insight で手前半を最優先化 → 設計確定**：[ADR-0015](adr/0015-mcp-brushup.md)・
-> 設計＝[docs/design/mcp-brushup.md](design/mcp-brushup.md)。決定の骨子（手前半 T3 先頭）：
->
-> - **T3 手前半（最優先）オーサリング契約＋テンプレ discovery**：上流 AI の end-to-end ループ（①調達→②書き方を知る
->   →③提出→④feedback）の手前半を埋める。`get_authoring_guide`（既存 `slideSystemPrompt(catalog)` を露出＝書式・
->   `<!-- col/kpi/step -->`・実レイアウト名解決）＋ actionable な capabilities ＋ `list_/use_/create_template`。
->   **既存資産の露出が主で安価**。
-> - **T1 フィードバック**：mutation を1つの兄弟 envelope `{ok, changed, beforeMd?, afterMd?, diagnostics, budget?, skipped?}`
->   に統一（#12/#13 横展開）＋ **collab の no-op スプリアス通知バグ**（`commitMutation`）を修正。
-> - **T2 構造操作**（最大の穴）：`insert_/delete_/move_/duplicate_slide`（schema 変更なし・alien-safe）＋ `get_slide` read
->   ＋ `set_slide_diagram` を緩和して text スライドへ図追加＋エラー契約統一・決定論ヒント。
-> - サイズ M〜L。実装 S1 オーサリング契約 → S2 テンプレ discovery → S3 envelope＋バグ修正 → S4 構造操作 →
->   S5 get_slide＋図追加 → S6 ヒント＋エラー契約＋docs 更新。
+> テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）は **完了**（2026-07-04・[ADR-0015](adr/0015-mcp-brushup.md)・
+> 設計＝[docs/design/mcp-brushup.md](design/mcp-brushup.md)・使い方＝[docs/mcp-server.md](mcp-server.md)）。監査（35 findings）
+> ＋ユーザ insight で手前半（自己記述オーサリング契約＋テンプレ調達）を最優先化し S1–S6 実装：`get_authoring_guide`/図の二段
+> ガイド・`create_template`・統一 mutation envelope＋collab no-op バグ修正・構造操作（insert/delete/move/duplicate）・
+> `get_slide`＋text スライドへ図追加・決定論 hints＋split の changedSlides。各スライスを敵対レビュー通過（全 982 tests・
+> schema 変更なし）。後続の小粒（S2 増分2＝`list_/use_template`）はバックログ参照。
 
 > **テーマ4「セキュリティレビュー」（配布/自動化前提の全面監査）**：
 >
@@ -66,6 +54,8 @@
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
+| MCP: テンプレ選択（S2 増分2） | `list_templates`/`use_template(id)` で登録済みテンプレを AI が選べるように。GUI の master レジストリ（`useMasterRegistry`/`src/ipc/master-store.ts`＝Tauri fs 裏）を `HostContext` に accessor 注入する host 機能で GUI 側実装と対。stdio は `create_template`／bytes 持参で代替可。[ADR-0015](adr/0015-mcp-brushup.md) の残タスク | S〜M |
+| MCP: エラー契約の完全統一 | ガード系 throw（範囲外 index・未オープン）を `{ok:false, error, code?}` に寄せ、`isError` を un-modeled crash 専用に。現状はドメイン拒否＝`{ok:false}`／呼び出し・クラッシュ＝`isError` の2カテゴリで運用（`docs/mcp-server.md` に明記済） | S |
 | HTML出力: 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。監査 harness は再利用可（`html_output_design`） | M |
 | HTML出力: @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
 | HTML出力: 印刷の恒久 e2e テスト | Playwright `page.pdf` でページ数/向き/背景を自動検証し実出力を仕組みで担保（[[feedback_verify_real_output]]） | S |
