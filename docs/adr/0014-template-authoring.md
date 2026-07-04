@@ -51,6 +51,10 @@ alien 対応・回復ラダー・テスト群完備）で、**書く側はゼロ
 **代償・限界**
 - **PowerPoint 実機での開封確認は未実施**（開発環境に PowerPoint/動作する LibreOffice が無い）。
   自前ローダ round-trip＋PPTX 組み立て生存で担保しているが、実機確認は次マイルストーンの手動項目。
+  【追記 2026-07-04】多レンズ構造検証（expat 整形式・python-pptx 開封・rels/Content-Types 整合）と
+  実アプリ取り込みのユーザ確認まで完了（`tests/pptx-wellformed.test.ts` / `template-writer-conventions.test.ts`
+  で恒久ゲート化・マスター ph 5種と docProps 等の慣習パートも生成に追加）。副産物として canonical の
+  整形式破損を発見・根絶（`31c556e`）。残り＝PowerPoint 実機（web 版可）での開封のみ（ROADMAP バックログ）。
 - 生成レイアウトの構成は内蔵 30 種固定（サブセット選択・カスタムレイアウト UI は将来）。
   モーダル内ライブプレビューも将来課題（現状は適用後のメインプレビューで確認する運用）。
 - 修復は type 付与のみ（ジオメトリ実体化・レイアウト命名の修復は扱わない）。
