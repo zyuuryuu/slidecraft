@@ -52,7 +52,7 @@ export function slideSystemPrompt(catalog?: LayoutCatalog): string {
 
   const rule = (role: LayoutRole, canonical: string, desc: string, sep?: string): string | undefined => {
     const name = catalog ? catalog.find((e) => e.role === role)?.name : canonical;
-    return name ? `- ${desc}: \`${name}\`${sep ? ` with \`${sep}\` separators` : ""}` : undefined;
+    return name ? `- ${desc}: \`${name}\`${sep ? ` — put one \`${sep}\` before EACH region (content before the first is ignored)` : ""}` : undefined;
   };
   const layoutRules = [
     rule("title", "Title.1Title.Single", "First slide (opening)"),
@@ -130,6 +130,28 @@ graph TD
   A[Start] --> B{Decision}
   B -->|Yes| C[Action]
   B -->|No| D[End]
+\`\`\`
+\`\`\`\`
+
+## Tables
+
+For structured data — comparisons, key-value specs, schedules — use a GFM table (rendered as a NATIVE PowerPoint table, not an image):
+
+\`\`\`
+| 指標 | 値 |
+| --- | --- |
+| 売上 | ¥1.2M |
+| 前年比 | +12% |
+\`\`\`
+
+## Code / Logs
+
+For code or log output, use a fenced code block with a language (rendered monospace):
+
+\`\`\`\`
+\`\`\`python
+def greet(name):
+    return f"Hello, {name}"
 \`\`\`
 \`\`\`\`
 
