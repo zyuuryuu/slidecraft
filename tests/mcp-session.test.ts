@@ -77,9 +77,13 @@ describe("mcp session — deterministic mutations", () => {
     const s = await opened();
     const kv = S.visualizeKeyValue(s, 1); // 速度/重量/価格 → table
     expect(kv.ok).toBe(true);
-    if (kv.ok) expect(kv.afterMd).toContain("|");
+    expect(kv.changed).toBe(true);
+    if (kv.changed) expect(kv.afterMd).toContain("|");
     const cover = S.visualizeKeyValue(s, 0); // cover has no key-value run
-    expect(cover.ok).toBe(false);
+    // ADR-0015: a legitimate "nothing to convert" is NOT a failure — ok:true, changed:false.
+    expect(cover.ok).toBe(true);
+    expect(cover.changed).toBe(false);
+    if (!cover.changed) expect(cover.status).toBe("not-applicable");
   });
 
   it("get_slide_fix returns a request packet for the agent to fulfill", async () => {
