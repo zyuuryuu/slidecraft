@@ -13,7 +13,7 @@ npm run dev              # Vite dev server (localhost:5173)
 npm run tauri dev        # Tauri + Vite 同時起動
 
 # テスト
-npm test                 # vitest run (118 tests)
+npm test                 # vitest run (918 tests)
 npm run test:watch       # vitest watch mode
 
 # ビルド
