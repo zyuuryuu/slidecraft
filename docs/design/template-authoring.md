@@ -27,9 +27,9 @@
 
 | # | 内容 | サイズ | 状態 |
 | --- | --- | --- | --- |
-| S1 | **登録支援（修復）エンジン** `template-repair.ts`：rejected テンプレの診断→修復提案→XML パッチ | M | 着手 |
-| S2 | 取り込み UI 配線：インポート時に健全性レポート＋「整形して取り込む」 | S | S1 と同時 |
-| S3 | **template-writer エンジン**：`TemplateSpec` → フル OOXML 生成（マスター/レイアウト/テーマ/配管） | L | |
+| S1 | **登録支援（修復）エンジン** `template-repair.ts`：rejected テンプレの診断→修復提案→XML パッチ | M | 完了 |
+| S2 | 取り込み UI 配線：インポート時に健全性レポート＋「整形して取り込む」 | S | 完了 |
+| S3 | **template-writer エンジン**：`TemplateSpec` → フル OOXML 生成（マスター/レイアウト/テーマ/配管） | L | 完了（engine＋テスト。PowerPoint 実機確認は S4 マイルストーン時に手動） |
 | S4 | テンプレ作成 UI：スペック編集 → ライブプレビュー（SlidePreview 再利用）→ 命名して登録 | M | |
 | S5 | AI スペック提案：自然言語/原稿 → `TemplateSpec`（ADR-0005 準拠 = AI は提案のみ、書くのは決定論コード） | S〜M | |
 | S6 | レジストリ永続化（Slice 1b）：`useMasterRegistry` を同一インターフェースで Tauri app-local-data へ | M | |
