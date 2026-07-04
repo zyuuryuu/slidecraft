@@ -73,6 +73,25 @@ export function isLocalBaseURL(url: string): boolean {
   return false;
 }
 
+/** Reject a base URL that would leak the API key: it must parse, and any NON-local host
+ *  must be https (an http:// cloud endpoint sends the `Authorization: Bearer <key>` header
+ *  in cleartext). Local / loopback / RFC1918 may stay http. Guards a malicious or typo'd
+ *  custom endpoint BEFORE the key is ever attached to a request (ADR-0016 F1). A bare host
+ *  (no scheme) is treated as http — same as isLocalBaseURL — so it too must be made https. */
+export function assertValidBaseURL(baseURL: string): void {
+  const raw = baseURL.trim();
+  if (!raw) throw new Error("Base URL が未設定です。");
+  let u: URL;
+  try {
+    u = new URL(raw.includes("://") ? raw : `http://${raw}`);
+  } catch {
+    throw new Error(`Base URL の形式が不正です: ${raw}`);
+  }
+  if (u.protocol !== "https:" && !isLocalBaseURL(raw)) {
+    throw new Error(`安全でない Base URL です（非ローカルの宛先には https が必須）: ${u.protocol}//${u.host}`);
+  }
+}
+
 /** Whether sending to this provider+endpoint stays on the local machine/LAN. Native
  *  Claude is always cloud; everything else is decided by the actual baseURL host. */
 export function isLocalTarget(provider: ProviderId, baseURL: string): boolean {
@@ -124,6 +143,13 @@ export function generateWithAI(req: AiRequest): Promise<string> {
       signal: req.signal,
     });
   }
+  // Reject an insecure/malformed endpoint before the key is sent (ADR-0016 F1). Converted to a
+  // rejected promise (not a sync throw) so this function keeps its "always returns a Promise" contract.
+  try {
+    assertValidBaseURL(req.baseURL);
+  } catch (e) {
+    return Promise.reject(e);
+  }
   return generateWithOpenAICompat({
     apiKey: req.apiKey,
     baseURL: req.baseURL,
@@ -149,8 +175,8 @@ export async function listProviderModels(
   apiKey: string,
 ): Promise<string[]> {
   if (provider === "claude") return CLAUDE_MODELS;
+  assertValidBaseURL(baseURL); // same key-leak guard on the model-listing path (ADR-0016 F1)
   const base = baseURL.trim().replace(/\/+$/, "");
-  if (!base) throw new Error("Base URL is required.");
   const res = await appFetch(`${base}/models`, {
     headers: apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
   });
