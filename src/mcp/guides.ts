@@ -19,15 +19,30 @@ import { VALID_TYPES } from "../engine/schema-constants";
  *  diagram / template-spec guides. This is the single ENTRY the AI reads before authoring; it requires
  *  an open project (never-silent via requireLoaded) so the layout names are the real template's. */
 export function getAuthoringGuide(s: Session) {
-  const catalog = S.getCatalog(s).entries; // requireLoaded inside → never-silent if no project open
-  const budget = S.getDiagnostics(s).budget;
+  const { entries, budget } = S.entriesAndBudget(s); // requireLoaded inside → never-silent if no project open
   return {
-    format: slideSystemPrompt(catalog),
+    format: slideSystemPrompt(entries),
     budget, // this template's body capacity (maxBullets/charsPerBullet) — keep each content slide within it
     seeAlso: {
       figures: "図を入れるなら get_diagram_types で種類を選び、get_diagram_guide(type) で構文を得る",
       templateSpec: "新しいテンプレを作るなら get_template_spec_guide（→ create_template）",
     },
+  };
+}
+
+/** The contract DIGEST that rides EVERY session-entry return (open/new/select_document) — the
+ *  unskippable push channel (§F ②). Anchor-type: only what the AI can't guess (this template's real
+ *  layout NAMES + the region-separator placement) + the body budget + pointers to the full guide and
+ *  the figure vocabulary. Kept lean because it ships on every entry; depth is PULLED via
+ *  get_authoring_guide / get_diagram_types. */
+export function contractDigest(s: Session) {
+  const { entries, budget } = S.entriesAndBudget(s);
+  return {
+    layouts: entries.map((e) => e.name),
+    budget,
+    separators:
+      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）",
+    seeAlso: { format: "get_authoring_guide", figures: "get_diagram_types" },
   };
 }
 

@@ -121,16 +121,29 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       return { ...(res as object), docId: entry.docId };
     });
 
+  // The authoring-contract digest rides EVERY path by which the AI enters a loaded doc: the stdio
+  // open/new returns, the host open/new/select returns, AND list_documents — because in collab the AI
+  // often lands on a GUI-opened doc via the sole-doc fallback (see entryOf) without ever calling
+  // open/new/select. safeContract guards contractDigest's precondition (a fully loaded
+  // deck+template+catalog) so a not-yet-loaded entry omits the contract instead of throwing.
+  // Guide pull (get_authoring_guide) + the format anchors on the edit tools are the belt to this push.
+  const safeContract = (s: Session) => (s.deck && s.template && s.catalog ? G.contractDigest(s) : undefined);
+  const withContract = (load: (s: Session) => Promise<object>) => async (s: Session): Promise<object> => {
+    const r = await load(s);
+    const c = safeContract(s);
+    return c ? { ...r, contract: c } : r;
+  };
+
   // ── entry: open / new ──
   server.registerTool(
     "open_project",
     { description: "base64 の .slidecraft を開く（host では新しいドキュメントとして開く）", inputSchema: { dataBase64: z.string() } },
-    (a, extra) => (host ? openInHost((s) => S.openProjectBytes(s, unb64(a.dataBase64)), extra) : mutate(extra, undefined, "open_project", (s) => S.openProjectBytes(s, unb64(a.dataBase64)))),
+    (a, extra) => (host ? openInHost(withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))), extra) : mutate(extra, undefined, "open_project", withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))))),
   );
   server.registerTool(
     "new_project",
     { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規作成（host では新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
-    (a, extra) => (host ? openInHost((s) => S.newProject(s, unb64(a.templateBase64), a.markdown), extra) : mutate(extra, undefined, "new_project", (s) => S.newProject(s, unb64(a.templateBase64), a.markdown))),
+    (a, extra) => (host ? openInHost(withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)), extra) : mutate(extra, undefined, "new_project", withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)))),
   );
 
   // ── reads ──
@@ -182,14 +195,22 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
 
   // ── host-only: multi-doc lifecycle + server-side undo ──
   if (host) {
-    server.registerTool("list_documents", { description: "開いているドキュメント一覧（AI クライアントは共有docのみ＝private-by-default）" }, (extra) =>
-      run(() => ({ documents: host.registry.list({ sharedOnly: host.sharedOnly }), activeDocId: host.active(extra) ?? null })),
+    server.registerTool("list_documents", { description: "開いているドキュメント一覧（AI クライアントは共有docのみ＝private-by-default）。各docに contract（書式ダイジェスト）付き", }, (extra) =>
+      run(() => ({
+        documents: host.registry.list({ sharedOnly: host.sharedOnly }).map((d) => {
+          const c = safeContract(host.registry.get(d.docId).session); // so the list→operate flow carries the contract
+          return c ? { ...d, contract: c } : d;
+        }),
+        activeDocId: host.active(extra) ?? null,
+      })),
     );
     server.registerTool("select_document", { description: "このコネクションの対象ドキュメントを切り替える（AI 版 switchDoc。deck は変えない）", inputSchema: { docId: z.string() } }, ({ docId }, extra) =>
       run(() => {
         const e = host.registry.get(docId);
         host.setActive(extra, docId);
-        return { docId: e.docId, slideCount: e.session.deck?.slides.length ?? 0, rev: e.rev };
+        // The AI may enter a doc via select — carry the contract here too (also on open/new + list_documents).
+        const c = safeContract(e.session);
+        return { docId: e.docId, slideCount: e.session.deck?.slides.length ?? 0, rev: e.rev, ...(c ? { contract: c } : {}) };
       }),
     );
     server.registerTool("close_document", { description: "ドキュメントを閉じる（dirty は force 必須＝never-silent）", inputSchema: { docId: z.string(), force: z.boolean().optional() } }, ({ docId, force }) =>
