@@ -5,6 +5,7 @@
 // let a compromised webview read/write anywhere. That arbitrary-fs hole is now closed.
 mod collab; // P2.3: spawn / supervise / reap the Node collab sidecar (start_collab/stop_collab)
 mod local_ai; // roadmap #2: spawn / supervise / reap the bundled llamafile in-app AI runtime
+mod secret_store; // ADR-0016 F3: OS keychain for the BYOK API key (secret_set/get/delete)
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -26,7 +27,10 @@ pub fn run() {
             local_ai::local_ai_status,
             local_ai::ensure_model_weights,
             local_ai::evict_model_weights,
-            local_ai::model_weights_present
+            local_ai::model_weights_present,
+            secret_store::secret_set,
+            secret_store::secret_get,
+            secret_store::secret_delete
         ])
         .setup(|_app| {
             eprintln!("[slidecraft] setup() reached — main window created, entering event loop");

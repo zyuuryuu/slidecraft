@@ -74,6 +74,13 @@ describe("renderDiagramToSvg", () => {
     expect(svg).not.toContain("<b>&amp;");
   });
 
+  it("escapes the single-quote in labels (latent single-quoted-attribute hardening — ADR-0016 F4)", () => {
+    const spec = { ...FLOW, nodes: [{ id: "x", label: "it's", shape: "rect" }], edges: [] } as unknown as DiagramSpec;
+    const svg = renderDiagramToSvg(spec);
+    expect(svg).toContain("it&#39;s");
+    expect(svg).not.toContain("it's"); // a raw ' could break out of a future single-quoted attribute
+  });
+
   it("neutralizes malicious colors so they cannot break out of fill/style attributes (XSS)", () => {
     // A hostile .slidecraft can set any string as a color (schema is z.string()). Without
     // escaping, `red" onmouseover=…` would close fill="…" and inject an event handler.
