@@ -40,7 +40,8 @@ function esc(s: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;"); // also escape ' so a value in a future single-quoted attr can't break out (ADR-0016 F4)
 }
 
 /** CJK/fullwidth code-point test (via code point → no literal CJK glyphs / irregular-whitespace lint). */
