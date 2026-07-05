@@ -88,4 +88,15 @@ test.describe("SlideCraft", () => {
     await page.waitForTimeout(500);
     await expect(page.locator("body")).toBeVisible();
   });
+
+  test("Slide Editor: Layout is collapsed by default and expands on click", async ({ page }) => {
+    await page.waitForTimeout(1500); // deck + slide editor
+    // The Layout row is a toggle showing the ACTIVE layout; its picker is hidden until expanded.
+    const layoutToggle = page.getByRole("button", { name: /Layout/ });
+    await expect(layoutToggle).toBeVisible();
+    const picker = page.locator('select:has(option[value="auto"])'); // the layout <select>
+    await expect(picker).toHaveCount(0); // collapsed by default → picker not rendered
+    await layoutToggle.click();
+    await expect(picker).toBeVisible(); // expanded → the picker appears
+  });
 });
