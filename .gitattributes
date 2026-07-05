@@ -1,0 +1,28 @@
+# Normalize line endings across every clone.
+#
+# The repo is developed on WSL/Linux (LF). Without this file, a Windows checkout gets CRLF working
+# copies, so git reports ~every file as "modified" and blocks `git pull` / `git checkout`. Forcing
+# LF in BOTH the index and the working tree (eol=lf) makes clones byte-identical on every OS.
+# `text=auto` still auto-detects binaries so an undeclared binary is never corrupted.
+* text=auto eol=lf
+
+# Shell scripts must be LF to run (redundant with the above, but explicit + intent-revealing).
+*.sh    text eol=lf
+*.mjs   text eol=lf
+
+# Binary assets — never apply text/eol conversion.
+*.pptx  binary
+*.potx  binary
+*.gguf  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.icns  binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
