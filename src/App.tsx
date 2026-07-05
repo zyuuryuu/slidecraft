@@ -251,7 +251,9 @@ export default function App() {
             left={
               <>
                 <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E] flex items-center justify-between">
-                  <span>Slide Editor — {currentLayoutName || "No slide"}</span>
+                  {/* Show the resolved layout in the title ONLY in Markdown view — the form view's
+                      LAYOUT row already shows it (avoid duplicating the layout name). */}
+                  <span>Slide Editor{slideEditView === "markdown" && currentLayoutName ? ` — ${currentLayoutName}` : ""}</span>
                   <div className="flex items-center gap-0.5">
                     <button
                       onClick={() => setSlideEditView("form")}
