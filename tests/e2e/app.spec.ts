@@ -100,6 +100,21 @@ test.describe("SlideCraft", () => {
     await expect(picker).toBeVisible(); // expanded → the picker appears
   });
 
+  test("slide list: add / duplicate / delete change the slide count", async ({ page }) => {
+    await page.waitForTimeout(1500); // sample deck
+    const del = page.getByTitle("このスライドを削除"); // one per slide (hover-revealed) = a count proxy
+    const before = await del.count();
+    expect(before).toBeGreaterThanOrEqual(3);
+    await page.getByRole("button", { name: /スライド追加/ }).click();
+    await expect(del).toHaveCount(before + 1);
+    await page.locator(".group").first().hover();
+    await page.getByTitle("このスライドを複製").first().click();
+    await expect(del).toHaveCount(before + 2);
+    await page.locator(".group").first().hover();
+    await del.first().click();
+    await expect(del).toHaveCount(before + 1);
+  });
+
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark"); // default

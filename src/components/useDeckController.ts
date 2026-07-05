@@ -12,6 +12,7 @@ import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { parseDiagramEditOps, applyDiagramEditOps } from "../engine/diagram-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit } from "../engine/ai-apply";
+import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -327,6 +328,37 @@ export function useDeckController() {
     [deck, setDeck, scheduleHostSend],
   );
 
+  // ── Slide STRUCTURE (add / delete / duplicate) — undo-able, via the shared deck-structure ops so the
+  // GUI and MCP never diverge. Gated while collab-locked (observe-only: the host owns structure there). ──
+  const handleAddSlide = useCallback(() => {
+    if (editLockedRef.current || !deck) return;
+    const { deck: next, at } = insertSlideAt(deck, activeSlide, blankSlide(), "after");
+    setDeck(next, "commit");
+    setActiveSlide(at);
+    setSelected(new Set([at]));
+    setEditNotice(null);
+  }, [deck, activeSlide, setDeck, setActiveSlide, setSelected, setEditNotice]);
+
+  const handleDeleteSlide = useCallback((index: number) => {
+    if (editLockedRef.current || !deck) return;
+    const next = deleteSlideAt(deck, index);
+    if (!next) { setEditNotice("最後の1枚は削除できません（スライドは最低1枚必要です）。"); return; }
+    setDeck(next, "commit");
+    const focus = Math.min(index, next.slides.length - 1); // keep the selection on a valid slide
+    setActiveSlide(focus);
+    setSelected(new Set([focus]));
+    setEditNotice(null);
+  }, [deck, setDeck, setActiveSlide, setSelected, setEditNotice]);
+
+  const handleDuplicateSlide = useCallback((index: number) => {
+    if (editLockedRef.current || !deck) return;
+    const { deck: next, newIndex } = duplicateSlideAt(deck, index, "after");
+    setDeck(next, "commit");
+    setActiveSlide(newIndex);
+    setSelected(new Set([newIndex]));
+    setEditNotice(null);
+  }, [deck, setDeck, setActiveSlide, setSelected, setEditNotice]);
+
   // Deterministic "→表" in Edit (deck = source of truth): serialize the slide →
   // visualize key-value bullets → parse back → replace the slide (deck-op, undoable).
   // Reuses the same markdown lever as Import, so Initialize/Edit stay consistent.
@@ -561,6 +593,7 @@ export function useDeckController() {
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
+    handleAddSlide, handleDeleteSlide, handleDuplicateSlide,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
