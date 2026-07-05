@@ -125,14 +125,15 @@ export function reconcileSlideEdit(old: SlideIR, rawMd: string): SlideEditReconc
 }
 
 /**
- * Fallback-path transparency (ADR-0019 observability). When a per-slide edit on a slide that HAS a
- * figure falls through the figure/ops/design detectors to the FULL-Markdown reconcile path AND that
- * path reports drift, the model almost certainly regenerated the whole slide (format A) instead of
- * emitting figure ops (format B) — the drift is the symptom, and the reconciled result rolls back to a
- * bare "変更なし". Prepend a tag so the reviewer sees WHY it rolled back (legible, not opaque). Benign
- * text edits don't drift → not tagged. Returns the warnings unchanged when there's nothing to explain.
+ * Fallback-path transparency (ADR-0019 observability). Trigger = a per-slide edit on a slide that HAS a
+ * figure could NOT be used as ops (parseDiagramEditOps null) so it fell to the whole-slide reconcile
+ * path AND that path reports drift. NOTE the trigger is "couldn't parse as ops", NOT "the model returned
+ * full text" — it also fires on prose-wrapped or malformed ops (which #3C keeps out of the ops path), and
+ * even a plain text edit on a figure slide that happens to drift. In all those the reconciled result
+ * rolls back to a bare "変更なし"; the tag makes WHY legible (and is the same signal that arms the ops
+ * auto-retry). Clean (no-drift) edits aren't tagged. Returns warnings unchanged when there's nothing to explain.
  */
 export function figureFallbackTag(hadFigure: boolean, warnings: string[]): string[] {
   if (!hadFigure || warnings.length === 0) return warnings;
-  return ["[全文フォールバック] 図の部分編集（ops）として解釈できず全文を再構成したため、以下のずれを検出しました。", ...warnings];
+  return ["[opsフォールバック] 図の部分編集（ops）として受け取れず、スライド全体の編集として処理したため、以下のずれを検出しました。", ...warnings];
 }

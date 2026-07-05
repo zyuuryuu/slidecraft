@@ -130,7 +130,7 @@ export default function AiPanel({
   // ① Self-repair, Option A (ADR-0019): when a figure edit drifted to full-Markdown (editPreview
   // .shouldRetry), auto-fire ONE ops-bias retry with the harness-authored nudge. Ref-guarded so it
   // runs at most once per user generate (reset in doGenerate) → never loops; a 2nd drift just shows the
-  // [全文フォールバック]-tagged result for the human to reject/edit. Adoption gate unchanged.
+  // [opsフォールバック]-tagged result for the human to reject/edit. Adoption gate unchanged.
   const autoRetriedRef = useRef(false);
   const [retrying, setRetrying] = useState(false);
   // 採用 = commit, then FREEZE the review as an "adopted" snapshot. Recomputing editPreview against the
@@ -355,7 +355,7 @@ export default function AiPanel({
           Transparent (not silent) even though it fires automatically. */}
       {retrying && ai.generating && (
         <div className="mx-3 mb-2 px-2 py-1.5 bg-accent/15 border border-accent/40 rounded text-xs text-accent-soft">
-          🔁 図が全文で返ったため、部分編集（ops）で自動的に再生成しています…
+          🔁 図の部分編集（ops）として受け取れなかったため、opsで自動的に再生成しています…
         </div>
       )}
 
