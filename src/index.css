@@ -144,3 +144,13 @@ body {
 .cm-scroller {
   overflow: auto !important;
 }
+
+/* Input placeholder hints — faint, so an empty field's example text reads clearly subtler than real
+   content (theme-aware via the token). Covers native inputs/textareas + the CodeMirror editor. */
+::placeholder {
+  color: var(--faint);
+  opacity: 1; /* Firefox dims placeholders by default — keep our explicit faint color */
+}
+.cm-placeholder {
+  color: var(--faint) !important;
+}
