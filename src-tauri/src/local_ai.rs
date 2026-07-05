@@ -30,14 +30,12 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// The pinned default model filename, downloaded into app-local-data/models by the (separate)
-/// weight-download step. `SLIDECRAFT_GGUF` overrides it (escape hatch for dev/testing).
-/// phi-3.5-mini is the Phase-0-validated tier (budget/parse/drift 5/5 with the Markdown-only
-/// prompt); qwen had a JA→中文 drift risk, so phi is the safer default.
-const WEIGHTS_NAME: &str = "phi-3.5-mini-instruct-q4_k_m.gguf";
-/// Pinned model download (bartowski's phi-3.5-mini Q4_K_M, ~2.39 GB) + its SHA256 for integrity.
-const WEIGHTS_URL: &str = "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf";
-const WEIGHTS_SHA256: &str = "e4165e3a71af97f1b4820da61079826d8752a2088e313af0c7d346796c38eff5";
+/// The default model now comes from the capability-selected TIER (`model_tier::spec_for`):
+/// Small = phi-3.5-mini 3.8B (safe floor), Balanced = granite-4.1-8B dense (measured cleaner on
+/// the edit contract). `SLIDECRAFT_GGUF` still overrides everything (dev escape hatch).
+fn current_spec() -> crate::model_tier::ModelSpec {
+    crate::model_tier::spec_for(crate::model_tier::selected_tier())
+}
 /// Generous cap: a 3B Q4 cold-load on CPU can take 10-60s (a 0.5B was ~1s in the spike). Windows
 /// first-load adds Defender scanning + cold page cache, so allow extra margin over the observed
 /// load time (the `-c`/`--parallel` pinning below keeps the actual load to a few seconds).
@@ -89,7 +87,7 @@ fn resolve_weights(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_local_data_dir()
         .map_err(|e| e.to_string())?
         .join("models");
-    Ok(dir.join(WEIGHTS_NAME))
+    Ok(dir.join(current_spec().file))
 }
 
 /// SHA256 of a file, streamed (never buffers the whole ~2.4 GB).
@@ -124,15 +122,16 @@ pub async fn ensure_model_weights(app: tauri::AppHandle) -> Result<String, Strin
         .map_err(|e| e.to_string())?
         .join("models");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let final_path = dir.join(WEIGHTS_NAME);
+    let spec = current_spec();
+    let final_path = dir.join(spec.file);
     if final_path.exists() {
         return Ok(final_path.to_string_lossy().to_string());
     }
-    let part_path = dir.join(format!("{WEIGHTS_NAME}.part"));
+    let part_path = dir.join(format!("{}.part", spec.file));
     let have = std::fs::metadata(&part_path).map(|m| m.len()).unwrap_or(0);
 
     let client = reqwest::Client::new();
-    let mut builder = client.get(WEIGHTS_URL);
+    let mut builder = client.get(spec.url);
     if have > 0 {
         builder = builder.header(reqwest::header::RANGE, format!("bytes={have}-"));
     }
@@ -162,7 +161,7 @@ pub async fn ensure_model_weights(app: tauri::AppHandle) -> Result<String, Strin
     }
     drop(file);
 
-    if sha256_file(&part_path)? != WEIGHTS_SHA256 {
+    if sha256_file(&part_path)? != spec.sha256 {
         let _ = std::fs::remove_file(&part_path);
         return Err("ダウンロードしたモデルの検証に失敗しました（チェックサム不一致・再取得してください）".into());
     }
@@ -179,8 +178,9 @@ pub fn evict_model_weights(app: tauri::AppHandle) -> Result<(), String> {
         .app_local_data_dir()
         .map_err(|e| e.to_string())?
         .join("models");
-    let _ = std::fs::remove_file(dir.join(WEIGHTS_NAME));
-    let _ = std::fs::remove_file(dir.join(format!("{WEIGHTS_NAME}.part")));
+    let spec = current_spec();
+    let _ = std::fs::remove_file(dir.join(spec.file));
+    let _ = std::fs::remove_file(dir.join(format!("{}.part", spec.file)));
     Ok(())
 }
 
