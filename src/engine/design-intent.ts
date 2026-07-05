@@ -92,23 +92,37 @@ function emphasisOverride(pos: NodePosition, level: "high" | "medium"): NodeOver
  * losslessly (mirrors the drag path — keeps overrides/fields the hand-rolled
  * diagramSpecToYaml would drop). A Mermaid figure graduates to the canonical diagram.
  */
-export function applyToFigure(slide: SlideIR, mutate: (spec: DiagramSpec, raw: RawDiagram) => void): SlideIR {
+/** Resolve the figure's base YAML + parsed spec/raw (a Mermaid figure graduates to the canonical
+ *  diagram first). Shared by applyToFigure (mutate + re-dump) and readFigureRaw (read-only). Returns
+ *  null when the slide has no parseable figure. */
+function loadFigureRaw(slide: SlideIR): { baseYaml: string; spec: DiagramSpec; raw: RawDiagram } | null {
   let baseYaml: string | null = null;
   if (slide.diagram) baseYaml = slide.diagram.yaml;
   else if (slide.mermaidBlock) {
     const s = mermaidToDiagramSpec(slide.mermaidBlock.mermaid);
     baseYaml = s ? diagramSpecToYaml(s) : null;
   }
-  if (!baseYaml) return slide;
-
+  if (!baseYaml) return null;
   const spec = specFromYaml(baseYaml);
-  if (!spec) return slide;
-  let raw: RawDiagram;
+  if (!spec) return null;
   try {
-    raw = (yaml.load(baseYaml) ?? {}) as RawDiagram;
+    return { baseYaml, spec, raw: (yaml.load(baseYaml) ?? {}) as RawDiagram };
   } catch {
-    return slide;
+    return null;
   }
+}
+
+/** Read-only view of the slide's figure as its raw YAML object (nodes/edges/direction), or null when
+ *  the slide has no parseable figure. For validators that must inspect the CURRENT figure WITHOUT
+ *  mutating/re-dumping it — e.g. the delete-intent cross-check (diagram-edit-ops). */
+export function readFigureRaw(slide: SlideIR): RawDiagram | null {
+  return loadFigureRaw(slide)?.raw ?? null;
+}
+
+export function applyToFigure(slide: SlideIR, mutate: (spec: DiagramSpec, raw: RawDiagram) => void): SlideIR {
+  const loaded = loadFigureRaw(slide);
+  if (!loaded) return slide;
+  const { baseYaml, spec, raw } = loaded;
   mutate(spec, raw);
 
   const placeholderIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? "1";
