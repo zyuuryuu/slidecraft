@@ -114,7 +114,10 @@ export default function AiPanel({
   const canSlide = !!currentSlideMd && !!onApplySlide;
   const slideScope = canSlide;
 
-  const ready = ai.canGenerate(userRequest) && !batchRunning && (batch || canSlide);
+  // !generating && !bestOfRunning = single-flight: a run in progress (incl. best-of-N fan-out) must NOT
+  // start a second generation (via ⌘/Ctrl+Enter or the button) — that orphaned the first batch and let
+  // a stale candidate be adopted (adversarial review). 停止 (cancel) is the only mid-run action.
+  const ready = ai.canGenerate(userRequest) && !batchRunning && !ai.generating && !ai.bestOfRunning && (batch || canSlide);
 
   // Reconcile+validate the AI result the way it WILL be applied, so the review shows the REAL
   // result (not raw output) + any advisory — the reviewer decides 採用/却下 informed, and an
@@ -133,7 +136,10 @@ export default function AiPanel({
     () => (slideScope && currentSlideMd && !busy
       ? cands.map((c) => {
           const p = onPreviewSlideEdit?.(c, userRequest) ?? null;
-          return { preview: p, score: (p?.shouldRetry ? 100 : 0) + (p?.warnings.length ?? 0) };
+          // A null preview = not a previewable content edit (design-intent/deck-gen) → score it WORST so
+          // it never beats a clean content candidate; a full-Markdown drift is next-worst.
+          const score = p ? (p.shouldRetry ? 100 : 0) + p.warnings.length : Number.POSITIVE_INFINITY;
+          return { preview: p, score };
         })
       : []),
     [cands, slideScope, currentSlideMd, busy, userRequest, onPreviewSlideEdit],
@@ -171,8 +177,12 @@ export default function AiPanel({
   const aiRetry = ai.retry;
   const bestOfN = ai.bestOfN;
   useEffect(() => {
-    if (adopted || bestOfN > 1) return; // no auto-retry for a committed edit, or in best-of-N mode (the
-    if (!editPreview?.shouldRetry || !editPreview.retryInstruction || !currentSlideMd) return; // fan-out IS the quality lever)
+    if (adopted) return; // never auto-retry a committed edit
+    // In best-of-N mode the fan-out IS the quality lever → disarm the one-shot. DISARM (set the ref),
+    // don't just early-return: else lowering 候補数 to 1 mid-review would let a stale drifted editPreview
+    // re-arm and fire a generation the user never asked for (adversarial review).
+    if (bestOfN > 1) { autoRetriedRef.current = true; return; }
+    if (!editPreview?.shouldRetry || !editPreview.retryInstruction || !currentSlideMd) return;
     if (autoRetriedRef.current || aiGenerating) return;
     autoRetriedRef.current = true;
     setRetrying(true);
@@ -186,6 +196,20 @@ export default function AiPanel({
     setRetrying(false);
     ai.reset();
   }, [ai]);
+
+  // Switching the focused slide (or selection scope) invalidates a pending AI review — it was generated
+  // for the OLD slide, so 採用 must not commit it onto a different one. Clear LOCAL review state during
+  // render (the sanctioned "reset on identity change" pattern), and reset the PARENT hook (candidates +
+  // result) in an effect (parent state can't be set during render).
+  const slideKey = `${activeSlideNum ?? ""}/${selectedCount}`;
+  const [prevSlideKey, setPrevSlideKey] = useState(slideKey);
+  if (slideKey !== prevSlideKey) {
+    setPrevSlideKey(slideKey);
+    setAdopted(null);
+    setRetrying(false);
+  }
+  const aiReset = ai.reset;
+  useEffect(() => { autoRetriedRef.current = false; aiReset(); }, [slideKey, aiReset]);
 
   const doGenerate = () => {
     if (batch) { onBatchEdit(userRequest); return; } // one instruction → every selected slide
@@ -370,8 +394,9 @@ export default function AiPanel({
         )}
       </div>
 
-      {/* Error */}
-      {ai.error && (
+      {/* Error — suppressed while best-of-N has surviving candidates: the foreground task is pinned to
+          batch[0], so if only that one failed we must not flash a global error over valid candidates. */}
+      {ai.error && cands.length === 0 && (
         <div className="mx-3 mb-2 px-2 py-1.5 bg-red-900/30 border border-red-500/40 rounded text-xs text-red-300">
           {ai.error}
         </div>
@@ -414,7 +439,12 @@ export default function AiPanel({
                 <button onClick={() => setSelIdx((i) => (i - 1 + cands.length) % cands.length)} title="前の候補" className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">◀</button>
                 <span className="tabular-nums">候補 {selectedIdx + 1}/{cands.length}</span>
                 <span className={(scored[selectedIdx]?.score ?? 1) === 0 ? "text-green-400" : "text-amber-300"}>
-                  {(scored[selectedIdx]?.score ?? 1) === 0 ? "✓" : `⚠${scored[selectedIdx]?.preview?.warnings.length ?? 0}`}
+                  {/* — = no content preview (design-intent); ⟳ = full-Markdown drift (score≥100, worse
+                      than any warning count); ✓ = clean; ⚠k = k advisories. */}
+                  {scored[selectedIdx]?.preview == null ? "—"
+                    : scored[selectedIdx].preview.shouldRetry ? "⟳"
+                    : scored[selectedIdx].score === 0 ? "✓"
+                    : `⚠${scored[selectedIdx].preview.warnings.length}`}
                 </span>
                 <button onClick={() => setSelIdx((i) => (i + 1) % cands.length)} title="次の候補" className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">▶</button>
               </div>

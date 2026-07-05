@@ -202,6 +202,18 @@ edges:
     expect(checkDeleteIntent(s, [{ op: "removeNode", id: "svc" }], "Auth Service を削除")).toEqual([]);
     expect(checkDeleteIntent(s, [{ op: "removeNode", id: "svc" }], "Auth-Service を削除")).toEqual([]);
   });
+
+  it("English/romaji instructions that DO name the target stay silent (no word-fusion false positive)", () => {
+    const s = slide(); // ids a, db; labels Start, Database
+    // "db" bordered by spaces is a real reference — folding separators to empty would fuse the sentence
+    // and embed "db" inside a letter run, wrongly firing the advisory.
+    expect(checkDeleteIntent(s, [{ op: "removeNode", id: "db" }], "remove the db node")).toEqual([]);
+    expect(checkDeleteIntent(s, [{ op: "removeNode", id: "db" }], "please delete db")).toEqual([]);
+    expect(checkDeleteIntent(s, [{ op: "removeEdge", from: "a", to: "db" }], "delete the a to db edge")).toEqual([]);
+    // and it STILL fires when the name is only an embedded substring (regression guard for the D fix)
+    expect(checkDeleteIntent(slide(`type: flowchart\nnodes:\n  - id: sql\n    label: SQL\n  - id: pg\n    label: PG\nedges:\n  - from: sql\n    to: pg\n`),
+      [{ op: "removeNode", id: "sql" }], "delete postgresql")).toHaveLength(1);
+  });
 });
 
 // ADR-0019 ① Option A: the deterministic ops-bias nudge used to auto-retry ONCE when a figure edit

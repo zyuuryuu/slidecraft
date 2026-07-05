@@ -215,7 +215,10 @@ export function checkDeleteIntent(slide: SlideIR, ops: DiagramEditOps, instructi
     const n = nodes.find((x) => String(x.id) === id);
     return n && typeof n.label === "string" ? n.label : "";
   };
-  const norm = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/[\s_-]+/g, ""); // fold space/hyphen/underscore
+  // Fold space/hyphen/underscore to a SINGLE space (not empty): the ASCII word-boundary check in refIn
+  // needs separators to survive, else an instruction like "remove the db node" fuses to "removethedbnode"
+  // and a correctly-named id ("db") is embedded in a letter run → false "not referenced" advisory.
+  const norm = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/[\s_-]+/g, " ").trim();
   const hay = norm(inst);
   // Does the instruction reference `needle`? A pure-ASCII needle must match at a WORD boundary (so a
   // short id like "sql" is NOT counted merely because it is a substring of "postgresql"); a needle with

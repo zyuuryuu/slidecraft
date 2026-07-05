@@ -55,6 +55,10 @@ pub struct LocalAiInfo {
 pub struct LocalAiState {
     child: Mutex<Option<Child>>,
     info: Mutex<Option<LocalAiInfo>>,
+    /// Serializes start_local_ai_blocking end-to-end (check → spawn → register). Without it two
+    /// concurrent starts both pass the "already running?" guard (child lock is released before spawn)
+    /// and double-load the model / leak a child. A 2nd caller blocks here, then sees the registered child.
+    start: Mutex<()>,
 }
 
 /// Resolve the bundled llamafile runtime. `SLIDECRAFT_LLAMAFILE` overrides everything (point it
@@ -320,6 +324,9 @@ pub async fn start_local_ai(app: tauri::AppHandle) -> Result<LocalAiInfo, String
 
 fn start_local_ai_blocking(app: &tauri::AppHandle) -> Result<LocalAiInfo, String> {
     let state = app.state::<LocalAiState>();
+    // Serialize the entire check→spawn→register so concurrent starts can't double-spawn (the child lock
+    // alone is released before spawn). A 2nd caller waits here and then observes the registered child.
+    let _start_guard = state.start.lock().unwrap_or_else(|e| e.into_inner());
     // Already running? hand back the live base URL. Otherwise reap a dead child and respawn.
     {
         let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
