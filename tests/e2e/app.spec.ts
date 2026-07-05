@@ -13,7 +13,8 @@ test.describe("SlideCraft", () => {
   test("shell: title + core toolbar buttons", async ({ page }) => {
     await expect(page.getByText("SlideCraft").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /ファイル/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Template/ })).toBeVisible();
+    // The template button is now the master picker, labelled with the current master (🎨 …).
+    await expect(page.getByRole("button", { name: /🎨/ })).toBeVisible();
   });
 
   test("lands in Edit (the home): slide list + slide editor", async ({ page }) => {
@@ -65,14 +66,14 @@ test.describe("SlideCraft", () => {
   });
 
   test("AI Assist hosts the task list (タスク tab)", async ({ page }) => {
-    await page.getByRole("button", { name: /AI Assist/ }).click();
+    await page.getByRole("button", { name: /✨ AI/ }).click();
     // The panel opens with the generate/edit + タスク tabs; the task tab shows the list.
     await page.getByRole("button", { name: /^タスク/ }).click();
     await expect(page.getByText("まだ AI タスクはありません")).toBeVisible();
   });
 
   test("AI Assist scope = the slide-list selection (no 対象 toggle)", async ({ page }) => {
-    await page.getByRole("button", { name: /AI Assist/ }).click();
+    await page.getByRole("button", { name: /✨ AI/ }).click();
     await expect(page.getByText(/編集対象:/)).toBeVisible(); // selection indicator
     await expect(page.getByRole("button", { name: "デッキ全体" })).toHaveCount(0); // toggle removed
     await expect(page.getByRole("button", { name: "このスライド" })).toHaveCount(0);
