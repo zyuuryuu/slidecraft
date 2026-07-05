@@ -18,6 +18,11 @@ interface SlideListProps {
   /** Highlighted multi-selection (focused = activeIndex). */
   selected?: Set<number>;
   onSelect: (index: number, mods?: { shift?: boolean; meta?: boolean }) => void;
+  /** Slide structure ops (undo-able). Omitted / disabled → controls hidden (e.g. collab observe-only). */
+  onAdd?: () => void;
+  onDelete?: (index: number) => void;
+  onDuplicate?: (index: number) => void;
+  disabled?: boolean;
 }
 
 export default function SlideList({
@@ -26,6 +31,10 @@ export default function SlideList({
   activeIndex,
   selected,
   onSelect,
+  onAdd,
+  onDelete,
+  onDuplicate,
+  disabled,
 }: SlideListProps) {
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
   if (!deck || deck.slides.length === 0) {
@@ -46,25 +55,63 @@ export default function SlideList({
         const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog);
         const layout = template ? findLayout(template, layoutName) : undefined;
 
+        const showOps = !disabled && (onDuplicate || onDelete);
         return (
           <div key={i} className="flex flex-col items-center">
-            <SlideCard
-              slide={slide}
-              slideIndex={i}
-              totalSlides={deck.slides.length}
-              layout={layout}
-              masterBgColor={template?.masterBgColor ?? "FFFFFF"}
-              masterDecorations={template?.masterDecorations}
-              masterStaticTexts={template?.masterStaticTexts}
-              scale={THUMB_SCALE}
-              isActive={activeIndex === i}
-              selected={selected?.has(i)}
-              onClick={(e) => onSelect(i, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey })}
-            />
+            <div className="relative group">
+              <SlideCard
+                slide={slide}
+                slideIndex={i}
+                totalSlides={deck.slides.length}
+                layout={layout}
+                masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+                masterDecorations={template?.masterDecorations}
+                masterStaticTexts={template?.masterStaticTexts}
+                scale={THUMB_SCALE}
+                isActive={activeIndex === i}
+                selected={selected?.has(i)}
+                onClick={(e) => onSelect(i, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey })}
+              />
+              {showOps && (
+                // Per-slide hover controls — stopPropagation so a control click doesn't also select.
+                <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {onDuplicate && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onDuplicate(i); }}
+                      title="このスライドを複製"
+                      className="w-5 h-5 flex items-center justify-center rounded bg-surface/90 border border-edge text-fg2 hover:bg-accent hover:text-on-accent text-[11px] leading-none"
+                    >
+                      ⧉
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onDelete(i); }}
+                      title="このスライドを削除"
+                      className="w-5 h-5 flex items-center justify-center rounded bg-surface/90 border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-[11px] leading-none"
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <span className="text-[10px] text-faint mt-0.5">{i + 1}</span>
           </div>
         );
       })}
+      {onAdd && !disabled && (
+        <button
+          type="button"
+          onClick={onAdd}
+          title="選択中のスライドの後ろに新しいスライドを追加"
+          className="mt-1 px-4 py-1.5 rounded border border-dashed border-edge text-faint hover:text-fg hover:border-accent text-xs transition-colors"
+        >
+          ＋ スライド追加
+        </button>
+      )}
     </div>
   );
 }

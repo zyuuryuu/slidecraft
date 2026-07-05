@@ -12,8 +12,9 @@
  */
 import type { Session } from "./session";
 import * as S from "./session";
-import { SlideIRSchema, type SlideIR } from "../engine/slide-schema";
+import { SlideIRSchema } from "../engine/slide-schema";
 import { parseMd } from "../engine/md-parser";
+import { insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo } from "../engine/deck-structure";
 import { GuardError } from "./guard-errors";
 
 function assertIdx(len: number, i: number, label = "index"): void {
@@ -47,12 +48,10 @@ export function insertSlide(s: Session, index: number, markdown: string, positio
   }
   const check = SlideIRSchema.safeParse(parsed.slides[0]); // validate ONLY the new slide; survivors keep refs
   if (!check.success) return { ok: false as const, error: zerr(check.error.issues) };
-  const at = position === "after" ? index + 1 : index;
-  const slides = [...deck.slides];
-  slides.splice(at, 0, check.data);
-  s.deck = { ...deck, slides }; // survivors byte-identical (no whole-deck reparse)
+  const { deck: nextDeck, at } = insertSlideAt(deck, index, check.data, position);
+  s.deck = nextDeck; // survivors byte-identical (no whole-deck reparse)
   s.dirty = true;
-  return { ok: true as const, changed: true as const, insertedIndex: at, slideCount: slides.length, insertedMd: S.getSlideMarkdown(s, at), ...tail(s) };
+  return { ok: true as const, changed: true as const, insertedIndex: at, slideCount: nextDeck.slides.length, insertedMd: S.getSlideMarkdown(s, at), ...tail(s) };
 }
 
 /** Delete a slide. Rejects removing the LAST remaining slide never-silently (DeckIR requires ≥1), and
@@ -60,13 +59,12 @@ export function insertSlide(s: Session, index: number, markdown: string, positio
 export function deleteSlide(s: Session, index: number) {
   const deck = S.getDeck(s);
   assertIdx(deck.slides.length, index);
-  if (deck.slides.length <= 1) return { ok: false as const, error: "最後の1枚は削除できません（deck は最低1枚必要です）。" };
-  const deletedMd = S.getSlideMarkdown(s, index);
-  const slides = [...deck.slides];
-  slides.splice(index, 1);
-  s.deck = { ...deck, slides }; // removing from a valid deck (len ≥ 2 here) stays valid — no re-parse needed
+  const next = deleteSlideAt(deck, index);
+  if (!next) return { ok: false as const, error: "最後の1枚は削除できません（deck は最低1枚必要です）。" };
+  const deletedMd = S.getSlideMarkdown(s, index); // read the doomed slide before swapping s.deck
+  s.deck = next; // removing from a valid deck (len ≥ 2 here) stays valid — no re-parse needed
   s.dirty = true;
-  return { ok: true as const, changed: true as const, deletedIndex: index, deletedMd, slideCount: slides.length, ...tail(s) };
+  return { ok: true as const, changed: true as const, deletedIndex: index, deletedMd, slideCount: next.slides.length, ...tail(s) };
 }
 
 /** Move a slide from one position to another (pure permutation — content/figures/layouts untouched).
@@ -76,12 +74,10 @@ export function moveSlide(s: Session, fromIndex: number, toIndex: number) {
   assertIdx(deck.slides.length, fromIndex, "fromIndex");
   assertIdx(deck.slides.length, toIndex, "toIndex");
   if (fromIndex === toIndex) return { ok: true as const, changed: false as const, fromIndex, toIndex, slideCount: deck.slides.length, ...tail(s) };
-  const slides = [...deck.slides];
-  const [moved] = slides.splice(fromIndex, 1);
-  slides.splice(toIndex, 0, moved);
-  s.deck = { ...deck, slides };
+  const next = moveSlideTo(deck, fromIndex, toIndex);
+  s.deck = next;
   s.dirty = true;
-  return { ok: true as const, changed: true as const, fromIndex, toIndex, slideCount: slides.length, ...tail(s) };
+  return { ok: true as const, changed: true as const, fromIndex, toIndex, slideCount: next.slides.length, ...tail(s) };
 }
 
 /** Duplicate a slide via a deep structuredClone (NOT via Markdown) so the copy's diagram / table / code
@@ -89,11 +85,8 @@ export function moveSlide(s: Session, fromIndex: number, toIndex: number) {
 export function duplicateSlide(s: Session, index: number, position: "before" | "after" = "after") {
   const deck = S.getDeck(s);
   assertIdx(deck.slides.length, index);
-  const clone: SlideIR = structuredClone(deck.slides[index]); // byte-identical copy of a valid slide → still valid
-  const at = position === "after" ? index + 1 : index;
-  const slides = [...deck.slides];
-  slides.splice(at, 0, clone);
-  s.deck = { ...deck, slides }; // survivors keep refs (uniform with delete/move; no whole-deck reparse)
+  const { deck: nextDeck, newIndex: at } = duplicateSlideAt(deck, index, position); // deep clone → figure/table/code byte-identical
+  s.deck = nextDeck; // survivors keep refs (uniform with delete/move; no whole-deck reparse)
   s.dirty = true;
-  return { ok: true as const, changed: true as const, newIndex: at, slideCount: slides.length, ...tail(s) };
+  return { ok: true as const, changed: true as const, newIndex: at, slideCount: nextDeck.slides.length, ...tail(s) };
 }
