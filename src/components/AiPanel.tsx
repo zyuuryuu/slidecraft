@@ -6,7 +6,7 @@
  * generation logic with the AI dialog via useAiGeneration (no divergence).
  */
 
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration } from "./useAiGeneration";
 import DiffView from "./DiffView";
@@ -20,6 +20,8 @@ interface AiPanelProps {
   currentSlideMd?: string;
   /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string) => void;
+  /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings). */
+  onPreviewSlideEdit?: (raw: string) => { afterMd: string; warnings: string[] } | null;
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
@@ -40,6 +42,7 @@ export default function AiPanel({
   onClose,
   currentSlideMd,
   onApplySlide,
+  onPreviewSlideEdit,
   activeSlideNum,
   selectedCount = 1,
   onBatchEdit,
@@ -109,6 +112,14 @@ export default function AiPanel({
   const slideScope = canSlide;
 
   const ready = ai.canGenerate(userRequest) && !batchRunning && (batch || canSlide);
+
+  // Reconcile+validate the AI result the way it WILL be applied, so the review shows the REAL
+  // result (not raw output) + any advisory — the reviewer decides 採用/却下 informed, and an
+  // adopted slide always renders. Only the content-edit path reconciles (else null → raw diff).
+  const editPreview = useMemo(
+    () => (slideScope && currentSlideMd && ai.result && !ai.generating ? (onPreviewSlideEdit?.(ai.result) ?? null) : null),
+    [slideScope, currentSlideMd, ai.result, ai.generating, onPreviewSlideEdit],
+  );
 
   const doGenerate = () => {
     if (batch) { onBatchEdit(userRequest); return; } // one instruction → every selected slide
@@ -300,8 +311,16 @@ export default function AiPanel({
               </button>
             </div>
           </div>
+          {/* Validation advisories for THIS edit — shown at the review so 採用/却下 is informed
+              (numbers/language changed, structure restored, a broken figure kept). */}
+          {editPreview && editPreview.warnings.length > 0 && (
+            <div className="mx-3 mb-1 px-2 py-1.5 rounded border border-amber-500/40 bg-amber-950/40 text-[11px] text-amber-200">
+              {editPreview.warnings.map((w, i) => <div key={i}>{w}</div>)}
+            </div>
+          )}
           {slideScope && currentSlideMd && !ai.generating ? (
-            <DiffView before={currentSlideMd} after={ai.result} fill />
+            // Diff the REAL applied result (reconciled) when available, else the raw output.
+            <DiffView before={currentSlideMd} after={editPreview?.afterMd ?? ai.result} fill />
           ) : (
             <pre className="flex-1 min-h-0 overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap">
               {ai.result}

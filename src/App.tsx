@@ -32,7 +32,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
-    handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, deckHint,
+    handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef, collabRef,
@@ -297,6 +297,7 @@ export default function App() {
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
             onApplySlide={handleApplySlide}
+            onPreviewSlideEdit={previewSlideEdit}
             activeSlideNum={activeSlide + 1}
             selectedCount={selected?.size ?? 1}
             onBatchEdit={editLocked ? undefined : (instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
