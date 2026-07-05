@@ -25,6 +25,13 @@ export type DiagramTypeChoice = DiagramType | "auto";
  *  must not depend on the "remember API key" opt-in that gates AI_CONFIG_STORAGE). */
 export const LOCAL_ONLY_STORAGE = "slidecraft_local_only";
 
+/** Best-of-N candidate count (single-slide edit). Persists to its own key. N=1 disables best-of-N.
+ *  HARD-clamped to [1, MAX_BEST_OF_N] so a mistaken huge value (e.g. 100) can never spawn a runaway
+ *  fan-out (100 offline generations would exhaust memory/time). */
+export const BEST_OF_N_STORAGE = "slidecraft_best_of_n";
+export const MAX_BEST_OF_N = 5;
+export const clampBestOfN = (n: number): number => Math.max(1, Math.min(MAX_BEST_OF_N, Math.floor(Number(n) || 1)));
+
 export interface AiProviderConfig {
   baseURL: string;
   model: string;
@@ -95,15 +102,16 @@ export function freshBuiltin(cfgs: AiConfigMap): AiConfigMap {
 
 /** Read persisted AI config ONCE — used as a lazy useState initializer (NOT a mount effect), so
  *  there is no synchronous setState / cascading render on mount. Seeds the state + hadSavedConfig. */
-export function loadSavedConfig(): { localOnly: boolean; provider?: ProviderId; configs?: Partial<AiConfigMap>; hadSaved: boolean } {
+export function loadSavedConfig(): { localOnly: boolean; bestOfN: number; provider?: ProviderId; configs?: Partial<AiConfigMap>; hadSaved: boolean } {
   try {
     const localOnly = localStorage.getItem(LOCAL_ONLY_STORAGE) === "1";
+    const bestOfN = clampBestOfN(Number(localStorage.getItem(BEST_OF_N_STORAGE) ?? 1));
     const raw = localStorage.getItem(AI_CONFIG_STORAGE);
-    if (!raw) return { localOnly, hadSaved: false };
+    if (!raw) return { localOnly, bestOfN, hadSaved: false };
     const saved = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<AiConfigMap> };
-    return { localOnly, provider: saved.provider, configs: saved.configs, hadSaved: true };
+    return { localOnly, bestOfN, provider: saved.provider, configs: saved.configs, hadSaved: true };
   } catch {
-    return { localOnly: false, hadSaved: false };
+    return { localOnly: false, bestOfN: 1, hadSaved: false };
   }
 }
 

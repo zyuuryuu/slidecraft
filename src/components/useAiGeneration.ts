@@ -17,7 +17,7 @@ import { ensureEgressConsent } from "../ipc/egress-consent";
 import { saveAiConfig, loadAiConfig, clearAiConfig } from "../ipc/key-store";
 import {
   type AiProviderConfig, type AiConfigMap, type AiMode, type AiTask, type DiagramTypeChoice,
-  LOCAL_ONLY_STORAGE, MAX_TASKS, MODE_LABEL, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection, freshBuiltin,
+  LOCAL_ONLY_STORAGE, BEST_OF_N_STORAGE, clampBestOfN, MAX_TASKS, MODE_LABEL, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection, freshBuiltin,
 } from "./ai-generation-types";
 import { useBuiltinRuntime } from "./useBuiltinRuntime";
 
@@ -39,11 +39,23 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const abortMap = useRef<Map<string, AbortController>>(new Map());
   const idCounter = useRef(0);
+  // Best-of-N (single-slide edit): the N raw candidate results + whether the batch is in flight.
+  // bestOfTaskIds lets cancel abort the whole fan-out. The picker/scoring live in AiPanel.
+  const [candidates, setCandidates] = useState<string[]>([]);
+  const [bestOfRunning, setBestOfRunning] = useState(false);
+  const bestOfTaskIds = useRef<string[]>([]);
   // The document new tasks are stamped with + the visible list is filtered to — so each
   // project keeps its own AI history. App keeps this in sync with the active document.
   // Local-model-only mode: when ON, generation is hard-blocked from any non-local target
   // (enforced in canGenerate AND in generateWithAI). See LOCAL_ONLY_STORAGE.
   const [localModelOnly, setLocalModelOnlyState] = useState(saved.localOnly);
+  // Best-of-N candidate count for single-slide edits (1 = off). setter HARD-clamps to [1,5] + persists.
+  const [bestOfN, setBestOfNState] = useState(saved.bestOfN);
+  const setBestOfN = useCallback((n: number) => {
+    const c = clampBestOfN(n);
+    setBestOfNState(c);
+    try { localStorage.setItem(BEST_OF_N_STORAGE, String(c)); } catch { /* ignore quota */ }
+  }, []);
   const [activeDocId, setActiveDocIdState] = useState<string>("");
   const activeDocIdRef = useRef<string>("");
   const setActiveDocId = useCallback((id: string) => {
@@ -303,16 +315,41 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     [enqueue, runTask],
   );
 
+  // Best-of-N (ADR-0019 ① Option B): fan out N generations for ONE instruction, collect the raw
+  // candidates; AiPanel scores each via the adoption gate and shows the best + a picker. Runs via
+  // Promise.all — the external API parallelizes; the builtin server serializes/parallelizes per its
+  // slot count (RAM-aware --parallel, Rust). Falls back to whatever candidates succeed.
+  const generateBest = useCallback(
+    async (userRequest: string, mode: AiMode, n: number) => {
+      if (!canGenerate(userRequest)) return;
+      persistConfig();
+      setCandidates([]);
+      setBestOfRunning(true);
+      const batch = Array.from({ length: n }, (_, i) => enqueue(userRequest, mode, `${MODE_LABEL[mode]} 候補${i + 1}/${n}`));
+      bestOfTaskIds.current = batch.map((t) => t.id);
+      setActiveTaskId(batch[0].id); // stream the first into the foreground while the rest run
+      try {
+        const results = await Promise.all(batch.map((t) => runTask(t).catch(() => "")));
+        setCandidates(results.filter((r) => r.trim()));
+      } finally {
+        setBestOfRunning(false);
+      }
+    },
+    [canGenerate, persistConfig, enqueue, runTask],
+  );
+  const clearCandidates = useCallback(() => setCandidates([]), []);
+
   const cancel = useCallback(() => {
-    if (activeTaskId) abortMap.current.get(activeTaskId)?.abort();
-  }, [activeTaskId]);
+    if (bestOfRunning) bestOfTaskIds.current.forEach((id) => abortMap.current.get(id)?.abort()); // abort the whole fan-out
+    else if (activeTaskId) abortMap.current.get(activeTaskId)?.abort();
+  }, [activeTaskId, bestOfRunning]);
   const cancelTask = useCallback((id: string) => abortMap.current.get(id)?.abort(), []);
   const clearTasks = useCallback(() => {
     setTasks((ts) => ts.filter((t) => t.status === "running")); // keep in-flight, drop history
   }, []);
 
   // Hide the foreground result/diff (e.g. after apply) without losing it from history.
-  const reset = useCallback(() => setActiveTaskId(null), []);
+  const reset = useCallback(() => { setActiveTaskId(null); setCandidates([]); }, []);
   // Back-compat for LlmAssist's manual paste: record it as a done task + make it active.
   const setResult = useCallback((text: string) => {
     const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
@@ -376,12 +413,13 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error, notice,
-    canGenerate, generate, retry, cancel, reset,
+    canGenerate, generate, retry, generateBest, candidates, bestOfRunning, clearCandidates, cancel, reset,
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
     switchToBuiltin, stopBuiltin, builtinStatus, weightsPresent, builtinModel,
     localModelOnly, setLocalModelOnly, localBlocked,
+    bestOfN, setBestOfN,
   };
 }
 
