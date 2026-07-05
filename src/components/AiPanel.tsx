@@ -119,13 +119,41 @@ export default function AiPanel({
   // Reconcile+validate the AI result the way it WILL be applied, so the review shows the REAL
   // result (not raw output) + any advisory — the reviewer decides 採用/却下 informed, and an
   // adopted slide always renders. Only the content-edit path reconciles (else null → raw diff).
-  const editPreview = useMemo(
-    // Pass the instruction so the preview can run the delete-intent cross-check (ADR-0019). It reflects
-    // the CURRENT prompt text; in the normal generate→review→adopt flow that's the instruction that
-    // produced ai.result.
-    () => (slideScope && currentSlideMd && ai.result && !ai.generating ? (onPreviewSlideEdit?.(ai.result, userRequest) ?? null) : null),
-    [slideScope, currentSlideMd, ai.result, ai.generating, onPreviewSlideEdit, userRequest],
+  // Best-of-N (ADR-0019 Option B): the review works over CANDIDATES — a single generate → [ai.result],
+  // best-of-N → ai.candidates. Each is scored via the adoption gate (fewer warnings = better; a
+  // full-Markdown drift is worst) so the best is preselected; a picker lets you compare/choose. The
+  // instruction (userRequest) feeds the delete-intent cross-check + the score.
+  const busy = ai.generating || ai.bestOfRunning;
+  const cands = useMemo(
+    () => (ai.bestOfRunning ? [] : ai.candidates.length ? ai.candidates : ai.result ? [ai.result] : []),
+    [ai.bestOfRunning, ai.candidates, ai.result],
   );
+  const [selIdx, setSelIdx] = useState(0);
+  const scored = useMemo(
+    () => (slideScope && currentSlideMd && !busy
+      ? cands.map((c) => {
+          const p = onPreviewSlideEdit?.(c, userRequest) ?? null;
+          return { preview: p, score: (p?.shouldRetry ? 100 : 0) + (p?.warnings.length ?? 0) };
+        })
+      : []),
+    [cands, slideScope, currentSlideMd, busy, userRequest, onPreviewSlideEdit],
+  );
+  const bestIdx = useMemo(() => {
+    let b = 0;
+    for (let i = 1; i < scored.length; i++) if (scored[i].score < scored[b].score) b = i;
+    return b;
+  }, [scored]);
+  // Preselect the best candidate when a NEW candidate set arrives — the sanctioned "adjust state on a
+  // prop change" pattern (setState during render, NOT an effect) so there's no cascading re-render. A
+  // manual pick within the same set is preserved (ai.candidates identity is unchanged until the next run).
+  const [prevCandidates, setPrevCandidates] = useState(ai.candidates);
+  if (ai.candidates !== prevCandidates) {
+    setPrevCandidates(ai.candidates);
+    setSelIdx(ai.candidates.length > 1 && !busy ? bestIdx : 0);
+  }
+  const selectedIdx = cands.length ? Math.min(selIdx, cands.length - 1) : 0;
+  const currentResult = cands[selectedIdx] ?? ai.result;
+  const editPreview = scored[selectedIdx]?.preview ?? null;
 
   // ① Self-repair, Option A (ADR-0019): when a figure edit drifted to full-Markdown (editPreview
   // .shouldRetry), auto-fire ONE ops-bias retry with the harness-authored nudge. Ref-guarded so it
@@ -141,14 +169,15 @@ export default function AiPanel({
   const preview = adopted ?? editPreview; // what the review pane renders: frozen snapshot once adopted
   const aiGenerating = ai.generating;
   const aiRetry = ai.retry;
+  const bestOfN = ai.bestOfN;
   useEffect(() => {
-    if (adopted) return; // never auto-retry a committed edit
-    if (!editPreview?.shouldRetry || !editPreview.retryInstruction || !currentSlideMd) return;
+    if (adopted || bestOfN > 1) return; // no auto-retry for a committed edit, or in best-of-N mode (the
+    if (!editPreview?.shouldRetry || !editPreview.retryInstruction || !currentSlideMd) return; // fan-out IS the quality lever)
     if (autoRetriedRef.current || aiGenerating) return;
     autoRetriedRef.current = true;
     setRetrying(true);
     aiRetry(`Current slide:\n${currentSlideMd}\n\nInstruction: ${editPreview.retryInstruction}`);
-  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, adopted]);
+  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, adopted, bestOfN]);
 
   // 却下 / 閉じる — discard the foreground result and re-arm the one-shot self-repair.
   const closePreview = useCallback(() => {
@@ -164,19 +193,23 @@ export default function AiPanel({
     autoRetriedRef.current = false; // a fresh user generate re-arms the one-shot self-repair
     setRetrying(false);
     setAdopted(null); // leaving the adopted snapshot behind for a new proposal
-    // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
-    ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
+    setSelIdx(0);
+    // One slide in, one slide out (text + any figure) — far fewer tokens than the deck. best-of-N (>1)
+    // fans out N candidates and lets the adoption gate pick the best; N=1 is the plain single generate.
+    const prompt = `Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`;
+    if (bestOfN > 1) ai.generateBest(prompt, "slide", bestOfN);
+    else ai.generate(prompt, "slide");
   };
 
   // Diagnostics-driven per-slide fixing lives in the ReviewBar ("まとめて整える") now —
   // this dock is just freeform edit of the focused slide + the task list, kept simple.
 
   const doApply = () => {
-    if (!onApplySlide || !ai.result.trim()) return;
-    onApplySlide(ai.result, userRequest);
+    if (!onApplySlide || !currentResult.trim()) return;
+    onApplySlide(currentResult, userRequest); // adopt the SELECTED candidate
     // Freeze the pre-adopt review (slide edits only — deck-gen "適用 → 編集へ" navigates away).
     if (slideScope) {
-      const snap = editPreview ?? { afterMd: ai.result, warnings: [] as string[] };
+      const snap = editPreview ?? { afterMd: currentResult, warnings: [] as string[] };
       setAdopted({ beforeMd: snap.beforeMd, afterMd: snap.afterMd, warnings: snap.warnings });
     }
   };
@@ -320,7 +353,7 @@ export default function AiPanel({
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) doGenerate();
             }}
           />
-          {ai.generating ? (
+          {busy ? (
             <button onClick={ai.cancel} className="self-start px-4 py-2 text-sm bg-edge hover:bg-accent/40 text-fg rounded shrink-0">
               停止
             </button>
@@ -330,7 +363,7 @@ export default function AiPanel({
               disabled={!ready}
               className="self-start px-4 py-2 text-sm bg-accent hover:bg-accent-hi disabled:bg-accent/30 disabled:text-on-accent/40 text-on-accent font-medium rounded shrink-0"
             >
-              {batchRunning ? "一括編集中…" : batch ? `${selectedCount}枚を編集` : "生成"}
+              {batchRunning ? "一括編集中…" : batch ? `${selectedCount}枚を編集` : bestOfN > 1 ? `生成 ×${bestOfN}` : "生成"}
             </button>
           )}
         </div>
@@ -359,14 +392,33 @@ export default function AiPanel({
         </div>
       )}
 
+      {/* Best-of-N (Option B): fanning out N candidates; the adoption gate picks the best when they land. */}
+      {ai.bestOfRunning && (
+        <div className="mx-3 mb-2 px-2 py-1.5 bg-accent/15 border border-accent/40 rounded text-xs text-accent-soft">
+          🎲 {bestOfN} 候補を生成中…（採用ゲートで最良を提示します）
+        </div>
+      )}
+
       {/* Result — for a slide edit show before→after diff so it's never applied
           blind (you see what changed/was dropped) → 採用/却下. Deck gen keeps raw. */}
-      {ai.result && (
+      {currentResult && !ai.bestOfRunning && (
         <div className="flex-1 flex flex-col min-h-0 border-t border-edge">
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-muted">
               {ai.generating ? "生成中…" : adopted ? "適用済み（プレビュー）" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
             </span>
+            {/* Best-of-N candidate picker: cycle candidates, ✓ = clean (no warnings), ⚠k = k advisories.
+                The best is preselected; ★ marks it. */}
+            {cands.length > 1 && !adopted && (
+              <div className="flex items-center gap-1 text-[11px] text-muted">
+                <button onClick={() => setSelIdx((i) => (i - 1 + cands.length) % cands.length)} title="前の候補" className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">◀</button>
+                <span className="tabular-nums">候補 {selectedIdx + 1}/{cands.length}</span>
+                <span className={(scored[selectedIdx]?.score ?? 1) === 0 ? "text-green-400" : "text-amber-300"}>
+                  {(scored[selectedIdx]?.score ?? 1) === 0 ? "✓" : `⚠${scored[selectedIdx]?.preview?.warnings.length ?? 0}`}
+                </span>
+                <button onClick={() => setSelIdx((i) => (i + 1) % cands.length)} title="次の候補" className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">▶</button>
+              </div>
+            )}
             <div className="flex items-center gap-1">
               {adopted ? (
                 // Adopted: the edit is committed; the review is a frozen record until you close it.
@@ -381,7 +433,7 @@ export default function AiPanel({
                   {slideScope && currentSlideMd && (
                     <button
                       onClick={closePreview}
-                      disabled={ai.generating}
+                      disabled={busy}
                       className="px-2.5 py-1 text-xs bg-field hover:bg-edge disabled:opacity-40 text-fg2 rounded"
                     >
                       却下
@@ -389,7 +441,7 @@ export default function AiPanel({
                   )}
                   <button
                     onClick={doApply}
-                    disabled={ai.generating || !ai.result.trim()}
+                    disabled={busy || !currentResult.trim()}
                     className="px-3 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
                   >
                     {slideScope ? "採用 → このスライド" : "適用 → 編集へ"}
@@ -405,13 +457,13 @@ export default function AiPanel({
               {preview.warnings.map((w, i) => <div key={i}>{w}</div>)}
             </div>
           )}
-          {slideScope && currentSlideMd && !ai.generating ? (
+          {slideScope && currentSlideMd && !busy ? (
             // Diff the REAL applied result (reconciled) when available, else the raw output. Once adopted
             // this is the frozen pre-adopt before→after, NOT a recompute against the updated slide.
-            <DiffView before={preview?.beforeMd ?? currentSlideMd} after={preview?.afterMd ?? ai.result} fill />
+            <DiffView before={preview?.beforeMd ?? currentSlideMd} after={preview?.afterMd ?? currentResult} fill />
           ) : (
             <pre className="flex-1 min-h-0 overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap">
-              {ai.result}
+              {currentResult}
             </pre>
           )}
         </div>

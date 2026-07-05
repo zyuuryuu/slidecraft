@@ -4,7 +4,22 @@
  * an ACTIONABLE message ("起動 で再起動 / 生成で自動起動") instead of the generic "接続できません".
  */
 import { describe, it, expect } from "vitest";
-import { computeConnection, freshBuiltin, defaultConfigs } from "../src/components/ai-generation-types";
+import { computeConnection, freshBuiltin, defaultConfigs, clampBestOfN, MAX_BEST_OF_N } from "../src/components/ai-generation-types";
+
+describe("clampBestOfN — best-of-N guardrail", () => {
+  it("caps at MAX_BEST_OF_N so a mistaken huge value never spawns a runaway fan-out", () => {
+    expect(clampBestOfN(100)).toBe(MAX_BEST_OF_N); // the user's "accidentally typed 100" case
+    expect(clampBestOfN(MAX_BEST_OF_N + 1)).toBe(MAX_BEST_OF_N);
+    expect(MAX_BEST_OF_N).toBe(5);
+  });
+  it("floors at 1 (N=1 disables best-of-N) and coerces junk to 1", () => {
+    expect(clampBestOfN(0)).toBe(1);
+    expect(clampBestOfN(-3)).toBe(1);
+    expect(clampBestOfN(NaN)).toBe(1);
+    expect(clampBestOfN(2.9)).toBe(2); // floors fractional
+    expect(clampBestOfN(3)).toBe(3); // in-range passes through
+  });
+});
 
 type ConnArgs = Parameters<typeof computeConnection>[0];
 const builtinArgs = (over: Partial<ConnArgs> = {}): ConnArgs => ({

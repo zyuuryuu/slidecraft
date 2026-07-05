@@ -1,6 +1,7 @@
 import { PROVIDERS } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
 import type { AiGeneration } from "./useAiGeneration";
+import { MAX_BEST_OF_N } from "./ai-generation-types";
 import LocalOnlyToggle from "./LocalOnlyToggle";
 
 const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
@@ -77,6 +78,21 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
       </div>
 
       <LocalOnlyToggle ai={ai} />
+
+      {/* Best-of-N: generate N candidates for a single-slide edit and let the adoption gate pick the
+          best. Capped at MAX_BEST_OF_N so a mistaken huge value can't spawn a runaway fan-out. */}
+      <label className="flex items-center gap-2 text-xs text-muted" title="1回の生成で候補を複数出し、採用ゲートで最良を提示（単一スライド編集）。1で無効。大きいほど品質↑・遅い/メモリ↑。">
+        <span className="text-fg2">候補数 (Best-of-N)</span>
+        <input
+          type="number"
+          min={1}
+          max={MAX_BEST_OF_N}
+          value={ai.bestOfN}
+          onChange={(e) => ai.setBestOfN(Number(e.target.value))}
+          className={`${field} w-14`}
+        />
+        <span className="text-faint">1〜{MAX_BEST_OF_N}</span>
+      </label>
 
       <div className="flex flex-wrap items-center gap-2">
         {!ai.preset.native && ai.provider !== "builtin" && (
