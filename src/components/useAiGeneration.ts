@@ -40,10 +40,20 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   const abortMap = useRef<Map<string, AbortController>>(new Map());
   const idCounter = useRef(0);
   // Best-of-N (single-slide edit): the N raw candidate results + whether the batch is in flight.
-  // bestOfTaskIds lets cancel abort the whole fan-out. The picker/scoring live in AiPanel.
+  // bestOfTaskIds lets cancel abort the whole fan-out. bestOfGen is a generation token: starting a new
+  // generation (single OR best-of-N) bumps it, so a superseded batch's late Promise.all resolution can't
+  // re-populate candidates over the newer one. The picker/scoring live in AiPanel.
   const [candidates, setCandidates] = useState<string[]>([]);
   const [bestOfRunning, setBestOfRunning] = useState(false);
   const bestOfTaskIds = useRef<string[]>([]);
+  const bestOfGen = useRef(0);
+  // Abort + invalidate any in-flight best-of-N fan-out (called when a new generation supersedes it).
+  const supersedeBestOf = useCallback(() => {
+    bestOfGen.current++;
+    bestOfTaskIds.current.forEach((id) => abortMap.current.get(id)?.abort());
+    bestOfTaskIds.current = [];
+    setBestOfRunning(false);
+  }, []);
   // The document new tasks are stamped with + the visible list is filtered to — so each
   // project keeps its own AI history. App keeps this in sync with the active document.
   // Local-model-only mode: when ON, generation is hard-blocked from any non-local target
@@ -295,12 +305,13 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     (userRequest: string, mode: AiMode, diagramType?: DiagramTypeChoice) => {
       if (!canGenerate(userRequest)) return;
       persistConfig();
+      supersedeBestOf(); // abort + invalidate any in-flight best-of-N so its late resolution can't repopulate
       setCandidates([]); // a fresh single generation supersedes any prior best-of-N candidate set
       const task = enqueue(userRequest, mode, MODE_LABEL[mode], diagramType);
       setActiveTaskId(task.id);
       void runTask(task).catch(() => {});
     },
-    [canGenerate, persistConfig, enqueue, runTask],
+    [canGenerate, persistConfig, enqueue, runTask, supersedeBestOf],
   );
 
   // Self-repair single-retry (ADR-0019 ①, Option A): re-run a slide edit with a harness-authored
@@ -324,6 +335,8 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     async (userRequest: string, mode: AiMode, n: number) => {
       if (!canGenerate(userRequest)) return;
       persistConfig();
+      supersedeBestOf(); // abort + invalidate any prior in-flight batch first
+      const gen = ++bestOfGen.current; // this batch's token
       setCandidates([]);
       setBestOfRunning(true);
       const batch = Array.from({ length: n }, (_, i) => enqueue(userRequest, mode, `${MODE_LABEL[mode]} 候補${i + 1}/${n}`));
@@ -331,26 +344,27 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       setActiveTaskId(batch[0].id); // stream the first into the foreground while the rest run
       try {
         const results = await Promise.all(batch.map((t) => runTask(t).catch(() => "")));
-        setCandidates(results.filter((r) => r.trim()));
+        if (bestOfGen.current === gen) setCandidates(results.filter((r) => r.trim())); // ignore if superseded
       } finally {
-        setBestOfRunning(false);
+        if (bestOfGen.current === gen) setBestOfRunning(false);
       }
     },
-    [canGenerate, persistConfig, enqueue, runTask],
+    [canGenerate, persistConfig, enqueue, runTask, supersedeBestOf],
   );
-  const clearCandidates = useCallback(() => setCandidates([]), []);
-
   const cancel = useCallback(() => {
-    if (bestOfRunning) bestOfTaskIds.current.forEach((id) => abortMap.current.get(id)?.abort()); // abort the whole fan-out
+    // Abort the whole in-flight fan-out (not just the latest ref) AND invalidate it so a resolving batch
+    // can't repopulate; else fall back to the single active task.
+    if (bestOfRunning || bestOfTaskIds.current.length) supersedeBestOf();
     else if (activeTaskId) abortMap.current.get(activeTaskId)?.abort();
-  }, [activeTaskId, bestOfRunning]);
+  }, [activeTaskId, bestOfRunning, supersedeBestOf]);
   const cancelTask = useCallback((id: string) => abortMap.current.get(id)?.abort(), []);
   const clearTasks = useCallback(() => {
     setTasks((ts) => ts.filter((t) => t.status === "running")); // keep in-flight, drop history
   }, []);
 
-  // Hide the foreground result/diff (e.g. after apply) without losing it from history.
-  const reset = useCallback(() => { setActiveTaskId(null); setCandidates([]); }, []);
+  // Hide the foreground result/diff (e.g. after apply) without losing it from history. Also invalidate
+  // any in-flight best-of-N so a resolving batch can't repopulate after the user dismissed the review.
+  const reset = useCallback(() => { supersedeBestOf(); setActiveTaskId(null); setCandidates([]); }, [supersedeBestOf]);
   // Back-compat for LlmAssist's manual paste: record it as a done task + make it active.
   const setResult = useCallback((text: string) => {
     const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
@@ -414,7 +428,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error, notice,
-    canGenerate, generate, retry, generateBest, candidates, bestOfRunning, clearCandidates, cancel, reset,
+    canGenerate, generate, retry, generateBest, candidates, bestOfRunning, cancel, reset,
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
