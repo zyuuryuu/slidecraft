@@ -17,6 +17,12 @@ import { validateStructure, validateCondense } from "./ai-validate";
 /** DiagramSpec YAML anchors — the first meaningful line of a spec is one of these top-level keys. */
 const SPEC_KEY = /^\s*(type|nodes|edges|direction|title|classDefs|groups|lanes|fragments|activations|quadrant|gantt|xychart|radar|kpi|layout)\s*:/;
 
+/** Remove fenced ```diagram / ```mermaid blocks from Markdown — for text-only comparisons (the figure
+ *  is validated/carried separately, so its numbers must not count as text-condense facts). */
+function stripFigureFences(md: string): string {
+  return md.replace(/```(?:diagram|mermaid)[^\n]*\n[\s\S]*?```/g, "").replace(/\n{3,}/g, "\n\n");
+}
+
 /**
  * Clean a figure-YAML candidate as a ~3B model tends to return it: unwrap a ```lang … ``` fence, and
  * drop a natural-language preamble ("はい、こちらが図です:") before the first DiagramSpec key. A normal
@@ -115,7 +121,14 @@ export function reconcileSlideEdit(old: SlideIR, rawMd: string): SlideEditReconc
   const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
   const reconciled = reconcileEdit(old, edited);
   const verdict = validateStructure(old, edited, "edit");
-  const cond = validateCondense(serializeMd({ slides: [old] }), rawMd);
+  // C: a text-only edit that drops the ```diagram fence still keeps the figure — reconcileEdit carries
+  // the OLD figure (and its numbers) back into `reconciled`. So don't let the condense fact-check count
+  // the figure's numbers as "lost" when the output has no figure — strip the figure from the before-side
+  // (mirrors validateStructure's deliberate figure-drop exception on kind='edit'). When the output DOES
+  // carry a figure, keep it so a real figure-number drift is still caught.
+  const oldMd = serializeMd({ slides: [old] });
+  const afterHasFigure = /```(?:diagram|mermaid)/.test(rawMd);
+  const cond = validateCondense(afterHasFigure ? oldMd : stripFigureFences(oldMd), rawMd);
   const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
   const warnings: string[] = [];
   if (figErr) warnings.push(`図の編集結果が不正なため、図は元のまま適用します（${figErr}）`);

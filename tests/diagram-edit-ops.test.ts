@@ -189,6 +189,19 @@ edges:
     expect(checkDeleteIntent(slide(REPRO), [{ op: "removeNode", id: "redis" }], "   ")).toEqual([]);
     expect(checkDeleteIntent({ layout: "auto", placeholders: [] }, [{ op: "removeNode", id: "redis" }], "Redis を削除")).toEqual([]);
   });
+
+  it("word-boundary: a short ASCII id is NOT 'referenced' by an unrelated longer word (FN fix)", () => {
+    const s = slide(`type: flowchart\nnodes:\n  - id: sql\n    label: 生SQL実行モジュール\n  - id: pg\n    label: PostgreSQL 15\nedges:\n  - from: sql\n    to: pg\n`);
+    // deletes 'sql' although the user named PostgreSQL (=pg). 'sql' is a substring of 'postgresql' but not a word.
+    expect(checkDeleteIntent(s, [{ op: "removeNode", id: "sql" }], "PostgreSQL 15 を削除")).toHaveLength(1);
+    expect(checkDeleteIntent(s, [{ op: "removeNode", id: "sql" }], "生SQL実行モジュールを削除")).toEqual([]); // named directly → silent
+  });
+
+  it("hyphen vs space name the same target → no spurious advisory (FP fix)", () => {
+    const s = slide(`type: flowchart\nnodes:\n  - id: svc\n    label: Auth-Service\n  - id: x\n    label: X\nedges:\n  - from: x\n    to: svc\n`);
+    expect(checkDeleteIntent(s, [{ op: "removeNode", id: "svc" }], "Auth Service を削除")).toEqual([]);
+    expect(checkDeleteIntent(s, [{ op: "removeNode", id: "svc" }], "Auth-Service を削除")).toEqual([]);
+  });
 });
 
 // ADR-0019 ① Option A: the deterministic ops-bias nudge used to auto-retry ONCE when a figure edit
@@ -206,5 +219,73 @@ describe("buildOpsRetryInstruction — ops-bias self-repair nudge", () => {
     const n = buildOpsRetryInstruction({ layout: "auto", placeholders: [] }, "直して");
     expect(n).toContain("直して");
     expect(n).toContain("（なし）");
+  });
+});
+
+// A figure that EXISTS but can't be parsed (schema-invalid) must never silently swallow an edit.
+describe("applyDiagramEditOps — unparseable figure is reported, not silently dropped", () => {
+  it("a schema-invalid figure (numeric id) → all ops skipped as 'unparseable-figure', slide unchanged", () => {
+    const bad: SlideIR = { layout: "auto", placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "図" }] }] }],
+      diagram: { placeholderIdx: "1", yaml: `type: flowchart\nnodes:\n  - id: 1\n    label: One\n  - id: 2\n    label: Two\nedges:\n  - from: 1\n    to: 2\n` } };
+    const { slide: out, skipped } = applyDiagramEditOps(bad, [{ op: "nodeUpdate", id: "1", label: "Uno" }]);
+    expect(out).toBe(bad); // unchanged (can't parse to mutate)…
+    expect(skipped).toHaveLength(1); // …but NOT silent
+    expect(skipped[0].reason).toBe("unparseable-figure");
+  });
+});
+
+// Sequence figures index activations/fragments into the message (edge) list; removals must rebase those
+// indices and drop refs to removed messages/participants (else orphan/out-of-range refs corrupt the render).
+describe("applyDiagramEditOps — sequence removals rebase activations/fragments", () => {
+  const SEQ = `type: sequence
+nodes:
+  - id: A
+    label: User
+  - id: B
+    label: API
+  - id: C
+    label: DB
+edges:
+  - from: A
+    to: B
+  - from: B
+    to: C
+  - from: C
+    to: B
+  - from: B
+    to: A
+activations:
+  - participant: B
+    from: 1
+    to: 3
+fragments:
+  - kind: loop
+    label: retry
+    from: 2
+    to: 3
+    dividers:
+      - at: 2
+        label: ""
+`;
+  const seqSlide = (): SlideIR => ({ layout: "auto", placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "図" }] }] }], diagram: { placeholderIdx: "1", yaml: SEQ } });
+  type Seq = { edges?: unknown[]; activations?: Array<{ participant: string; from: number; to: number }>; fragments?: Array<{ from: number; to: number; dividers?: Array<{ at: number }> }> };
+  const loadSeq = (s: SlideIR): Seq => yaml.load(s.diagram!.yaml) as Seq;
+
+  it("removeEdge shifts indices → activations/fragments are re-based to the surviving messages", () => {
+    const { slide: out } = applyDiagramEditOps(seqSlide(), [{ op: "removeEdge", from: "A", to: "B" }]); // old index 0 removed
+    const d = loadSeq(out);
+    expect(d.activations).toEqual([{ participant: "B", from: 0, to: 2 }]); // 1→0, 3→2
+    expect(d.fragments![0]).toMatchObject({ from: 1, to: 2 }); // 2→1, 3→2
+    expect(d.fragments![0].dividers![0].at).toBe(1); // at 2→1
+    expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull(); // still valid
+  });
+
+  it("removeNode drops the orphan participant activation AND fragments spanning removed messages", () => {
+    const { slide: out } = applyDiagramEditOps(seqSlide(), [{ op: "removeNode", id: "B" }]); // B is in every message + activation
+    const d = loadSeq(out);
+    expect(d.edges).toHaveLength(0);
+    expect(d.activations).toEqual([]); // participant B gone
+    expect(d.fragments).toEqual([]); // referenced removed messages
+    expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull();
   });
 });
