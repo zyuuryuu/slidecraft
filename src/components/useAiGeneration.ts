@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence } from "../engine/deck-plan";
+import { sanitizeSlideEditOutput } from "../engine/edit-sanitize";
 import type { LayoutCatalog } from "../engine/template-catalog";
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
@@ -254,8 +255,12 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       return { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)), ...(notice ? { notice } : {}) };
     }
     if (mode === "slide" || mode === "condense") {
-      const md = stripMarkdownFence(raw);
-      return md ? { result: md } : { error: "Couldn't read the edited slide (empty response)." };
+      // Strip the meta-chatter a weak offline model leaks (format label / echoed Instruction / prose
+      // note) BEFORE the diff/reconcile sees it — harness over model (ADR-0016 の相談メモ・edit-sanitize).
+      const md = sanitizeSlideEditOutput(stripMarkdownFence(raw));
+      return md
+        ? { result: md }
+        : { error: "有効な編集が生成できませんでした。具体的な指示（例: 要約 / 箇条書きに整形 / 図を追加 / 英語に翻訳）でお試しください。" };
     }
     if (mode === "diagram-edit") {
       const r = parseJsonLoose(raw);
