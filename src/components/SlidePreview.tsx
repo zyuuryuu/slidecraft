@@ -402,6 +402,9 @@ interface SlidePreviewProps {
   deck: DeckIR | null;
   template: TemplateData | null;
   error: string | null;
+  /** NON-blocking advisory (e.g. an AI edit changed numbers) — a banner over a STILL-rendered slide. */
+  notice?: string | null;
+  onNoticeDismiss?: () => void;
   activeSlide?: number;
   onSlideClick?: (index: number) => void;
   singleSlide?: boolean; // show only the active slide
@@ -414,6 +417,8 @@ export default function SlidePreview({
   deck,
   template,
   error,
+  notice,
+  onNoticeDismiss,
   activeSlide,
   onSlideClick,
   singleSlide = false,
@@ -474,6 +479,16 @@ export default function SlidePreview({
 
   return (
     <div ref={containerRef} className="h-full w-full relative overflow-hidden">
+      {/* Non-blocking advisory (AI edit changed numbers / restored structure) — the slide below
+          still renders; this is a dismissable banner, NOT the fatal error state. */}
+      {notice && !error && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-start gap-2 max-w-[92%] rounded-md border border-amber-500/50 bg-amber-950/80 px-3 py-1.5 text-[11px] text-amber-200 shadow-lg shadow-black/40">
+          <span className="whitespace-pre-wrap">{notice}</span>
+          {onNoticeDismiss && (
+            <button onClick={onNoticeDismiss} className="shrink-0 text-amber-400 hover:text-amber-200 leading-none" title="閉じる">×</button>
+          )}
+        </div>
+      )}
       {error ? (
         <div className="h-full flex items-center justify-center p-4">
           <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 max-w-md">

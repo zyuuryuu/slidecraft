@@ -9,11 +9,8 @@ import { type HistoryMode } from "./useHistoryState";
 import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
-import { validateDiagramSource } from "../engine/mermaid-to-diagram";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
-import { applyFigureYaml } from "../engine/ai-apply";
-import { reconcileEdit } from "../engine/ai-reconcile";
-import { validateStructure, validateCondense } from "../engine/ai-validate";
+import { applyFigureYaml, reconcileSlideEdit } from "../engine/ai-apply";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -68,6 +65,11 @@ export function useDeckController() {
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc,
   } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "サンプル" });
+
+  // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
+  // a broken figure kept as-is). Kept SEPARATE from parseError: the slide is valid and MUST still
+  // render — this shows as a banner over the preview, not an error that blanks it.
+  const [editNotice, setEditNotice] = useState<string | null>(null);
 
   // Catalog → layout selection + capacity adapt to the loaded template (canonical = unchanged).
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
@@ -384,38 +386,42 @@ export function useDeckController() {
       const intent = parseDesignIntent(raw);
       if (intent && old) {
         const { slide, skipped } = applyDesignIntentReport(old, intent);
-        if (skipped.length > 0) setParseError(skipped.map((sk) => sk.message).join(" ｜ "));
+        // Advisory (an op couldn't take effect), NOT a fatal error — banner, don't blank the preview.
+        setEditNotice(skipped.length > 0 ? skipped.map((sk) => sk.message).join(" ｜ ") : null);
         handleSlideUpdate(activeSlide, slide, "commit");
         return;
       }
-      // ① Content edit (Markdown).
-      const newSlide = parseMd(raw).slides[0];
-      if (!newSlide) return;
-      if (!old) { handleSlideUpdate(activeSlide, newSlide, "commit"); return; }
-      // If the edited figure YAML is broken, drop it so reconcile carries the OLD (valid) diagram
-      // instead of rendering a broken one.
-      const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
-      // Drop a broken edited diagram (set undefined) so reconcile carries the OLD valid one.
-      const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
-      if (figErr) setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${figErr}）`);
-      // HARNESS GUARD (構造ヘッダー保全): restore any structural scaffolding the AI dropped —
-      // layout pin / title / subtitle / meta / group hint / figure — from the previous slide. The
-      // front-facing path is synchronous (no retry), so we reconcile deterministically and ANNOUNCE
-      // what was restored rather than silently mangling the slide's structure.
-      const reconciled = reconcileEdit(old, edited);
-      const verdict = validateStructure(old, edited, "edit");
-      // The single-slide "適用" has NO review step, so a silent number-swap or language flip is worst
-      // here. Surface (don't reject — the edit may intend it) both the structure restore and any
-      // fact/language change as a one-line notice.
-      const cond = validateCondense(serializeMd({ slides: [old] }), raw);
-      const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
-      const notices: string[] = [];
-      if (verdict.violations.length > 0) notices.push(`構造を元から復元しました（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
-      if (factMsgs.length > 0) notices.push(`⚠ 数値/言語が変化しています（${factMsgs.join(" / ")}）— 確認してください`);
-      if (notices.length > 0) setParseError(notices.join(" ｜ "));
-      handleSlideUpdate(activeSlide, reconciled, "commit"); // AI edit = one discrete undo step
+      // ① Content edit (Markdown). Validation + reconcile were surfaced at the REVIEW step
+      // (previewSlideEdit → the 変更プレビュー shows the reconciled result + its warnings), so the
+      // reviewer decided 採用/却下 informed. Adoption just COMMITS that same reconciled slide — no
+      // post-hoc validation, no blocking: an adopted slide is valid and always renders.
+      if (!old) {
+        const ns = parseMd(raw).slides[0];
+        if (ns) handleSlideUpdate(activeSlide, ns, "commit");
+        return;
+      }
+      const rec = reconcileSlideEdit(old, raw);
+      if (!rec) return; // unparseable AI output — keep the slide as-is
+      setEditNotice(null); // clear any stale advisory banner
+      handleSlideUpdate(activeSlide, rec.slide, "commit"); // AI edit = one discrete undo step
     },
-    [deck, activeSlide, handleSlideUpdate, setParseError],
+    [deck, activeSlide, handleSlideUpdate, setEditNotice],
+  );
+
+  // Preview an AI slide edit AS IT WILL BE APPLIED (reconciled) + its validation advisories, so the
+  // 変更プレビュー shows the real result + warnings and the reviewer decides 採用/却下 informed. Only
+  // the CONTENT-edit path reconciles; figure/design edits keep the raw diff (return null).
+  const previewSlideEdit = useCallback(
+    (raw: string): { afterMd: string; warnings: string[] } | null => {
+      const s = deck?.slides[activeSlide];
+      if (!s) return null;
+      if (applyFigureYaml(s, raw) || parseDesignIntent(raw)) return null; // figure/design → raw diff
+      const rec = reconcileSlideEdit(s, raw);
+      if (!rec) return null;
+      const resolved = autoSelectLayout(rec.slide, activeSlide, deck!.slides.length, catalog);
+      return { afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }), warnings: rec.warnings };
+    },
+    [deck, activeSlide, catalog],
   );
 
   // Markdown of the active slide → AI panel "this slide" + the Markdown view.
@@ -525,12 +531,12 @@ export function useDeckController() {
 
   return {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
-    slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
+    slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
