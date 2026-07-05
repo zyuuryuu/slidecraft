@@ -6,10 +6,8 @@
  * generation logic with the AI dialog via useAiGeneration (no divergence).
  */
 
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
-import { PROVIDERS } from "../ipc/ai";
-import { runningInTauri } from "../ipc/commands";
-import LocalOnlyToggle from "./LocalOnlyToggle";
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration } from "./useAiGeneration";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
@@ -22,6 +20,8 @@ interface AiPanelProps {
   currentSlideMd?: string;
   /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string) => void;
+  /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings). */
+  onPreviewSlideEdit?: (raw: string) => { afterMd: string; warnings: string[] } | null;
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
@@ -42,6 +42,7 @@ export default function AiPanel({
   onClose,
   currentSlideMd,
   onApplySlide,
+  onPreviewSlideEdit,
   activeSlideNum,
   selectedCount = 1,
   onBatchEdit,
@@ -111,7 +112,14 @@ export default function AiPanel({
   const slideScope = canSlide;
 
   const ready = ai.canGenerate(userRequest) && !batchRunning && (batch || canSlide);
-  const field = "px-2 py-1 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-xs text-white";
+
+  // Reconcile+validate the AI result the way it WILL be applied, so the review shows the REAL
+  // result (not raw output) + any advisory — the reviewer decides 採用/却下 informed, and an
+  // adopted slide always renders. Only the content-edit path reconciles (else null → raw diff).
+  const editPreview = useMemo(
+    () => (slideScope && currentSlideMd && ai.result && !ai.generating ? (onPreviewSlideEdit?.(ai.result) ?? null) : null),
+    [slideScope, currentSlideMd, ai.result, ai.generating, onPreviewSlideEdit],
+  );
 
   const doGenerate = () => {
     if (batch) { onBatchEdit(userRequest); return; } // one instruction → every selected slide
@@ -134,7 +142,7 @@ export default function AiPanel({
     : "text-amber-400";
 
   return (
-    <div className="border-t border-[#3B82F6]/40 bg-[#0a0e1a] flex flex-col shrink-0" style={{ height: panelH }}>
+    <div className="relative border-t border-[#3B82F6]/40 bg-[#0a0e1a] flex flex-col shrink-0" style={{ height: panelH }}>
       {/* Drag the top edge to resize the dock (double-click resets) */}
       <div
         onMouseDown={onResizeDown}
@@ -160,12 +168,16 @@ export default function AiPanel({
         )}
         <div className="flex-1" />
         {hubTab === "assist" && (
+          // One compact status pill = the only always-visible AI control. Shows readiness + model
+          // (or DL%/error) at a glance and opens the settings popover; everything else lives there.
           <button
             onClick={() => setShowSettings((v) => !v)}
-            title={`${ai.connection.label}${ai.connection.hint ? " — " + ai.connection.hint : ""}（クリックで設定）`}
-            className={`flex items-center gap-1 text-xs px-1.5 py-1 rounded hover:bg-[#2D3A6E] ${showSettings ? "bg-[#2D3A6E] text-white" : "text-gray-400"}`}
+            title={`${ai.connection.label}${ai.connection.hint ? " — " + ai.connection.hint : ""}（クリックで AI 設定）`}
+            className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-[#2D3A6E] hover:bg-[#2D3A6E] max-w-[230px] ${showSettings ? "bg-[#2D3A6E] text-white" : "bg-[#1a1f3a] text-gray-300"}`}
           >
-            <span className={toneColor}>●</span> ⚙
+            <span className={`${toneColor} leading-none`}>●</span>
+            <span className="truncate">{ai.connection.label}</span>
+            <span className="text-gray-400 leading-none">⚙</span>
           </button>
         )}
         <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none" title="閉じる">
@@ -182,114 +194,14 @@ export default function AiPanel({
 
       {hubTab === "collab" ? collabTab : (
       <>
-      {/* Settings (folded): connection + provider + Ollama assist, then endpoint/model/key */}
+      {/* AI settings popover — anchored below the header pill; a transparent backdrop closes it. */}
       {showSettings && (
-        <div className="flex flex-col gap-2 px-3 py-2 border-b border-[#2D3A6E] bg-[#0f1117]">
-          <div className="flex items-center gap-2 text-[11px] flex-wrap">
-            <span className={toneColor}>●</span>
-            <span className="text-gray-300">{ai.connection.label}</span>
-            {ai.connection.hint && <span className="text-gray-500">— {ai.connection.hint}</span>}
-            <div className="flex-1" />
-            <select
-              value={ai.provider}
-              onChange={(e) => ai.setProvider(e.target.value as typeof ai.provider)}
-              className={field}
-            >
-              {PROVIDERS.filter((p) => !ai.localModelOnly || p.local || p.id === "custom").map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-            {ai.ollamaModels && ai.ollamaModels.length > 0 && ai.provider !== "ollama" && (
-              <button
-                onClick={ai.switchToOllama}
-                className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
-                title="ローカルの Ollama に切り替え"
-              >
-                🦙 Ollama → 使う
-              </button>
-            )}
-            {runningInTauri() &&
-              (ai.builtinStatus.kind === "idle" || ai.builtinStatus.kind === "error") &&
-              (ai.provider !== "builtin" || ai.weightsPresent === false) && (
-                <button
-                  onClick={ai.switchToBuiltin}
-                  className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
-                  title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
-                >
-                  {ai.weightsPresent === false ? "⬇ オフラインAI（初回DL 2.4GB）" : "💻 オフラインAIを使う"}
-                </button>
-              )}
-            {runningInTauri() && ai.builtinStatus.kind === "running" && (
-              <button
-                onClick={ai.stopBuiltin}
-                className="px-2 py-0.5 rounded bg-[#1a1f3a] text-gray-300 hover:bg-[#2D3A6E] border border-[#2D3A6E]"
-                title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
-              >
-                ⏹ 停止
-              </button>
-            )}
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
+          <div className="absolute right-2 top-12 z-50 w-[min(30rem,92vw)] rounded-lg border border-[#2D3A6E] bg-[#0f1117] shadow-xl shadow-black/50">
+            <AiSettingsPopover ai={ai} />
           </div>
-          <LocalOnlyToggle ai={ai} />
-          <div className="flex flex-wrap items-center gap-2">
-          {!ai.preset.native && ai.provider !== "builtin" && (
-            <input
-              className={`${field} w-56`}
-              placeholder="Base URL"
-              value={ai.cfg.baseURL}
-              onChange={(e) => ai.setField("baseURL", e.target.value)}
-            />
-          )}
-          {ai.models.length > 0 ? (
-            <select
-              className={`${field} w-44`}
-              value={ai.cfg.model}
-              onChange={(e) => ai.setField("model", e.target.value)}
-            >
-              {ai.cfg.model && !ai.models.includes(ai.cfg.model) && (
-                <option value={ai.cfg.model}>{ai.cfg.model}（未インストール）</option>
-              )}
-              {ai.models.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className={`${field} w-40`}
-              placeholder="model"
-              value={ai.cfg.model}
-              onChange={(e) => ai.setField("model", e.target.value)}
-            />
-          )}
-          <button
-            onClick={ai.refreshModels}
-            type="button"
-            title="インストール済みモデルを取得"
-            className={`${field} hover:bg-[#2D3A6E]`}
-          >
-            ↻
-          </button>
-          {/* API key / remember are unused for the runtime-managed builtin model — hide them. */}
-          {ai.provider !== "builtin" && (
-            <>
-              <input
-                className={`${field} w-56`}
-                type="password"
-                placeholder={ai.preset.keyRequired ? "API key" : "API key (任意)"}
-                value={ai.cfg.apiKey}
-                onChange={(e) => ai.setField("apiKey", e.target.value)}
-              />
-              <label className="flex items-center gap-1 text-xs text-gray-400">
-                <input
-                  type="checkbox"
-                  checked={ai.rememberKey}
-                  onChange={(e) => ai.setRememberKey(e.target.checked)}
-                />
-                キーを記憶
-              </label>
-            </>
-          )}
-          </div>
-        </div>
+        </>
       )}
 
       {/* Tabs: generate/edit vs the AI task list (in-flight + history) */}
@@ -399,8 +311,16 @@ export default function AiPanel({
               </button>
             </div>
           </div>
+          {/* Validation advisories for THIS edit — shown at the review so 採用/却下 is informed
+              (numbers/language changed, structure restored, a broken figure kept). */}
+          {editPreview && editPreview.warnings.length > 0 && (
+            <div className="mx-3 mb-1 px-2 py-1.5 rounded border border-amber-500/40 bg-amber-950/40 text-[11px] text-amber-200">
+              {editPreview.warnings.map((w, i) => <div key={i}>{w}</div>)}
+            </div>
+          )}
           {slideScope && currentSlideMd && !ai.generating ? (
-            <DiffView before={currentSlideMd} after={ai.result} fill />
+            // Diff the REAL applied result (reconciled) when available, else the raw output.
+            <DiffView before={currentSlideMd} after={editPreview?.afterMd ?? ai.result} fill />
           ) : (
             <pre className="flex-1 min-h-0 overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap">
               {ai.result}

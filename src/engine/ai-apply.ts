@@ -9,6 +9,10 @@
 import type { SlideIR } from "./slide-schema";
 import { validateDiagramSource } from "./mermaid-to-diagram";
 import { applyRegionSplit } from "./design-intent";
+import { parseMd } from "./md-parser";
+import { serializeMd } from "./md-serializer";
+import { reconcileEdit } from "./ai-reconcile";
+import { validateStructure, validateCondense } from "./ai-validate";
 
 /** DiagramSpec YAML anchors — the first meaningful line of a spec is one of these top-level keys. */
 const SPEC_KEY = /^\s*(type|nodes|edges|direction|title|classDefs|groups|lanes|fragments|activations|quadrant|gantt|xychart|radar|kpi|layout)\s*:/;
@@ -58,4 +62,36 @@ export function applyFigureYaml(slide: SlideIR, raw: string): SlideIR | null {
   );
   const withFigure: SlideIR = { ...slide, layout: "auto", diagram: { yaml, placeholderIdx: "1" } };
   return hasBodyText ? applyRegionSplit(withFigure, "text-left") : withFigure;
+}
+
+/** What an AI content edit resolves to, computed BEFORE adoption. */
+export interface SlideEditReconcile {
+  /** The reconciled slide that will actually be committed (structure restored from `old`). */
+  slide: SlideIR;
+  /** Human advisories to show in the review — structure restored / numbers-or-language changed /
+   *  a broken figure kept as-is. Empty when the edit is clean. */
+  warnings: string[];
+}
+
+/**
+ * Reconcile + VALIDATE an AI content edit into what will actually be applied — computed at REVIEW
+ * time (before 採用), not after. This puts validation on the adoption gate: the reviewer sees the
+ * real reconciled result + any advisory and decides 採用/却下; once adopted the slide is valid and
+ * always renders (no post-hoc blocking). Returns null when the AI output doesn't parse to a slide.
+ * A broken figure is dropped so the OLD valid one is carried (and flagged), never a broken render.
+ */
+export function reconcileSlideEdit(old: SlideIR, rawMd: string): SlideEditReconcile | null {
+  const newSlide = parseMd(rawMd).slides[0];
+  if (!newSlide) return null;
+  const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
+  const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
+  const reconciled = reconcileEdit(old, edited);
+  const verdict = validateStructure(old, edited, "edit");
+  const cond = validateCondense(serializeMd({ slides: [old] }), rawMd);
+  const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
+  const warnings: string[] = [];
+  if (figErr) warnings.push(`図の編集結果が不正なため、図は元のまま適用します（${figErr}）`);
+  if (verdict.violations.length > 0) warnings.push(`構造を元から復元します（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
+  if (factMsgs.length > 0) warnings.push(`⚠ 数値/言語が変化しています（${factMsgs.join(" / ")}）`);
+  return { slide: reconciled, warnings };
 }

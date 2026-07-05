@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence } from "../engine/deck-plan";
+import { sanitizeSlideEditOutput } from "../engine/edit-sanitize";
 import type { LayoutCatalog } from "../engine/template-catalog";
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
@@ -31,6 +32,8 @@ export interface AiProviderConfig {
   apiKey: string;
 }
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
+/** The capability-selected default offline model (from Rust model_tier::builtin_model_info). */
+export interface BuiltinModelInfo { tier: "small" | "balanced"; display: string; file: string; sizeMb: number; }
 export type AiMode = "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "template-spec";
 
 export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
@@ -254,8 +257,12 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       return { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)), ...(notice ? { notice } : {}) };
     }
     if (mode === "slide" || mode === "condense") {
-      const md = stripMarkdownFence(raw);
-      return md ? { result: md } : { error: "Couldn't read the edited slide (empty response)." };
+      // Strip the meta-chatter a weak offline model leaks (format label / echoed Instruction / prose
+      // note) BEFORE the diff/reconcile sees it — harness over model (ADR-0016 の相談メモ・edit-sanitize).
+      const md = sanitizeSlideEditOutput(stripMarkdownFence(raw));
+      return md
+        ? { result: md }
+        : { error: "有効な編集が生成できませんでした。具体的な指示（例: 要約 / 箇条書きに整形 / 図を追加 / 英語に翻訳）でお試しください。" };
     }
     if (mode === "diagram-edit") {
       const r = parseJsonLoose(raw);
@@ -434,6 +441,9 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   // enable: it DOWNLOADS the model on first use (with progress) then spawns. Desktop-only.
   const [builtinStatus, setBuiltinStatus] = useState<{ kind: "idle" | "downloading" | "starting" | "running" | "error"; message?: string; pct?: number }>({ kind: "idle" });
   const [weightsPresent, setWeightsPresent] = useState<boolean | null>(null);
+  // The capability-selected default model (name + real DL size) — so the UI shows "Granite 4.1 8B"
+  // and the true size, not a stale saved config / hard-coded "2.4GB". Auto-detected in Rust.
+  const [builtinModel, setBuiltinModel] = useState<BuiltinModelInfo | null>(null);
   useEffect(() => {
     if (!runningInTauri()) return;
     let cancelled = false;
@@ -442,6 +452,8 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
         const { invoke } = await import("@tauri-apps/api/core");
         const present = await invoke<boolean>("model_weights_present");
         if (!cancelled) setWeightsPresent(present);
+        const info = await invoke<BuiltinModelInfo>("builtin_model_info");
+        if (!cancelled) setBuiltinModel(info);
       } catch {
         /* ignore */
       }
@@ -539,12 +551,12 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       return { ok: true, tone: "ok", label: `${cfg.model} を使用` };
     }
     if (provider === "builtin") {
-      if (builtinStatus.kind === "downloading") return { ok: false, tone: "checking", label: `モデルをダウンロード中… ${builtinStatus.pct ?? 0}%` };
+      if (builtinStatus.kind === "downloading") return { ok: false, tone: "checking", label: `${builtinModel?.display ?? "モデル"} をダウンロード中… ${builtinStatus.pct ?? 0}%` };
       if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: "オフラインAIを起動中…（初回は数十秒）" };
       if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: "オフラインAIの起動に失敗", hint: builtinStatus.message };
       if (!cfg.baseURL.trim()) {
         return weightsPresent === false
-          ? { ok: false, tone: "warn", label: "オフラインAI モデル未取得", hint: "『⬇ モデルをDL』で初回ダウンロード（約2.4GB）" }
+          ? { ok: false, tone: "warn", label: `${builtinModel?.display ?? "オフラインAI"} 未取得`, hint: `⬇ ボタンで初回ダウンロード（約${builtinModel ? (builtinModel.sizeMb / 1024).toFixed(1) : "?"}GB）` }
           : { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "そのまま生成すると自動で起動します（初回は数十秒）" };
       }
       // baseURL filled → fall through to the generic model checks below.
@@ -576,7 +588,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
-    switchToBuiltin, stopBuiltin, builtinStatus, weightsPresent,
+    switchToBuiltin, stopBuiltin, builtinStatus, weightsPresent, builtinModel,
     localModelOnly, setLocalModelOnly, localBlocked,
   };
 }
