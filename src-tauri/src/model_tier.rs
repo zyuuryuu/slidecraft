@@ -40,6 +40,10 @@ pub struct ModelSpec {
     pub url: &'static str,
     /// SHA256 of the GGUF content (HF git-LFS oid).
     pub sha256: &'static str,
+    /// Human-facing model name for the UI (not the raw filename).
+    pub display: &'static str,
+    /// Approx download size in MB — so the UI shows the real "初回DL X GB", not a hard-coded value.
+    pub size_mb: u64,
 }
 
 /// The model each tier ships. Small = phi-3.5-mini 3.8B (safe floor); Balanced = granite-4.1-8B
@@ -50,13 +54,35 @@ pub fn spec_for(tier: Tier) -> ModelSpec {
             file: "phi-3.5-mini-instruct-q4_k_m.gguf",
             url: "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
             sha256: "e4165e3a71af97f1b4820da61079826d8752a2088e313af0c7d346796c38eff5",
+            display: "Phi-3.5-mini 3.8B",
+            size_mb: 2447,
         },
         Tier::Balanced => ModelSpec {
             file: "granite-4.1-8b-Q4_K_M.gguf",
             url: "https://huggingface.co/unsloth/granite-4.1-8b-GGUF/resolve/main/granite-4.1-8b-Q4_K_M.gguf",
             sha256: "0f45c1af986e9900bb3b6ba46a25937e1bb80426935bc242d88c9ca90e9f5c88",
+            display: "Granite 4.1 8B",
+            size_mb: 5100,
         },
     }
+}
+
+/// UI-facing description of the tier this machine defaults to + its model (name, size). Lets the
+/// panel show "Granite 4.1 8B" and the real DL size instead of a stale saved config / hard-coded GB.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuiltinModelInfo {
+    pub tier: Tier,
+    pub display: &'static str,
+    pub file: &'static str,
+    pub size_mb: u64,
+}
+
+#[tauri::command]
+pub fn builtin_model_info() -> BuiltinModelInfo {
+    let tier = selected_tier();
+    let s = spec_for(tier);
+    BuiltinModelInfo { tier, display: s.display, file: s.file, size_mb: s.size_mb }
 }
 
 /// The tier the app uses now: the detected recommendation. A persisted USER OVERRIDE

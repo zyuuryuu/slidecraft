@@ -32,7 +32,8 @@ pub fn run() {
             secret_store::secret_set,
             secret_store::secret_get,
             secret_store::secret_delete,
-            model_tier::recommended_model_tier
+            model_tier::recommended_model_tier,
+            model_tier::builtin_model_info
         ])
         .setup(|_app| {
             eprintln!("[slidecraft] setup() reached — main window created, entering event loop");
