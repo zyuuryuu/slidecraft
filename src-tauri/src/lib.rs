@@ -6,6 +6,7 @@
 mod collab; // P2.3: spawn / supervise / reap the Node collab sidecar (start_collab/stop_collab)
 mod local_ai; // roadmap #2: spawn / supervise / reap the bundled llamafile in-app AI runtime
 mod secret_store; // ADR-0016 F3: OS keychain for the BYOK API key (secret_set/get/delete)
+mod model_tier; // 環境適応の既定モデル選択（RAM/コア → Small|Balanced tier）
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,7 +31,8 @@ pub fn run() {
             local_ai::model_weights_present,
             secret_store::secret_set,
             secret_store::secret_get,
-            secret_store::secret_delete
+            secret_store::secret_delete,
+            model_tier::recommended_model_tier
         ])
         .setup(|_app| {
             eprintln!("[slidecraft] setup() reached — main window created, entering event loop");
