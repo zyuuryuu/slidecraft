@@ -2,43 +2,16 @@
 
 前方向きの計画のみを記す。完了フェーズの履歴は **ADR ＋ git（PR）** に移管済み。決定の記録は `docs/adr/` を参照。
 
-**現在地（2026-07-04）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6）・
-**プロンプト磨き込み**（構造ヘッダー保全 [ADR-0012](adr/0012-ai-edit-structure-preservation.md)、敵対検証ハードニング、
-生成 payload 保全 #12、design-op 告知 #13、テキストスライドへ図追加 #3B、図生成の二段構え、プロンプト整合 #3・#1）
-まで完了（PR #58）。**UI 磨き込み**（AI Assist＋協働を1つの ✨AI ドックにタブ統合・マスターピッカーを Top/Draft 共通の
-単一プルダウンに刷新・Draft ヘッダ整理）も反映（PR #59）。機能フェーズは **テーマ1「HTML 出力」**
-（MVP・表現力・印刷/PDF 堅牢化・図テキスト SVG `<text>` 統一 [ADR-0013](adr/0013-svg-native-text.md)・PR #60–#63）と
-**テーマ2「テンプレ作成補助」**（[ADR-0014](adr/0014-template-authoring.md)）・**テーマ3「MCP ブラッシュアップ」**
-（[ADR-0015](adr/0015-mcp-brushup.md)）・**テーマ4「セキュリティレビュー」**（監査完了・[ADR-0016](adr/0016-security-review-theme4.md)）が完了。
-**named 主要テーマ 1〜4 は全て完了**（テーマ4 是正は F1/F3/F4 実装済＝PR #66、残 F2・F1' のみバックログ）。詳細は開発メモリ `html_output_design` / `roadmap_post_p2`。
+**現在地（2026-07-05）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6）に加え、
+named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[ADR-0013](adr/0013-svg-native-text.md)／
+テーマ2「テンプレ作成補助」[ADR-0014](adr/0014-template-authoring.md)／テーマ3「MCP ブラッシュアップ」[ADR-0015](adr/0015-mcp-brushup.md)／
+テーマ4「セキュリティレビュー」[ADR-0016](adr/0016-security-review-theme4.md)。各テーマの経緯・意思決定は対応 ADR ＋ git（PR）、
+背景メモは開発メモリ `html_output_design` / `roadmap_post_p2`。
+
+**次の大物テーマは未定** — 下記バックログ（AI 編集の深化・HTML 品質磨き込み・テンプレ作成 UI・i18n 等）から選定する。
+テーマ4 是正は F1/F3/F4 実装済（PR #66）、残は **F2（svgCache XSS・HIGH）** と **F1'（保留）** のみ。
 
 ---
-
-## 次の主要テーマ（優先順）
-
-**named 主要テーマ（1〜4）は全て完了。** 残りは下記バックログ（テーマ4 是正の残 F2・F1' を含む）と運用項目。
-
-> テーマ1「HTML 出力」（大マイルストーン）は **完了**（2026-07-04・[ADR-0013](adr/0013-svg-native-text.md)・
-> 設計＝[docs/design/html-output.md](design/html-output.md)）。MVP＋表現力（遷移/オーバービュー/選択UI）＋
-> 印刷/PDF 堅牢化（1枚1ページ・背景印刷・図テキスト SVG `<text>` 統一）まで main（PR #60–#63・実 PDF 検証済み）。
-> 後続の磨き込み（図/テンプレ品質・CJK フォント埋め込み・印刷 e2e）はバックログ参照。
-
-> テーマ2「テンプレ作成補助」は **完了**（2026-07-04・[ADR-0014](adr/0014-template-authoring.md)・
-> 設計＝[docs/design/template-authoring.md](design/template-authoring.md)）。後続の小粒タスクはバックログ参照。
-
-> テーマ3「MCP ブラッシュアップ」（上流 AI の作業性向上）は **完了**（2026-07-04・[ADR-0015](adr/0015-mcp-brushup.md)・
-> 設計＝[docs/design/mcp-brushup.md](design/mcp-brushup.md)・使い方＝[docs/mcp-server.md](mcp-server.md)）。監査（35 findings）
-> ＋ユーザ insight で手前半（自己記述オーサリング契約＋テンプレ調達）を最優先化し S1–S6 実装：`get_authoring_guide`/図の二段
-> ガイド・`create_template`・統一 mutation envelope＋collab no-op バグ修正・構造操作（insert/delete/move/duplicate）・
-> `get_slide`＋text スライドへ図追加・決定論 hints＋split の changedSlides。各スライスを敵対レビュー通過（全 982 tests・
-> schema 変更なし）。後続の小粒（S2 増分2＝`list_/use_template`）はバックログ参照。
-
-> テーマ4「セキュリティレビュー」（配布/自動化前提の全面監査）は **監査完了**（2026-07-04・[ADR-0016](adr/0016-security-review-theme4.md)・
-> [ADR-0010](adr/0010-security-model.md) を supersede せず補追）。5 サーフェス並列 read-only 監査（MCP＋協働ホスト／BYOK＋egress／
-> Tauri backend＋モデルDL／供給網＋CI／XSS＋untrusted 入力）で **ADR-0010 の中核ガードは実挙動として成立を確認**（token 境界・
-> loopback・no-fs・zip 硬化・spawn 安全・モデルDL整合性・prototype 汚染不発）。是正 **F1（egress 右サイズ）・F3（キー keychain）・
-> F4（供給網）は実装済＝PR #66**、**残るは F2（svgCache XSS・HIGH）と F1'（egress hard boundary・保留）のみ**（下記バックログ）。
-> 詳細は [ADR-0016](adr/0016-security-review-theme4.md)。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 
