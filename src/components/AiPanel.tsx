@@ -216,7 +216,9 @@ export default function AiPanel({
                   className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
                   title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
                 >
-                  {ai.weightsPresent === false ? "⬇ オフラインAI（初回DL 2.4GB）" : "💻 オフラインAIを使う"}
+                  {ai.weightsPresent === false
+                    ? `⬇ ${ai.builtinModel?.display ?? "オフラインAI"}（初回DL ${ai.builtinModel ? (ai.builtinModel.sizeMb / 1024).toFixed(1) : "?"}GB）`
+                    : "💻 オフラインAIを使う"}
                 </button>
               )}
             {runningInTauri() && ai.builtinStatus.kind === "running" && (
@@ -239,7 +241,13 @@ export default function AiPanel({
               onChange={(e) => ai.setField("baseURL", e.target.value)}
             />
           )}
-          {ai.models.length > 0 ? (
+          {ai.provider === "builtin" && ai.builtinStatus.kind !== "running" ? (
+            // The builtin model is capability-selected + auto-adopted, not user-typed — show it
+            // read-only (the real tier model, not a stale saved name) until it's actually running.
+            <span className={`${field} w-44 text-gray-400 flex items-center`}>
+              {ai.builtinModel?.display ?? "組み込みモデル"}
+            </span>
+          ) : ai.models.length > 0 ? (
             <select
               className={`${field} w-44`}
               value={ai.cfg.model}
