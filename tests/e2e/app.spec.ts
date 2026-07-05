@@ -80,6 +80,16 @@ test.describe("SlideCraft", () => {
     await expect(page.getByRole("button", { name: "このスライド" })).toHaveCount(0);
   });
 
+  test("AI Assist: the instruction box collapses (freeing the preview) and re-expands", async ({ page }) => {
+    await page.getByRole("button", { name: /✨ AI/ }).click();
+    const box = page.getByPlaceholder(/このスライドへの指示/);
+    await expect(box).toBeVisible(); // expanded by default
+    await page.getByTitle(/指示欄をたたむ/).click(); // chevron ▾ → fold
+    await expect(box).toHaveCount(0); // textarea removed → room goes to the preview
+    await page.getByTitle("指示欄を開く").click(); // chevron ▸ → unfold
+    await expect(box).toBeVisible();
+  });
+
   test("does not crash on invalid editor input (in the Draft modal)", async ({ page }) => {
     await page.getByRole("button", { name: /Draft/ }).click();
     const editor = page.locator(".cm-editor .cm-content");
