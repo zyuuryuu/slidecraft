@@ -41,8 +41,9 @@ const SLIDE_W = 13.333;
 const HEADER_BAR_H = 1.18; // light 系レイアウトのヘッダーバー（idx15/16 ヘッダーを覆う）
 
 // マスター既定（canonical と同値 — lstStyle は差分のみ出力するのでここが基準）
-const MASTER_TITLE = { sz: 4400, bold: true, font: "major" as const, color: "titleText" as PaletteKey };
-const MASTER_BODY = { sz: 1400, bold: false, font: "minor" as const, color: "bodyText" as PaletteKey };
+type MasterStyle = { sz: number; bold: boolean; font: "major" | "minor"; color: PaletteKey };
+const MASTER_TITLE: MasterStyle = { sz: 4400, bold: true, font: "major", color: "titleText" };
+const MASTER_BODY: MasterStyle = { sz: 1400, bold: false, font: "minor", color: "bodyText" };
 
 const escXml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -89,7 +90,7 @@ const emptySpTreeHeader =
   `<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>` +
   `<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
 
-function masterStyleXml(tag: string, base: typeof MASTER_TITLE, spec: TemplateSpec): string {
+function masterStyleXml(tag: string, base: MasterStyle, spec: TemplateSpec): string {
   return `<p:${tag}><a:lvl1pPr algn="l"><a:defRPr sz="${base.sz}"${base.bold ? ` b="1"` : ""}>` +
     `<a:solidFill><a:srgbClr val="${spec.palette[base.color]}"/></a:solidFill>` +
     `<a:latin typeface="${escXml(spec.fonts[base.font])}"/></a:defRPr></a:lvl1pPr></p:${tag}>`;
