@@ -32,22 +32,23 @@
   --color-ok: var(--ok);
 }
 
-/* Dark (default) — Slate neutral: cool grey surfaces, violet accent, low saturation (the plain dark). */
+/* Dark (default) — rich graphite/slate: deep near-black base + slightly richer cool surfaces + crisp
+   highlights, for a bit of sheen/depth (艶) instead of flat matte grey. Violet accent. */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --void: #07090d;
-  --canvas: #0b0e14;
-  --panel: #12161f;
-  --surface: #1a1f2a;
-  --field: #161a22;
-  --edge: #2a2f3a;
-  --edge2: #3a4150;
-  --fg: #e5e7eb;
-  --fg2: #cbd1db;
-  --muted: #9ca3af;
-  --faint: #6b7280;
-  --dim: #4b5563;
+  --void: #05060c;
+  --canvas: #090b12;
+  --panel: #10131d;
+  --surface: #1c2231;
+  --field: #13161f;
+  --edge: #2c3446;
+  --edge2: #3f4759;
+  --fg: #f1f4fa;
+  --fg2: #ced5e1;
+  --muted: #98a0b1;
+  --faint: #687082;
+  --dim: #485061;
   /* Foreground for text/icons ON a saturated fill (accent/brand/cyan buttons) — stays light in
      every theme (blue/violet/cyan are dark enough for white). Inherited by light/modern via :root. */
   --on-accent: #ffffff;
@@ -92,24 +93,24 @@
   --ok: #059669;
 }
 
-/* Modern — the navy palette: deep blue surfaces, blue accent (the distinctive/branded look). */
+/* Modern — blue palette leaning toward 水色 (aqua): bluer/cyan-tinted navy surfaces + sky-blue accent. */
 [data-theme="modern"] {
   color-scheme: dark;
-  --void: #0a0e1a;
-  --canvas: #0f1117;
-  --panel: #141b41;
-  --surface: #1e2761;
-  --field: #1a1f3a;
-  --edge: #2d3a6e;
-  --edge2: #3b4a7e;
+  --void: #091120;
+  --canvas: #0e1420;
+  --panel: #142348;
+  --surface: #1a2c62;
+  --field: #16203c;
+  --edge: #294474;
+  --edge2: #35527e;
   --fg: #ffffff;
   --fg2: #d1d5db;
   --muted: #9ca3af;
   --faint: #6b7280;
   --dim: #4b5563;
-  --accent: #3b82f6;
-  --accent-hi: #2563eb;
-  --accent-soft: #93c5fd;
+  --accent: #33a6ec;
+  --accent-hi: #1f8bd6;
+  --accent-soft: #a8daf8;
   --cyan: #06b6d4;
   --cyan-hi: #0891b2;
   --brand: #8900ff;
