@@ -7,13 +7,14 @@
 //! provider at it; the existing OpenAI-compat path + egress gate + condense guardrail then work
 //! unchanged. Rust never touches the DeckIR — it only supervises the process.
 //!
-//! Flags: `--server --host 127.0.0.1 --port <n> -m <gguf> --gpu disable -c 8192 --parallel 1`
+//! Flags: `--server --host 127.0.0.1 --port <n> -m <gguf> --gpu disable -c <ctx> --parallel <N>`
 //! (CPU-only is `--gpu disable`, NOT `-ngl 0`; `--nobrowser` was removed). `/health` returns 200
-//! once the model is loaded. `-c 8192 --parallel 1` are LOAD-CRITICAL: a newer llamafile defaults
-//! `--parallel` to auto (=4) and the context to the model's max (phi-3.5 = 128K), so the KV cache
-//! balloons to ~60 GB and the cold-load blows past the health timeout. We serve one request at a
-//! time and slide/condense prompts fit in 8K, so pinning these keeps the KV ~1/64th and the load
-//! to a few seconds.
+//! once the model is loaded. `-c`/`--parallel` are LOAD-CRITICAL and MUST be pinned: a newer llamafile
+//! defaults `--parallel` to auto (=4) and the context to the model's max (phi-3.5 = 128K), so the KV
+//! cache balloons to ~60 GB and the cold-load blows past the health timeout. `choose_parallel` picks
+//! `--parallel N` by AVAILABLE RAM (N=1 by default, up to 3 slots when there's headroom — powers
+//! best-of-N, ADR-0019) and scales `-c` = 8192·N so each slot keeps ~8K tokens; on a tight box it
+//! stays 1 slot / 8K, keeping the KV small and the load to a few seconds (never risking OOM).
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -241,9 +242,37 @@ fn poll_health(child: &mut Child, port: u16) -> Result<(), PollErr> {
     }
 }
 
+/// Pick `(--parallel N, -c total_ctx)` by AVAILABLE RAM (ADR-0019 ① Option B best-of-N). When there's
+/// headroom we open N slots so best-of-N fans out truly in parallel; otherwise we fall back to a single
+/// slot — NEVER risk OOM (the whole point of "RAM見て自動"). llama.cpp splits `-c` across slots, so we
+/// scale `-c` with N to keep ~CTX_PER_SLOT per slot. Estimate = weights (gguf size) + N·KV_PER_SLOT +
+/// margin, compared to free RAM at launch (before the weights load). Conservative on purpose: an
+/// over-estimate just means fewer slots (slower), an under-estimate would mean OOM.
+fn choose_parallel(gguf: &Path) -> (u32, u32) {
+    const CTX_PER_SLOT: u32 = 8192;
+    const KV_PER_SLOT_MB: u64 = 2048; // generous KV for one 8192-ctx slot of an ~8B Q4 model
+    const MARGIN_MB: u64 = 1536; // OS + runtime headroom
+    const MAX_SLOTS: u32 = 3; // cap (the observed acceptable parallelism)
+
+    let mut sys = sysinfo::System::new();
+    sys.refresh_memory();
+    let avail_mb = sys.available_memory() / 1024 / 1024;
+    let weights_mb = std::fs::metadata(gguf).map(|m| m.len() / 1024 / 1024).unwrap_or(6144);
+
+    let mut slots = 1u32;
+    for n in 2..=MAX_SLOTS {
+        if avail_mb >= weights_mb + (n as u64) * KV_PER_SLOT_MB + MARGIN_MB {
+            slots = n;
+        }
+    }
+    eprintln!("[local_ai] --parallel {slots} -c {} (avail {avail_mb}MB, weights {weights_mb}MB)", CTX_PER_SLOT * slots);
+    (slots, CTX_PER_SLOT * slots)
+}
+
 /// Spawn one llamafile server on `port`. Drains stdout on a thread (log-only) so a full pipe
 /// never blocks the child under load.
 fn spawn_llamafile(bin: &Path, gguf: &Path, port: u16) -> Result<Child, String> {
+    let (parallel, ctx) = choose_parallel(gguf);
     let mut cmd = Command::new(bin);
     cmd.arg("--server")
         .arg("--host")
@@ -255,9 +284,9 @@ fn spawn_llamafile(bin: &Path, gguf: &Path, port: u16) -> Result<Child, String> 
         .arg("--gpu")
         .arg("disable") // CPU-only (v1); GPU is a separate epic
         .arg("-c")
-        .arg("8192") // pin context — else a newer llamafile uses the model max (phi-3.5 = 128K) → giant KV
-        .arg("--parallel")
-        .arg("1") // one slot — we serve a single request at a time; avoids the 4× KV of the auto default
+        .arg(ctx.to_string()) // pin context — else a newer llamafile uses the model max (→ giant KV);
+        .arg("--parallel") //     scaled with --parallel so each slot keeps ~8192 tokens
+        .arg(parallel.to_string()) // RAM-aware: N slots when there's headroom (best-of-N), else 1
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     #[cfg(windows)]

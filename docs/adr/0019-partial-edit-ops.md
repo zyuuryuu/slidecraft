@@ -39,7 +39,16 @@
 - **自動発火・1回だけ**：`AiPanel` が `useEffect` で検出→`ai.retry`（`useAiGeneration`・enqueue/runTask 再利用・タスク名「🔁 opsで再生成」）。**ref ガードで user generate ごとに最大1回**（2回目の drift は `[全文フォールバック]` タグ付き結果を出すだけ＝ループしない）。透明バナー表示。
 - **bound（ADR-0018 の auto-repair 懸念に正対）**：トリガは HARD drift かつ図スライド時のみ・上限1回・**採用ゲート不変（最終は必ず人が採用/却下）**。生成自体は非決定論だがトリガと nudge 本文は完全決定論。`--parallel 1` は不変。
 - **前提修正（同梱）**：`applyDiagramEditOps` に `dirty` フラグ＝実質 no-op（不在idの removeNode 等）は元スライドを byte-identical で返す。再ダンプ（`yaml.dump` は書式非同一）による偽 `-0+1` diff／無言リフォームを防ぎ、偽 drift による空振りリトライも塞ぐ。
-- **best-of-N（Option B）は後日**：whole-deck refine の外部API prov オプトインとして（内蔵 llamafile は KV約N倍のため `--parallel 1` 据え置き＝N=1クランプ）。触点・採点設計は開発メモリ `backlog_ai_edit_efficiency`。
+
+#### ① best-of-N（Option B・単一スライド編集）＝2026-07-05 実装
+
+Option A（単発リテイク）でも弱モデルは複雑な構造編集で取りこぼす（実機 ②「pay→paygw を消さず並列に不正検知を追加」＝不完全な張り替え）。**複数候補から採用ゲートで最良を拾う** best-of-N を単一スライド編集に実装：
+
+- **N候補生成**：`useAiGeneration.generateBest(prompt, mode, n)` が N世代を `Promise.all` で fan-out。`generateWithAI` は per-call 純関数なので外部APIは真の並列、内蔵は llamafile のスロット数に応じ直列/並列。cancel は fan-out 全体を中断。
+- **決定論採点＋選別**：`AiPanel` が各候補を**採用ゲート**（`previewSlideEdit`/`reconcileSlideEdit` の warnings 数＋全文ドリフトに大ペナルティ）でスコア化し**最良を preselect**。候補ピッカー（◀ n/N ▶・✓/⚠k）で人が見比べ→採用。**採用ゲート不変・最終は人**。選別は決定論、生成N本のみ非決定論。
+- **N は設定・HARD clamp [1,5]**（`clampBestOfN`・`MAX_BEST_OF_N=5`・永続化）。誤って 100 等でも暴走ファンアウトしない（ユーザ要望のガードレール）。N=1 で無効＝Option A（自動リテイク）に戻る（N>1 時は自動リテイク停止＝best-of-N が品質レバー）。
+- **内蔵ランタイム＝RAM 連動**（ユーザ選択「RAM見て自動」）：`local_ai.rs` `choose_parallel` が空きRAMで `--parallel N`（余裕あれば最大3・`-c`=8192·N で各スロット8K維持）、tight なら 1スロット/8K にフォールバック（**OOM を絶対に招かない**保守見積り＝weights〔gguf サイズ〕＋N·KV〔2GB/slot〕＋margin）。外部API は常に真の並列。
+- **将来**：whole-deck refine への展開（refine.ts の aiFix を N候補+選別に）。開発メモリ `backlog_ai_edit_efficiency`。
 
 #### P1 実機テスト由来の補強（2026-07-05・弱モデル granite-4.1-8b で観測）
 
