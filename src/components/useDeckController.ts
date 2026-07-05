@@ -69,6 +69,11 @@ export function useDeckController() {
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc,
   } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "サンプル" });
 
+  // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
+  // a broken figure kept as-is). Kept SEPARATE from parseError: the slide is valid and MUST still
+  // render — this shows as a banner over the preview, not an error that blanks it.
+  const [editNotice, setEditNotice] = useState<string | null>(null);
+
   // Catalog → layout selection + capacity adapt to the loaded template (canonical = unchanged).
   const catalog = useMemo(() => (templateData ? buildCatalog(templateData) : undefined), [templateData]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -397,7 +402,6 @@ export function useDeckController() {
       const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
       // Drop a broken edited diagram (set undefined) so reconcile carries the OLD valid one.
       const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
-      if (figErr) setParseError(`図の編集結果が不正なため、図は元のまま適用しました（${figErr}）`);
       // HARNESS GUARD (構造ヘッダー保全): restore any structural scaffolding the AI dropped —
       // layout pin / title / subtitle / meta / group hint / figure — from the previous slide. The
       // front-facing path is synchronous (no retry), so we reconcile deterministically and ANNOUNCE
@@ -410,12 +414,15 @@ export function useDeckController() {
       const cond = validateCondense(serializeMd({ slides: [old] }), raw);
       const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
       const notices: string[] = [];
+      if (figErr) notices.push(`図の編集結果が不正なため、図は元のまま適用しました（${figErr}）`);
       if (verdict.violations.length > 0) notices.push(`構造を元から復元しました（${verdict.violations.map((v) => v.detail).join(" / ")}）`);
       if (factMsgs.length > 0) notices.push(`⚠ 数値/言語が変化しています（${factMsgs.join(" / ")}）— 確認してください`);
-      if (notices.length > 0) setParseError(notices.join(" ｜ "));
+      // Advisory only — the reconciled slide IS valid + renders. Shown as a banner, NOT parseError,
+      // so the preview no longer blanks + the status bar no longer flags "Error" on a good edit.
+      setEditNotice(notices.length > 0 ? notices.join(" ｜ ") : null);
       handleSlideUpdate(activeSlide, reconciled, "commit"); // AI edit = one discrete undo step
     },
-    [deck, activeSlide, handleSlideUpdate, setParseError],
+    [deck, activeSlide, handleSlideUpdate, setParseError, setEditNotice],
   );
 
   // Markdown of the active slide → AI panel "this slide" + the Markdown view.
@@ -525,7 +532,7 @@ export function useDeckController() {
 
   return {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
-    slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
+    slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,

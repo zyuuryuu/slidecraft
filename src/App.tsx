@@ -27,7 +27,7 @@ import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
-    slideEditView, setSlideEditView, mdText, deck, templateData, parseError, generating,
+    slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
@@ -286,7 +286,7 @@ export default function App() {
                   Preview — Slide {activeSlide + 1}
                 </div>
                 <div className="flex-1 min-h-0 bg-[#0f1117]">
-                  <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
+                  <SlidePreview deck={deck} template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
                 </div>
               </>
             }
