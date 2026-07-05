@@ -2,7 +2,7 @@
 
 前方向きの計画のみを記す。完了フェーズの履歴は **ADR ＋ git（PR）** に移管済み。決定の記録は `docs/adr/` を参照。
 
-**現在地（2026-07-05）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6）に加え、
+**現在地（2026-07-05）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6・[ADR-0017](adr/0017-inapp-offline-ai-runtime.md)／AI 編集の検証は採用ゲート・[ADR-0018](adr/0018-validation-at-adoption-gate.md)）に加え、
 named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[ADR-0013](adr/0013-svg-native-text.md)／
 テーマ2「テンプレ作成補助」[ADR-0014](adr/0014-template-authoring.md)／テーマ3「MCP ブラッシュアップ」[ADR-0015](adr/0015-mcp-brushup.md)／
 テーマ4「セキュリティレビュー」[ADR-0016](adr/0016-security-review-theme4.md)。各テーマの経緯・意思決定は対応 ADR ＋ git（PR）、
