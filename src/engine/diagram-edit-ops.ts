@@ -189,3 +189,18 @@ export function checkDeleteIntent(slide: SlideIR, ops: DiagramEditOps, instructi
   }
   return out;
 }
+
+/**
+ * Deterministic ops-bias nudge for the single-retry self-repair (ADR-0019 ①, Option A). When a figure
+ * edit drifted to full-Markdown (the model chose format A and lost numbers/language → rolled back), we
+ * re-ask ONCE for ONLY the ops (format B). The nudge is HARNESS-authored (not the model's): it restates
+ * the instruction, lists the REAL node ids so the model doesn't fuzzy-match, forbids full-Markdown, and
+ * pins numbers/language. Pure (R2): `slide` in, string out.
+ */
+export function buildOpsRetryInstruction(slide: SlideIR, instruction: string): string {
+  const raw = readFigureRaw(slide);
+  const ids = (raw?.nodes ?? []).map((n) => String(n.id)).join(", ") || "（なし）";
+  return `${instruction.trim()}
+
+【重要・再指示】前回の出力はスライド全文の Markdown で、図以外の数値・言語まで変わってしまいました。今回は図の部分編集として、変更する図要素だけの ops JSON 配列（形式B）のみを返してください（全文 Markdown は返さない）。既存ノードid: ${ids}。指示に無いノード・エッジ・数値・固有名詞は変更せず、入力の言語も保ってください。`;
+}

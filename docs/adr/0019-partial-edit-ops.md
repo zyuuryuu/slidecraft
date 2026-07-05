@@ -31,6 +31,16 @@
   - **実装知見**：`diagram-edit` モード（`diagramEditSystemPrompt`）は**実 UI から未起動＝dead**（生成呼び出しは `slide`〔AiPanel〕と `diagram`〔LlmAssist・新規生成〕のみ）と判明。よって live な**スライド編集プロンプト `slideMarkdownEditPrompt` の (B) ops ブランチ**（既に design ops を提示）に**図コンテンツ ops を追加**し、apply/preview（`handleApplySlide`/`previewSlideEdit`）は **`parseDiagramEditOps`→`parseDesignIntent`→Markdown** の順で**出力フォーマットにより判別**（モード非依存）。図コンテンツ変更は (A) Markdown 内でフェンス全体を再出力する経路（drift 源）から (B) ops に誘導。効かない op は `editNotice` で報告。
 - **P2** placeholder テキスト ops（`applyFieldEdit` 即利用）／**P3** chart/table/gantt ops（series/cards/tasks/cell）／**P4** refine・batch 経路へ配線＋delta 成功率テレメトリ。
 
+#### ① 自己修復（単発リテイク・Option A）＝2026-07-05 実装
+
+実機テストで、L5 プロンプト後も弱モデルは図編集で **(A) 全文へ逸れて drift → reconcile 原状復帰 → 意図喪失**する回が残った（L4 で*見える*が*直って*はいない）。これを**決定論トリガの単発リテイク**で埋める（ユーザ選択＝Option C の A 部分・発火は自動）：
+
+- **トリガ（決定論）**：`previewSlideEdit` が「図持ちスライド ∧ 全文フォールバックで drift（`figureFallbackTag` 発火）」を検出したら `shouldRetry:true` ＋ **harness 生成の ops-bias nudge**（`buildOpsRetryInstruction`＝元指示＋**実ノードid列挙**＋「全文 Markdown 禁止・ops 配列のみ・数値/言語保持」・純粋 R2）を返す。
+- **自動発火・1回だけ**：`AiPanel` が `useEffect` で検出→`ai.retry`（`useAiGeneration`・enqueue/runTask 再利用・タスク名「🔁 opsで再生成」）。**ref ガードで user generate ごとに最大1回**（2回目の drift は `[全文フォールバック]` タグ付き結果を出すだけ＝ループしない）。透明バナー表示。
+- **bound（ADR-0018 の auto-repair 懸念に正対）**：トリガは HARD drift かつ図スライド時のみ・上限1回・**採用ゲート不変（最終は必ず人が採用/却下）**。生成自体は非決定論だがトリガと nudge 本文は完全決定論。`--parallel 1` は不変。
+- **前提修正（同梱）**：`applyDiagramEditOps` に `dirty` フラグ＝実質 no-op（不在idの removeNode 等）は元スライドを byte-identical で返す。再ダンプ（`yaml.dump` は書式非同一）による偽 `-0+1` diff／無言リフォームを防ぎ、偽 drift による空振りリトライも塞ぐ。
+- **best-of-N（Option B）は後日**：whole-deck refine の外部API prov オプトインとして（内蔵 llamafile は KV約N倍のため `--parallel 1` 据え置き＝N=1クランプ）。触点・採点設計は開発メモリ `backlog_ai_edit_efficiency`。
+
 #### P1 実機テスト由来の補強（2026-07-05・弱モデル granite-4.1-8b で観測）
 
 実機で2つの実害を確認し、**決定論・採用ゲート不変**の範囲で塞いだ（プロンプト側の判定強化＝L5 はユーザ承認の上で適用済み）：
