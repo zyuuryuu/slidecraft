@@ -64,7 +64,7 @@ function specFromYaml(text: string): DiagramSpec | null {
   }
 }
 
-type RawDiagram = { direction?: string; nodes?: Array<Record<string, unknown>>; [k: string]: unknown };
+export type RawDiagram = { direction?: string; nodes?: Array<Record<string, unknown>>; edges?: Array<Record<string, unknown>>; [k: string]: unknown };
 
 /**
  * Compute the emphasis override box for a node: enlarge it (keeping its centre) and
@@ -92,7 +92,7 @@ function emphasisOverride(pos: NodePosition, level: "high" | "medium"): NodeOver
  * losslessly (mirrors the drag path — keeps overrides/fields the hand-rolled
  * diagramSpecToYaml would drop). A Mermaid figure graduates to the canonical diagram.
  */
-function applyToFigure(slide: SlideIR, mutate: (spec: DiagramSpec, raw: RawDiagram) => void): SlideIR {
+export function applyToFigure(slide: SlideIR, mutate: (spec: DiagramSpec, raw: RawDiagram) => void): SlideIR {
   let baseYaml: string | null = null;
   if (slide.diagram) baseYaml = slide.diagram.yaml;
   else if (slide.mermaidBlock) {
