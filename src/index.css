@@ -32,23 +32,23 @@
   --color-ok: var(--ok);
 }
 
-/* Dark (default) — rich graphite/slate: deep near-black base + slightly richer cool surfaces + crisp
-   highlights, for a bit of sheen/depth (艶) instead of flat matte grey. Violet accent. */
+/* Dark (default) — two-tone black + grey: near-black CONTENT (canvas), clearly GREY panels/toolbar/
+   inputs for depth & separation (濃淡), crisp highlights. Violet accent. */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --void: #05060c;
-  --canvas: #090b12;
-  --panel: #10131d;
-  --surface: #1c2231;
-  --field: #13161f;
-  --edge: #2c3446;
-  --edge2: #3f4759;
-  --fg: #f1f4fa;
-  --fg2: #ced5e1;
-  --muted: #98a0b1;
-  --faint: #687082;
-  --dim: #485061;
+  --void: #060709;
+  --canvas: #0c0e12;
+  --panel: #1a1e26;
+  --surface: #262c37;
+  --field: #14171d;
+  --edge: #353d49;
+  --edge2: #49525f;
+  --fg: #f2f4fa;
+  --fg2: #cdd4e0;
+  --muted: #969db0;
+  --faint: #666e81;
+  --dim: #464e60;
   /* Foreground for text/icons ON a saturated fill (accent/brand/cyan buttons) — stays light in
      every theme (blue/violet/cyan are dark enough for white). Inherited by light/modern via :root. */
   --on-accent: #ffffff;
@@ -65,52 +65,54 @@
   --ok: #10b981;
 }
 
-/* Light — warm off-white (a touch of skin-tone warmth), warm-dark ink; NOT stark white. */
+/* Light — soft warm off-white, GENTLE & low-contrast: warm-cream content, near-white panels for a
+   subtle layered depth (濃淡), soft warm-charcoal ink (not near-black), softened accents. */
 [data-theme="light"] {
   color-scheme: light;
-  --void: #eae2d4;
-  --canvas: #f6f0e6;
-  --panel: #fffdf7;
-  --surface: #f0e9db;
-  --field: #fffdf7;
-  --edge: #e4dccb;
-  --edge2: #d4cbb6;
-  --fg: #2a2620;
-  --fg2: #453f36;
-  --muted: #6d6559;
-  --faint: #9a9182;
-  --dim: #bfb6a4;
-  --accent: #2563eb;
-  --accent-hi: #1d4ed8;
-  --accent-soft: #2563eb;
-  --cyan: #0891b2;
+  --void: #e7ddcc;
+  --canvas: #f4ecde;
+  --panel: #fdfaf3;
+  --surface: #fbf6ec;
+  --field: #fffdf8;
+  --edge: #e6ddc9;
+  --edge2: #d5cbb5;
+  --fg: #3c372e;
+  --fg2: #585144;
+  --muted: #7e7667;
+  --faint: #a89f8c;
+  --dim: #c9c0ac;
+  --accent: #3576cc;
+  --accent-hi: #285fb0;
+  --accent-soft: #3576cc;
+  --cyan: #0e93b8;
   --cyan-hi: #0e7490;
   --brand: #7c3aed;
   --brand-soft: #7c3aed;
-  --warn: #b45309;
-  --danger: #dc2626;
-  --danger-soft: #dc2626;
-  --ok: #059669;
+  --warn: #b4670a;
+  --danger: #d63a3a;
+  --danger-soft: #d63a3a;
+  --ok: #0a936a;
 }
 
-/* Modern — blue palette leaning toward 水色 (aqua): bluer/cyan-tinted navy surfaces + sky-blue accent. */
+/* Modern — aqua/水色 blue: teal-tinted blue surfaces with a clear dark→light ramp (濃淡) and a bright
+   sky-blue accent. */
 [data-theme="modern"] {
   color-scheme: dark;
-  --void: #091120;
-  --canvas: #0e1420;
-  --panel: #142348;
-  --surface: #1a2c62;
-  --field: #16203c;
-  --edge: #294474;
-  --edge2: #35527e;
+  --void: #08111d;
+  --canvas: #0d1622;
+  --panel: #153458;
+  --surface: #1b4068;
+  --field: #132840;
+  --edge: #2a5480;
+  --edge2: #356792;
   --fg: #ffffff;
-  --fg2: #d1d5db;
-  --muted: #9ca3af;
-  --faint: #6b7280;
-  --dim: #4b5563;
-  --accent: #33a6ec;
-  --accent-hi: #1f8bd6;
-  --accent-soft: #a8daf8;
+  --fg2: #d1dbe4;
+  --muted: #9fb0bf;
+  --faint: #6b8298;
+  --dim: #4b6072;
+  --accent: #26bce6;
+  --accent-hi: #159fd0;
+  --accent-soft: #b3e4fa;
   --cyan: #06b6d4;
   --cyan-hi: #0891b2;
   --brand: #8900ff;
