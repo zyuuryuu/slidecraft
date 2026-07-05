@@ -9,7 +9,7 @@ named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[
 背景メモは開発メモリ `html_output_design` / `roadmap_post_p2`。
 
 **次の大物テーマは未定** — 下記バックログ（AI 編集の深化・HTML 品質磨き込み・テンプレ作成 UI・i18n 等）から選定する。
-テーマ4 是正は F1/F3/F4 実装済（PR #66）、残は **F2（svgCache XSS・HIGH）** と **F1'（保留）** のみ。
+テーマ4 是正は F1〜F4 実装済（F1/F3/F4＝PR #66、**F2 svgCache XSS＝commit `20978cd`**：open 時 svgCache strip＋エクスポート HTML per-export nonce CSP）、残は **F1'（egress hard boundary・保留）** のみ。
 
 ---
 
@@ -24,7 +24,6 @@ named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[
 | 🧠 AI編集: 自己修復ループ（検証→自動フィードバック→再生成） | 単一スライド編集（AiPanel）は現状 one-shot（生成→レビュー→採用）。**理想＝検証で出た警告**（数値/言語 drift・構造欠落＝`reconcileSlideEdit` の warnings）を **AI に自動フィードバックして、より良い回答を自動再生成**（人が却下→指示し直す手間を減らす）。既存 `refine.ts` の validate→retry ループ（whole-deck refine 用）を single-slide edit にも適用する構図。harness-over-model の自己修復（[[product_philosophy_harness]]・ADR-0005）。触点: `src/engine/refine.ts`・`src/components/useDeckRefine.ts`・AiPanel 生成フロー・`reconcileSlideEdit` | M〜L |
 | 🧠 AI編集: 部分生成（全文再生成をやめる） | 一部編集でもスライド**全文を再生成**＝出力多（遅い・特にオフライン）＋**全行が drift の温床**（＝warnings の根本原因）。生成を**最小編集単位**に絞る：**(B) 構造フィールド編集**＝図/gantt/表は**変更フィールドのみ**出力→**決定論マージ**（他は verbatim・drift ゼロ・最速／**推奨**）／(C) サブパート再生成（該当ブロックのみ）／(A) diff-patch は弱モデルに不向き。`diagram-edit` は既に「図のみ」だが「図**全体**」を出す→**タスク/フィールド単位**に細分化。S2 チップ（narrow prompt）の延長・構造編集語彙＋マージ実装要。設計フェーズ込みで大きめ。触点: `src/ipc/ai.ts`（mode）・`diagram-*`・`ai-apply.ts`（マージ）・`llm-prompts` | L |
 | 🔒 セキュリティ F1'（egress hard boundary）｜LOW（保留） | 保留（F2 で前提縮小）：`http:default` の `https://**` を CSP 一致 allowlist（3 AI API＋`huggingface.co`＋`cdn-lfs*.huggingface.co`〔モデルDL の LFS CDN 302 先・含めないと DL 破綻〕＋loopback）に縮小し、承認済み custom host を **Rust 側 egress ゲート**（reqwest・host allowlist 強制）で通す実境界化。streaming fetch の Rust 越し再実装を要し大きめ。触点: `src-tauri/capabilities/default.json`・Rust command・`src/ipc/app-fetch.ts` | M |
-| 🔒 セキュリティ F2（svgCache XSS）｜HIGH | 永続 `mermaidBlock.svgCache`（untrusted `deck.json` 文字列）が `mermaid.render()` を経ず `dangerouslySetInnerHTML` へ直行（`SlidePreview.tsx:68`）＋**エクスポート HTML に CSP 無し**（`html-shell.ts`）で共有先発火。**root-cause＝open 時に svgCache 破棄/再計算**＋エクスポート shell に CSP `<meta>`＋SlideCard SVG sink を DOMPurify。[ADR-0016](adr/0016-security-review-theme4.md) F2 | S〜M |
 | MCP: テンプレ選択（S2 増分2） | `list_templates`/`use_template(id)` で登録済みテンプレを AI が選べるように。GUI の master レジストリ（`useMasterRegistry`/`src/ipc/master-store.ts`＝Tauri fs 裏）を `HostContext` に accessor 注入する host 機能で GUI 側実装と対。stdio は `create_template`／bytes 持参で代替可。[ADR-0015](adr/0015-mcp-brushup.md) の残タスク | S〜M |
 | MCP: エラー契約の完全統一 | ガード系 throw（範囲外 index・未オープン）を `{ok:false, error, code?}` に寄せ、`isError` を un-modeled crash 専用に。現状はドメイン拒否＝`{ok:false}`／呼び出し・クラッシュ＝`isError` の2カテゴリで運用（`docs/mcp-server.md` に明記済） | S |
 | HTML出力: 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。監査 harness は再利用可（`html_output_design`） | M |

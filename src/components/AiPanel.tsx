@@ -20,8 +20,9 @@ interface AiPanelProps {
   currentSlideMd?: string;
   /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string) => void;
-  /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings). */
-  onPreviewSlideEdit?: (raw: string) => { afterMd: string; warnings: string[] } | null;
+  /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings).
+   *  `beforeMd` overrides the diff's LEFT side (a figure edit diffs the figure source, not the slide). */
+  onPreviewSlideEdit?: (raw: string) => { afterMd: string; warnings: string[]; beforeMd?: string } | null;
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
@@ -320,7 +321,7 @@ export default function AiPanel({
           )}
           {slideScope && currentSlideMd && !ai.generating ? (
             // Diff the REAL applied result (reconciled) when available, else the raw output.
-            <DiffView before={currentSlideMd} after={editPreview?.afterMd ?? ai.result} fill />
+            <DiffView before={editPreview?.beforeMd ?? currentSlideMd} after={editPreview?.afterMd ?? ai.result} fill />
           ) : (
             <pre className="flex-1 min-h-0 overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap">
               {ai.result}

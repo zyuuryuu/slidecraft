@@ -127,10 +127,15 @@ describe("single-slide serialization (per-slide editing / AI context)", () => {
     expect(rt.placeholders.find((p) => p.idx === "1")).toBeDefined();
   });
 
-  it("serializing a lone content slide WITHOUT a resolved layout mangles it (documents the bug)", () => {
+  it("serializing a lone content slide (title+body) at index 0 keeps its content, not Title coercion", () => {
+    // Was a documented bug: a content slide serialized alone landed at index 0 and autoSelectLayout
+    // coerced it to Title, reading the title through the empty title namespace (idx 0/1) → mangled.
+    // Fixed in slideRoleRegions: a title WITH body (idx 15 + idx 1) at index 0 is a content slide, not
+    // a cover (which is title-only). See serializer-content-index0.test.ts.
     const deck = parseMd("# First\n\n---\n\n# 見出し\n> サブ\n\n- A\n\n");
-    const md = serializeMd({ slides: [deck.slides[1]] }); // index 0 → Title coercion
-    expect(md.includes("# 見出し")).toBe(false);
+    const md = serializeMd({ slides: [deck.slides[1]] });
+    expect(md.includes("# 見出し")).toBe(true);
+    expect(md.includes("A")).toBe(true); // the body survives too
   });
 });
 

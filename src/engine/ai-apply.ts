@@ -64,6 +64,34 @@ export function applyFigureYaml(slide: SlideIR, raw: string): SlideIR | null {
   return hasBodyText ? applyRegionSplit(withFigure, "text-left") : withFigure;
 }
 
+/** A slide's current figure as its fenced source block (```diagram / ```mermaid), or undefined. */
+export function figureFence(slide: SlideIR): string | undefined {
+  if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
+  if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
+  return undefined;
+}
+
+/** The before/after sides of a figure-edit change preview. */
+export interface FigureEditPreview {
+  /** The slide's current figure source (fenced), or "" when the edit ADDS a figure to a figureless slide. */
+  beforeMd: string;
+  /** The new figure source (fenced). */
+  afterMd: string;
+}
+
+/**
+ * Preview a diagram-edit as a FIGURE-SOURCE diff (YAML-vs-YAML) instead of full-Markdown-vs-raw-YAML.
+ * The AI diagram-edit mode returns a bare DiagramSpec YAML; diffing it against the whole slide's
+ * Markdown misaligns visually. Return the old vs new fenced figure block so the reviewer sees exactly
+ * the diagram change. Returns null when `raw` is not a figure-YAML edit (caller uses the Markdown diff).
+ * Pure (R2).
+ */
+export function previewFigureEdit(slide: SlideIR, raw: string): FigureEditPreview | null {
+  const applied = applyFigureYaml(slide, raw);
+  if (!applied) return null;
+  return { beforeMd: figureFence(slide) ?? "", afterMd: figureFence(applied) ?? raw.trim() };
+}
+
 /** What an AI content edit resolves to, computed BEFORE adoption. */
 export interface SlideEditReconcile {
   /** The reconciled slide that will actually be committed (structure restored from `old`). */

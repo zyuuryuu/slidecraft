@@ -10,7 +10,7 @@ import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
-import { applyFigureYaml, reconcileSlideEdit } from "../engine/ai-apply";
+import { applyFigureYaml, previewFigureEdit, reconcileSlideEdit } from "../engine/ai-apply";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -412,10 +412,14 @@ export function useDeckController() {
   // 変更プレビュー shows the real result + warnings and the reviewer decides 採用/却下 informed. Only
   // the CONTENT-edit path reconciles; figure/design edits keep the raw diff (return null).
   const previewSlideEdit = useCallback(
-    (raw: string): { afterMd: string; warnings: string[] } | null => {
+    (raw: string): { afterMd: string; warnings: string[]; beforeMd?: string } | null => {
       const s = deck?.slides[activeSlide];
       if (!s) return null;
-      if (applyFigureYaml(s, raw) || parseDesignIntent(raw)) return null; // figure/design → raw diff
+      // Figure edit (bare DiagramSpec YAML): diff the figure SOURCE (YAML-vs-YAML), not the whole
+      // slide's Markdown against raw YAML — the latter misaligns visually.
+      const fig = previewFigureEdit(s, raw);
+      if (fig) return { afterMd: fig.afterMd, warnings: [], beforeMd: fig.beforeMd };
+      if (parseDesignIntent(raw)) return null; // design → raw diff
       const rec = reconcileSlideEdit(s, raw);
       if (!rec) return null;
       const resolved = autoSelectLayout(rec.slide, activeSlide, deck!.slides.length, catalog);

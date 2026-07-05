@@ -540,7 +540,13 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
     .toLowerCase();
   const isClosing = allText.includes("thank") || allText.includes("感謝") || allText.includes("ありがとう");
 
-  if (slideIndex === 0 && !visualIdx) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  // Index-0 slides default to a Title (cover) slide, EXCEPT a real content slide authored first (no
+  // separate cover): a title WITH body (idx 15 + idx 1). The parser stores every `# X`/`## Y` in the
+  // content namespace (idx 15/16) regardless of position, so a cover (`# 表紙 / ## サブ` → idx 15/16,
+  // NO body) still coerces to Title here — the distinguisher is hasBody. Without this, a content slide
+  // at idx 0 is read through the empty title namespace (idx 0/1) and serializes mangled. See
+  // serializer-content-index0.test.ts.
+  if (slideIndex === 0 && !visualIdx && !(hasTitle && hasBody)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
   if (isClosing && slideIndex === totalSlides - 1) return { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
   if (slide.code) return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
   if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };
