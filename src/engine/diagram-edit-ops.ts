@@ -33,7 +33,7 @@ export type DiagramEditOp = DiagramEditOps[number];
 /** One op that didn't take effect (unknown id / no figure) — surfaced never-silently (mirrors design SkippedOp). */
 export interface SkippedDiagramOp {
   op: DiagramEditOp["op"];
-  reason: "no-figure" | "unknown-node" | "unknown-edge" | "duplicate-id";
+  reason: "no-figure" | "unparseable-figure" | "unknown-node" | "unknown-edge" | "duplicate-id";
   message: string; // human, Japanese — ready to show as a notice
 }
 
@@ -58,6 +58,41 @@ const idsOf = (raw: RawDiagram): string => (raw.nodes ?? []).map((n) => String(n
 const edgesOf = (raw: RawDiagram): string => (raw.edges ?? []).map((e) => `${String(e.from)}→${String(e.to)}`).join(", ") || "なし";
 
 /**
+ * Sequence figures index activations/fragments into the ORDERED message (edge) list, and activations
+ * name a participant (node id). When messages are removed those indices must be RE-BASED and refs to a
+ * removed message / removed participant DROPPED — otherwise the figure keeps orphan / out-of-range refs
+ * that pass schema validation (schema treats them as free string/number) but corrupt the renderer.
+ * `keptOldIndices[newIdx] = oldIdx` lists the surviving message positions in order. No-op unless sequence.
+ */
+function rebaseSequenceRefs(raw: RawDiagram, keptOldIndices: number[], removedNodeIds: Set<string>): void {
+  if (raw.type !== "sequence") return;
+  const toNew = new Map<number, number>();
+  keptOldIndices.forEach((oldIdx, newIdx) => toNew.set(oldIdx, newIdx));
+  const remap = (i: unknown): number | null => (typeof i === "number" && toNew.has(i) ? (toNew.get(i) as number) : null);
+  if (Array.isArray(raw.activations)) {
+    raw.activations = (raw.activations as Array<Record<string, unknown>>).filter((a) => {
+      if (removedNodeIds.has(String(a.participant))) return false; // participant gone
+      const f = remap(a.from), t = remap(a.to);
+      if (f === null || t === null) return false; // spans a removed message
+      a.from = f; a.to = t; return true;
+    });
+  }
+  if (Array.isArray(raw.fragments)) {
+    raw.fragments = (raw.fragments as Array<Record<string, unknown>>).filter((fr) => {
+      const f = remap(fr.from), t = remap(fr.to);
+      if (f === null || t === null) return false;
+      fr.from = f; fr.to = t;
+      if (Array.isArray(fr.dividers)) {
+        fr.dividers = (fr.dividers as Array<Record<string, unknown>>)
+          .filter((dv) => remap(dv.at) !== null)
+          .map((dv) => ({ ...dv, at: remap(dv.at) as number }));
+      }
+      return true;
+    });
+  }
+}
+
+/**
  * Merge DiagramEditOps into the slide's figure DETERMINISTICALLY: only the named node/edge fields are
  * mutated on the parsed raw YAML; untouched fields keep their exact values and re-dump via
  * applyToFigure. Ops that can't apply (unknown id, no figure, duplicate add) are collected in `skipped`
@@ -67,6 +102,12 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
   const skipped: SkippedDiagramOp[] = [];
   if (!slide.diagram && !slide.mermaidBlock) {
     return { slide, skipped: ops.map((op) => ({ op: op.op, reason: "no-figure" as const, message: "図がないため編集をスキップしました。" })) };
+  }
+  // The slide HAS a figure but it can't be parsed (schema-invalid: numeric id, unknown shape, malformed
+  // YAML …). applyToFigure would return the slide identically → the edit vanishes with NO signal. Report
+  // it as skipped so the loss is never silent (matches the no-figure branch). ADR-0018/0019.
+  if (readFigureRaw(slide) === null) {
+    return { slide, skipped: ops.map((op) => ({ op: op.op, reason: "unparseable-figure" as const, message: "図の定義を解析できないため編集をスキップしました（図の記述に不正がある可能性）。" })) };
   }
   // `dirty` tracks whether any op ACTUALLY changed the figure. applyToFigure always re-dumps via
   // dumpDiagramLikeSource→yaml.dump (data-lossless but NOT formatting-identical), so a pure no-op
@@ -99,9 +140,17 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
           const before = raw.nodes.length;
           const edgesBefore = raw.edges.length;
           raw.nodes = raw.nodes.filter((x) => String(x.id) !== op.id);
-          raw.edges = raw.edges.filter((e) => String(e.from) !== op.id && String(e.to) !== op.id); // drop now-dangling edges
+          const keptEdgeIdx: number[] = [];
+          raw.edges = raw.edges.filter((e, i) => {
+            const keep = String(e.from) !== op.id && String(e.to) !== op.id; // drop now-dangling edges
+            if (keep) keptEdgeIdx.push(i);
+            return keep;
+          });
           if (raw.nodes.length === before) skipped.push({ op: op.op, reason: "unknown-node", message: `ノード「${op.id}」が見つからず削除をスキップ（候補: ${idsOf(raw)}）。` });
-          if (raw.nodes.length !== before || raw.edges.length !== edgesBefore) dirty = true;
+          if (raw.nodes.length !== before || raw.edges.length !== edgesBefore) {
+            rebaseSequenceRefs(raw, keptEdgeIdx, new Set([op.id])); // sequence: drop orphan participant + rebase message indices
+            dirty = true;
+          }
           break;
         }
         case "edgeUpdate": {
@@ -118,9 +167,14 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
         }
         case "removeEdge": {
           const before = raw.edges.length;
-          raw.edges = raw.edges.filter((e) => !(String(e.from) === op.from && String(e.to) === op.to));
+          const keptEdgeIdx: number[] = [];
+          raw.edges = raw.edges.filter((e, i) => {
+            const keep = !(String(e.from) === op.from && String(e.to) === op.to);
+            if (keep) keptEdgeIdx.push(i);
+            return keep;
+          });
           if (raw.edges.length === before) skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず削除をスキップ（候補: ${edgesOf(raw)}）。` });
-          else dirty = true;
+          else { rebaseSequenceRefs(raw, keptEdgeIdx, new Set()); dirty = true; } // sequence: rebase message indices
           break;
         }
         case "setDirection": {
@@ -161,17 +215,28 @@ export function checkDeleteIntent(slide: SlideIR, ops: DiagramEditOps, instructi
     const n = nodes.find((x) => String(x.id) === id);
     return n && typeof n.label === "string" ? n.label : "";
   };
-  const norm = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+  const norm = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/[\s_-]+/g, ""); // fold space/hyphen/underscore
   const hay = norm(inst);
-  // "referenced" = the id, the full label, or any label word appears in the instruction. Candidates
-  // shorter than 2 normalized chars are ignored (a 1-char id like "a" substring-matches almost any
-  // sentence → it would mask a real mistarget), so the advisory still fires for those.
+  // Does the instruction reference `needle`? A pure-ASCII needle must match at a WORD boundary (so a
+  // short id like "sql" is NOT counted merely because it is a substring of "postgresql"); a needle with
+  // any non-ASCII char (Japanese) is matched by substring (CJK has no word boundaries). No regex
+  // lookbehind — older webviews (Tauri/WKWebView) lack it — so boundaries are checked manually.
+  const refIn = (needle: string): boolean => {
+    if (needle.length < 2) return false; // a 1-char id would match almost any sentence
+    if (!/^[a-z0-9]+$/.test(needle)) return hay.includes(needle);
+    for (let i = hay.indexOf(needle); i !== -1; i = hay.indexOf(needle, i + 1)) {
+      const before = i > 0 ? hay[i - 1] : "";
+      const after = i + needle.length < hay.length ? hay[i + needle.length] : "";
+      if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    }
+    return false;
+  };
+  // "referenced" = the id, the full label, or any label word appears in the instruction.
   const referenced = (...cands: string[]): boolean =>
     cands.some((c) => {
       if (!c) return false;
-      const nc = norm(c);
-      if (nc.length >= 2 && hay.includes(nc)) return true;
-      return c.split(/\s+/).some((w) => norm(w).length >= 2 && hay.includes(norm(w)));
+      if (refIn(norm(c))) return true;
+      return c.split(/[\s_-]+/).some((w) => refIn(norm(w)));
     });
   const out: DeleteIntentAdvisory[] = [];
   for (const op of ops) {
