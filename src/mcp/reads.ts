@@ -10,11 +10,12 @@
 import type { Session } from "./session";
 import * as S from "./session";
 import { autoSelectLayout } from "../engine/template-loader";
+import { GuardError } from "./guard-errors";
 
 export function getSlide(s: Session, i: number) {
   const deck = S.getDeck(s); // never-silent if no project open
   if (!Number.isInteger(i) || i < 0 || i >= deck.slides.length) {
-    throw new Error(`スライド番号が範囲外です（0..${deck.slides.length - 1}）: ${i}`);
+    throw new GuardError(`スライド番号が範囲外です（0..${deck.slides.length - 1}）: ${i}`, "index-out-of-range");
   }
   const slide = deck.slides[i];
   const { entries: catalog, budget } = S.entriesAndBudget(s);

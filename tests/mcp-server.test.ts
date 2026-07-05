@@ -1,7 +1,8 @@
 /**
  * mcp-server.test.ts — drives the real MCP server through an in-memory client↔server pair
  * (no subprocess, no build): list tools, run the open→edit→validate→export loop over the
- * protocol, and confirm engine errors surface as isError tool results.
+ * protocol, and confirm GUARD failures surface as modeled { ok:false, code } results (isError is
+ * reserved for unmodeled crashes) — the error-contract unification.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -95,12 +96,35 @@ describe("mcp server (in-memory client↔server pair)", () => {
     expect(bytes[1]).toBe(0x4b); // 'K' → valid OOXML zip
   });
 
-  it("surfaces engine errors as isError tool results (out-of-range slide)", async () => {
+  it("guard failure (out-of-range slide) → modeled {ok:false, code}, NOT isError", async () => {
     const client = await connect();
     await call(client, "open_project", { dataBase64: bundleB64 });
     const res = await call(client, "get_slide_markdown", { index: 99 });
-    expect(res.isError).toBe(true);
-    expect(String(res.data)).toMatch(/範囲外/);
+    expect(res.isError).toBe(false); // a guard rejection is a normal result, not a transport/crash error
+    const d = res.data as { ok: boolean; error: string; code?: string };
+    expect(d.ok).toBe(false);
+    expect(d.error).toMatch(/範囲外/);
+    expect(d.code).toBe("index-out-of-range");
+  });
+
+  it("guard failure (read before open) → {ok:false, code:project-not-opened}", async () => {
+    const client = await connect();
+    const res = await call(client, "get_deck");
+    expect(res.isError).toBe(false);
+    const d = res.data as { ok: boolean; error: string; code?: string };
+    expect(d.ok).toBe(false);
+    expect(d.code).toBe("project-not-opened");
+    expect(d.error).toMatch(/開かれていません/);
+  });
+
+  it("guard failure on a STRUCTURE op (delete out-of-range) → {ok:false, code:index-out-of-range}", async () => {
+    const client = await connect();
+    await call(client, "open_project", { dataBase64: bundleB64 });
+    const res = await call(client, "delete_slide", { index: 999 });
+    expect(res.isError).toBe(false);
+    const d = res.data as { ok: boolean; code?: string };
+    expect(d.ok).toBe(false);
+    expect(d.code).toBe("index-out-of-range");
   });
 
   it("exposes deck state as MCP resources (list + read reflect the open project)", async () => {

@@ -61,11 +61,16 @@ describe("CollabClient", () => {
     expect(changed[0].rev).toBe(1);
   });
 
-  it("callTool throws on an engine error result (out-of-range slide, never silent)", async () => {
+  it("callTool returns a modeled {ok:false,code} for an out-of-range slide (guard, never silent)", async () => {
     client = new CollabClient({ url: host.url, token: host.token });
     await client.connect();
     await client.callTool("new_project", { templateBase64: templateB64, markdown: "# A\n\n---\n\n# B" });
-    await expect(client.callTool("get_slide_markdown", { index: 99 })).rejects.toThrow(/範囲外/);
+    // A guard rejection is now a MODELED result (isError reserved for crashes), so the client returns
+    // it rather than throwing — the caller branches on ok:false.
+    const res = await client.callTool<{ ok: boolean; error: string; code?: string }>("get_slide_markdown", { index: 99 });
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/範囲外/);
+    expect(res.code).toBe("index-out-of-range");
   });
 
   it("set_slide_markdown honours expectedRev (stale → never-silent) and echoes opId (P2.5 round-trip)", async () => {
