@@ -25,10 +25,24 @@ describe("slideMarkdownEditPrompt — structure preservation + dual-mode decisio
     expect(p).toMatch(/言語を保つ|同じ言語/);
   });
 
-  it("gives an A/B decision tree that defaults to (A) when in doubt", () => {
-    expect(p).toMatch(/When in doubt, choose \(A\)|迷ったら/);
+  it("routes existing-figure node/edge edits to (B) ops (no anti-ops 'when in doubt (A)' default)", () => {
     expect(p).toContain("(A)");
     expect(p).toContain("(B)");
+    // L5 (ADR-0019): the old "when in doubt → (A)" default biased weak models OFF the deterministic ops
+    // path (T2 oscillation). It's replaced by "prefer (B) for any change to an existing figure".
+    expect(p).not.toMatch(/When in doubt, choose \(A\)/);
+    expect(p).toMatch(/NODE or EDGE inside an existing figure is \(B\), NOT \(A\)/);
+    expect(p).toMatch(/Prefer \(B\)/);
+  });
+
+  it("teaches safe deletion: emit the EXACT named id, never a nearby substitute", () => {
+    // L5 (delete-safety at source, T4a): a weak model told to delete an absent node must NOT fuzzy-match
+    // to a nearby one — it emits the exact id and the engine skips+reports it.
+    expect(p).toMatch(/EXACT id/);
+    expect(p).toMatch(/NEVER substitute/);
+    const delFewShot = '[{"op":"removeNode","id":"cache"}]';
+    expect(p).toContain(delFewShot); // the deletion few-shot
+    expect(parseDiagramEditOps(delFewShot)).not.toBeNull(); // and it parses via the real engine
   });
 
   it("includes a few-shot whose output preserves the header + title (only the body condenses)", () => {

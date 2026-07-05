@@ -55,9 +55,9 @@ export function slideMarkdownEditPrompt(): string {
   return `You revise ONE slide. You are given the current slide's Markdown and an instruction. Reply in the ONE format that matches the kind of change — no prose, never both formats.
 
 Choose the format:
-- Change to WHAT the slide says — text, bullets, title, meta, or ADD / REMOVE / REBALANCE a whole figure? → (A) Markdown.
-- Change to an EXISTING figure — its CONTENT (rename/relabel a node, change a value, add/remove a node or edge, change its direction) OR its ARRANGEMENT (move/place it, emphasize a node)? → (B) a JSON array of ops.
-- When in doubt, choose (A).
+- Change to WHAT the slide says — text, bullets, title, meta — or ADD / REMOVE a whole figure (none↔one)? → (A) Markdown.
+- Change to an EXISTING figure — its CONTENT (rename/relabel a node, change a value, ADD or REMOVE a node/edge, change its direction) OR its ARRANGEMENT (move/place it, emphasize a node)? → (B) a JSON array of ops.
+- Adding or removing a NODE or EDGE inside an existing figure is (B), NOT (A). Prefer (B) for any change to an existing figure's nodes/edges/labels/direction; use (A) only when the slide's TEXT changes, or a figure is added/removed as a whole.
 
 (A) CONTENT change — return the FULL revised slide as MARKDOWN:
 - Keep the first line \`<!-- slide: LayoutName -->\` EXACTLY as given (do not delete, rename, or reorder it). If the input has none, do not add one.
@@ -78,6 +78,9 @@ CONTENT ops (change the figure's data — this is how you rename/relabel/add/rem
   {"op":"addEdge","from":"<id>","to":"<id>","label"?:"…"},
   {"op":"removeEdge","from":"<id>","to":"<id>"},
   {"op":"setDirection","direction":"TB"|"LR"|"RL"|"BT"} ]
+- To DELETE, use removeNode/removeEdge with the EXACT id from the \`\`\`diagram block. If that id is not in
+  the diagram, that is fine — the engine skips it and reports it. NEVER substitute a similar or nearby id;
+  deleting the wrong node/edge is worse than doing nothing.
 
 ARRANGEMENT ops (change only WHERE it sits / what's focal):
 [ {"op":"regionSplit","arrangement":"text-left"|"text-right"|"diagram-only"},
@@ -87,6 +90,8 @@ ARRANGEMENT ops (change only WHERE it sits / what's focal):
 
 Example (B) — instruction "DBノードを PostgreSQL にして、後ろにキャッシュを追加":
 [{"op":"nodeUpdate","id":"db","label":"PostgreSQL"},{"op":"addNode","id":"cache","label":"Redis"},{"op":"addEdge","from":"db","to":"cache"}]
+Example (B) — instruction "存在しない Cache ノードを削除"（emit the named id even if absent — the engine skips + reports it; do NOT delete a different node）:
+[{"op":"removeNode","id":"cache"}]
 
 ## 保持する不変条件（指示が明示的に変更を求めない限り厳守）
 - 先頭の \`<!-- slide: LayoutName -->\` 行、\`# 見出し\`（タイトル）、\`Category:\` / \`Date:\` / \`Footer:\` のメタ行、\`<!-- card/step/kpi -->\` セパレータ、\`\`\`diagram / \`\`\`mermaid / \`\`\`（コード）フェンス・GFM 表を、指示外では**落とさない・改名しない**。スライドの骨格（見出し・セクション構造）を壊さない。
