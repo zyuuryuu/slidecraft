@@ -7,9 +7,13 @@
 //! provider at it; the existing OpenAI-compat path + egress gate + condense guardrail then work
 //! unchanged. Rust never touches the DeckIR — it only supervises the process.
 //!
-//! Flags validated against llamafile 0.10.3 (spike): `--server --host 127.0.0.1 --port <n>
-//! -m <gguf> --gpu disable` (CPU-only is `--gpu disable`, NOT `-ngl 0`; `--nobrowser` was removed).
-//! `/health` returns 200 `{"status":"ok"}` once the model is loaded.
+//! Flags: `--server --host 127.0.0.1 --port <n> -m <gguf> --gpu disable -c 8192 --parallel 1`
+//! (CPU-only is `--gpu disable`, NOT `-ngl 0`; `--nobrowser` was removed). `/health` returns 200
+//! once the model is loaded. `-c 8192 --parallel 1` are LOAD-CRITICAL: a newer llamafile defaults
+//! `--parallel` to auto (=4) and the context to the model's max (phi-3.5 = 128K), so the KV cache
+//! balloons to ~60 GB and the cold-load blows past the health timeout. We serve one request at a
+//! time and slide/condense prompts fit in 8K, so pinning these keeps the KV ~1/64th and the load
+//! to a few seconds.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -34,8 +38,10 @@ const WEIGHTS_NAME: &str = "phi-3.5-mini-instruct-q4_k_m.gguf";
 /// Pinned model download (bartowski's phi-3.5-mini Q4_K_M, ~2.39 GB) + its SHA256 for integrity.
 const WEIGHTS_URL: &str = "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf";
 const WEIGHTS_SHA256: &str = "e4165e3a71af97f1b4820da61079826d8752a2088e313af0c7d346796c38eff5";
-/// Generous cap: a 3B Q4 cold-load on CPU can take 10-60s (a 0.5B was ~1s in the spike).
-const HEALTH_TIMEOUT: Duration = Duration::from_secs(90);
+/// Generous cap: a 3B Q4 cold-load on CPU can take 10-60s (a 0.5B was ~1s in the spike). Windows
+/// first-load adds Defender scanning + cold page cache, so allow extra margin over the observed
+/// load time (the `-c`/`--parallel` pinning below keeps the actual load to a few seconds).
+const HEALTH_TIMEOUT: Duration = Duration::from_secs(180);
 const POLL_INTERVAL: Duration = Duration::from_millis(400);
 /// Port pre-pick is a TOCTOU race (bind:0 → read → drop → child re-binds); retry a few times.
 const SPAWN_ATTEMPTS: usize = 5;
@@ -248,6 +254,10 @@ fn spawn_llamafile(bin: &Path, gguf: &Path, port: u16) -> Result<Child, String> 
         .arg(gguf)
         .arg("--gpu")
         .arg("disable") // CPU-only (v1); GPU is a separate epic
+        .arg("-c")
+        .arg("8192") // pin context — else a newer llamafile uses the model max (phi-3.5 = 128K) → giant KV
+        .arg("--parallel")
+        .arg("1") // one slot — we serve a single request at a time; avoids the 4× KV of the auto default
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     #[cfg(windows)]
