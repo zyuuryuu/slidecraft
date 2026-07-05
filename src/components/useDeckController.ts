@@ -10,7 +10,8 @@ import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
-import { applyFigureYaml, previewFigureEdit, reconcileSlideEdit } from "../engine/ai-apply";
+import { parseDiagramEditOps, applyDiagramEditOps } from "../engine/diagram-edit-ops";
+import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit } from "../engine/ai-apply";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -379,6 +380,18 @@ export function useDeckController() {
         const fig = applyFigureYaml(old, raw);
         if (fig) { handleSlideUpdate(activeSlide, fig, "commit"); return; }
       }
+      // ① Figure CONTENT ops (部分生成・ADR-0019): the model emitted a diagram-edit ops array (ONLY the
+      // changed fields). Merge deterministically — untouched nodes/labels/values stay verbatim (drift ゼロ).
+      // A skipped op (unknown id) is ANNOUNCED via editNotice, not silently dropped.
+      if (old) {
+        const editOps = parseDiagramEditOps(raw);
+        if (editOps) {
+          const { slide, skipped } = applyDiagramEditOps(old, editOps);
+          setEditNotice(skipped.length > 0 ? skipped.map((sk) => sk.message).join(" ｜ ") : null);
+          handleSlideUpdate(activeSlide, slide, "commit");
+          return;
+        }
+      }
       // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
       // The engine maps it to clamped geometry on the current slide, and reports any op that
       // couldn't take effect (e.g. an emphasize whose node id the AI renamed away) so it's ANNOUNCED
@@ -415,6 +428,13 @@ export function useDeckController() {
     (raw: string): { afterMd: string; warnings: string[]; beforeMd?: string } | null => {
       const s = deck?.slides[activeSlide];
       if (!s) return null;
+      // Figure CONTENT ops (部分生成・ADR-0019): merge the ops, then diff the figure SOURCE (old vs
+      // merged YAML) — same YAML-vs-YAML review as a bare-YAML figure edit.
+      const editOps = parseDiagramEditOps(raw);
+      if (editOps) {
+        const { slide: merged } = applyDiagramEditOps(s, editOps);
+        return { afterMd: figureFence(merged) ?? "", warnings: [], beforeMd: figureFence(s) ?? "" };
+      }
       // Figure edit (bare DiagramSpec YAML): diff the figure SOURCE (YAML-vs-YAML), not the whole
       // slide's Markdown against raw YAML — the latter misaligns visually.
       const fig = previewFigureEdit(s, raw);

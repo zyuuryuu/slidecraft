@@ -55,23 +55,38 @@ export function slideMarkdownEditPrompt(): string {
   return `You revise ONE slide. You are given the current slide's Markdown and an instruction. Reply in the ONE format that matches the kind of change — no prose, never both formats.
 
 Choose the format:
-- Does the instruction change WHAT the slide says — text, bullets, title, or ADD / REMOVE / REBALANCE a figure? → (A) Markdown.
-- Does it only change HOW an EXISTING figure is arranged — move/place it, emphasize a node, change its flow direction? → (B) a JSON array of ops.
+- Change to WHAT the slide says — text, bullets, title, meta, or ADD / REMOVE / REBALANCE a whole figure? → (A) Markdown.
+- Change to an EXISTING figure — its CONTENT (rename/relabel a node, change a value, add/remove a node or edge, change its direction) OR its ARRANGEMENT (move/place it, emphasize a node)? → (B) a JSON array of ops.
 - When in doubt, choose (A).
 
 (A) CONTENT change — return the FULL revised slide as MARKDOWN:
 - Keep the first line \`<!-- slide: LayoutName -->\` EXACTLY as given (do not delete, rename, or reorder it). If the input has none, do not add one.
 - "# Title" first body line; "## Subtitle" / "> Subtitle" optional.
-- An optional figure as a fenced block — keep the fence EXACTLY: a \`\`\`diagram block (YAML) or a \`\`\`mermaid block. Edit its contents only when the instruction is about the figure's CONTENT.
+- An optional figure as a fenced block (\`\`\`diagram / \`\`\`mermaid) — keep it VERBATIM here. To change the figure's CONTENT (labels/nodes/edges/direction), use (B) ops instead of editing the fence.
 - "Category: …" / "Date: …" / "Footer: …" are metadata — keep them.
 - Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
 
-(B) DESIGN change — return ONLY a JSON array of ops:
+(B) FIGURE change — return ONLY a JSON array of ops. Use ids EXACTLY as in the \`\`\`diagram block, and
+emit ONLY the ops the change needs (unchanged nodes/labels/values stay — the engine keeps them, so
+never re-list them). Emit ONE kind per reply (CONTENT ops or ARRANGEMENT ops), not both.
+
+CONTENT ops (change the figure's data — this is how you rename/relabel/add/remove/redirect):
+[ {"op":"nodeUpdate","id":"<id>","label"?:"…","sublabel"?:"…","value"?:<number>,"icon"?:"…","shape"?:"…"},
+  {"op":"addNode","id":"<newId>","label":"…","shape"?:"…","group"?:"…"},
+  {"op":"removeNode","id":"<id>"},
+  {"op":"edgeUpdate","from":"<id>","to":"<id>","label"?:"…","relation"?:"…"},
+  {"op":"addEdge","from":"<id>","to":"<id>","label"?:"…"},
+  {"op":"removeEdge","from":"<id>","to":"<id>"},
+  {"op":"setDirection","direction":"TB"|"LR"|"RL"|"BT"} ]
+
+ARRANGEMENT ops (change only WHERE it sits / what's focal):
 [ {"op":"regionSplit","arrangement":"text-left"|"text-right"|"diagram-only"},
-  {"op":"emphasize","nodeId":"<an id from the figure's nodes>","level":"high"|"medium"},
+  {"op":"emphasize","nodeId":"<id>","level":"high"|"medium"},
   {"op":"relayout","direction":"TB"|"LR"|"RL"|"BT"} ]
 - "text-left" = figure on the right, text on the left; "text-right" = figure on the left.
-- Use node ids EXACTLY as they appear in the \`\`\`diagram block. Emit only the ops the instruction needs.
+
+Example (B) — instruction "DBノードを PostgreSQL にして、後ろにキャッシュを追加":
+[{"op":"nodeUpdate","id":"db","label":"PostgreSQL"},{"op":"addNode","id":"cache","label":"Redis"},{"op":"addEdge","from":"db","to":"cache"}]
 
 ## 保持する不変条件（指示が明示的に変更を求めない限り厳守）
 - 先頭の \`<!-- slide: LayoutName -->\` 行、\`# 見出し\`（タイトル）、\`Category:\` / \`Date:\` / \`Footer:\` のメタ行、\`<!-- card/step/kpi -->\` セパレータ、\`\`\`diagram / \`\`\`mermaid / \`\`\`（コード）フェンス・GFM 表を、指示外では**落とさない・改名しない**。スライドの骨格（見出し・セクション構造）を壊さない。

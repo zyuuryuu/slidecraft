@@ -7,6 +7,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { slideMarkdownEditPrompt, slideCondensePrompt } from "../src/engine/deck-plan-prompts";
+import { parseDiagramEditOps } from "../src/engine/diagram-edit-ops";
+import { parseDesignIntent } from "../src/engine/design-intent";
 
 describe("slideMarkdownEditPrompt — structure preservation + dual-mode decision tree", () => {
   const p = slideMarkdownEditPrompt();
@@ -32,6 +34,24 @@ describe("slideMarkdownEditPrompt — structure preservation + dual-mode decisio
   it("includes a few-shot whose output preserves the header + title (only the body condenses)", () => {
     // the example keeps the <!-- slide --> header and "# 課題" title, condensing only the bullet
     expect(p).toContain("情報共有の遅れ→全体遅延");
+  });
+
+  it("offers figure CONTENT ops (部分生成・ADR-0019) whose example parses via the real engine parser", () => {
+    for (const op of ["nodeUpdate", "addNode", "removeNode", "edgeUpdate", "addEdge", "removeEdge", "setDirection"]) {
+      expect(p).toContain(op);
+    }
+    // the embedded (B) content-ops example MUST be consumable by applyDiagramEditOps's parser — this
+    // gate keeps the prompt example and the engine that applies it from drifting apart.
+    const example = '[{"op":"nodeUpdate","id":"db","label":"PostgreSQL"},{"op":"addNode","id":"cache","label":"Redis"},{"op":"addEdge","from":"db","to":"cache"}]';
+    expect(p).toContain(example);
+    expect(parseDiagramEditOps(example)).not.toBeNull();
+    expect(parseDesignIntent(example)).toBeNull(); // content ops are NOT design ops (disjoint routing)
+  });
+
+  it("still offers arrangement (design) ops that route to parseDesignIntent", () => {
+    expect(p).toContain("regionSplit");
+    expect(parseDesignIntent('[{"op":"relayout","direction":"LR"}]')).not.toBeNull();
+    expect(parseDiagramEditOps('[{"op":"relayout","direction":"LR"}]')).toBeNull(); // design op ≠ content op
   });
 });
 
