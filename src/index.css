@@ -32,68 +32,9 @@
   --color-ok: var(--ok);
 }
 
-/* Dark (default) — the original navy palette; nearby shades are folded to one token (sub-perceptual). */
+/* Dark (default) — Slate neutral: cool grey surfaces, violet accent, low saturation (the plain dark). */
 :root,
 [data-theme="dark"] {
-  color-scheme: dark;
-  --void: #0a0e1a;
-  --canvas: #0f1117;
-  --panel: #141b41;
-  --surface: #1e2761;
-  --field: #1a1f3a;
-  --edge: #2d3a6e;
-  --edge2: #3b4a7e;
-  --fg: #ffffff;
-  --fg2: #d1d5db;
-  --muted: #9ca3af;
-  --faint: #6b7280;
-  --dim: #4b5563;
-  /* Foreground for text/icons ON a saturated fill (accent/brand/cyan buttons) — stays light in
-     every theme (blue/violet/cyan are dark enough for white). Inherited by light/modern via :root. */
-  --on-accent: #ffffff;
-  --accent: #3b82f6;
-  --accent-hi: #2563eb;
-  --accent-soft: #93c5fd;
-  --cyan: #06b6d4;
-  --cyan-hi: #0891b2;
-  --brand: #8900ff;
-  --brand-soft: #c4b5fd;
-  --warn: #f59e0b;
-  --danger: #ef4444;
-  --danger-soft: #f87171;
-  --ok: #10b981;
-}
-
-/* Light — standard bright palette (dark ink on white surfaces). */
-[data-theme="light"] {
-  color-scheme: light;
-  --void: #e8ebf0;
-  --canvas: #f5f7fa;
-  --panel: #ffffff;
-  --surface: #eaf0fe;
-  --field: #ffffff;
-  --edge: #d5dce8;
-  --edge2: #c0cad9;
-  --fg: #1f2430;
-  --fg2: #374151;
-  --muted: #5b6472;
-  --faint: #8a93a3;
-  --dim: #aeb6c2;
-  --accent: #2563eb;
-  --accent-hi: #1d4ed8;
-  --accent-soft: #2563eb;
-  --cyan: #0891b2;
-  --cyan-hi: #0e7490;
-  --brand: #7c3aed;
-  --brand-soft: #7c3aed;
-  --warn: #b45309;
-  --danger: #dc2626;
-  --danger-soft: #dc2626;
-  --ok: #059669;
-}
-
-/* Modern — Slate neutral dark: cool grey surfaces, violet accent, less saturation than Dark. */
-[data-theme="modern"] {
   color-scheme: dark;
   --void: #07090d;
   --canvas: #0b0e14;
@@ -107,12 +48,71 @@
   --muted: #9ca3af;
   --faint: #6b7280;
   --dim: #4b5563;
+  /* Foreground for text/icons ON a saturated fill (accent/brand/cyan buttons) — stays light in
+     every theme (blue/violet/cyan are dark enough for white). Inherited by light/modern via :root. */
+  --on-accent: #ffffff;
   --accent: #8b5cf6;
   --accent-hi: #7c3aed;
   --accent-soft: #a78bfa;
   --cyan: #22d3ee;
   --cyan-hi: #06b6d4;
   --brand: #a855f7;
+  --brand-soft: #c4b5fd;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --danger-soft: #f87171;
+  --ok: #10b981;
+}
+
+/* Light — warm off-white (a touch of skin-tone warmth), warm-dark ink; NOT stark white. */
+[data-theme="light"] {
+  color-scheme: light;
+  --void: #eae2d4;
+  --canvas: #f6f0e6;
+  --panel: #fffdf7;
+  --surface: #f0e9db;
+  --field: #fffdf7;
+  --edge: #e4dccb;
+  --edge2: #d4cbb6;
+  --fg: #2a2620;
+  --fg2: #453f36;
+  --muted: #6d6559;
+  --faint: #9a9182;
+  --dim: #bfb6a4;
+  --accent: #2563eb;
+  --accent-hi: #1d4ed8;
+  --accent-soft: #2563eb;
+  --cyan: #0891b2;
+  --cyan-hi: #0e7490;
+  --brand: #7c3aed;
+  --brand-soft: #7c3aed;
+  --warn: #b45309;
+  --danger: #dc2626;
+  --danger-soft: #dc2626;
+  --ok: #059669;
+}
+
+/* Modern — the navy palette: deep blue surfaces, blue accent (the distinctive/branded look). */
+[data-theme="modern"] {
+  color-scheme: dark;
+  --void: #0a0e1a;
+  --canvas: #0f1117;
+  --panel: #141b41;
+  --surface: #1e2761;
+  --field: #1a1f3a;
+  --edge: #2d3a6e;
+  --edge2: #3b4a7e;
+  --fg: #ffffff;
+  --fg2: #d1d5db;
+  --muted: #9ca3af;
+  --faint: #6b7280;
+  --dim: #4b5563;
+  --accent: #3b82f6;
+  --accent-hi: #2563eb;
+  --accent-soft: #93c5fd;
+  --cyan: #06b6d4;
+  --cyan-hi: #0891b2;
+  --brand: #8900ff;
   --brand-soft: #c4b5fd;
   --warn: #f59e0b;
   --danger: #ef4444;
