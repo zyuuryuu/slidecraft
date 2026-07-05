@@ -112,6 +112,26 @@ describe("applyDiagramEditOps — deterministic merge (zero drift on untouched f
     expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull(); // null = valid
   });
 
+  it("a no-op ops batch returns the slide byte-identical (no spurious re-dump / false -0+1 diff)", () => {
+    // applyToFigure re-dumps via yaml.dump (not formatting-identical), so a pure no-op would otherwise
+    // yield a figure string that differs by a line. dirty-tracking must return the ORIGINAL slide.
+    const input = slide();
+    const rmGhost = applyDiagramEditOps(input, [{ op: "removeNode", id: "ghost" }]);
+    expect(rmGhost.slide).toBe(input); // reference-identical → figureFence(before)===figureFence(after)
+    expect(rmGhost.skipped).toHaveLength(1); // …and the miss is still reported
+    // nodeUpdate to the SAME value / setDirection to the SAME direction are no-ops too
+    expect(applyDiagramEditOps(input, [{ op: "nodeUpdate", id: "db", label: "Database" }]).slide).toBe(input);
+    expect(applyDiagramEditOps(input, [{ op: "setDirection", direction: "TB" }]).slide).toBe(input);
+    expect(applyDiagramEditOps(input, [{ op: "removeEdge", from: "x", to: "y" }]).slide).toBe(input);
+  });
+
+  it("a REAL edit returns a NEW slide (dirty tracking doesn't over-suppress)", () => {
+    const input = slide();
+    expect(applyDiagramEditOps(input, [{ op: "nodeUpdate", id: "db", label: "PostgreSQL" }]).slide).not.toBe(input);
+    expect(applyDiagramEditOps(input, [{ op: "removeNode", id: "db" }]).slide).not.toBe(input); // removes node + dangling edge
+    expect(applyDiagramEditOps(input, [{ op: "setDirection", direction: "LR" }]).slide).not.toBe(input);
+  });
+
   it("unknown removeNode / removeEdge skip messages list the candidates (never a bare miss)", () => {
     // L3: the ops-path adoption gate must be as informative as the Markdown path's.
     const rmNode = applyDiagramEditOps(slide(), [{ op: "removeNode", id: "ghost" }]).skipped;

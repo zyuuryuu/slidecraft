@@ -68,6 +68,12 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
   if (!slide.diagram && !slide.mermaidBlock) {
     return { slide, skipped: ops.map((op) => ({ op: op.op, reason: "no-figure" as const, message: "図がないため編集をスキップしました。" })) };
   }
+  // `dirty` tracks whether any op ACTUALLY changed the figure. applyToFigure always re-dumps via
+  // dumpDiagramLikeSource→yaml.dump (data-lossless but NOT formatting-identical), so a pure no-op
+  // (e.g. removeNode of an absent id, or nodeUpdate to the same value) would otherwise yield a
+  // re-serialized figure that differs by a line → a spurious "-0 +1" diff / a silent reformat on adopt.
+  // If nothing changed we return the ORIGINAL slide byte-identical.
+  let dirty = false;
   const out = applyToFigure(slide, (_spec, raw) => {
     raw.nodes ??= [];
     raw.edges ??= [];
@@ -76,50 +82,57 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
         case "nodeUpdate": {
           const n = raw.nodes.find((x) => String(x.id) === op.id);
           if (!n) { skipped.push({ op: op.op, reason: "unknown-node", message: `ノード「${op.id}」が見つからず更新をスキップ（候補: ${idsOf(raw)}）。` }); break; }
-          if (op.label !== undefined) n.label = op.label;
-          if (op.sublabel !== undefined) n.sublabel = op.sublabel;
-          if (op.value !== undefined) n.value = op.value;
-          if (op.icon !== undefined) n.icon = op.icon;
-          if (op.shape !== undefined) n.shape = op.shape;
+          if (op.label !== undefined && n.label !== op.label) { n.label = op.label; dirty = true; }
+          if (op.sublabel !== undefined && n.sublabel !== op.sublabel) { n.sublabel = op.sublabel; dirty = true; }
+          if (op.value !== undefined && n.value !== op.value) { n.value = op.value; dirty = true; }
+          if (op.icon !== undefined && n.icon !== op.icon) { n.icon = op.icon; dirty = true; }
+          if (op.shape !== undefined && n.shape !== op.shape) { n.shape = op.shape; dirty = true; }
           break;
         }
         case "addNode": {
           if (raw.nodes.some((x) => String(x.id) === op.id)) { skipped.push({ op: op.op, reason: "duplicate-id", message: `ノード id「${op.id}」は既に存在するため追加をスキップしました。` }); break; }
           raw.nodes.push({ id: op.id, label: op.label, ...(op.shape ? { shape: op.shape } : {}), ...(op.group ? { group: op.group } : {}) });
+          dirty = true;
           break;
         }
         case "removeNode": {
           const before = raw.nodes.length;
+          const edgesBefore = raw.edges.length;
           raw.nodes = raw.nodes.filter((x) => String(x.id) !== op.id);
           raw.edges = raw.edges.filter((e) => String(e.from) !== op.id && String(e.to) !== op.id); // drop now-dangling edges
           if (raw.nodes.length === before) skipped.push({ op: op.op, reason: "unknown-node", message: `ノード「${op.id}」が見つからず削除をスキップ（候補: ${idsOf(raw)}）。` });
+          if (raw.nodes.length !== before || raw.edges.length !== edgesBefore) dirty = true;
           break;
         }
         case "edgeUpdate": {
           const e = raw.edges.find((x) => String(x.from) === op.from && String(x.to) === op.to);
           if (!e) { skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず更新をスキップ（候補: ${edgesOf(raw)}）。` }); break; }
-          if (op.label !== undefined) e.label = op.label;
-          if (op.relation !== undefined) e.relation = op.relation;
+          if (op.label !== undefined && e.label !== op.label) { e.label = op.label; dirty = true; }
+          if (op.relation !== undefined && e.relation !== op.relation) { e.relation = op.relation; dirty = true; }
           break;
         }
         case "addEdge": {
           raw.edges.push({ from: op.from, to: op.to, ...(op.label ? { label: op.label } : {}) });
+          dirty = true;
           break;
         }
         case "removeEdge": {
           const before = raw.edges.length;
           raw.edges = raw.edges.filter((e) => !(String(e.from) === op.from && String(e.to) === op.to));
           if (raw.edges.length === before) skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず削除をスキップ（候補: ${edgesOf(raw)}）。` });
+          else dirty = true;
           break;
         }
         case "setDirection": {
-          raw.direction = op.direction;
+          if (raw.direction !== op.direction) { raw.direction = op.direction; dirty = true; }
           break;
         }
       }
     }
   });
-  return { slide: out, skipped };
+  // No real change → keep the ORIGINAL slide (identity), so figureFence(before)===figureFence(after)
+  // and adopting a no-op never silently reformats the figure YAML.
+  return { slide: dirty ? out : slide, skipped };
 }
 
 /** One removeNode/removeEdge whose target isn't referenced by the instruction — a possible mistarget. */
