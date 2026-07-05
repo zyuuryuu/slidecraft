@@ -154,3 +154,10 @@ body {
 .cm-placeholder {
   color: var(--faint) !important;
 }
+/* Dark: an even fainter placeholder (its deep near-black base makes --faint read a touch strong). */
+[data-theme="dark"] ::placeholder {
+  color: var(--dim);
+}
+[data-theme="dark"] .cm-placeholder {
+  color: var(--dim) !important;
+}
