@@ -6,15 +6,12 @@
  */
 
 import { useCallback, useState } from "react";
-import * as yaml from "js-yaml";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
-import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource, canSerializeToMermaid } from "../engine/mermaid-to-diagram";
-import EdgeStyleControls from "./EdgeStyleControls";
-import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 import { buildFieldMap, bodyPlaceholders, nthBody, applyFieldEdit } from "../engine/placeholder-binding";
 import { groupEditorPlan } from "../engine/group-binding";
+import DiagramEditor from "./DiagramEditor";
 
 interface SlideEditorProps {
   slide: SlideIR;
@@ -98,6 +95,9 @@ function textToParagraphs(text: string): Paragraph[] {
 }
 
 export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout, suggestions, onChange }: SlideEditorProps) {
+  // Layout is meta/structural (which master layout), changed rarely — collapse it by default so the
+  // content fields lead; the header still shows the active layout, expand to change it.
+  const [layoutOpen, setLayoutOpen] = useState(false);
   // ── Update a specific placeholder ──
   const updatePlaceholder = useCallback(
     (idx: string, text: string) => {
@@ -178,54 +178,73 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
     ].filter((x): x is string => !!x),
   );
 
+  // What the collapsed Layout header shows: the ACTIVE layout (Auto resolves to a concrete name).
+  const layoutLabel = slide.layout === "auto" ? (resolvedLayout ? `自動 → ${resolvedLayout}` : "自動") : slide.layout;
+
   return (
     <div className="h-full overflow-auto p-3 flex flex-col gap-3">
-      {/* Layout selector — the full list stays freely selectable (as before); the only change is that
-          the "Auto" option shows what it RESOLVED to, and ranked candidates are one-click chips. */}
+      {/* Layout = meta/structural, collapsed by default. The header row shows the ACTIVE (resolved)
+          layout so nothing is hidden; expanding reveals the full picker + ranked candidate chips. */}
       <div>
-        <label className="text-[10px] text-gray-500 uppercase tracking-wider">Layout</label>
-        <select
-          value={slide.layout}
-          onChange={(e) => updateLayout(e.target.value)}
-          className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
+        <button
+          type="button"
+          onClick={() => setLayoutOpen((o) => !o)}
+          aria-expanded={layoutOpen}
+          className="w-full flex items-center justify-between gap-2 py-0.5 text-left group"
         >
-          <option value="auto">{resolvedLayout ? `自動 → ${resolvedLayout}` : "自動"}</option>
-          {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Layout</span>
+          <span className="flex items-center gap-1 min-w-0 text-[11px] text-gray-400 group-hover:text-gray-200">
+            <span className="truncate">{layoutLabel}</span>
+            <span className="shrink-0 text-gray-600">{layoutOpen ? "▾" : "▸"}</span>
+          </span>
+        </button>
 
-        {/* Ranked candidates (★ = Auto's top pick = best score; the rest are the next-best) + an Auto
-            toggle. Picking a candidate PINS it; ⟳Auto re-adapts (keeps slide.layout === "auto"). */}
-        {suggestions && suggestions.length > 1 && (
-          <div className="mt-1.5 flex flex-wrap gap-1 items-center">
-            <span className="text-[10px] text-gray-500">候補:</span>
-            {suggestions.map((name, i) => {
-              const active = slide.layout === name;
-              return (
+        {layoutOpen && (
+          <div className="mt-1">
+            <select
+              value={slide.layout}
+              onChange={(e) => updateLayout(e.target.value)}
+              className="w-full px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
+            >
+              <option value="auto">{resolvedLayout ? `自動 → ${resolvedLayout}` : "自動"}</option>
+              {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+
+            {/* Ranked candidates (★ = Auto's top pick = best score; the rest are the next-best) + an Auto
+                toggle. Picking a candidate PINS it; ⟳Auto re-adapts (keeps slide.layout === "auto"). */}
+            {suggestions && suggestions.length > 1 && (
+              <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+                <span className="text-[10px] text-gray-500">候補:</span>
+                {suggestions.map((name, i) => {
+                  const active = slide.layout === name;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => updateLayout(name)}
+                      title={i === 0 ? "Auto の第一候補（最良評価）" : "次点の候補レイアウト"}
+                      className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                        active ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+                      }`}
+                    >
+                      {i === 0 && "★ "}{name}
+                    </button>
+                  );
+                })}
                 <button
-                  key={name}
                   type="button"
-                  onClick={() => updateLayout(name)}
-                  title={i === 0 ? "Auto の第一候補（最良評価）" : "次点の候補レイアウト"}
+                  onClick={() => updateLayout("auto")}
+                  title="自動選択に戻す（常に最良評価を選ぶ）"
                   className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                    active ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+                    slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
                   }`}
                 >
-                  {i === 0 && "★ "}{name}
+                  ⟳ Auto
                 </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => updateLayout("auto")}
-              title="自動選択に戻す（常に最良評価を選ぶ）"
-              className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
-              }`}
-            >
-              ⟳ Auto
-            </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -269,185 +288,6 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           onChange={onChange}
         />
       )}
-    </div>
-  );
-}
-
-// ── Diagram editor with mode switching ──
-
-type DiagramMode = "mermaid" | "yaml" | "json";
-
-/** A diagram that can't round-trip to Mermaid (sequence / UML class) — the MERMAID toggle is
- *  disabled for these (edit in YAML/JSON). Plain function so the React Compiler memoizes the call. */
-function isMermaidIncompatible(diagramYaml: string | undefined): boolean {
-  if (!diagramYaml) return false;
-  try {
-    const result = DiagramSpecSchema.safeParse(yaml.load(diagramYaml));
-    return result.success ? !canSerializeToMermaid(result.data) : false;
-  } catch {
-    return false;
-  }
-}
-
-function DiagramEditor({
-  slide,
-  onUpdateDiagramYaml,
-  onUpdateMermaid,
-  onChange,
-}: {
-  slide: SlideIR;
-  onUpdateDiagramYaml: (yaml: string) => void;
-  onUpdateMermaid: (mermaid: string) => void;
-  onChange: (updated: SlideIR) => void;
-}) {
-  const currentMode: DiagramMode = slide.mermaidBlock ? "mermaid" : "yaml";
-  const [mode, setMode] = useState<DiagramMode>(currentMode);
-
-  // Mermaid graph syntax can't represent sequence / UML class diagrams, so the
-  // YAML→Mermaid serializer would flatten them to a flowchart (lossy + type-
-  // breaking). Disable the MERMAID toggle for those — edit them in YAML/JSON.
-  const mermaidIncompatible = isMermaidIncompatible(slide.diagram?.yaml);
-
-  // ── Convert between modes ──
-  const switchMode = useCallback(
-    (newMode: DiagramMode) => {
-      if (newMode === mode) return;
-      // Never convert a sequence/class diagram to Mermaid (would corrupt its type).
-      if (newMode === "mermaid" && mermaidIncompatible) return;
-
-      // Only switch the mode if the content was actually converted — otherwise the
-      // editor would show e.g. the "YAML" label over still-JSON text (mode/content drift).
-      let applied = false;
-
-      if (mode === "mermaid" && (newMode === "yaml" || newMode === "json")) {
-        // Mermaid → DiagramSpec
-        const mmd = slide.mermaidBlock?.mermaid || "";
-        const spec = mermaidToDiagramSpec(mmd);
-        if (spec) {
-          const yamlStr = diagramSpecToYaml(spec);
-          onChange({
-            ...slide,
-            mermaidBlock: undefined,
-            diagram: { yaml: newMode === "json" ? JSON.stringify(spec, null, 2) : yamlStr, placeholderIdx: "1" },
-          });
-          applied = true;
-        }
-      } else if (mode === "yaml" && newMode === "mermaid") {
-        // YAML → Mermaid
-        try {
-          const data = yaml.load(slide.diagram?.yaml || "");
-          const result = DiagramSpecSchema.safeParse(data);
-          if (result.success) {
-            const mmd = diagramSpecToMermaid(result.data);
-            onChange({
-              ...slide,
-              diagram: undefined,
-              mermaidBlock: { mermaid: mmd, placeholderIdx: "1" },
-            });
-            applied = true;
-          }
-        } catch { /* keep current */ }
-      } else if (mode === "yaml" && newMode === "json") {
-        // YAML → JSON (raw object round-trip)
-        try {
-          const data = yaml.load(slide.diagram?.yaml || "");
-          onUpdateDiagramYaml(JSON.stringify(data, null, 2));
-          applied = true;
-        } catch { /* keep current */ }
-      } else if (mode === "json" && newMode === "yaml") {
-        // JSON → YAML — symmetric inverse of YAML→JSON (yaml.dump, not the strict
-        // diagramSpecToYaml which throws on a minimal/round-tripped spec).
-        try {
-          const data = JSON.parse(slide.diagram?.yaml || "{}");
-          onUpdateDiagramYaml(yaml.dump(data));
-          applied = true;
-        } catch { /* keep current */ }
-      } else if (mode === "json" && newMode === "mermaid") {
-        // JSON → Mermaid
-        try {
-          const data = JSON.parse(slide.diagram?.yaml || "{}");
-          const result = DiagramSpecSchema.safeParse(data);
-          if (result.success) {
-            const mmd = diagramSpecToMermaid(result.data);
-            onChange({
-              ...slide,
-              diagram: undefined,
-              mermaidBlock: { mermaid: mmd, placeholderIdx: "1" },
-            });
-            applied = true;
-          }
-        } catch { /* keep current */ }
-      }
-
-      if (applied) setMode(newMode);
-    },
-    [mode, slide, onChange, onUpdateDiagramYaml, mermaidIncompatible],
-  );
-
-  const textValue = mode === "mermaid"
-    ? (slide.mermaidBlock?.mermaid || "")
-    : (slide.diagram?.yaml || "");
-
-  const handleTextChange = useCallback(
-    (text: string) => {
-      if (mode === "mermaid") {
-        onUpdateMermaid(text);
-      } else {
-        onUpdateDiagramYaml(text);
-      }
-    },
-    [mode, onUpdateMermaid, onUpdateDiagramYaml],
-  );
-
-  const colorClass = mode === "mermaid" ? "text-cyan-300" : mode === "json" ? "text-amber-300" : "text-green-300";
-  const label = mode === "mermaid"
-    ? "Mermaid (→ SVG image in PPTX)"
-    : mode === "json"
-      ? "JSON (→ PptxGenJS shapes)"
-      : "YAML (→ PptxGenJS shapes)";
-  const validationError = validateDiagramSource(textValue, mode);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] text-gray-500 uppercase tracking-wider">
-          {label}
-        </label>
-        {/* Editing-format selector: a dropdown shows only the current choice (less
-            clutter); MERMAID is a disabled option WITH its reason when the figure
-            can't be represented in Mermaid (icons / kpi / radar / custom class, …). */}
-        <select
-          value={mode}
-          onChange={(e) => switchMode(e.target.value as DiagramMode)}
-          title={mermaidIncompatible ? "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。" : "編集フォーマットを選択"}
-          className="px-2 py-0.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-[11px] text-white hover:border-[#3B82F6]/60"
-        >
-          <option value="yaml">YAML</option>
-          <option value="json">JSON</option>
-          <option value="mermaid" disabled={mermaidIncompatible && mode !== "mermaid"}>
-            {mermaidIncompatible && mode !== "mermaid" ? "MERMAID（変換不可）" : "MERMAID"}
-          </option>
-        </select>
-      </div>
-      <textarea
-        value={textValue}
-        onChange={(e) => handleTextChange(e.target.value)}
-        rows={12}
-        className={`w-full px-2 py-1.5 bg-[#1a1f3a] border rounded text-sm ${colorClass} font-mono resize-y ${
-          validationError ? "border-[#C0504D]" : "border-[#2D3A6E]"
-        }`}
-        placeholder={mode === "mermaid" ? "graph TD\n  A[Start] --> B[End]" : "type: flowchart\nnodes:\n  - id: a\n    label: A"}
-      />
-      {validationError ? (
-        <div className="mt-1 text-[10px] text-[#F87171] font-mono break-words">
-          {validationError}
-        </div>
-      ) : textValue.trim() && mode !== "mermaid" ? (
-        <div className="mt-1 text-[10px] text-[#06B6D4]">✓ valid</div>
-      ) : null}
-      {mode !== "mermaid" && !validationError && slide.diagram?.yaml ? (
-        <EdgeStyleControls diagramYaml={slide.diagram.yaml} onChange={onUpdateDiagramYaml} />
-      ) : null}
     </div>
   );
 }
