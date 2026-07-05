@@ -295,6 +295,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     (userRequest: string, mode: AiMode, diagramType?: DiagramTypeChoice) => {
       if (!canGenerate(userRequest)) return;
       persistConfig();
+      setCandidates([]); // a fresh single generation supersedes any prior best-of-N candidate set
       const task = enqueue(userRequest, mode, MODE_LABEL[mode], diagramType);
       setActiveTaskId(task.id);
       void runTask(task).catch(() => {});
