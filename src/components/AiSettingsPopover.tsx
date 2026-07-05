@@ -3,7 +3,7 @@ import { runningInTauri } from "../ipc/commands";
 import type { AiGeneration } from "./useAiGeneration";
 import LocalOnlyToggle from "./LocalOnlyToggle";
 
-const field = "px-2 py-1 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-xs text-white";
+const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
 
 /**
  * AiSettingsPopover — the AI configuration (provider / model / endpoint / key / 上級), pulled out
@@ -15,20 +15,20 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
   const toneColor =
     ai.connection.tone === "ok" ? "text-green-400"
     : ai.connection.tone === "err" ? "text-red-400"
-    : ai.connection.tone === "checking" ? "text-gray-400"
+    : ai.connection.tone === "checking" ? "text-muted"
     : "text-amber-400";
   return (
     <div className="flex flex-col gap-2.5 p-3">
-      <div className="text-[11px] font-medium text-gray-300">AI 設定</div>
+      <div className="text-[11px] font-medium text-fg2">AI 設定</div>
 
       <div className="flex items-center gap-2 text-[11px] flex-wrap">
         <span className={toneColor}>●</span>
-        <span className="text-gray-300">{ai.connection.label}</span>
-        {ai.connection.hint && <span className="text-gray-500">— {ai.connection.hint}</span>}
+        <span className="text-fg2">{ai.connection.label}</span>
+        {ai.connection.hint && <span className="text-faint">— {ai.connection.hint}</span>}
       </div>
 
       <div className="flex items-center gap-2 text-[11px] flex-wrap">
-        <span className="shrink-0 text-gray-400">プロバイダ</span>
+        <span className="shrink-0 text-muted">プロバイダ</span>
         <select
           value={ai.provider}
           onChange={(e) => ai.setProvider(e.target.value as typeof ai.provider)}
@@ -41,7 +41,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         {ai.ollamaModels && ai.ollamaModels.length > 0 && ai.provider !== "ollama" && (
           <button
             onClick={ai.switchToOllama}
-            className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+            className="px-2 py-0.5 rounded bg-field text-accent-soft hover:bg-edge border border-edge"
             title="ローカルの Ollama に切り替え"
           >
             🦙 Ollama → 使う
@@ -52,7 +52,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           (ai.provider !== "builtin" || ai.weightsPresent === false) && (
             <button
               onClick={ai.switchToBuiltin}
-              className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+              className="px-2 py-0.5 rounded bg-field text-accent-soft hover:bg-edge border border-edge"
               title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
             >
               {ai.weightsPresent === false
@@ -63,7 +63,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         {runningInTauri() && ai.builtinStatus.kind === "running" && (
           <button
             onClick={ai.stopBuiltin}
-            className="px-2 py-0.5 rounded bg-[#1a1f3a] text-gray-300 hover:bg-[#2D3A6E] border border-[#2D3A6E]"
+            className="px-2 py-0.5 rounded bg-field text-fg2 hover:bg-edge border border-edge"
             title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
           >
             ⏹ 停止
@@ -85,7 +85,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         {ai.provider === "builtin" && ai.builtinStatus.kind !== "running" ? (
           // The builtin model is capability-selected + auto-adopted, not user-typed — show it
           // read-only (the real tier model, not a stale saved name) until it's actually running.
-          <span className={`${field} w-44 text-gray-400 flex items-center`}>
+          <span className={`${field} w-44 text-muted flex items-center`}>
             {ai.builtinModel?.display ?? "組み込みモデル"}
           </span>
         ) : ai.models.length > 0 ? (
@@ -113,7 +113,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           onClick={ai.refreshModels}
           type="button"
           title="インストール済みモデルを取得"
-          className={`${field} hover:bg-[#2D3A6E]`}
+          className={`${field} hover:bg-edge`}
         >
           ↻
         </button>
@@ -127,7 +127,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
               value={ai.cfg.apiKey}
               onChange={(e) => ai.setField("apiKey", e.target.value)}
             />
-            <label className="flex items-center gap-1 text-xs text-gray-400">
+            <label className="flex items-center gap-1 text-xs text-muted">
               <input
                 type="checkbox"
                 checked={ai.rememberKey}

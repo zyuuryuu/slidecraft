@@ -192,10 +192,10 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           aria-expanded={layoutOpen}
           className="w-full flex items-center justify-between gap-2 py-0.5 text-left group"
         >
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Layout</span>
-          <span className="flex items-center gap-1 min-w-0 text-[11px] text-gray-400 group-hover:text-gray-200">
+          <span className="text-[10px] text-faint uppercase tracking-wider">Layout</span>
+          <span className="flex items-center gap-1 min-w-0 text-[11px] text-muted group-hover:text-fg2">
             <span className="truncate">{layoutLabel}</span>
-            <span className="shrink-0 text-gray-600">{layoutOpen ? "▾" : "▸"}</span>
+            <span className="shrink-0 text-dim">{layoutOpen ? "▾" : "▸"}</span>
           </span>
         </button>
 
@@ -204,7 +204,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
             <select
               value={slide.layout}
               onChange={(e) => updateLayout(e.target.value)}
-              className="w-full px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white"
+              className="w-full px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg"
             >
               <option value="auto">{resolvedLayout ? `自動 → ${resolvedLayout}` : "自動"}</option>
               {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
@@ -216,7 +216,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 toggle. Picking a candidate PINS it; ⟳Auto re-adapts (keeps slide.layout === "auto"). */}
             {suggestions && suggestions.length > 1 && (
               <div className="mt-1.5 flex flex-wrap gap-1 items-center">
-                <span className="text-[10px] text-gray-500">候補:</span>
+                <span className="text-[10px] text-faint">候補:</span>
                 {suggestions.map((name, i) => {
                   const active = slide.layout === name;
                   return (
@@ -226,7 +226,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                       onClick={() => updateLayout(name)}
                       title={i === 0 ? "Auto の第一候補（最良評価）" : "次点の候補レイアウト"}
                       className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                        active ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+                        active ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"
                       }`}
                     >
                       {i === 0 && "★ "}{name}
@@ -238,7 +238,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                   onClick={() => updateLayout("auto")}
                   title="自動選択に戻す（常に最良評価を選ぶ）"
                   className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                    slide.layout === "auto" ? "bg-[#3B82F6] border-[#3B82F6] text-white" : "bg-[#1a1f3a] border-[#2D3A6E] text-gray-300 hover:border-[#3B82F6]/60"
+                    slide.layout === "auto" ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"
                   }`}
                 >
                   ⟳ Auto
@@ -264,15 +264,15 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
 
         return (
           <div key={phIdx}>
-            <label className={`text-[10px] uppercase tracking-wider ${over ? "text-[#F87171]" : "text-gray-500"}`}>
+            <label className={`text-[10px] uppercase tracking-wider ${over ? "text-danger-soft" : "text-faint"}`}>
               {label}
-              {!isGroup && <span className="text-gray-600 ml-1">(idx {phIdx})</span>}
+              {!isGroup && <span className="text-dim ml-1">(idx {phIdx})</span>}
             </label>
             <textarea
               value={currentText}
               onChange={(e) => updatePlaceholder(contentIdx, e.target.value)}
               rows={isGroup ? 4 : phIdx === "1" || phIdx === "2" ? 6 : 2}
-              className="w-full mt-0.5 px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white font-mono resize-y"
+              className="w-full mt-0.5 px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg font-mono resize-y"
               placeholder={isGroup ? "### 見出し\n本文…" : label}
             />
           </div>

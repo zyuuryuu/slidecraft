@@ -78,7 +78,7 @@ export default function ResizableSplit({
         onMouseDown={onMouseDown}
         onDoubleClick={() => setPct(initialLeftPct)}
         title="Drag to resize (double-click to reset)"
-        className="w-1.5 shrink-0 cursor-col-resize bg-[#2D3A6E] hover:bg-[#3B82F6] transition-colors"
+        className="w-1.5 shrink-0 cursor-col-resize bg-edge hover:bg-accent transition-colors"
       />
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {right}

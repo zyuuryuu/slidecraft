@@ -14,9 +14,9 @@ export default function DiffView({ before, after, fill }: { before: string; afte
       className={`overflow-auto text-[11px] font-mono leading-relaxed ${fill ? "flex-1 min-h-0" : ""}`}
       style={fill ? undefined : { maxHeight: 160 }}
     >
-      <div className="px-3 py-0.5 text-gray-500 sticky top-0 bg-[#0a0e1a]">
+      <div className="px-3 py-0.5 text-faint sticky top-0 bg-void">
         変更: <span className="text-red-400">−{del}</span> <span className="text-green-400">+{add}</span>
-        {del === 0 && add === 0 && <span className="text-gray-600"> （変更なし）</span>}
+        {del === 0 && add === 0 && <span className="text-dim"> （変更なし）</span>}
       </div>
       <div className="px-3 pb-2">
         {rows.map((r, i) => (
@@ -27,10 +27,10 @@ export default function DiffView({ before, after, fill }: { before: string; afte
                 ? "text-red-300 bg-red-900/20"
                 : r.type === "add"
                   ? "text-green-200 bg-green-900/20"
-                  : "text-gray-500"
+                  : "text-faint"
             }
           >
-            <span className="select-none text-gray-600">{r.type === "del" ? "−" : r.type === "add" ? "+" : " "} </span>
+            <span className="select-none text-dim">{r.type === "del" ? "−" : r.type === "add" ? "+" : " "} </span>
             {r.text || " "}
           </div>
         ))}

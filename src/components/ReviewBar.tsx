@@ -39,20 +39,20 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
     const canTable = d.levers.includes("visualize") && !d.levers.includes("split");
     const needsAi = onAiFix && (d.levers.includes("condense") || d.levers.includes("title"));
     return (
-      <div key={key} className="flex items-center gap-2 px-3 py-1.5 border-t border-[#161a2b] hover:bg-[#161a2b]">
+      <div key={key} className="flex items-center gap-2 px-3 py-1.5 border-t border-canvas hover:bg-canvas">
         <button
           onClick={() => { onJump(d.slideIndex); setOpen(false); }}
           title={`推奨: ${d.levers.join(" / ")}`}
           className="flex items-baseline gap-1.5 flex-1 min-w-0 text-left"
         >
-          <span className={`shrink-0 ${warn ? "text-amber-300" : "text-[#6b86a8]"}`}>S{d.slideIndex + 1}</span>
-          <span className={`truncate ${warn ? "text-gray-200" : "text-gray-400"}`}>{d.message}</span>
+          <span className={`shrink-0 ${warn ? "text-amber-300" : "text-faint"}`}>S{d.slideIndex + 1}</span>
+          <span className={`truncate ${warn ? "text-fg2" : "text-muted"}`}>{d.message}</span>
         </button>
         {canTable && (
           <button
             onClick={() => onFixDeterministic(d)}
             title="表に変換（決定論・元に戻せます）"
-            className="shrink-0 px-2 py-0.5 rounded border border-[#252b45] text-[#5eead4] hover:bg-[#2D3A6E]"
+            className="shrink-0 px-2 py-0.5 rounded border border-surface text-cyan hover:bg-edge"
           >
             →表
           </button>
@@ -61,7 +61,7 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
           <button
             onClick={() => { onAiFix(d.slideIndex, fixPromptForIssue(d)); setOpen(false); }}
             title="AI Assist を開いて直す（指示プリセット・確認/編集してから生成）"
-            className="shrink-0 px-2 py-0.5 rounded border border-[#252b45] text-[#c4b5fd] hover:bg-[#2D3A6E]"
+            className="shrink-0 px-2 py-0.5 rounded border border-surface text-brand-soft hover:bg-edge"
           >
             ✨直す
           </button>
@@ -71,21 +71,21 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
   };
 
   return (
-    <div className="relative shrink-0 bg-[#0f1117] border-b border-[#2D3A6E] text-[11px]">
+    <div className="relative shrink-0 bg-canvas border-b border-edge text-[11px]">
       {/* Thin always-visible summary */}
-      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2.5 w-full px-3 py-1.5 hover:bg-[#161a2b]">
+      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2.5 w-full px-3 py-1.5 hover:bg-canvas">
         {warnIssues.length > 0 && <span className="text-amber-400 font-medium">⚠ 課題 {warnIssues.length}</span>}
-        {tipIssues.length > 0 && <span className="text-gray-400">💡 提案 {tipIssues.length}</span>}
-        <span className="text-gray-600">{open ? "▴" : "▾"}</span>
+        {tipIssues.length > 0 && <span className="text-muted">💡 提案 {tipIssues.length}</span>}
+        <span className="text-dim">{open ? "▴" : "▾"}</span>
         <div className="flex-1" />
-        <span className="text-gray-600 text-[10px]">{open ? "閉じる" : "詳細を見る"}</span>
+        <span className="text-dim text-[10px]">{open ? "閉じる" : "詳細を見る"}</span>
       </button>
 
       {/* Dropdown list (on demand) */}
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-50 max-h-72 overflow-y-auto bg-[#0f1117] border-b border-[#2D3A6E] shadow-2xl">
+          <div className="absolute left-0 right-0 top-full z-50 max-h-72 overflow-y-auto bg-canvas border-b border-edge shadow-2xl">
             {warnIssues.map((d, i) => row(d, `w${i}`, true))}
             {tipIssues.map((d, i) => row(d, `t${i}`, false))}
           </div>

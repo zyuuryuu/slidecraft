@@ -47,23 +47,23 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
         title="このデッキで使うスライドマスター"
-        className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E] inline-flex items-center gap-1.5 max-w-[220px]"
+        className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge inline-flex items-center gap-1.5 max-w-[220px]"
       >
         <span className="shrink-0">🎨</span>
         <span className="truncate">{active ? active.name : "マスター選択"}</span>
-        <span className="shrink-0 text-gray-400 text-xs">▾</span>
+        <span className="shrink-0 text-muted text-xs">▾</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 z-50 min-w-[220px] max-w-[320px] bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1 text-sm">
+        <div className="absolute right-0 mt-1 z-50 min-w-[220px] max-w-[320px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
           {masters.map((m) => {
             const isActive = m.id === activeId;
             return (
               <button
                 key={m.id}
                 onClick={() => { onSelect(m.id); setOpen(false); }}
-                className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#2D3A6E] ${
-                  isActive ? "text-[#93C5FD] bg-[#3B82F6]/15 font-medium" : "text-gray-200"
+                className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-edge ${
+                  isActive ? "text-accent-soft bg-accent/15 font-medium" : "text-fg2"
                 }`}
               >
                 <span className="w-3 shrink-0 text-center">{isActive ? "✓" : ""}</span>
@@ -71,12 +71,12 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
               </button>
             );
           })}
-          {(onImport || onCreate) && <div className="my-1 h-px bg-[#2D3A6E]" />}
+          {(onImport || onCreate) && <div className="my-1 h-px bg-edge" />}
           {onImport && (
             <button
               onClick={() => { onImport(); setOpen(false); }}
               title=".pptx をスライドマスターとして取り込む"
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-gray-300 hover:bg-[#2D3A6E]"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
               <span className="w-3 shrink-0 text-center">＋</span>
               <span>マスターを取り込む（.pptx）</span>
@@ -86,7 +86,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
             <button
               onClick={() => { onCreate(); setOpen(false); }}
               title="配色とフォントを選んで新しいテンプレを生成する"
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-gray-300 hover:bg-[#2D3A6E]"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
               <span className="w-3 shrink-0 text-center">＋</span>
               <span>テンプレを作成…</span>

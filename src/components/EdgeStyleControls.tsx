@@ -60,15 +60,15 @@ export default function EdgeStyleControls({
     }
   };
 
-  const lbl = "text-[10px] text-gray-500";
+  const lbl = "text-[10px] text-faint";
   return (
-    <div className="mt-2 border-t border-[#2D3A6E] pt-2 flex flex-col gap-1.5">
+    <div className="mt-2 border-t border-edge pt-2 flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-gray-500 uppercase tracking-wider">矢印スタイル</span>
+        <span className="text-[10px] text-faint uppercase tracking-wider">矢印スタイル</span>
         <select
           value={idx}
           onChange={(e) => setSel(Number(e.target.value))}
-          className="flex-1 px-1.5 py-0.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-[11px] text-white"
+          className="flex-1 px-1.5 py-0.5 bg-field border border-edge rounded text-[11px] text-fg"
         >
           {edges.map((e, i) => (
             <option key={i} value={i}>
@@ -78,7 +78,7 @@ export default function EdgeStyleControls({
         </select>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap text-[11px] text-gray-300">
+      <div className="flex items-center gap-3 flex-wrap text-[11px] text-fg2">
         <label className="flex items-center gap-1">
           <span className={lbl}>太さ</span>
           <input
@@ -88,7 +88,7 @@ export default function EdgeStyleControls({
             step={0.5}
             value={style.width ?? 2}
             onChange={(e) => patch({ width: Number(e.target.value) })}
-            className="w-12 px-1 py-0.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-white"
+            className="w-12 px-1 py-0.5 bg-field border border-edge rounded text-fg"
           />
         </label>
 
@@ -107,12 +107,12 @@ export default function EdgeStyleControls({
             type="color"
             value={style.color ?? "#94A3B8"}
             onChange={(e) => patch({ color: e.target.value })}
-            className="w-6 h-5 bg-transparent border border-[#2D3A6E] rounded p-0"
+            className="w-6 h-5 bg-transparent border border-edge rounded p-0"
           />
         </label>
       </div>
 
-      <label className="flex items-center gap-2 text-[11px] text-gray-300">
+      <label className="flex items-center gap-2 text-[11px] text-fg2">
         <span className={lbl}>始点位置</span>
         <input
           type="range"
@@ -125,7 +125,7 @@ export default function EdgeStyleControls({
         />
         <button
           onClick={() => patch({ srcPort: 0 })}
-          className="text-[10px] text-gray-400 hover:text-white px-1"
+          className="text-[10px] text-muted hover:text-fg px-1"
           title="始点位置をリセット"
         >
           ⟲
