@@ -43,7 +43,7 @@ interface InitializeModalProps {
   gotoLine?: { line: number; ts: number };
 }
 
-const action = "px-2.5 py-1 rounded bg-[#1E2761] text-[#93C5FD] hover:bg-[#2D3A6E] border border-[#3B82F6]/40";
+const action = "px-2.5 py-1 rounded bg-surface text-accent-soft hover:bg-edge border border-accent/40";
 
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
@@ -54,7 +54,7 @@ export default function InitializeModal({
   if (!isOpen) return null;
   return (
     <div
-      className="fixed inset-0 z-40 bg-black/60 flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-40 bg-void/60 flex items-center justify-center p-4 sm:p-6"
       onKeyDown={(e) => {
         if (e.key === "Escape") onCancel();
       }}
@@ -63,19 +63,19 @@ export default function InitializeModal({
         role="dialog"
         aria-modal="true"
         aria-label="Draft — 原稿からスライドを作る"
-        className="bg-[#0a0e1a] border border-[#3B82F6]/40 rounded-lg shadow-2xl flex flex-col w-full max-w-6xl"
+        className="bg-void border border-accent/40 rounded-lg shadow-2xl flex flex-col w-full max-w-6xl"
         style={{ height: "86vh" }}
       >
         {/* Header + input methods (one tidy row) */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-[#2D3A6E] text-xs shrink-0">
-          <span className="text-sm text-[#93C5FD] font-medium mr-1">📝 Draft</span>
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-edge text-xs shrink-0">
+          <span className="text-sm text-accent-soft font-medium mr-1">📝 Draft</span>
           <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} />
-          <span className="w-px h-4 bg-[#2D3A6E] mx-1" />
+          <span className="w-px h-4 bg-edge mx-1" />
           <button onClick={onOpenFile} className={action} title=".md / .yaml を取り込む">📄 Markdown を取込む</button>
           <button onClick={onGenerateAI} className={action} title="AI でデッキを生成">✨ AIで生成</button>
           <button onClick={onStructure} className={action} title="生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）">🧹 原稿を整形</button>
           <div className="flex-1" />
-          <button onClick={onCancel} title="キャンセル" className="text-gray-400 hover:text-white text-lg leading-none">×</button>
+          <button onClick={onCancel} title="キャンセル" className="text-muted hover:text-fg text-lg leading-none">×</button>
         </div>
 
         {/* Structure review of the resulting split (awareness + per-chip →表). The
@@ -92,9 +92,9 @@ export default function InitializeModal({
           storageKey="slidecraft_split_init"
           left={
             <>
-              <div className="px-3 py-1 bg-[#141B41] text-xs border-b border-[#2D3A6E]">
-                <span className="text-gray-400">Markdown Editor</span>
-                <span className="text-gray-600"> ・ ここに直接貼り付け／入力してもOK</span>
+              <div className="px-3 py-1 bg-panel text-xs border-b border-edge">
+                <span className="text-muted">Markdown Editor</span>
+                <span className="text-dim"> ・ ここに直接貼り付け／入力してもOK</span>
               </div>
               <div className="flex-1 min-h-0">
                 <Editor value={mdText} onChange={onMdChange} language="markdown" onCursorLine={onCursorLine} gotoLine={gotoLine} />
@@ -103,8 +103,8 @@ export default function InitializeModal({
           }
           right={
             <>
-              <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">Slide Preview（分割結果）</div>
-              <div className="flex-1 min-h-0 bg-[#0f1117]">
+              <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">Slide Preview（分割結果）</div>
+              <div className="flex-1 min-h-0 bg-canvas">
                 <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} onSlideClick={onSlideClick} />
               </div>
             </>
@@ -112,18 +112,18 @@ export default function InitializeModal({
         />
 
         {/* Commit / discard */}
-        <div className="flex items-center gap-2 px-4 py-2 border-t border-[#2D3A6E] shrink-0">
+        <div className="flex items-center gap-2 px-4 py-2 border-t border-edge shrink-0">
           {!deck && (
             <span className="text-[11px] text-amber-300 truncate">
               {parseError ? `Markdown を解析できません: ${parseError}` : "内容が空です — 貼り付けるか取り込んでください"}
             </span>
           )}
           <div className="flex-1" />
-          <button onClick={onCancel} className="px-3 py-1 text-xs bg-[#1a1f3a] hover:bg-[#2D3A6E] text-gray-300 rounded">キャンセル</button>
+          <button onClick={onCancel} className="px-3 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">キャンセル</button>
           <button
             onClick={onConfirm}
             disabled={!deck}
-            className="px-4 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
+            className="px-4 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
           >
             ✓ スライドにする
           </button>

@@ -77,15 +77,15 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   if (!isOpen) return null;
 
   const fieldClass =
-    "w-full px-3 py-2 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white";
+    "w-full px-3 py-2 bg-field border border-edge rounded text-sm text-fg";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-[#0f1117] border border-[#2D3A6E] rounded-lg w-[800px] max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/60">
+      <div className="bg-canvas border border-edge rounded-lg w-[800px] max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2D3A6E]">
-          <h2 className="text-white font-semibold">✨ AIで生成 — 原稿からデッキを生成</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
+          <h2 className="text-fg font-semibold">✨ AIで生成 — 原稿からデッキを生成</h2>
+          <button onClick={onClose} className="text-muted hover:text-fg text-lg">
             ×
           </button>
         </div>
@@ -93,14 +93,14 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
         <div className="flex-1 overflow-auto p-4 flex flex-col gap-4">
           {/* Step 1: User request */}
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider">
+            <label className="text-xs text-muted uppercase tracking-wider">
               1. What do you want to create?
             </label>
             <div className="flex gap-2 mt-1 mb-2">
               <button
                 onClick={() => setMode("slides")}
                 className={`px-3 py-1 text-xs rounded ${
-                  mode === "slides" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"
+                  mode === "slides" ? "bg-accent text-on-accent" : "bg-field text-muted"
                 }`}
               >
                 Slide Deck
@@ -108,7 +108,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               <button
                 onClick={() => setMode("diagram")}
                 className={`px-3 py-1 text-xs rounded ${
-                  mode === "diagram" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400"
+                  mode === "diagram" ? "bg-accent text-on-accent" : "bg-field text-muted"
                 }`}
               >
                 Diagram
@@ -116,11 +116,11 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             </div>
             {mode === "diagram" && (
               <div className="flex items-center gap-2 mb-2">
-                <label className="text-xs text-gray-400 shrink-0">図の種類</label>
+                <label className="text-xs text-muted shrink-0">図の種類</label>
                 <select
                   value={diagramType}
                   onChange={(e) => setDiagramType(e.target.value as DiagramTypeChoice)}
-                  className="px-2 py-1 text-xs bg-[#1a1f3a] border border-[#2D3A6E] rounded text-white"
+                  className="px-2 py-1 text-xs bg-field border border-edge rounded text-fg"
                 >
                   <option value="auto">おまかせ（AIが選ぶ）</option>
                   {Object.entries(DIAGRAM_TYPES).map(([t, info]) => (
@@ -143,7 +143,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
 
           {/* Step 2: Provider & connection (BYOK) */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-gray-400 uppercase tracking-wider">
+            <label className="text-xs text-muted uppercase tracking-wider">
               2. AI provider
             </label>
             <select
@@ -168,19 +168,19 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                     : ai.connection.tone === "err"
                       ? "text-red-400"
                       : ai.connection.tone === "checking"
-                        ? "text-gray-400"
+                        ? "text-muted"
                         : "text-amber-400"
                 }
               >
                 ●
               </span>
-              <span className="text-gray-300">{ai.connection.label}</span>
-              {ai.connection.hint && <span className="text-gray-500 truncate">— {ai.connection.hint}</span>}
+              <span className="text-fg2">{ai.connection.label}</span>
+              {ai.connection.hint && <span className="text-faint truncate">— {ai.connection.hint}</span>}
               <div className="flex-1" />
               {ai.ollamaModels && ai.ollamaModels.length > 0 && ai.provider !== "ollama" && (
                 <button
                   onClick={ai.switchToOllama}
-                  className="px-2 py-0.5 rounded bg-[#2D3A6E] text-[#93C5FD] hover:bg-[#3B4A7E] shrink-0"
+                  className="px-2 py-0.5 rounded bg-edge text-accent-soft hover:bg-edge2 shrink-0"
                   title="ローカルの Ollama に切り替え"
                 >
                   🦙 Ollama検出（{ai.ollamaModels.length}）→ 使う
@@ -191,7 +191,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                 (ai.provider !== "builtin" || ai.weightsPresent === false) && (
                   <button
                     onClick={ai.switchToBuiltin}
-                    className="px-2 py-0.5 rounded bg-[#2D3A6E] text-[#93C5FD] hover:bg-[#3B4A7E] shrink-0"
+                    className="px-2 py-0.5 rounded bg-edge text-accent-soft hover:bg-edge2 shrink-0"
                     title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
                   >
                     {ai.weightsPresent === false ? "⬇ オフラインAI（初回DL 2.4GB）" : "💻 オフラインAIを使う"}
@@ -200,7 +200,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               {runningInTauri() && ai.builtinStatus.kind === "running" && (
                 <button
                   onClick={ai.stopBuiltin}
-                  className="px-2 py-0.5 rounded bg-[#2D3A6E] text-gray-300 hover:bg-[#3B4A7E] shrink-0"
+                  className="px-2 py-0.5 rounded bg-edge text-fg2 hover:bg-edge2 shrink-0"
                   title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
                 >
                   ⏹ 停止
@@ -247,13 +247,13 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                 onClick={ai.refreshModels}
                 type="button"
                 title="インストール済みモデルを取得"
-                className="px-2 py-2 text-xs bg-[#2D3A6E] text-gray-200 rounded shrink-0"
+                className="px-2 py-2 text-xs bg-edge text-fg2 rounded shrink-0"
               >
                 ↻
               </button>
             </div>
             {!ai.preset.native && ai.models.length === 0 && (
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-faint">
                 {ai.modelsError
                   ? `モデル一覧を取得できません（${ai.modelsError}）。Base URL を確認、↻ で再取得。手入力も可。`
                   : "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。"}
@@ -274,14 +274,14 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                   />
                   <button
                     onClick={() => setShowKey((s) => !s)}
-                    className="px-2 py-2 text-xs bg-[#2D3A6E] text-gray-200 rounded"
+                    className="px-2 py-2 text-xs bg-edge text-fg2 rounded"
                     type="button"
                   >
                     {showKey ? "Hide" : "Show"}
                   </button>
                 </div>
 
-                <label className="flex items-center gap-2 text-xs text-gray-400">
+                <label className="flex items-center gap-2 text-xs text-muted">
                   <input
                     type="checkbox"
                     checked={ai.rememberKey}
@@ -298,7 +298,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             {ai.generating ? (
               <button
                 onClick={ai.cancel}
-                className="px-4 py-1.5 text-sm bg-[#C0504D] hover:bg-[#a83f3c] text-white rounded"
+                className="px-4 py-1.5 text-sm bg-danger hover:bg-danger text-on-accent rounded"
               >
                 Cancel
               </button>
@@ -306,17 +306,17 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               <button
                 onClick={handleGenerate}
                 disabled={!canGenerate}
-                className="px-4 py-1.5 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 text-white rounded"
+                className="px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi disabled:bg-accent/30 text-on-accent rounded"
               >
                 Generate
               </button>
             )}
             {ai.generating && (
-              <span className="text-xs text-[#06B6D4] animate-pulse">Generating…</span>
+              <span className="text-xs text-cyan animate-pulse">Generating…</span>
             )}
             <button
               onClick={() => setShowManual((s) => !s)}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-300 underline"
+              className="ml-auto text-xs text-faint hover:text-fg2 underline"
               type="button"
             >
               {showManual ? "Hide manual copy/paste" : "Or copy the prompt instead"}
@@ -324,7 +324,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
           </div>
 
           {ai.error && (
-            <div className="text-xs text-[#F87171] bg-[#C0504D]/10 border border-[#C0504D]/40 rounded px-3 py-2">
+            <div className="text-xs text-danger-soft bg-danger/10 border border-danger/40 rounded px-3 py-2">
               {ai.error}
             </div>
           )}
@@ -337,23 +337,23 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
 
           {/* Manual fallback: copy prompt to any LLM */}
           {showManual && (
-            <div className="border border-[#2D3A6E] rounded p-3 flex flex-col gap-2">
+            <div className="border border-edge rounded p-3 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs text-gray-400 uppercase tracking-wider">
+                <label className="text-xs text-muted uppercase tracking-wider">
                   Manual — copy this prompt to your LLM
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={handleGeneratePrompt}
                     disabled={!userRequest.trim()}
-                    className="px-3 py-1 text-xs bg-[#2D3A6E] hover:bg-[#3B82F6]/40 disabled:opacity-40 text-white rounded"
+                    className="px-3 py-1 text-xs bg-edge hover:bg-accent/40 disabled:opacity-40 text-on-accent rounded"
                   >
                     Build Prompt
                   </button>
                   {prompt && (
                     <button
                       onClick={handleCopyPrompt}
-                      className="px-3 py-1 text-xs bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded"
+                      className="px-3 py-1 text-xs bg-edge hover:bg-accent/40 text-on-accent rounded"
                     >
                       {copied ? "Copied!" : "Copy"}
                     </button>
@@ -365,7 +365,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                   value={prompt}
                   readOnly
                   rows={6}
-                  className="w-full px-3 py-2 bg-[#141B41] border border-[#2D3A6E] rounded text-xs text-gray-300 font-mono"
+                  className="w-full px-3 py-2 bg-panel border border-edge rounded text-xs text-fg2 font-mono"
                 />
               )}
             </div>
@@ -373,7 +373,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
 
           {/* Result */}
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider">
+            <label className="text-xs text-muted uppercase tracking-wider">
               3. Result {showManual && "(or paste your LLM's response here)"}
             </label>
             <textarea
@@ -386,7 +386,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             <button
               onClick={handleImport}
               disabled={!ai.result.trim() || ai.generating}
-              className="mt-2 px-4 py-1.5 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 text-white rounded"
+              className="mt-2 px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi disabled:bg-accent/30 text-on-accent rounded"
             >
               Import to SlideCraft
             </button>

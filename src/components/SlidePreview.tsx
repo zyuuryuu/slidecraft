@@ -496,7 +496,7 @@ export default function SlidePreview({
           </div>
         </div>
       ) : !hasSlides ? (
-        <div className="h-full flex items-center justify-center text-gray-500">
+        <div className="h-full flex items-center justify-center text-faint">
           <div className="text-center">
             <p className="text-lg mb-2">スライドプレビュー</p>
             <p className="text-sm">Markdown を入力すると</p>
@@ -518,10 +518,10 @@ export default function SlidePreview({
       )}
 
       {hasSlides && (
-        <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-[#0a0e1a]/90 border border-[#2D3A6E] rounded text-[11px] text-gray-300 select-none shadow">
-          <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} title="縮小" className="px-1.5 py-0.5 hover:bg-[#2D3A6E] rounded-l">−</button>
-          <button onClick={() => setZoom(1)} title="フィットに戻す" className="px-1.5 py-0.5 hover:bg-[#2D3A6E] tabular-nums text-center" style={{ minWidth: 40 }}>{Math.round(zoom * 100)}%</button>
-          <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} title="拡大" className="px-1.5 py-0.5 hover:bg-[#2D3A6E] rounded-r">＋</button>
+        <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-void/90 border border-edge rounded text-[11px] text-fg2 select-none shadow">
+          <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} title="縮小" className="px-1.5 py-0.5 hover:bg-edge rounded-l">−</button>
+          <button onClick={() => setZoom(1)} title="フィットに戻す" className="px-1.5 py-0.5 hover:bg-edge tabular-nums text-center" style={{ minWidth: 40 }}>{Math.round(zoom * 100)}%</button>
+          <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} title="拡大" className="px-1.5 py-0.5 hover:bg-edge rounded-r">＋</button>
         </div>
       )}
     </div>

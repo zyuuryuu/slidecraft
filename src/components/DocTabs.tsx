@@ -15,7 +15,7 @@ interface Props {
 export default function DocTabs({ docs, activeId, onSwitch, onClose }: Props) {
   if (docs.length <= 1) return null;
   return (
-    <div className="flex items-stretch bg-[#141B41] border-b border-[#2D3A6E] overflow-x-auto">
+    <div className="flex items-stretch bg-panel border-b border-edge overflow-x-auto">
       {docs.map((d) => {
         const active = d.id === activeId;
         return (
@@ -23,8 +23,8 @@ export default function DocTabs({ docs, activeId, onSwitch, onClose }: Props) {
             key={d.id}
             onClick={() => onSwitch(d.id)}
             title={d.title}
-            className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer border-r border-[#2D3A6E] max-w-[200px] ${
-              active ? "bg-[#0f1117] text-white" : "text-gray-400 hover:bg-[#1a2150] hover:text-gray-200"
+            className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer border-r border-edge max-w-[200px] ${
+              active ? "bg-canvas text-fg" : "text-muted hover:bg-canvas hover:text-fg2"
             }`}
           >
             <span className="truncate">{d.title || "Untitled"}</span>
@@ -34,7 +34,7 @@ export default function DocTabs({ docs, activeId, onSwitch, onClose }: Props) {
                 onClose(d.id);
               }}
               title="閉じる"
-              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-white px-1 leading-none rounded"
+              className="opacity-0 group-hover:opacity-100 text-faint hover:text-fg px-1 leading-none rounded"
             >
               ×
             </button>

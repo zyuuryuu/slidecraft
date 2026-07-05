@@ -48,21 +48,21 @@ export default function Toolbar({
 }: ToolbarProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [htmlSub, setHtmlSub] = useState(false); // HTML export → transition flyout
-  const btn = "px-3 py-1.5 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded transition-colors";
+  const btn = "px-3 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors";
 
   return (
     <div className="flex flex-1 items-center gap-2 px-4 py-2">
       <div className="flex items-center gap-1 mr-4">
-        <div className="w-1 h-6 bg-[#3B82F6] rounded-full" />
-        <h1 className="text-white font-semibold text-lg tracking-tight">SlideCraft</h1>
+        <div className="w-1 h-6 bg-accent rounded-full" />
+        <h1 className="text-fg font-semibold text-lg tracking-tight">SlideCraft</h1>
       </div>
 
       {onUndo && (
         <div className="flex items-center gap-0.5">
-          <button onClick={onUndo} disabled={!canUndo} title="元に戻す (⌘/Ctrl+Z)" className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-[#2D3A6E]`}>
+          <button onClick={onUndo} disabled={!canUndo} title="元に戻す (⌘/Ctrl+Z)" className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
             ↶
           </button>
-          <button onClick={onRedo} disabled={!canRedo} title="やり直す (⌘/Ctrl+Shift+Z)" className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-[#2D3A6E]`}>
+          <button onClick={onRedo} disabled={!canRedo} title="やり直す (⌘/Ctrl+Shift+Z)" className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
             ↷
           </button>
         </div>
@@ -79,13 +79,13 @@ export default function Toolbar({
           className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
             aiCollabActive
               ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
-              : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+              : "bg-brand hover:bg-brand text-on-accent"
           }`}
         >
           {aiCollabActive ? "✨ AI・協働編集中" : "✨ AI"}
           {aiCollabActive && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           {aiRunning > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-white/25 text-[10px] leading-none animate-pulse">
+            <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-fg/25 text-[10px] leading-none animate-pulse">
               {aiRunning}
             </span>
           )}
@@ -98,7 +98,7 @@ export default function Toolbar({
       <div className="relative">
         <button
           onClick={() => { setExportOpen((v) => !v); setHtmlSub(false); }}
-          className="px-4 py-1.5 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white font-medium rounded transition-colors inline-flex items-center gap-1.5"
+          className="px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi text-on-accent font-medium rounded transition-colors inline-flex items-center gap-1.5"
         >
           {generating ? "書き出し中…" : "ファイル"}
           <span className="text-[10px] opacity-80">▾</span>
@@ -106,35 +106,35 @@ export default function Toolbar({
         {exportOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => { setExportOpen(false); setHtmlSub(false); }} />
-            <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1 text-sm">
+            <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
               {onOpenProject && (
                 <button
                   onClick={() => { setExportOpen(false); onOpenProject(); }}
-                  className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"
+                  className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
                 >
                   <span>📂 プロジェクトを開く</span>
-                  <span className="text-gray-500 text-xs">.slidecraft</span>
+                  <span className="text-faint text-xs">.slidecraft</span>
                 </button>
               )}
               {onSaveProject && (
                 <button
                   onClick={() => { setExportOpen(false); onSaveProject(); }}
                   disabled={!hasSpec}
-                  className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                  className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                 >
                   <span>💾 プロジェクトを保存</span>
-                  <span className="text-gray-500 text-xs">.slidecraft</span>
+                  <span className="text-faint text-xs">.slidecraft</span>
                 </button>
               )}
-              <div className="my-1 border-t border-[#2D3A6E]" />
-              <div className="px-3 pb-0.5 text-[10px] text-gray-500">書き出す</div>
+              <div className="my-1 border-t border-edge" />
+              <div className="px-3 pb-0.5 text-[10px] text-faint">書き出す</div>
               <button
                 onClick={() => { setExportOpen(false); onGenerate(); }}
                 disabled={!hasSpec || generating}
-                className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
               >
                 <span>📊 PPTX</span>
-                <span className="text-gray-500 text-xs">.pptx</span>
+                <span className="text-faint text-xs">.pptx</span>
               </button>
               {onExportHtml && (
                 <div
@@ -146,21 +146,21 @@ export default function Toolbar({
                   <button
                     onClick={() => { setExportOpen(false); onExportHtml("slide"); }}
                     disabled={!hasSpec}
-                    className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] disabled:opacity-40 flex items-center justify-between"
+                    className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                   >
                     <span>🌐 HTML</span>
-                    <span className="text-gray-500 text-xs">遷移 ▸</span>
+                    <span className="text-faint text-xs">遷移 ▸</span>
                   </button>
                   {htmlSub && hasSpec && (
-                    <div className="absolute right-full top-0 w-36 bg-[#0f1117] border border-[#2D3A6E] rounded-lg shadow-2xl py-1">
+                    <div className="absolute right-full top-0 w-36 bg-canvas border border-edge rounded-lg shadow-2xl py-1">
                       {HTML_TRANSITIONS.map(({ v, label }) => (
                         <button
                           key={v}
                           onClick={() => { setExportOpen(false); setHtmlSub(false); onExportHtml(v); }}
-                          className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"
+                          className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
                         >
                           <span>{label}</span>
-                          {v === "slide" && <span className="text-gray-500 text-[10px]">既定</span>}
+                          {v === "slide" && <span className="text-faint text-[10px]">既定</span>}
                         </button>
                       ))}
                     </div>
@@ -169,10 +169,10 @@ export default function Toolbar({
               )}
               <button
                 onClick={() => { setExportOpen(false); onSave(); }}
-                className="w-full px-3 py-1.5 text-white hover:bg-[#2D3A6E] flex items-center justify-between"
+                className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
               >
                 <span>📝 Markdown</span>
-                <span className="text-gray-500 text-xs">.md</span>
+                <span className="text-faint text-xs">.md</span>
               </button>
             </div>
           </>

@@ -99,4 +99,15 @@ test.describe("SlideCraft", () => {
     await layoutToggle.click();
     await expect(picker).toBeVisible(); // expanded → the picker appears
   });
+
+  test("theme toggle switches the palette and persists across reload", async ({ page }) => {
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute("data-theme", "dark"); // default
+    await page.getByTitle("Light").click();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    await page.reload(); // persisted (applied before first paint → no flash)
+    await expect(html).toHaveAttribute("data-theme", "light");
+    await page.getByTitle(/Modern/).click();
+    await expect(html).toHaveAttribute("data-theme", "modern");
+  });
 });

@@ -30,7 +30,7 @@ export default function SlideList({
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
   if (!deck || deck.slides.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-500 text-xs p-2">
+      <div className="h-full flex items-center justify-center text-faint text-xs p-2">
         No slides
       </div>
     );
@@ -61,7 +61,7 @@ export default function SlideList({
               selected={selected?.has(i)}
               onClick={(e) => onSelect(i, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey })}
             />
-            <span className="text-[10px] text-gray-500 mt-0.5">{i + 1}</span>
+            <span className="text-[10px] text-faint mt-0.5">{i + 1}</span>
           </div>
         );
       })}

@@ -147,7 +147,7 @@ export default function DiagramEditor({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] text-gray-500 uppercase tracking-wider">
+        <label className="text-[10px] text-faint uppercase tracking-wider">
           {label}
         </label>
         {/* Editing-format selector: a dropdown shows only the current choice (less
@@ -157,7 +157,7 @@ export default function DiagramEditor({
           value={mode}
           onChange={(e) => switchMode(e.target.value as DiagramMode)}
           title={mermaidIncompatible ? "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。" : "編集フォーマットを選択"}
-          className="px-2 py-0.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-[11px] text-white hover:border-[#3B82F6]/60"
+          className="px-2 py-0.5 bg-field border border-edge rounded text-[11px] text-fg hover:border-accent/60"
         >
           <option value="yaml">YAML</option>
           <option value="json">JSON</option>
@@ -170,17 +170,17 @@ export default function DiagramEditor({
         value={textValue}
         onChange={(e) => handleTextChange(e.target.value)}
         rows={12}
-        className={`w-full px-2 py-1.5 bg-[#1a1f3a] border rounded text-sm ${colorClass} font-mono resize-y ${
-          validationError ? "border-[#C0504D]" : "border-[#2D3A6E]"
+        className={`w-full px-2 py-1.5 bg-field border rounded text-sm ${colorClass} font-mono resize-y ${
+          validationError ? "border-danger" : "border-edge"
         }`}
         placeholder={mode === "mermaid" ? "graph TD\n  A[Start] --> B[End]" : "type: flowchart\nnodes:\n  - id: a\n    label: A"}
       />
       {validationError ? (
-        <div className="mt-1 text-[10px] text-[#F87171] font-mono break-words">
+        <div className="mt-1 text-[10px] text-danger-soft font-mono break-words">
           {validationError}
         </div>
       ) : textValue.trim() && mode !== "mermaid" ? (
-        <div className="mt-1 text-[10px] text-[#06B6D4]">✓ valid</div>
+        <div className="mt-1 text-[10px] text-cyan">✓ valid</div>
       ) : null}
       {mode !== "mermaid" && !validationError && slide.diagram?.yaml ? (
         <EdgeStyleControls diagramYaml={slide.diagram.yaml} onChange={onUpdateDiagramYaml} />

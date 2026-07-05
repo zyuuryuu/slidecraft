@@ -40,7 +40,7 @@ export default function SlideMarkdownEditor({ md, onChange }: SlideMarkdownEdito
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       spellCheck={false}
-      className="h-full w-full px-3 py-2 bg-[#0f1117] text-sm text-gray-200 font-mono resize-none outline-none leading-relaxed"
+      className="h-full w-full px-3 py-2 bg-canvas text-sm text-fg2 font-mono resize-none outline-none leading-relaxed"
       placeholder={"# 見出し\n> サブタイトル\n\n- 箇条書き\n- 箇条書き"}
     />
   );

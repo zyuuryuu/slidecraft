@@ -139,30 +139,30 @@ export default function AiPanel({
   const toneColor =
     ai.connection.tone === "ok" ? "text-green-400"
     : ai.connection.tone === "err" ? "text-red-400"
-    : ai.connection.tone === "checking" ? "text-gray-400"
+    : ai.connection.tone === "checking" ? "text-muted"
     : "text-amber-400";
 
   return (
-    <div className="relative border-t border-[#3B82F6]/40 bg-[#0a0e1a] flex flex-col shrink-0" style={{ height: panelH }}>
+    <div className="relative border-t border-accent/40 bg-void flex flex-col shrink-0" style={{ height: panelH }}>
       {/* Drag the top edge to resize the dock (double-click resets) */}
       <div
         onMouseDown={onResizeDown}
         onDoubleClick={() => setPanelH(340)}
         title="ドラッグで高さ変更（ダブルクリックでリセット）"
-        className="h-1.5 shrink-0 cursor-row-resize bg-[#2D3A6E] hover:bg-[#3B82F6] transition-colors"
+        className="h-1.5 shrink-0 cursor-row-resize bg-edge hover:bg-accent transition-colors"
       />
       {/* Header — hub tabs (アシスト / 協働); gear (config) shows only on the assist tab */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[#2D3A6E]">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-edge">
         <button
           onClick={() => setHubTab("assist")}
-          className={`px-2 py-0.5 rounded text-sm ${hubTab === "assist" ? "bg-[#2D3A6E] text-[#93C5FD] font-medium" : "text-gray-400 hover:text-white"}`}
+          className={`px-2 py-0.5 rounded text-sm ${hubTab === "assist" ? "bg-edge text-accent-soft font-medium" : "text-muted hover:text-fg"}`}
         >
           ✨ アシスト
         </button>
         {collabTab && (
           <button
             onClick={() => setHubTab("collab")}
-            className={`px-2 py-0.5 rounded text-sm inline-flex items-center gap-1 ${hubTab === "collab" ? "bg-[#2D3A6E] text-white font-medium" : "text-gray-400 hover:text-white"}`}
+            className={`px-2 py-0.5 rounded text-sm inline-flex items-center gap-1 ${hubTab === "collab" ? "bg-edge text-fg font-medium" : "text-muted hover:text-fg"}`}
           >
             🔗 協働{collabConnected && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           </button>
@@ -174,20 +174,20 @@ export default function AiPanel({
           <button
             onClick={() => setShowSettings((v) => !v)}
             title={`${ai.connection.label}${ai.connection.hint ? " — " + ai.connection.hint : ""}（クリックで AI 設定）`}
-            className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-[#2D3A6E] hover:bg-[#2D3A6E] max-w-[230px] ${showSettings ? "bg-[#2D3A6E] text-white" : "bg-[#1a1f3a] text-gray-300"}`}
+            className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
           >
             <span className={`${toneColor} leading-none`}>●</span>
             <span className="truncate">{ai.connection.label}</span>
-            <span className="text-gray-400 leading-none">⚙</span>
+            <span className="text-muted leading-none">⚙</span>
           </button>
         )}
-        <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none" title="閉じる">
+        <button onClick={onClose} className="text-muted hover:text-fg text-lg leading-none" title="閉じる">
           ×
         </button>
       </div>
 
       {/* Plain-language description of the active tab — so it's obvious what each does (non-IT friendly) */}
-      <div className="px-3 py-1.5 text-[11px] text-gray-400 border-b border-[#2D3A6E] bg-[#0f1117] leading-relaxed shrink-0">
+      <div className="px-3 py-1.5 text-[11px] text-muted border-b border-edge bg-canvas leading-relaxed shrink-0">
         {hubTab === "assist"
           ? "🖊️ AI にお願いして、このアプリの中でスライドを作る・直します。"
           : "🤝 あなたが使っている別の AI（例：Claude Code）をこの画面につなぎ、同じ資料を一緒に編集します。（上級者向け）"}
@@ -199,27 +199,27 @@ export default function AiPanel({
       {showSettings && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
-          <div className="absolute right-2 top-12 z-50 w-[min(30rem,92vw)] rounded-lg border border-[#2D3A6E] bg-[#0f1117] shadow-xl shadow-black/50">
+          <div className="absolute right-2 top-12 z-50 w-[min(30rem,92vw)] rounded-lg border border-edge bg-canvas shadow-xl shadow-black/50">
             <AiSettingsPopover ai={ai} />
           </div>
         </>
       )}
 
       {/* Tabs: generate/edit vs the AI task list (in-flight + history) */}
-      <div className="flex items-center gap-1 px-3 py-1 border-b border-[#2D3A6E]">
+      <div className="flex items-center gap-1 px-3 py-1 border-b border-edge">
         <button
           onClick={() => setTab("gen")}
-          className={`px-2 py-0.5 rounded text-[11px] ${tab === "gen" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+          className={`px-2 py-0.5 rounded text-[11px] ${tab === "gen" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-on-accent"}`}
         >
           生成・編集
         </button>
         <button
           onClick={() => setTab("tasks")}
-          className={`px-2 py-0.5 rounded text-[11px] ${tab === "tasks" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+          className={`px-2 py-0.5 rounded text-[11px] ${tab === "tasks" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-on-accent"}`}
         >
           タスク{ai.tasks.length > 0 ? ` ${ai.tasks.length}` : ""}
         </button>
-        {runningCount > 0 && <span className="text-[10px] text-[#93C5FD] animate-pulse ml-1">● {runningCount} 実行中</span>}
+        {runningCount > 0 && <span className="text-[10px] text-accent-soft animate-pulse ml-1">● {runningCount} 実行中</span>}
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col">
@@ -230,16 +230,16 @@ export default function AiPanel({
       {/* Scope + Prompt — grows with the dock so the instruction box isn't stuck at 2 rows */}
       <div className="px-3 py-2 flex flex-col gap-2 flex-1 min-h-0">
         {/* Scope = the slide-list selection (no toggle). 1 = focused slide, >1 = batch. */}
-        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+        <div className="flex items-center gap-1.5 text-xs text-muted">
           <span>編集対象:</span>
           {batch ? (
-            <span className="px-2 py-0.5 rounded bg-[#3B82F6]/20 text-[#93C5FD]">選択 {selectedCount} 枚を一括編集</span>
+            <span className="px-2 py-0.5 rounded bg-accent/20 text-accent-soft">選択 {selectedCount} 枚を一括編集</span>
           ) : canSlide ? (
-            <span className="px-2 py-0.5 rounded bg-[#1a1f3a] text-[#93C5FD]">スライド {activeSlideNum}</span>
+            <span className="px-2 py-0.5 rounded bg-field text-accent-soft">スライド {activeSlideNum}</span>
           ) : (
-            <span className="text-gray-500">スライドを選択してください</span>
+            <span className="text-faint">スライドを選択してください</span>
           )}
-          {batch && <span className="text-gray-500">— 1つの指示を各スライドに適用 → 確認して採用</span>}
+          {batch && <span className="text-faint">— 1つの指示を各スライドに適用 → 確認して採用</span>}
         </div>
         <div className="flex gap-2 flex-1 min-h-0">
           <textarea
@@ -250,20 +250,20 @@ export default function AiPanel({
                 ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / 図を追加 / DBノードを足す / 英語にする）"
                 : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
             }
-            className="flex-1 min-h-[3rem] px-2 py-1.5 bg-[#1a1f3a] border border-[#2D3A6E] rounded text-sm text-white resize-none"
+            className="flex-1 min-h-[3rem] px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg resize-none"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) doGenerate();
             }}
           />
           {ai.generating ? (
-            <button onClick={ai.cancel} className="self-start px-4 py-2 text-sm bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white rounded shrink-0">
+            <button onClick={ai.cancel} className="self-start px-4 py-2 text-sm bg-edge hover:bg-accent/40 text-fg rounded shrink-0">
               停止
             </button>
           ) : (
             <button
               onClick={doGenerate}
               disabled={!ready}
-              className="self-start px-4 py-2 text-sm bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#3B82F6]/30 disabled:text-white/40 text-white font-medium rounded shrink-0"
+              className="self-start px-4 py-2 text-sm bg-accent hover:bg-accent-hi disabled:bg-accent/30 disabled:text-on-accent/40 text-on-accent font-medium rounded shrink-0"
             >
               {batchRunning ? "一括編集中…" : batch ? `${selectedCount}枚を編集` : "生成"}
             </button>
@@ -288,9 +288,9 @@ export default function AiPanel({
       {/* Result — for a slide edit show before→after diff so it's never applied
           blind (you see what changed/was dropped) → 採用/却下. Deck gen keeps raw. */}
       {ai.result && (
-        <div className="flex-1 flex flex-col min-h-0 border-t border-[#2D3A6E]">
+        <div className="flex-1 flex flex-col min-h-0 border-t border-edge">
           <div className="flex items-center justify-between px-3 py-1">
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted">
               {ai.generating ? "生成中…" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
             </span>
             <div className="flex items-center gap-1">
@@ -298,7 +298,7 @@ export default function AiPanel({
                 <button
                   onClick={ai.reset}
                   disabled={ai.generating}
-                  className="px-2.5 py-1 text-xs bg-[#1a1f3a] hover:bg-[#2D3A6E] disabled:opacity-40 text-gray-300 rounded"
+                  className="px-2.5 py-1 text-xs bg-field hover:bg-edge disabled:opacity-40 text-fg2 rounded"
                 >
                   却下
                 </button>
@@ -306,7 +306,7 @@ export default function AiPanel({
               <button
                 onClick={doApply}
                 disabled={ai.generating || !ai.result.trim()}
-                className="px-3 py-1 text-xs bg-[#06B6D4] hover:bg-[#0891B2] disabled:opacity-40 text-white font-medium rounded"
+                className="px-3 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
               >
                 {slideScope ? "採用 → このスライド" : "適用 → 編集へ"}
               </button>

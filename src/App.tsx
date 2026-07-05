@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
 import MasterPicker from "./components/MasterPicker";
+import ThemeToggle from "./components/ThemeToggle";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
@@ -179,7 +180,7 @@ export default function App() {
 
   return (
     <>
-      <div className="flex items-stretch bg-[#1E2761] border-b border-[#3B82F6]/30" inert={bgInert}>
+      <div className="flex items-stretch bg-surface border-b border-accent/30" inert={bgInert}>
         <Toolbar
           onSave={handleSave}
           onGenerate={handleGenerate}
@@ -205,7 +206,7 @@ export default function App() {
             onClick={handleEnterImport}
             disabled={editLocked}
             title={editLocked ? "協働接続中は編集ロック中" : "原稿（テキスト）からスライドを作る・取り込む"}
-            className="px-3 py-1.5 text-sm rounded bg-[#2D3A6E] hover:bg-[#3B82F6]/40 text-white transition-colors disabled:opacity-40 disabled:hover:bg-[#2D3A6E]"
+            className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge"
           >
             📝 Draft
           </button>
@@ -217,6 +218,7 @@ export default function App() {
             onCreate={() => setShowTemplateCreator(true)}
             disabled={editLocked}
           />
+          <ThemeToggle />
         </div>
       </div>
 
@@ -235,8 +237,8 @@ export default function App() {
         />
         <div className="flex-1 flex min-h-0">
           {/* Left: Slide list */}
-          <div className="w-[220px] border-r border-[#2D3A6E] flex flex-col min-h-0 bg-[#0a0e1a]">
-            <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+          <div className="w-[220px] border-r border-edge flex flex-col min-h-0 bg-void">
+            <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">
               Slides
             </div>
             <div className="flex-1 min-h-0">
@@ -250,28 +252,28 @@ export default function App() {
             initialLeftPct={55}
             left={
               <>
-                <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E] flex items-center justify-between">
+                <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge flex items-center justify-between">
                   {/* Show the resolved layout in the title ONLY in Markdown view — the form view's
                       LAYOUT row already shows it (avoid duplicating the layout name). */}
                   <span>Slide Editor{slideEditView === "markdown" && currentLayoutName ? ` — ${currentLayoutName}` : ""}</span>
                   <div className="flex items-center gap-0.5">
                     <button
                       onClick={() => setSlideEditView("form")}
-                      className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "form" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+                      className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "form" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-fg"}`}
                     >
                       フォーム
                     </button>
                     <button
                       onClick={() => setSlideEditView("markdown")}
-                      className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "markdown" ? "bg-[#3B82F6] text-white" : "bg-[#1a1f3a] text-gray-400 hover:text-white"}`}
+                      className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "markdown" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-fg"}`}
                     >
                       Markdown
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 min-h-0 bg-[#0f1117]">
+                <div className="flex-1 min-h-0 bg-canvas">
                   {!currentSlide ? (
-                    <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                    <div className="h-full flex items-center justify-center text-faint text-sm">
                       Select a slide
                     </div>
                   ) : slideEditView === "markdown" ? (
@@ -284,10 +286,10 @@ export default function App() {
             }
             right={
               <>
-                <div className="px-3 py-1 bg-[#141B41] text-xs text-gray-400 border-b border-[#2D3A6E]">
+                <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">
                   Preview — Slide {activeSlide + 1}
                 </div>
-                <div className="flex-1 min-h-0 bg-[#0f1117]">
+                <div className="flex-1 min-h-0 bg-canvas">
                   <SlidePreview deck={deck} template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
                 </div>
               </>
@@ -384,7 +386,7 @@ export default function App() {
         <div
           key={toast.ts}
           role="status"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg bg-[#1E2761] border border-[#3B82F6]/50 text-sm text-amber-100 shadow-2xl"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg bg-surface border border-accent/50 text-sm text-amber-100 shadow-2xl"
         >
           {toast.message}
         </div>

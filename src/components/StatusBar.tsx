@@ -8,7 +8,7 @@ interface StatusBarProps {
 
 export default function StatusBar({ spec, error, filePath }: StatusBarProps) {
   return (
-    <div className="flex items-center gap-4 px-4 py-1 bg-[#141B41] text-xs text-gray-400 border-t border-[#2D3A6E]">
+    <div className="flex items-center gap-4 px-4 py-1 bg-panel text-xs text-muted border-t border-edge">
       <span>
         {error ? (
           <span className="text-red-400">Error</span>
@@ -31,7 +31,7 @@ export default function StatusBar({ spec, error, filePath }: StatusBarProps) {
       )}
 
       <div className="flex-1" />
-      {filePath && <span className="text-gray-500 truncate max-w-xs">{filePath}</span>}
+      {filePath && <span className="text-faint truncate max-w-xs">{filePath}</span>}
     </div>
   );
 }
