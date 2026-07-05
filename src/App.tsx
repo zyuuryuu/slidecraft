@@ -246,12 +246,22 @@ export default function App() {
             maxPct={45}
             left={
               <>
-                <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">
-                  Slides
+                <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge flex items-center justify-between">
+                  <span>Slides</span>
+                  {!editLocked && (
+                    <button
+                      type="button"
+                      onClick={handleAddSlide}
+                      title="スライドを追加（選択中のスライドの後ろに）"
+                      className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none"
+                    >
+                      ＋
+                    </button>
+                  )}
                 </div>
                 <div className="flex-1 min-h-0 bg-void">
                   <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
-                    onAdd={handleAddSlide} onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} disabled={editLocked} />
+                    onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} disabled={editLocked} />
                 </div>
               </>
             }

@@ -106,7 +106,7 @@ test.describe("SlideCraft", () => {
     const del = page.getByTitle("このスライドを削除"); // one per slide (hover-revealed) = a count proxy
     const before = await del.count();
     expect(before).toBeGreaterThanOrEqual(3);
-    await page.getByRole("button", { name: /スライド追加/ }).click();
+    await page.getByTitle(/スライドを追加/).click(); // ＋ in the "Slides" header band
     await expect(del).toHaveCount(before + 1);
     await page.locator(".group").first().hover();
     await page.getByTitle("このスライドを複製").first().click();
