@@ -290,6 +290,19 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     [canGenerate, persistConfig, enqueue, runTask],
   );
 
+  // Self-repair single-retry (ADR-0019 ①, Option A): re-run a slide edit with a harness-authored
+  // ops-bias prompt when the first attempt drifted to full-Markdown. Same machinery as generate
+  // (enqueue + track active so result/generating reflect it); a distinct label marks it in history.
+  // Caller (AiPanel) enforces "once per user-generate" so this never loops.
+  const retry = useCallback(
+    (prompt: string) => {
+      const task = enqueue(prompt, "slide", "🔁 opsで再生成");
+      setActiveTaskId(task.id);
+      void runTask(task).catch(() => {});
+    },
+    [enqueue, runTask],
+  );
+
   const cancel = useCallback(() => {
     if (activeTaskId) abortMap.current.get(activeTaskId)?.abort();
   }, [activeTaskId]);
@@ -363,7 +376,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     configs, cfg, preset, setField,
     rememberKey, setRememberKey,
     generating, result, setResult, error, notice,
-    canGenerate, generate, cancel, reset,
+    canGenerate, generate, retry, cancel, reset,
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
     models, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,

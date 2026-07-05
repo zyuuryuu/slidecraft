@@ -10,7 +10,7 @@ import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
-import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent } from "../engine/diagram-edit-ops";
+import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
 import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
@@ -465,7 +465,7 @@ export function useDeckController() {
   // 変更プレビュー shows the real result + warnings and the reviewer decides 採用/却下 informed. Only
   // the CONTENT-edit path reconciles; figure/design edits keep the raw diff (return null).
   const previewSlideEdit = useCallback(
-    (raw: string, instruction?: string): { afterMd: string; warnings: string[]; beforeMd?: string } | null => {
+    (raw: string, instruction?: string): { afterMd: string; warnings: string[]; beforeMd?: string; shouldRetry?: boolean; retryInstruction?: string } | null => {
       const s = deck?.slides[activeSlide];
       if (!s) return null;
       // Figure CONTENT ops (部分生成・ADR-0019): merge the ops, then diff the figure SOURCE (old vs
@@ -491,7 +491,15 @@ export function useDeckController() {
       // L4: a figure slide that fell to the full-Markdown path AND drifted → tag it so the "変更なし"
       // rollback is legible (the model regenerated the whole slide instead of emitting figure ops).
       const hadFigure = !!s.diagram || !!s.mermaidBlock;
-      return { afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }), warnings: figureFallbackTag(hadFigure, rec.warnings) };
+      // ① Option A: that SAME condition (figure slide drifted to full-Markdown) is the deterministic
+      // trigger for a single ops-bias auto-retry — AiPanel re-asks once for (B) ops. retryInstruction is
+      // the harness-authored nudge (needs the original instruction; absent for batch/✨直す w/o one).
+      const shouldRetry = hadFigure && rec.warnings.length > 0;
+      return {
+        afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }),
+        warnings: figureFallbackTag(hadFigure, rec.warnings),
+        ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
+      };
     },
     [deck, activeSlide, catalog],
   );

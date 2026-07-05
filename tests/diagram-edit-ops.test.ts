@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import * as yaml from "js-yaml";
 import type { SlideIR } from "../src/engine/slide-schema";
-import { applyDiagramEditOps, parseDiagramEditOps, checkDeleteIntent } from "../src/engine/diagram-edit-ops";
+import { applyDiagramEditOps, parseDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../src/engine/diagram-edit-ops";
 import { validateDiagramSource } from "../src/engine/mermaid-to-diagram";
 
 const DIAGRAM = `type: flowchart
@@ -188,5 +188,23 @@ edges:
     expect(checkDeleteIntent(slide(REPRO), [{ op: "nodeUpdate", id: "db", label: "X" }, { op: "addNode", id: "n", label: "N" }], "何かして")).toEqual([]);
     expect(checkDeleteIntent(slide(REPRO), [{ op: "removeNode", id: "redis" }], "   ")).toEqual([]);
     expect(checkDeleteIntent({ layout: "auto", placeholders: [] }, [{ op: "removeNode", id: "redis" }], "Redis を削除")).toEqual([]);
+  });
+});
+
+// ADR-0019 ① Option A: the deterministic ops-bias nudge used to auto-retry ONCE when a figure edit
+// drifted to full-Markdown. Harness-authored: it lists the real node ids and forbids full-Markdown.
+describe("buildOpsRetryInstruction — ops-bias self-repair nudge", () => {
+  it("restates the instruction, lists the real node ids, and forbids full-Markdown", () => {
+    const n = buildOpsRetryInstruction(slide(), "API の後ろに Redis を追加");
+    expect(n).toContain("API の後ろに Redis を追加"); // the original instruction is kept
+    expect(n).toMatch(/既存ノードid:.*\ba\b/); // node ids from the figure (a, db)
+    expect(n).toContain("db");
+    expect(n).toMatch(/形式B|ops JSON 配列/); // steers to (B) ops
+    expect(n).toMatch(/全文 ?Markdown は返さない/); // and away from (A)
+  });
+  it("degrades gracefully on a figureless slide (no ids)", () => {
+    const n = buildOpsRetryInstruction({ layout: "auto", placeholders: [] }, "直して");
+    expect(n).toContain("直して");
+    expect(n).toContain("（なし）");
   });
 });

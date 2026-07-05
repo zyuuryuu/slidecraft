@@ -127,9 +127,27 @@ export default function AiPanel({
     [slideScope, currentSlideMd, ai.result, ai.generating, onPreviewSlideEdit, userRequest],
   );
 
+  // ① Self-repair, Option A (ADR-0019): when a figure edit drifted to full-Markdown (editPreview
+  // .shouldRetry), auto-fire ONE ops-bias retry with the harness-authored nudge. Ref-guarded so it
+  // runs at most once per user generate (reset in doGenerate) → never loops; a 2nd drift just shows the
+  // [全文フォールバック]-tagged result for the human to reject/edit. Adoption gate unchanged.
+  const autoRetriedRef = useRef(false);
+  const [retrying, setRetrying] = useState(false);
+  const aiGenerating = ai.generating;
+  const aiRetry = ai.retry;
+  useEffect(() => {
+    if (!editPreview?.shouldRetry || !editPreview.retryInstruction || !currentSlideMd) return;
+    if (autoRetriedRef.current || aiGenerating) return;
+    autoRetriedRef.current = true;
+    setRetrying(true);
+    aiRetry(`Current slide:\n${currentSlideMd}\n\nInstruction: ${editPreview.retryInstruction}`);
+  }, [editPreview, aiGenerating, aiRetry, currentSlideMd]);
+
   const doGenerate = () => {
     if (batch) { onBatchEdit(userRequest); return; } // one instruction → every selected slide
     if (!currentSlideMd) return;
+    autoRetriedRef.current = false; // a fresh user generate re-arms the one-shot self-repair
+    setRetrying(false);
     // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
     ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
   };
@@ -308,6 +326,14 @@ export default function AiPanel({
       {ai.notice && (
         <div className="mx-3 mb-2 px-2 py-1.5 bg-amber-900/30 border border-amber-500/40 rounded text-xs text-amber-200">
           {ai.notice}
+        </div>
+      )}
+
+      {/* ① Self-repair (Option A): the first attempt drifted to full-Markdown → auto re-asking for ops.
+          Transparent (not silent) even though it fires automatically. */}
+      {retrying && ai.generating && (
+        <div className="mx-3 mb-2 px-2 py-1.5 bg-accent/15 border border-accent/40 rounded text-xs text-accent-soft">
+          🔁 図が全文で返ったため、部分編集（ops）で自動的に再生成しています…
         </div>
       )}
 
