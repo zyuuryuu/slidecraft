@@ -133,21 +133,37 @@ export default function AiPanel({
   // [全文フォールバック]-tagged result for the human to reject/edit. Adoption gate unchanged.
   const autoRetriedRef = useRef(false);
   const [retrying, setRetrying] = useState(false);
+  // 採用 = commit, then FREEZE the review as an "adopted" snapshot. Recomputing editPreview against the
+  // now-updated slide would re-apply the edit (e.g. a dup addNode → "既に存在" skip) and show a spurious
+  // error while the bar stays as if nothing happened. The snapshot keeps the preview visible (you may
+  // want to keep looking) but in an explicit adopted state until 閉じる. null = pending (not yet adopted).
+  const [adopted, setAdopted] = useState<{ beforeMd?: string; afterMd: string; warnings: string[] } | null>(null);
+  const preview = adopted ?? editPreview; // what the review pane renders: frozen snapshot once adopted
   const aiGenerating = ai.generating;
   const aiRetry = ai.retry;
   useEffect(() => {
+    if (adopted) return; // never auto-retry a committed edit
     if (!editPreview?.shouldRetry || !editPreview.retryInstruction || !currentSlideMd) return;
     if (autoRetriedRef.current || aiGenerating) return;
     autoRetriedRef.current = true;
     setRetrying(true);
     aiRetry(`Current slide:\n${currentSlideMd}\n\nInstruction: ${editPreview.retryInstruction}`);
-  }, [editPreview, aiGenerating, aiRetry, currentSlideMd]);
+  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, adopted]);
+
+  // 却下 / 閉じる — discard the foreground result and re-arm the one-shot self-repair.
+  const closePreview = useCallback(() => {
+    setAdopted(null);
+    autoRetriedRef.current = false;
+    setRetrying(false);
+    ai.reset();
+  }, [ai]);
 
   const doGenerate = () => {
     if (batch) { onBatchEdit(userRequest); return; } // one instruction → every selected slide
     if (!currentSlideMd) return;
     autoRetriedRef.current = false; // a fresh user generate re-arms the one-shot self-repair
     setRetrying(false);
+    setAdopted(null); // leaving the adopted snapshot behind for a new proposal
     // One slide in, one slide out (text + any figure) — far fewer tokens than the deck.
     ai.generate(`Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`, "slide");
   };
@@ -156,7 +172,13 @@ export default function AiPanel({
   // this dock is just freeform edit of the focused slide + the task list, kept simple.
 
   const doApply = () => {
-    if (onApplySlide) onApplySlide(ai.result, userRequest);
+    if (!onApplySlide || !ai.result.trim()) return;
+    onApplySlide(ai.result, userRequest);
+    // Freeze the pre-adopt review (slide edits only — deck-gen "適用 → 編集へ" navigates away).
+    if (slideScope) {
+      const snap = editPreview ?? { afterMd: ai.result, warnings: [] as string[] };
+      setAdopted({ beforeMd: snap.beforeMd, afterMd: snap.afterMd, warnings: snap.warnings });
+    }
   };
 
   const toneColor =
@@ -343,37 +365,50 @@ export default function AiPanel({
         <div className="flex-1 flex flex-col min-h-0 border-t border-edge">
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-muted">
-              {ai.generating ? "生成中…" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
+              {ai.generating ? "生成中…" : adopted ? "適用済み（プレビュー）" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
             </span>
             <div className="flex items-center gap-1">
-              {slideScope && currentSlideMd && (
-                <button
-                  onClick={ai.reset}
-                  disabled={ai.generating}
-                  className="px-2.5 py-1 text-xs bg-field hover:bg-edge disabled:opacity-40 text-fg2 rounded"
-                >
-                  却下
-                </button>
+              {adopted ? (
+                // Adopted: the edit is committed; the review is a frozen record until you close it.
+                <>
+                  <span className="text-xs text-green-300">✓ 適用しました</span>
+                  <button onClick={closePreview} className="px-2.5 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">
+                    閉じる
+                  </button>
+                </>
+              ) : (
+                <>
+                  {slideScope && currentSlideMd && (
+                    <button
+                      onClick={closePreview}
+                      disabled={ai.generating}
+                      className="px-2.5 py-1 text-xs bg-field hover:bg-edge disabled:opacity-40 text-fg2 rounded"
+                    >
+                      却下
+                    </button>
+                  )}
+                  <button
+                    onClick={doApply}
+                    disabled={ai.generating || !ai.result.trim()}
+                    className="px-3 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
+                  >
+                    {slideScope ? "採用 → このスライド" : "適用 → 編集へ"}
+                  </button>
+                </>
               )}
-              <button
-                onClick={doApply}
-                disabled={ai.generating || !ai.result.trim()}
-                className="px-3 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
-              >
-                {slideScope ? "採用 → このスライド" : "適用 → 編集へ"}
-              </button>
             </div>
           </div>
           {/* Validation advisories for THIS edit — shown at the review so 採用/却下 is informed
-              (numbers/language changed, structure restored, a broken figure kept). */}
-          {editPreview && editPreview.warnings.length > 0 && (
+              (numbers/language changed, structure restored, a broken figure kept). Frozen once adopted. */}
+          {preview && preview.warnings.length > 0 && (
             <div className="mx-3 mb-1 px-2 py-1.5 rounded border border-amber-500/40 bg-amber-950/40 text-[11px] text-amber-200">
-              {editPreview.warnings.map((w, i) => <div key={i}>{w}</div>)}
+              {preview.warnings.map((w, i) => <div key={i}>{w}</div>)}
             </div>
           )}
           {slideScope && currentSlideMd && !ai.generating ? (
-            // Diff the REAL applied result (reconciled) when available, else the raw output.
-            <DiffView before={editPreview?.beforeMd ?? currentSlideMd} after={editPreview?.afterMd ?? ai.result} fill />
+            // Diff the REAL applied result (reconciled) when available, else the raw output. Once adopted
+            // this is the frozen pre-adopt before→after, NOT a recompute against the updated slide.
+            <DiffView before={preview?.beforeMd ?? currentSlideMd} after={preview?.afterMd ?? ai.result} fill />
           ) : (
             <pre className="flex-1 min-h-0 overflow-auto px-3 pb-2 text-[11px] text-green-200 font-mono whitespace-pre-wrap">
               {ai.result}
