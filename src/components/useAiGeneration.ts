@@ -17,7 +17,7 @@ import { ensureEgressConsent } from "../ipc/egress-consent";
 import { saveAiConfig, loadAiConfig, clearAiConfig } from "../ipc/key-store";
 import {
   type AiProviderConfig, type AiConfigMap, type AiMode, type AiTask, type DiagramTypeChoice,
-  LOCAL_ONLY_STORAGE, MAX_TASKS, MODE_LABEL, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection,
+  LOCAL_ONLY_STORAGE, MAX_TASKS, MODE_LABEL, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection, freshBuiltin,
 } from "./ai-generation-types";
 import { useBuiltinRuntime } from "./useBuiltinRuntime";
 
@@ -30,7 +30,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   // Default to the bundled offline model on desktop (the product's offline-first north star);
   // the browser/demo build can't spawn a runtime, so it falls back to Claude. A saved choice wins.
   const [provider, setProvider] = useState<ProviderId>(saved.provider ?? (runningInTauri() ? "builtin" : "claude"));
-  const [configs, setConfigs] = useState<AiConfigMap>(() => (saved.configs ? { ...defaultConfigs(), ...saved.configs } : defaultConfigs()));
+  const [configs, setConfigs] = useState<AiConfigMap>(() => freshBuiltin(saved.configs ? { ...defaultConfigs(), ...saved.configs } : defaultConfigs()));
   const [rememberKey, setRememberKey] = useState(!!saved.configs);
   // Central AI task store: the live list (in-flight + history) + which task is the
   // "foreground" one whose result/error the single-shot surfaces (AiPanel/LlmAssist)
@@ -72,7 +72,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       try {
         const parsed = JSON.parse(raw) as { provider?: ProviderId; configs?: Partial<AiConfigMap> };
         if (parsed.configs) {
-          setConfigs((c) => ({ ...c, ...parsed.configs }));
+          setConfigs((c) => freshBuiltin({ ...c, ...parsed.configs }));
           if (parsed.provider) setProvider(parsed.provider);
           setRememberKey(true);
           hadSavedConfig.current = true; // don't let the fresh-install auto-select clobber a saved choice
@@ -253,7 +253,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   const persistConfig = useCallback(() => {
     // Persist the config (incl. the BYOK key) to the OS keychain on desktop, else localStorage
     // (ADR-0016 F3). Fire-and-forget: a keychain write must not block the generate path.
-    if (rememberKey) void saveAiConfig(JSON.stringify({ provider, configs }));
+    if (rememberKey) void saveAiConfig(JSON.stringify({ provider, configs: freshBuiltin(configs) }));
     else void clearAiConfig();
   }, [rememberKey, provider, configs]);
 

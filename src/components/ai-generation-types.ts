@@ -85,6 +85,14 @@ export function defaultConfigs(): AiConfigMap {
   return out;
 }
 
+/** Blank the builtin runtime's baseURL. It's an EPHEMERAL per-run port (llamafile picks it on spawn),
+ *  so it must NEVER persist/restore: a stale endpoint from a past session defeats auto-start-on-generate
+ *  (which only fires when baseURL is empty) and shows "接続できません" against a dead port. Applied to any
+ *  config coming from / going to storage; a fresh install's builtin baseURL is already "", so it's a no-op. */
+export function freshBuiltin(cfgs: AiConfigMap): AiConfigMap {
+  return cfgs.builtin ? { ...cfgs, builtin: { ...cfgs.builtin, baseURL: "" } } : cfgs;
+}
+
 /** Read persisted AI config ONCE — used as a lazy useState initializer (NOT a mount effect), so
  *  there is no synchronous setState / cascading render on mount. Seeds the state + hadSavedConfig. */
 export function loadSavedConfig(): { localOnly: boolean; provider?: ProviderId; configs?: Partial<AiConfigMap>; hadSaved: boolean } {
@@ -167,7 +175,10 @@ export function computeConnection(a: {
         ? { ok: false, tone: "warn", label: `${builtinModel?.display ?? "オフラインAI"} 未取得`, hint: `⬇ ボタンで初回ダウンロード（約${builtinModel ? (builtinModel.sizeMb / 1024).toFixed(1) : "?"}GB）` }
         : { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "そのまま生成すると自動で起動します（初回は数十秒）" };
     }
-    // baseURL filled → fall through to the generic model checks below.
+    // baseURL is set but the runtime isn't answering (a stale port from a past session, or it stopped).
+    // Give the ACTIONABLE fix instead of the generic "接続できません".
+    if (modelsError) return { ok: false, tone: "err", label: "オフラインAIが応答しません", hint: "設定の「💻 起動」で再起動できます（または、そのまま生成すると自動で起動します）" };
+    // baseURL filled + reachable → fall through to the generic model checks below.
   }
   if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "Base URL 未設定" };
   if (modelsLoading) return { ok: false, tone: "checking", label: "接続を確認中…" };

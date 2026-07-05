@@ -49,15 +49,20 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         )}
         {runningInTauri() &&
           (ai.builtinStatus.kind === "idle" || ai.builtinStatus.kind === "error") &&
-          (ai.provider !== "builtin" || ai.weightsPresent === false) && (
+          // Show the start/enable button when another provider is active OR builtin is selected but NOT
+          // connected (未取得・未起動・応答しない). Previously it was hidden once builtin was selected with
+          // weights present, leaving no recovery when a stale endpoint blocked auto-start.
+          (ai.provider !== "builtin" || ai.weightsPresent === false || !ai.connection.ok) && (
             <button
               onClick={ai.switchToBuiltin}
               className="px-2 py-0.5 rounded bg-field text-accent-soft hover:bg-edge border border-edge"
-              title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
+              title="オフラインの組み込みモデルを起動（初回はモデルを自動ダウンロード）"
             >
               {ai.weightsPresent === false
                 ? `⬇ ${ai.builtinModel?.display ?? "オフラインAI"}（初回DL ${ai.builtinModel ? (ai.builtinModel.sizeMb / 1024).toFixed(1) : "?"}GB）`
-                : "💻 オフラインAIを使う"}
+                : ai.provider === "builtin"
+                  ? "💻 オフラインAIを起動"
+                  : "💻 オフラインAIを使う"}
             </button>
           )}
         {runningInTauri() && ai.builtinStatus.kind === "running" && (
