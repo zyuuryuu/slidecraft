@@ -18,8 +18,8 @@ interface SlideListProps {
   /** Highlighted multi-selection (focused = activeIndex). */
   selected?: Set<number>;
   onSelect: (index: number, mods?: { shift?: boolean; meta?: boolean }) => void;
-  /** Slide structure ops (undo-able). Omitted / disabled → controls hidden (e.g. collab observe-only). */
-  onAdd?: () => void;
+  /** Per-slide structure ops (undo-able). Omitted / disabled → controls hidden (e.g. collab observe-only).
+   *  "Add" lives in the panel header (App), not here. */
   onDelete?: (index: number) => void;
   onDuplicate?: (index: number) => void;
   disabled?: boolean;
@@ -31,7 +31,6 @@ export default function SlideList({
   activeIndex,
   selected,
   onSelect,
-  onAdd,
   onDelete,
   onDuplicate,
   disabled,
@@ -102,16 +101,6 @@ export default function SlideList({
           </div>
         );
       })}
-      {onAdd && !disabled && (
-        <button
-          type="button"
-          onClick={onAdd}
-          title="選択中のスライドの後ろに新しいスライドを追加"
-          className="mt-1 px-4 py-1.5 rounded border border-dashed border-edge text-faint hover:text-fg hover:border-accent text-xs transition-colors"
-        >
-          ＋ スライド追加
-        </button>
-      )}
     </div>
   );
 }
