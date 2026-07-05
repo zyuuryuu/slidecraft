@@ -54,6 +54,8 @@ export default function AiPanel({
   collabConnected,
 }: AiPanelProps) {
   const [userRequest, setUserRequest] = useState("");
+  // Collapse the instruction box (keep scope + a truncated echo) so the 変更プレビュー below gets the room.
+  const [promptCollapsed, setPromptCollapsed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<"gen" | "tasks">("gen");
   // Hub-level tab: this dock now houses both the AI assistant and the 協働 (live-collab) surface.
@@ -227,10 +229,22 @@ export default function AiPanel({
         <AiTasksPanel tasks={ai.tasks} onCancel={ai.cancelTask} onClear={ai.clearTasks} />
       ) : (
       <>
-      {/* Scope + Prompt — grows with the dock so the instruction box isn't stuck at 2 rows */}
-      <div className="px-3 py-2 flex flex-col gap-2 flex-1 min-h-0">
-        {/* Scope = the slide-list selection (no toggle). 1 = focused slide, >1 = batch. */}
+      {/* Scope + Prompt — content-height (NOT flex-1) so the instruction box stays compact and the
+          freed space goes to the result/preview below; the box is user-resizable (resize-y) AND
+          collapsible (chevron) so reviewing the 変更プレビュー can reclaim the whole area. */}
+      <div className="px-3 py-2 flex flex-col gap-2">
+        {/* Scope = the slide-list selection (no toggle). 1 = focused slide, >1 = batch.
+            Leading chevron folds/unfolds the instruction box below. */}
         <div className="flex items-center gap-1.5 text-xs text-muted">
+          <button
+            type="button"
+            onClick={() => setPromptCollapsed((v) => !v)}
+            title={promptCollapsed ? "指示欄を開く" : "指示欄をたたむ（プレビューを広く）"}
+            aria-expanded={!promptCollapsed}
+            className="w-4 h-4 flex items-center justify-center leading-none text-muted hover:text-fg shrink-0"
+          >
+            {promptCollapsed ? "▸" : "▾"}
+          </button>
           <span>編集対象:</span>
           {batch ? (
             <span className="px-2 py-0.5 rounded bg-accent/20 text-accent-soft">選択 {selectedCount} 枚を一括編集</span>
@@ -239,9 +253,17 @@ export default function AiPanel({
           ) : (
             <span className="text-faint">スライドを選択してください</span>
           )}
-          {batch && <span className="text-faint">— 1つの指示を各スライドに適用 → 確認して採用</span>}
+          {batch && !promptCollapsed && <span className="text-faint">— 1つの指示を各スライドに適用 → 確認して採用</span>}
+          {/* Collapsed: echo the current instruction (truncated) so folding doesn't hide what you asked. */}
+          {promptCollapsed && (
+            <span className="flex-1 min-w-0 truncate text-faint">
+              {userRequest.trim() ? `— ${userRequest.trim()}` : "— 指示欄はたたまれています（▸ で開く）"}
+            </span>
+          )}
         </div>
-        <div className="flex gap-2 flex-1 min-h-0">
+        {/* Compact by default (~3 rows); resize-y lets you drag it a little taller, clamped so it can't swallow the panel. */}
+        {!promptCollapsed && (
+        <div className="flex gap-2">
           <textarea
             value={userRequest}
             onChange={(e) => setUserRequest(e.target.value)}
@@ -250,7 +272,7 @@ export default function AiPanel({
                 ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / 図を追加 / DBノードを足す / 英語にする）"
                 : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
             }
-            className="flex-1 min-h-[3rem] px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg resize-none"
+            className="flex-1 h-[4.5rem] min-h-[2.75rem] max-h-56 px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg resize-y"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) doGenerate();
             }}
@@ -269,6 +291,7 @@ export default function AiPanel({
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* Error */}
