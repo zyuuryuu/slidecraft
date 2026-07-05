@@ -27,7 +27,8 @@
 
 ### 段階導入
 
-- **P1（本 ADR で着手）＝ diagram-edit の ops 化**：文書化された最大の drift 源。`DiagramEditOp`（`nodeUpdate`/`edgeUpdate`/`addNode`/`removeNode`/`addEdge`/`removeEdge`/`setDirection`）→ `applyDiagramEditOps`（`applyToFigure` 再利用）。プロンプトを「FULL 返せ」→「変更 ops のみ」に。
+- **P1（本 ADR で実装）＝ 図コンテンツの ops 化**：`DiagramEditOp`（`nodeUpdate`/`edgeUpdate`/`addNode`/`removeNode`/`addEdge`/`removeEdge`/`setDirection`）→ `applyDiagramEditOps`（`applyToFigure` 再利用・drift ゼロ）。
+  - **実装知見**：`diagram-edit` モード（`diagramEditSystemPrompt`）は**実 UI から未起動＝dead**（生成呼び出しは `slide`〔AiPanel〕と `diagram`〔LlmAssist・新規生成〕のみ）と判明。よって live な**スライド編集プロンプト `slideMarkdownEditPrompt` の (B) ops ブランチ**（既に design ops を提示）に**図コンテンツ ops を追加**し、apply/preview（`handleApplySlide`/`previewSlideEdit`）は **`parseDiagramEditOps`→`parseDesignIntent`→Markdown** の順で**出力フォーマットにより判別**（モード非依存）。図コンテンツ変更は (A) Markdown 内でフェンス全体を再出力する経路（drift 源）から (B) ops に誘導。効かない op は `editNotice` で報告。
 - **P2** placeholder テキスト ops（`applyFieldEdit` 即利用）／**P3** chart/table/gantt ops（series/cards/tasks/cell）／**P4** refine・batch 経路へ配線＋delta 成功率テレメトリ。
 
 ## Consequences
