@@ -51,7 +51,11 @@ describe("figureFallbackTag", () => {
     const w = ["⚠ 数値/言語が変化しています（…）"];
     const tagged = figureFallbackTag(true, w);
     expect(tagged.length).toBe(2);
-    expect(tagged[0]).toContain("全文フォールバック");
+    // The tag reflects the REAL trigger (couldn't parse as ops), NOT "the model returned full text" —
+    // it also fires on prose-wrapped / malformed ops. So the wording is "opsとして受け取れ(ない)".
+    expect(tagged[0]).toContain("opsフォールバック");
+    expect(tagged[0]).toMatch(/ops.*受け取れ|受け取れ.*ops/);
+    expect(tagged[0]).not.toContain("全文で返"); // no longer overclaims the model returned full text
     expect(tagged.slice(1)).toEqual(w); // original warnings preserved after the tag
   });
   it("does not tag a no-figure slide or a clean (no-warning) edit", () => {
