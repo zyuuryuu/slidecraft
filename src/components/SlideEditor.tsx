@@ -7,13 +7,13 @@
 
 import { useCallback, useState } from "react";
 import * as yaml from "js-yaml";
-import type { SlideIR, PlaceholderContent, Paragraph } from "../engine/slide-schema";
+import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource, canSerializeToMermaid } from "../engine/mermaid-to-diagram";
 import EdgeStyleControls from "./EdgeStyleControls";
 import { DiagramSpecSchema } from "../engine/schema";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
-import { buildFieldMap, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
+import { buildFieldMap, bodyPlaceholders, nthBody, applyFieldEdit } from "../engine/placeholder-binding";
 import { groupEditorPlan } from "../engine/group-binding";
 
 interface SlideEditorProps {
@@ -101,21 +101,8 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   // ── Update a specific placeholder ──
   const updatePlaceholder = useCallback(
     (idx: string, text: string) => {
-      const newParagraphs = textToParagraphs(text);
-      const existing = slide.placeholders.find((p) => p.idx === idx);
-      let newPlaceholders: PlaceholderContent[];
-
-      if (existing) {
-        newPlaceholders = slide.placeholders.map((p) =>
-          p.idx === idx ? { ...p, paragraphs: newParagraphs } : p,
-        );
-      } else {
-        newPlaceholders = [
-          ...slide.placeholders,
-          { idx, paragraphs: newParagraphs },
-        ];
-      }
-
+      // Clearing a field DROPS its placeholder (applyFieldEdit) instead of leaving an empty paragraph.
+      const newPlaceholders = applyFieldEdit(slide.placeholders, idx, textToParagraphs(text));
       onChange({ ...slide, placeholders: newPlaceholders });
     },
     [slide, onChange],
