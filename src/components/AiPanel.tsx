@@ -19,10 +19,10 @@ interface AiPanelProps {
   /** Markdown of the FOCUSED slide — the AI edits this one (scope = slide-list selection). */
   currentSlideMd?: string;
   /** Apply the edited slide back to the focused slide. */
-  onApplySlide?: (markdown: string) => void;
+  onApplySlide?: (markdown: string, instruction?: string) => void;
   /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings).
    *  `beforeMd` overrides the diff's LEFT side (a figure edit diffs the figure source, not the slide). */
-  onPreviewSlideEdit?: (raw: string) => { afterMd: string; warnings: string[]; beforeMd?: string } | null;
+  onPreviewSlideEdit?: (raw: string, instruction?: string) => { afterMd: string; warnings: string[]; beforeMd?: string } | null;
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
@@ -120,8 +120,11 @@ export default function AiPanel({
   // result (not raw output) + any advisory — the reviewer decides 採用/却下 informed, and an
   // adopted slide always renders. Only the content-edit path reconciles (else null → raw diff).
   const editPreview = useMemo(
-    () => (slideScope && currentSlideMd && ai.result && !ai.generating ? (onPreviewSlideEdit?.(ai.result) ?? null) : null),
-    [slideScope, currentSlideMd, ai.result, ai.generating, onPreviewSlideEdit],
+    // Pass the instruction so the preview can run the delete-intent cross-check (ADR-0019). It reflects
+    // the CURRENT prompt text; in the normal generate→review→adopt flow that's the instruction that
+    // produced ai.result.
+    () => (slideScope && currentSlideMd && ai.result && !ai.generating ? (onPreviewSlideEdit?.(ai.result, userRequest) ?? null) : null),
+    [slideScope, currentSlideMd, ai.result, ai.generating, onPreviewSlideEdit, userRequest],
   );
 
   const doGenerate = () => {
@@ -135,7 +138,7 @@ export default function AiPanel({
   // this dock is just freeform edit of the focused slide + the task list, kept simple.
 
   const doApply = () => {
-    if (onApplySlide) onApplySlide(ai.result);
+    if (onApplySlide) onApplySlide(ai.result, userRequest);
   };
 
   const toneColor =

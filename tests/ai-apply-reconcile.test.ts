@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { parseMd } from "../src/engine/md-parser";
-import { reconcileSlideEdit } from "../src/engine/ai-apply";
+import { reconcileSlideEdit, figureFallbackTag } from "../src/engine/ai-apply";
 
 const OLD_MD = `<!-- slide: Content.1Body.Single -->
 # 売上サマリ
@@ -40,5 +40,22 @@ describe("reconcileSlideEdit — validation at the adoption gate", () => {
     const edited = `<!-- slide: Content.1Body.Single -->\n- 第1四半期: 100万円\n- 第2四半期: 150万円`; // title dropped
     const rec = reconcileSlideEdit(old, edited)!;
     expect(rec.warnings.some((w) => /構造|復元|タイトル/.test(w))).toBe(true);
+  });
+});
+
+// L4 (ADR-0019 observability): a figure slide whose per-slide edit fell to the full-Markdown path AND
+// drifted → the model regenerated the whole slide (A) instead of emitting ops (B). Tag it so the
+// otherwise-opaque "変更なし" rollback is legible. Benign (non-drift) edits are NOT tagged.
+describe("figureFallbackTag", () => {
+  it("prepends the fallback explanation only when a figure existed AND there is drift", () => {
+    const w = ["⚠ 数値/言語が変化しています（…）"];
+    const tagged = figureFallbackTag(true, w);
+    expect(tagged.length).toBe(2);
+    expect(tagged[0]).toContain("全文フォールバック");
+    expect(tagged.slice(1)).toEqual(w); // original warnings preserved after the tag
+  });
+  it("does not tag a no-figure slide or a clean (no-warning) edit", () => {
+    expect(figureFallbackTag(false, ["⚠ 数値/言語が変化しています（…）"])).toEqual(["⚠ 数値/言語が変化しています（…）"]);
+    expect(figureFallbackTag(true, [])).toEqual([]);
   });
 });

@@ -11,7 +11,7 @@
 import { z } from "zod";
 import type { SlideIR } from "./slide-schema";
 import { VALID_SHAPES, VALID_RELATIONS } from "./schema";
-import { applyToFigure, type RawDiagram } from "./design-intent";
+import { applyToFigure, readFigureRaw, type RawDiagram } from "./design-intent";
 import { parseJsonLoose } from "./json-salvage";
 
 // ── DiagramEditOp: the changed-fields-only ops the model emits (a bare JSON ops array) ──
@@ -55,6 +55,7 @@ export function parseDiagramEditOps(raw: string): DiagramEditOps | null {
 }
 
 const idsOf = (raw: RawDiagram): string => (raw.nodes ?? []).map((n) => String(n.id)).join(", ") || "なし";
+const edgesOf = (raw: RawDiagram): string => (raw.edges ?? []).map((e) => `${String(e.from)}→${String(e.to)}`).join(", ") || "なし";
 
 /**
  * Merge DiagramEditOps into the slide's figure DETERMINISTICALLY: only the named node/edge fields are
@@ -91,12 +92,12 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
           const before = raw.nodes.length;
           raw.nodes = raw.nodes.filter((x) => String(x.id) !== op.id);
           raw.edges = raw.edges.filter((e) => String(e.from) !== op.id && String(e.to) !== op.id); // drop now-dangling edges
-          if (raw.nodes.length === before) skipped.push({ op: op.op, reason: "unknown-node", message: `ノード「${op.id}」が見つからず削除をスキップしました。` });
+          if (raw.nodes.length === before) skipped.push({ op: op.op, reason: "unknown-node", message: `ノード「${op.id}」が見つからず削除をスキップ（候補: ${idsOf(raw)}）。` });
           break;
         }
         case "edgeUpdate": {
           const e = raw.edges.find((x) => String(x.from) === op.from && String(x.to) === op.to);
-          if (!e) { skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず更新をスキップしました。` }); break; }
+          if (!e) { skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず更新をスキップ（候補: ${edgesOf(raw)}）。` }); break; }
           if (op.label !== undefined) e.label = op.label;
           if (op.relation !== undefined) e.relation = op.relation;
           break;
@@ -108,7 +109,7 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
         case "removeEdge": {
           const before = raw.edges.length;
           raw.edges = raw.edges.filter((e) => !(String(e.from) === op.from && String(e.to) === op.to));
-          if (raw.edges.length === before) skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず削除をスキップしました。` });
+          if (raw.edges.length === before) skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず削除をスキップ（候補: ${edgesOf(raw)}）。` });
           break;
         }
         case "setDirection": {
@@ -119,4 +120,59 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
     }
   });
   return { slide: out, skipped };
+}
+
+/** One removeNode/removeEdge whose target isn't referenced by the instruction — a possible mistarget. */
+export interface DeleteIntentAdvisory {
+  op: "removeNode" | "removeEdge";
+  message: string; // human, Japanese — ready to show as an advisory (never blocks)
+}
+
+/**
+ * Cross-check DELETE ops against the user's instruction (ADR-0018/0019). A weak model told to delete a
+ * NON-existent element may hallucinate the nearest existing one (observed: "Cacheを削除" → removeEdge
+ * api→redis). applyDiagramEditOps validates op SHAPE, not INTENT, so that op applies cleanly and only a
+ * YAML diff hints at it. Here, for each removeNode/removeEdge, if the deleted element's id/label is NOT
+ * referenced anywhere in the instruction, we flag it — advisory-only, surfaced at the adoption gate so
+ * the reviewer catches the mistarget before 採用. Substring match only (NFKC+lowercase, id · full label ·
+ * label words ≥2 chars); no fuzzy lib in v1 (kept advisory so a false positive never blocks a real delete).
+ * The instruction is a plain string arg (lives in the UI layer) → this stays R2-pure.
+ */
+export function checkDeleteIntent(slide: SlideIR, ops: DiagramEditOps, instruction: string): DeleteIntentAdvisory[] {
+  const inst = instruction.trim();
+  if (!inst) return [];
+  const raw = readFigureRaw(slide);
+  if (!raw) return [];
+  const nodes = raw.nodes ?? [];
+  const labelOf = (id: string): string => {
+    const n = nodes.find((x) => String(x.id) === id);
+    return n && typeof n.label === "string" ? n.label : "";
+  };
+  const norm = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+  const hay = norm(inst);
+  // "referenced" = the id, the full label, or any label word appears in the instruction. Candidates
+  // shorter than 2 normalized chars are ignored (a 1-char id like "a" substring-matches almost any
+  // sentence → it would mask a real mistarget), so the advisory still fires for those.
+  const referenced = (...cands: string[]): boolean =>
+    cands.some((c) => {
+      if (!c) return false;
+      const nc = norm(c);
+      if (nc.length >= 2 && hay.includes(nc)) return true;
+      return c.split(/\s+/).some((w) => norm(w).length >= 2 && hay.includes(norm(w)));
+    });
+  const out: DeleteIntentAdvisory[] = [];
+  for (const op of ops) {
+    if (op.op === "removeNode") {
+      const label = labelOf(op.id);
+      if (!referenced(op.id, label))
+        out.push({ op: "removeNode", message: `削除対象「${label || op.id}」は指示文に見当たりません — 意図と違う削除の可能性があります（採用前に確認してください）。` });
+    } else if (op.op === "removeEdge") {
+      const fl = labelOf(op.from), tl = labelOf(op.to);
+      const edge = (raw.edges ?? []).find((e) => String(e.from) === op.from && String(e.to) === op.to);
+      const el = edge && typeof edge.label === "string" ? edge.label : "";
+      if (!referenced(op.from, op.to, fl, tl, el))
+        out.push({ op: "removeEdge", message: `削除対象のエッジ「${fl || op.from}→${tl || op.to}」は指示文に見当たりません — 意図と違う削除の可能性があります（採用前に確認してください）。` });
+    }
+  }
+  return out;
 }

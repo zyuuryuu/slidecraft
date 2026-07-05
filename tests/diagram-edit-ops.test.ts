@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import * as yaml from "js-yaml";
 import type { SlideIR } from "../src/engine/slide-schema";
-import { applyDiagramEditOps, parseDiagramEditOps } from "../src/engine/diagram-edit-ops";
+import { applyDiagramEditOps, parseDiagramEditOps, checkDeleteIntent } from "../src/engine/diagram-edit-ops";
 import { validateDiagramSource } from "../src/engine/mermaid-to-diagram";
 
 const DIAGRAM = `type: flowchart
@@ -110,5 +110,63 @@ describe("applyDiagramEditOps — deterministic merge (zero drift on untouched f
       { op: "addEdge", from: "db", to: "c" },
     ]);
     expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull(); // null = valid
+  });
+
+  it("unknown removeNode / removeEdge skip messages list the candidates (never a bare miss)", () => {
+    // L3: the ops-path adoption gate must be as informative as the Markdown path's.
+    const rmNode = applyDiagramEditOps(slide(), [{ op: "removeNode", id: "ghost" }]).skipped;
+    expect(rmNode[0].message).toContain("候補:");
+    expect(rmNode[0].message).toContain("db"); // the ids that DO exist
+    const rmEdge = applyDiagramEditOps(slide(), [{ op: "removeEdge", from: "x", to: "y" }]).skipped;
+    expect(rmEdge[0].message).toMatch(/候補:.*a→db/); // the edges that DO exist
+  });
+});
+
+// L2 (delete-safety, ADR-0019): a weak model told to delete a NON-existent element may hallucinate the
+// nearest existing one (observed: "Cacheを削除" → removeEdge api→redis). checkDeleteIntent flags a
+// delete whose target isn't referenced by the instruction — advisory-only, surfaced at the adoption gate.
+describe("checkDeleteIntent — mistargeted-deletion advisory", () => {
+  // A figure mirroring the on-device repro: web→api→db plus a redis node + api→redis edge.
+  const REPRO = `type: flowchart
+nodes:
+  - id: web
+    label: Webサーバー
+  - id: api
+    label: APIゲートウェイ 1200req/s
+  - id: db
+    label: Database
+  - id: redis
+    label: Redis
+edges:
+  - from: web
+    to: api
+  - from: api
+    to: db
+  - from: api
+    to: redis
+`;
+
+  it("flags a removeEdge whose endpoints the instruction never names (the redis-for-cache misfire)", () => {
+    const adv = checkDeleteIntent(slide(REPRO), [{ op: "removeEdge", from: "api", to: "redis" }], "存在しない Cache を削除");
+    expect(adv).toHaveLength(1);
+    expect(adv[0].op).toBe("removeEdge");
+    expect(adv[0].message).toContain("Redis"); // names what it would delete
+  });
+
+  it("stays silent when the delete target IS named — by label or by id", () => {
+    expect(checkDeleteIntent(slide(REPRO), [{ op: "removeNode", id: "redis" }], "Redis を削除")).toEqual([]); // label
+    expect(checkDeleteIntent(slide(REPRO), [{ op: "removeNode", id: "redis" }], "redis ノードを消して")).toEqual([]); // id
+    expect(checkDeleteIntent(slide(REPRO), [{ op: "removeEdge", from: "api", to: "db" }], "API から Database のエッジを削除")).toEqual([]);
+  });
+
+  it("flags a removeNode not referenced; single-char ids don't mask the miss", () => {
+    expect(checkDeleteIntent(slide(), [{ op: "removeNode", id: "a" }], "Cache を削除")).toHaveLength(1); // id 'a' must NOT substring-match "cache"
+    expect(checkDeleteIntent(slide(REPRO), [{ op: "removeNode", id: "db" }], "Cache を削除")).toHaveLength(1);
+  });
+
+  it("never fires on non-delete ops, empty instruction, or a figureless slide", () => {
+    expect(checkDeleteIntent(slide(REPRO), [{ op: "nodeUpdate", id: "db", label: "X" }, { op: "addNode", id: "n", label: "N" }], "何かして")).toEqual([]);
+    expect(checkDeleteIntent(slide(REPRO), [{ op: "removeNode", id: "redis" }], "   ")).toEqual([]);
+    expect(checkDeleteIntent({ layout: "auto", placeholders: [] }, [{ op: "removeNode", id: "redis" }], "Redis を削除")).toEqual([]);
   });
 });

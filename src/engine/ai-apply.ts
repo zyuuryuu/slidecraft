@@ -123,3 +123,16 @@ export function reconcileSlideEdit(old: SlideIR, rawMd: string): SlideEditReconc
   if (factMsgs.length > 0) warnings.push(`⚠ 数値/言語が変化しています（${factMsgs.join(" / ")}）`);
   return { slide: reconciled, warnings };
 }
+
+/**
+ * Fallback-path transparency (ADR-0019 observability). When a per-slide edit on a slide that HAS a
+ * figure falls through the figure/ops/design detectors to the FULL-Markdown reconcile path AND that
+ * path reports drift, the model almost certainly regenerated the whole slide (format A) instead of
+ * emitting figure ops (format B) — the drift is the symptom, and the reconciled result rolls back to a
+ * bare "変更なし". Prepend a tag so the reviewer sees WHY it rolled back (legible, not opaque). Benign
+ * text edits don't drift → not tagged. Returns the warnings unchanged when there's nothing to explain.
+ */
+export function figureFallbackTag(hadFigure: boolean, warnings: string[]): string[] {
+  if (!hadFigure || warnings.length === 0) return warnings;
+  return ["[全文フォールバック] 図の部分編集（ops）として解釈できず全文を再構成したため、以下のずれを検出しました。", ...warnings];
+}

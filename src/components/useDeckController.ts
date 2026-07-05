@@ -10,8 +10,8 @@ import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
-import { parseDiagramEditOps, applyDiagramEditOps } from "../engine/diagram-edit-ops";
-import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit } from "../engine/ai-apply";
+import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent } from "../engine/diagram-edit-ops";
+import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
 import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
@@ -402,7 +402,9 @@ export function useDeckController() {
   // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
   // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
   const handleApplySlide = useCallback(
-    (raw: string) => {
+    // `instruction` (the user's request) is optional — when present it enables the delete-intent
+    // cross-check on figure ops (a mistargeted delete is surfaced, never blocks). ADR-0019.
+    (raw: string, instruction?: string) => {
       if (!deck) return;
       const old = deck.slides[activeSlide];
       // ⓪ Figure edit: AI mode "diagram-edit" returns a BARE DiagramSpec YAML (not Markdown). Apply
@@ -419,7 +421,13 @@ export function useDeckController() {
         const editOps = parseDiagramEditOps(raw);
         if (editOps) {
           const { slide, skipped } = applyDiagramEditOps(old, editOps);
-          setEditNotice(skipped.length > 0 ? skipped.map((sk) => sk.message).join(" ｜ ") : null);
+          // Skipped ops (unknown id) AND delete-intent advisories (a delete the instruction never named)
+          // are ANNOUNCED via editNotice — never silent (ADR-0018/0019).
+          const notices = [
+            ...skipped.map((sk) => sk.message),
+            ...(instruction ? checkDeleteIntent(old, editOps, instruction).map((a) => a.message) : []),
+          ];
+          setEditNotice(notices.length > 0 ? notices.join(" ｜ ") : null);
           handleSlideUpdate(activeSlide, slide, "commit");
           return;
         }
@@ -457,15 +465,20 @@ export function useDeckController() {
   // 変更プレビュー shows the real result + warnings and the reviewer decides 採用/却下 informed. Only
   // the CONTENT-edit path reconciles; figure/design edits keep the raw diff (return null).
   const previewSlideEdit = useCallback(
-    (raw: string): { afterMd: string; warnings: string[]; beforeMd?: string } | null => {
+    (raw: string, instruction?: string): { afterMd: string; warnings: string[]; beforeMd?: string } | null => {
       const s = deck?.slides[activeSlide];
       if (!s) return null;
       // Figure CONTENT ops (部分生成・ADR-0019): merge the ops, then diff the figure SOURCE (old vs
-      // merged YAML) — same YAML-vs-YAML review as a bare-YAML figure edit.
+      // merged YAML) — same YAML-vs-YAML review as a bare-YAML figure edit. Surface skipped ops AND the
+      // delete-intent advisory as warnings so the ops path's adoption gate is as informative as text's.
       const editOps = parseDiagramEditOps(raw);
       if (editOps) {
-        const { slide: merged } = applyDiagramEditOps(s, editOps);
-        return { afterMd: figureFence(merged) ?? "", warnings: [], beforeMd: figureFence(s) ?? "" };
+        const { slide: merged, skipped } = applyDiagramEditOps(s, editOps);
+        const warnings = [
+          ...skipped.map((sk) => sk.message),
+          ...(instruction ? checkDeleteIntent(s, editOps, instruction).map((a) => a.message) : []),
+        ];
+        return { afterMd: figureFence(merged) ?? "", warnings, beforeMd: figureFence(s) ?? "" };
       }
       // Figure edit (bare DiagramSpec YAML): diff the figure SOURCE (YAML-vs-YAML), not the whole
       // slide's Markdown against raw YAML — the latter misaligns visually.
@@ -475,7 +488,10 @@ export function useDeckController() {
       const rec = reconcileSlideEdit(s, raw);
       if (!rec) return null;
       const resolved = autoSelectLayout(rec.slide, activeSlide, deck!.slides.length, catalog);
-      return { afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }), warnings: rec.warnings };
+      // L4: a figure slide that fell to the full-Markdown path AND drifted → tag it so the "変更なし"
+      // rollback is legible (the model regenerated the whole slide instead of emitting figure ops).
+      const hadFigure = !!s.diagram || !!s.mermaidBlock;
+      return { afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }), warnings: figureFallbackTag(hadFigure, rec.warnings) };
     },
     [deck, activeSlide, catalog],
   );
