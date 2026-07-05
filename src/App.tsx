@@ -237,18 +237,25 @@ export default function App() {
           onAiFix={handleAiFix}
         />
         <div className="flex-1 flex min-h-0">
-          {/* Left: Slide list */}
-          <div className="w-[220px] border-r border-edge flex flex-col min-h-0 bg-void">
-            <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">
-              Slides
-            </div>
-            <div className="flex-1 min-h-0">
-              <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
-                onAdd={handleAddSlide} onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} disabled={editLocked} />
-            </div>
-          </div>
-
-          {/* Center+Right: Slide editor | preview (draggable divider) */}
+          {/* Slides | (Editor | Preview) — BOTH dividers draggable via a nested ResizableSplit, so the
+              slide list can be widened to see full thumbnails or narrowed to give the editor room. */}
+          <ResizableSplit
+            storageKey="slidecraft_split_slides"
+            initialLeftPct={18}
+            minPct={8}
+            maxPct={45}
+            left={
+              <>
+                <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">
+                  Slides
+                </div>
+                <div className="flex-1 min-h-0 bg-void">
+                  <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
+                    onAdd={handleAddSlide} onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} disabled={editLocked} />
+                </div>
+              </>
+            }
+            right={
           <ResizableSplit
             storageKey="slidecraft_split_edit"
             initialLeftPct={55}
@@ -295,6 +302,8 @@ export default function App() {
                   <SlidePreview deck={deck} template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} />
                 </div>
               </>
+            }
+          />
             }
           />
         </div>

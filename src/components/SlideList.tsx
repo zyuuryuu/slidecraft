@@ -9,7 +9,7 @@ import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { SlideCard } from "./SlidePreview";
 
-const THUMB_SCALE = 18;
+const THUMB_SCALE = 15;
 
 interface SlideListProps {
   deck: DeckIR | null;

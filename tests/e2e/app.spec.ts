@@ -20,6 +20,7 @@ test.describe("SlideCraft", () => {
   test("lands in Edit (the home): slide list + slide editor", async ({ page }) => {
     await expect(page.getByText("Slides", { exact: true })).toBeVisible();
     await expect(page.getByText(/Slide Editor/)).toBeVisible();
+    await expect(page.locator(".cursor-col-resize")).toHaveCount(2); // Slides|Editor AND Editor|Preview dividers
   });
 
   test("Draft opens the modal (Markdown editor + split preview)", async ({ page }) => {
