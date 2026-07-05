@@ -33,11 +33,12 @@
 
 #### P1 実機テスト由来の補強（2026-07-05・弱モデル granite-4.1-8b で観測）
 
-実機で2つの実害を確認し、**決定論・採用ゲート不変**の範囲で塞いだ（プロンプト側の (A)/(B) 判定強化＝L5 は behavior＋既存テスト変更のため別途ユーザ承認待ち）：
+実機で2つの実害を確認し、**決定論・採用ゲート不変**の範囲で塞いだ（プロンプト側の判定強化＝L5 はユーザ承認の上で適用済み）：
 
 - **削除の的外し（T4a）**＝「存在しない Cache を削除」に弱モデルが近い `redis` を幻覚マッチ→`removeEdge api→redis` を出す。ops は**形状**しか検証しないため素通り。**`checkDeleteIntent(slide, ops, instruction)`**（`diagram-edit-ops.ts`・純粋 R2・指示文は文字列引数）を追加：削除対象の id/label が**指示文に出てこない**削除を**アドバイザリで告知**（NFKC＋部分一致・1文字idは無効化・**採用は止めない**）。
 - **ops パスの可観測性（L3）**：`previewSlideEdit` の ops 分岐は従来 `warnings:[]`＝図 diff のみだった → skipped＋delete アドバイザリを **warnings に載せ**、`removeNode`/`removeEdge`/`edgeUpdate` の skip メッセージに**候補一覧**を付す（Markdown パスと同等の情報量に）。
 - **全文フォールバックの透明化（L4）**＝図スライドの編集が (B) ops でなく (A) 全文で返り drift→原状復帰した際、`変更なし` が不透明。**`figureFallbackTag(hadFigure, warnings)`**（`ai-apply.ts`）で「図の部分編集として解釈できず全文再構成→ずれ検出」タグを前置（drift 時のみ・良性のテキスト編集は非対象）。
+- **L5 プロンプト判定強化（T2/T4a を源で減）**：`slideMarkdownEditPrompt` の (A)/(B) セレクタを書き直し — 「既存図のノード/エッジ増減も (A) 全文へ」と読める衝突を解消し、弱モデルを決定論 ops から遠ざけていた**「迷ったら (A)」を撤去**して**「既存図の変更は (B) 優先」**に。加えて (B) に**削除の安全則**（`removeNode`/`removeEdge` は指示の id を厳密に・図に無くても engine が skip＋報告するので**近い id に置換するな**）＋**削除 few-shot**（`[{"op":"removeNode","id":"cache"}]`）。プロンプトは確率的で保証ではない（弱 8B は依然揺れうる）ため L2〜L4 の決定論ガードの**補完**と位置づけ。
 - **見送り**：ops 検出の prose 許容拡大（L1）は既存の regression ガード `apply-routing.test.ts`（#3C＝prose 内の ops 配列で Markdown を破棄しない）と衝突し、かつ観測された T2 失敗は「(A) 全文選択」であって「prose 巻き ops の誤ルーティング」ではないため**却下**（R6：根本は L5 のプロンプト判定）。
 
 ## Consequences
