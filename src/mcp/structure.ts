@@ -14,9 +14,10 @@ import type { Session } from "./session";
 import * as S from "./session";
 import { SlideIRSchema, type SlideIR } from "../engine/slide-schema";
 import { parseMd } from "../engine/md-parser";
+import { GuardError } from "./guard-errors";
 
 function assertIdx(len: number, i: number, label = "index"): void {
-  if (!Number.isInteger(i) || i < 0 || i >= len) throw new Error(`${label} が範囲外です（0..${len - 1}）: ${i}`);
+  if (!Number.isInteger(i) || i < 0 || i >= len) throw new GuardError(`${label} が範囲外です（0..${len - 1}）: ${i}`, "index-out-of-range");
 }
 /** The uniform envelope tail (post-op diagnostics + body budget) via the public diagnose read — same
  *  shape the deterministic mutations return (Theme 3 S3), so the AI branches on identical fields. */

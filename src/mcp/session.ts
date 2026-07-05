@@ -23,6 +23,7 @@ import { DiagramSpecSchema } from "../engine/schema";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import { parseDesignIntent, applyDesignIntentReport, applyRegionSplit } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
+import { GuardError } from "./guard-errors";
 
 export interface Session {
   root: string | null; // an allow-listed dir for file ops, or null = --no-fs (base64 only)
@@ -44,14 +45,14 @@ interface Loaded {
 }
 function requireLoaded(s: Session): Loaded {
   if (!s.deck || !s.template || !s.catalog) {
-    throw new Error("プロジェクトが開かれていません（先に open_project を呼んでください）。");
+    throw new GuardError("プロジェクトが開かれていません（先に open_project を呼んでください）。", "project-not-opened");
   }
   return { deck: s.deck, template: s.template, catalog: s.catalog };
 }
 
 function assertIndex(deck: DeckIR, i: number): void {
   if (!Number.isInteger(i) || i < 0 || i >= deck.slides.length) {
-    throw new Error(`スライド番号が範囲外です（0..${deck.slides.length - 1}）: ${i}`);
+    throw new GuardError(`スライド番号が範囲外です（0..${deck.slides.length - 1}）: ${i}`, "index-out-of-range");
   }
 }
 

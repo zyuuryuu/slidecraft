@@ -21,6 +21,7 @@ import * as R from "./reads";
 import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { type HostContext, type DocEntry, commitMutation, undoDoc, redoDoc } from "./host-core";
+import { GuardError } from "./guard-errors";
 
 interface ToolResult {
   content: { type: "text"; text: string }[];
@@ -28,10 +29,13 @@ interface ToolResult {
   [k: string]: unknown; // match the SDK's CallToolResult (passthrough _meta etc.)
 }
 const ok = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 2) }] });
-const fail = (e: unknown): ToolResult => ({
-  content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }],
-  isError: true,
-});
+// A GuardError is a MODELED precondition failure → the { ok:false, error, code } envelope
+// (isError:false, a normal result). Everything else is an unmodeled crash → isError:true. This is
+// THE choke point: run() and both mutate() branches funnel every throw through here (ADR-0015).
+const fail = (e: unknown): ToolResult =>
+  e instanceof GuardError
+    ? ok({ ok: false as const, error: e.message, code: e.code })
+    : { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
 async function run(fn: () => unknown | Promise<unknown>): Promise<ToolResult> {
   try {
     return ok(await fn());
@@ -76,9 +80,9 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // the sole open doc; otherwise never-silent ("select a document").
   const entryOf = (extra: unknown, docId?: string): DocEntry => {
     const h = host;
-    if (!h) throw new Error("host モードではありません");
+    if (!h) throw new GuardError("host モードではありません", "host-mode-required");
     const id = docId ?? h.active(extra) ?? h.registry.soleDocId();
-    if (!id) throw new Error("ドキュメントが選択されていません（select_document か docId を指定してください）。");
+    if (!id) throw new GuardError("ドキュメントが選択されていません（select_document か docId を指定してください）。", "document-not-selected");
     return h.registry.get(id);
   };
   const sessionOf = (extra: unknown, docId?: string): Session => (host ? entryOf(extra, docId).session : session);

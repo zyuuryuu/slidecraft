@@ -55,7 +55,9 @@ export class CollabClient {
     await this.client.connect(this.transport);
   }
 
-  /** Call a host tool and return its parsed result JSON. Engine errors surface as a thrown Error. */
+  /** Call a host tool and return its parsed result JSON. An UNMODELED crash (isError:true) throws; a
+   *  MODELED failure — a guard rejection (out-of-range/未オープン → { ok:false, code }) or a domain
+   *  reject ({ ok:false }) — is returned for the caller to branch on (error-contract unification). */
   async callTool<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T> {
     const res = (await this.client.callTool({ name, arguments: args })) as { content: { text?: string }[]; isError?: boolean };
     const text = res.content[0]?.text ?? "null";
