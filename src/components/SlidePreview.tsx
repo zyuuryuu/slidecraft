@@ -136,6 +136,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
   const codeBodyIdx = slide.code ? nthBody(bodyPhs, slide.code.placeholderIdx)?.idx : undefined;
+  const imageBodyIdx = slide.image ? nthBody(bodyPhs, slide.image.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
@@ -339,6 +340,25 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
               }}
             >
               {slide.code.content}
+            </div>
+          );
+        }
+
+        // Image (![alt](data URI)) → <img> fit into the body box; contain keeps the aspect ratio.
+        if (slide.image && ph.idx === imageBodyIdx) {
+          return (
+            <div
+              key={`image-${ph.idx}`}
+              style={{
+                position: "absolute",
+                left: `${(s.x / SLIDE_W) * 100}%`,
+                top: `${(s.y / SLIDE_H) * 100}%`,
+                width: `${(s.w / SLIDE_W) * 100}%`,
+                height: `${(s.h / SLIDE_H) * 100}%`,
+                overflow: "hidden",
+              }}
+            >
+              <img src={slide.image.src} alt={slide.image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
           );
         }

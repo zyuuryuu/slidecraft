@@ -113,6 +113,15 @@ describe("autoSelectLayout", () => {
     expect(name).toMatch(/^Section\./);
   });
 
+  it("an image (like table/code) counts as body → a content layout, not a title, even at index 0", () => {
+    const slide = makeSlide({
+      placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "画像" }] }] }],
+      image: { src: "data:image/png;base64,AAAA", alt: "", placeholderIdx: "1" },
+    });
+    expect(autoSelectLayout(slide, 0, 3)).not.toMatch(/^Title\./); // a figure slide isn't forced to a cover
+    expect(autoSelectLayout(slide, 1, 3)).toMatch(/Content|Body/i); // routes to a body-bearing layout
+  });
+
   it("selects Content for heading + body", () => {
     const slide = makeSlide({
       placeholders: [

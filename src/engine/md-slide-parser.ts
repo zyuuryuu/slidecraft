@@ -4,7 +4,7 @@
  * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
@@ -133,6 +133,7 @@ export function parseSlideBlock(
   let diagram: DiagramBlock | undefined;
   let mermaidBlock: MermaidBlock | undefined;
   let code: CodeBlock | undefined;
+  let image: ImageBlock | undefined;
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -292,6 +293,14 @@ export function parseSlideBlock(
       continue;
     }
 
+    // ![alt](src) ALONE on a line → an embedded image (data URI or path). Fills body region 1.
+    // Only the first one becomes the figure; further images fall through to body text.
+    const imgMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch && !image) {
+      image = { src: imgMatch[2], alt: imgMatch[1], placeholderIdx: "1" };
+      continue;
+    }
+
     // Everything else → body
     bodyLines.push(line);
   }
@@ -330,7 +339,7 @@ export function parseSlideBlock(
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
@@ -348,6 +357,7 @@ export function parseSlideBlock(
     mermaidBlock,
     ...(table ? { table } : {}),
     ...(code ? { code } : {}),
+    ...(image ? { image } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + lines.length - 1,
   };
