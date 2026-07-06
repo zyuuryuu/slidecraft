@@ -2,15 +2,16 @@
 
 前方向きの計画のみを記す。完了フェーズの履歴は **ADR ＋ git（PR）** に移管済み。決定の記録は `docs/adr/` を参照。
 
-**現在地（2026-07-05）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6・[ADR-0017](adr/0017-inapp-offline-ai-runtime.md)／AI 編集の検証は採用ゲート・[ADR-0018](adr/0018-validation-at-adoption-gate.md)）に加え、
+**現在地（2026-07-06）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6・[ADR-0017](adr/0017-inapp-offline-ai-runtime.md)／AI 編集の検証は採用ゲート・[ADR-0018](adr/0018-validation-at-adoption-gate.md)）に加え、
 named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[ADR-0013](adr/0013-svg-native-text.md)／
 テーマ2「テンプレ作成補助」[ADR-0014](adr/0014-template-authoring.md)／テーマ3「MCP ブラッシュアップ」[ADR-0015](adr/0015-mcp-brushup.md)／
 テーマ4「セキュリティレビュー」[ADR-0016](adr/0016-security-review-theme4.md)。各テーマの経緯・意思決定は対応 ADR ＋ git（PR）、
 背景メモは開発メモリ `html_output_design` / `roadmap_post_p2`。
 
-**2026-07-05 の消化**：小粒バックログ群（serializer 空出力・field-clear の空 ph・図編集 diff の見た目・HTML 印刷 e2e・
-**MCP エラー契約統一**〔GuardError→`{ok:false,code}`〕・**useAiGeneration 分割**〔599→377 行〕・編集画面の **Layout 折りたたみ**）を一掃、
-加えて **UI 配色モード（Dark / Light / Modern）** を追加（トークン化＋トグル・詳細は git）。
+**以降の消化（〜2026-07-06）**：**AI 編集の部分生成＋自己修復＋best-of-N**（[ADR-0019](adr/0019-partial-edit-ops.md)：図コンテンツを ops 化＝drift ゼロ〔P1〕・全文逸れの単発リテイク〔Option A〕・N候補→採用ゲート選別〔best-of-N・単一/全体/一括すべて完了〕）／
+**スライド構造編集**（追加・複製・削除・pointer ドラッグ並べ替え）／
+**画像機能**（data URI 埋め込み・サイズ/位置の微調整＋サイズスライダー・pic 枠への優先バインド・最背面レイヤー＝[ADR-0020](adr/0020-image-embedding.md)）／
+UI 配色モード（Dark/Light/Modern）・MCP エラー契約統一・`useAiGeneration` 分割。
 テーマ4 是正は **F1〜F4 実装済**（F1/F3/F4＝PR #66、F2 svgCache XSS＝commit `20978cd`）、残は **F1'（egress hard boundary・保留）** のみ。
 
 **次の大物テーマは未定** — 下記バックログから選定する。
@@ -25,10 +26,11 @@ named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[
 
 ### 🧠 AI 編集の深化
 
+> **実装済（表から除去・[ADR-0019](adr/0019-partial-edit-ops.md)）**：部分生成 P1（図コンテンツ ops 化・drift ゼロ）／自己修復リテイク（Option A・全文逸れ検出で ops 再試行）／best-of-N（Option B・単一/whole-deck refine/batch すべて）。
+
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
-| 自己修復ループ（検証→自動フィードバック→再生成） | 単一スライド編集（AiPanel）は現状 one-shot（生成→レビュー→採用）。**理想＝検証で出た警告**（数値/言語 drift・構造欠落＝`reconcileSlideEdit` の warnings）を **AI に自動フィードバックして、より良い回答を自動再生成**（人が却下→指示し直す手間を減らす）。既存 `refine.ts` の validate→retry ループ（whole-deck refine 用）を single-slide edit にも適用する構図。harness-over-model の自己修復（[[product_philosophy_harness]]・ADR-0005）。触点: `src/engine/refine.ts`・`src/components/useDeckRefine.ts`・AiPanel 生成フロー・`reconcileSlideEdit` | M〜L |
-| 部分生成（全文再生成をやめる） | 一部編集でもスライド**全文を再生成**＝出力多（遅い・特にオフライン）＋**全行が drift の温床**（＝warnings の根本原因）。生成を**最小編集単位**に絞る：**(B) 構造フィールド編集**＝図/gantt/表は**変更フィールドのみ**出力→**決定論マージ**（他は verbatim・drift ゼロ・最速／**推奨**）／(C) サブパート再生成（該当ブロックのみ）／(A) diff-patch は弱モデルに不向き。`diagram-edit` は既に「図のみ」だが「図**全体**」を出す→**タスク/フィールド単位**に細分化。S2 チップ（narrow prompt）の延長・構造編集語彙＋マージ実装要。設計フェーズ込みで大きめ。触点: `src/ipc/ai.ts`（mode）・`diagram-*`・`ai-apply.ts`（マージ）・`llm-prompts` | L |
+| 部分生成の続き（P2〜P4） | ops 化は **P1＝図コンテンツで実装済**（変更フィールドのみ出力→決定論マージ・drift ゼロ・[ADR-0019](adr/0019-partial-edit-ops.md)）。**テキスト編集はまだ全文再生成＝drift の温床**が残る。残り：**P2 placeholder テキスト ops**（`applyFieldEdit` 即利用）／**P3 chart・table・gantt ops**（series/cards/tasks/cell）／**P4 refine・batch 経路への ops 配線＋delta 成功率テレメトリ**。触点: `diagram-edit-ops.ts`（雛形）・`placeholder-binding.applyFieldEdit`・`ai-apply.ts`（マージ）・`llm-prompts` | M〜L |
 | 生成の encoding 事故を構造で抑止（#12-D） | 弱モデルの `\uXXXX` 違反を**発生させない**根本抑止。案：(D-1) 生成を per-slide 分割し違反の被害半径を1枚に＋壊れた1枚だけ再試行（`extractSlidePlan` 既存）／(D-2) 本文を JSON 文字列から出しエスケープ不要な形式へ。現状は floor（違反破棄＋告知＝#12-5 C）で担保済。着手時に設計 | M |
 
 ### 🖼 HTML / 描画品質
@@ -77,3 +79,5 @@ named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[
 - **セキュリティ是正の実機検証** — F3（OS keychain・実装 PR #66）の**実 keychain 往復が WSL 開発機で未確認**＝
   Windows/macOS 実機で保存/読み出しを要検証（[ADR-0016](adr/0016-security-review-theme4.md) F3）。
 - **実験用一時ファイルの後始末** — テンプレ検証・headless 生成で散らかった temp 出力（`_probe.ts`・未追跡 `.potx` 等）を整理（↑「テンプレ資産の棚卸」と関連）。
+- **column 内 table の認識（小改修）** — separator レイアウト（col/card/kpi/step）の各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`extractFencedBlock` のみ・`findTableInLines` 未適用）。列内テーブルを native table として拾う（[ADR-0020](adr/0020-image-embedding.md) 敵対レビューで確認・画像とは独立）。触点: `md-slide-parser.ts` separator 分岐。
+- **最背面画像のプレビュー直接ドラッグ（小）** — 最背面レイヤーはハンドルが content の下に隠れるため現状フォーム編集のみ。編集 chrome（枠線＋角ハンドル）だけを前面 overlay 化してドラッグ/リサイズを再有効化（[ADR-0020](adr/0020-image-embedding.md)）。
