@@ -55,8 +55,14 @@ alien 対応・回復ラダー・テスト群完備）で、**書く側はゼロ
   実アプリ取り込みのユーザ確認まで完了（`tests/pptx-wellformed.test.ts` / `template-writer-conventions.test.ts`
   で恒久ゲート化・マスター ph 5種と docProps 等の慣習パートも生成に追加）。副産物として canonical の
   整形式破損を発見・根絶（`31c556e`）。残り＝PowerPoint 実機（web 版可）での開封のみ（ROADMAP バックログ）。
-- 生成レイアウトの構成は内蔵 30 種固定（サブセット選択・カスタムレイアウト UI は将来）。
-  モーダル内ライブプレビューも将来課題（現状は適用後のメインプレビューで確認する運用）。
+- ~~生成レイアウトの構成は内蔵 30 種固定（サブセット選択・カスタムレイアウト UI は将来）。
+  モーダル内ライブプレビューも将来課題（現状は適用後のメインプレビューで確認する運用）。~~
+  【追記 2026-07-07・作成後続UI 実装完了】`TemplateCreator` にモーダル内**ライブプレビュー**（`buildTemplatePreview`＝
+  `writeTemplate→loadTemplate→distill` を debounce・`SlidePreview` 再利用＝WYSIWYG）／**レイアウトサブセット選択**
+  （30 種チェックボックス→`spec.layouts`・空/不足は受け入れゲート `assessTemplateHealth` 再利用で never-silent 無効化）／
+  **カスタムレイアウト定義**（`LayoutEditor.tsx`＝`LayoutDef` フォーム・showcase スライドで即プレビュー・名前は
+  `combineLayouts` で非空/一意化・数値は有限値ガード）を追加。全て `spec.layouts` へのデータ渡しで完結し **schema.ts 不変
+  （R4 非該当）**。敵対レビューで7件是正（custom-only 作成ブロック・NaN 座標・名前衝突/空・health staleness race）。
 - 修復は type 付与のみ（ジオメトリ実体化・レイアウト命名の修復は扱わない）。
 - `useAiGeneration.ts` は既存の 400 行超過に +9 行（モード追加）。分割は別途。
 
