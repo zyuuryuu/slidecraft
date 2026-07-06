@@ -234,3 +234,21 @@ export function nthBody(bodyPhs: readonly PlaceholderInfo[], placeholderIdx?: st
   if (!placeholderIdx) return undefined;
   return bodyPhs[Math.max(1, parseInt(placeholderIdx) || 1) - 1];
 }
+
+/**
+ * The placeholder an EMBEDDED IMAGE targets. Unlike a diagram/table (always a BODY region), an image
+ * prefers a real PICTURE frame (type="pic" → role "picture") when the layout offers one — that's what
+ * an image-specific placeholder is for — riding the Nth picture by the same 1-based ordinal, and
+ * clamping a too-large ordinal to a picture rather than dropping to body. Layouts WITHOUT a picture
+ * frame (all bundled canonical/report masters) fall back to nthBody(body) → byte-identical to before.
+ * Pure (R2); shared by preview / form / export so the image can't bind to different frames.
+ */
+export function imagePlaceholder(
+  layoutPlaceholders: readonly PlaceholderInfo[],
+  placeholderIdx?: string,
+): PlaceholderInfo | undefined {
+  if (!placeholderIdx) return undefined;
+  const pics = [...layoutPlaceholders].sort(sortByIdx).filter((p) => placeholderRole(p) === "picture");
+  if (pics.length) return pics[Math.max(1, parseInt(placeholderIdx) || 1) - 1] ?? pics[0];
+  return nthBody(bodyPlaceholders(layoutPlaceholders), placeholderIdx);
+}

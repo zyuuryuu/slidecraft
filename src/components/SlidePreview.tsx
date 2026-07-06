@@ -11,7 +11,7 @@ import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-
 import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody } from "../engine/placeholder-binding";
+import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder } from "../engine/placeholder-binding";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -136,7 +136,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
   const codeBodyIdx = slide.code ? nthBody(bodyPhs, slide.code.placeholderIdx)?.idx : undefined;
-  const imageBodyIdx = slide.image ? nthBody(bodyPhs, slide.image.placeholderIdx)?.idx : undefined;
+  // An image prefers a PICTURE frame (else the Nth body) — resolved the same way as the export.
+  const imageBodyIdx = slide.image ? imagePlaceholder(layoutPhs, slide.image.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 

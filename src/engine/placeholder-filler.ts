@@ -13,7 +13,7 @@ import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog } from "./template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody } from "./placeholder-binding";
+import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder } from "./placeholder-binding";
 import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
@@ -152,7 +152,8 @@ async function buildSlideXml(
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
   const codeBodyIdx = slide.code ? visualBody(slide.code.placeholderIdx)?.idx : undefined;
-  const imageBodyIdx = slide.image ? visualBody(slide.image.placeholderIdx)?.idx : undefined;
+  // An image prefers a PICTURE frame (else the Nth body) — the diagram/table path stays body-only.
+  const imageBodyIdx = slide.image ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx : undefined;
 
   let shapes = "";
   let id = 2;
@@ -205,7 +206,7 @@ async function buildSlideXml(
   // mermaid, which is fine (a slide never has both — inserting an image strips other body figures).
   let imageRId: string | undefined;
   if (slide.image && imageBodyIdx && dataUriToImage(slide.image.src)) {
-    const phInfo = visualBody(slide.image.placeholderIdx);
+    const phInfo = imagePlaceholder(layout.placeholders, slide.image.placeholderIdx);
     if (phInfo) {
       const s = phInfo.style;
       const EMU = (inches: number) => Math.round(inches * 914400);

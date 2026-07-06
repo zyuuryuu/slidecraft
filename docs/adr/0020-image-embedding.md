@@ -28,6 +28,15 @@
 - パス src は非埋め込み（PPTX に出ない）＝将来パス→data URI 化 or fs 解決を足す余地。
 - SVG data URI は ext/mime を持つが PowerPoint の SVG 対応は限定的（fallback PNG 未実装）＝当面 png/jpg/gif/webp 前提。
 
+## 追記（2026-07-06）: 画像は PICTURE 枠を優先（B）
+
+画像バインドを **picture 専用プレースホルダ対応**に拡張。レイアウトが `type="pic"`（`placeholderRole`→"picture"）の枠を持つとき、画像はその枠に優先バインド（Nth を同じ 1-based ordinal で・過大 ordinal は picture にクランプ）。無ければ従来どおり Nth body へフォールバック。preview / form / PPTX は共有 `imagePlaceholder()`（`placeholder-binding`）を通すので分岐しない＝WYSIWYG 不変。
+
+- **定義は STRICT**（`type="pic"` のみ）。`obj` は含めない — obj は多目的スロット（SmartArt / 表 / 図 / テキスト）で、画像を強制すると設計意図のコンテンツを押しのけ、`usableBody` の picture-body 回避コストモデルと矛盾する。
+- **レイアウト選択は不変**（`autoSelectLayout` を picture 枠優先にはしない）— 別リスク面のため保留。resolver は「既にある画像がどの枠に乗るか」だけを決める。
+- 束ねる canonical/報告書テンプレは `type="pic"` ゼロ → **全て no-op（byte-identical）**。B が効くのは pic 枠を持つ**インポート master**（velis「Two Columns, Picture Right」等）。テストは実 fixture（velis）で pic バインド＋`<p:pic>` の EMU 幾何一致を検証。
+- コード: `placeholder-binding.imagePlaceholder` ＋ `placeholder-filler`・`SlidePreview`・`SlideEditor`（3箇所を同 resolver に統一）。テスト: `tests/image-placeholder.test.ts`。
+
 ## References
 
 - コード：`slide-schema.ts`（ImageBlock）・`md-slide-parser.ts`/`md-serializer.ts`（往復）・`SlidePreview.tsx`（`<img>`）・`placeholder-filler.ts`（`dataUriToImage`/`<p:pic>`/media/CT）・`template-loader.ts`（visualIdx）・`useDeckController.ts`（handleInsertImage）・`App.tsx`（paste＋file-drop）
