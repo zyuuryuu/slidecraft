@@ -264,6 +264,13 @@ export function imageRect(image: ImageBlock, ph: PlaceholderInfo | undefined): I
   return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
 }
 
+/** The aspect ratio (w/h) to preserve when resizing an image: the measured intrinsic aspect, else the
+ *  current box's aspect, else 1. ONE source of truth so the preview drag and the form-numeric resize
+ *  lock to the SAME ratio (they diverged when each inlined its own fallback). Pure. */
+export function imageAspectRatio(image: ImageBlock, box: ImageRect | undefined): number {
+  return image.aspect && image.aspect > 0 ? image.aspect : box && box.h > 0 ? box.w / box.h : 1;
+}
+
 /** The PPTX picture geometry for an image dropped in `box` (inches): the actual <p:pic> rect plus an
  *  optional crop (srcRect, fractions in 1/1000 %). PowerPoint's blipFill STRETCHES to the pic rect, so
  *  we do the aspect math here — matching the browser's object-fit so preview == export (WYSIWYG):
@@ -293,4 +300,37 @@ export function fitImageInBox(
   }
   const w = box.h * aspect; // height-bound
   return { rect: { x: box.x + (box.w - w) / 2, y: box.y, w, h: box.h } };
+}
+
+/** New image rect for a preview drag gesture (案B): "move" translates the box (clamped onto the slide);
+ *  a corner handle resizes from the OPPOSITE (fixed) corner, width-driven with the height following the
+ *  aspect (so a drag never distorts), clamped to a min size and kept within the slide. dx/dy in inches.
+ *  Pure — the pointer→inch conversion + gesture state live in the component. */
+export function dragImageRect(
+  mode: "move" | "nw" | "ne" | "sw" | "se",
+  base: ImageRect,
+  dx: number,
+  dy: number,
+  aspect: number,
+  slideW: number,
+  slideH: number,
+): ImageRect {
+  const MIN = 0.4;
+  const ar = aspect > 0 ? aspect : base.h > 0 ? base.w / base.h : 1;
+  if (mode === "move") {
+    return {
+      x: Math.min(Math.max(0, base.x + dx), Math.max(0, slideW - base.w)),
+      y: Math.min(Math.max(0, base.y + dy), Math.max(0, slideH - base.h)),
+      w: base.w,
+      h: base.h,
+    };
+  }
+  const right = mode === "ne" || mode === "se";
+  const bottom = mode === "sw" || mode === "se";
+  const ax = right ? base.x : base.x + base.w; // fixed anchor = opposite corner
+  const ay = bottom ? base.y : base.y + base.h;
+  const maxW = Math.min(right ? slideW - ax : ax, (bottom ? slideH - ay : ay) * ar);
+  const w = Math.max(MIN, Math.min(right ? base.w + dx : base.w - dx, maxW));
+  const h = w / ar;
+  return { x: right ? ax : ax - w, y: bottom ? ay : ay - h, w, h };
 }

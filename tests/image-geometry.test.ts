@@ -10,7 +10,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { parseMd } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
-import { imageRect } from "../src/engine/placeholder-binding";
+import { imageRect, imageAspectRatio, dragImageRect } from "../src/engine/placeholder-binding";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
@@ -61,6 +61,43 @@ describe("案B: imageRect resolver", () => {
   });
   it("is undefined when neither rect nor placeholder is available", () => {
     expect(imageRect({ src: IMG, alt: "", placeholderIdx: "1" }, undefined)).toBeUndefined();
+  });
+});
+
+describe("案B: imageAspectRatio (one fallback, shared by preview drag + form so they agree)", () => {
+  const img = (aspect?: number) => ({ src: IMG, alt: "", placeholderIdx: "1", ...(aspect ? { aspect } : {}) });
+  it("uses the measured intrinsic aspect when present", () => {
+    expect(imageAspectRatio(img(1.5), { x: 0, y: 0, w: 5, h: 4 })).toBe(1.5);
+  });
+  it("falls back to the box aspect (NOT a hardcoded 1) when no measured aspect", () => {
+    expect(imageAspectRatio(img(), { x: 0, y: 0, w: 5, h: 4 })).toBe(1.25); // preview + form agree on 1.25
+  });
+  it("falls back to 1 only when there is neither a measured aspect nor a box", () => {
+    expect(imageAspectRatio(img(), undefined)).toBe(1);
+  });
+});
+
+describe("案B: dragImageRect (preview drag/resize math)", () => {
+  const base = { x: 2, y: 2, w: 4, h: 2 }; // ar 2
+  it("move translates the box", () => {
+    expect(dragImageRect("move", base, 1, -1, 2, 13.33, 7.5)).toEqual({ x: 3, y: 1, w: 4, h: 2 });
+  });
+  it("move clamps the box onto the slide", () => {
+    expect(dragImageRect("move", { x: 0, y: 0, w: 4, h: 2 }, -5, -5, 2, 13.33, 7.5)).toMatchObject({ x: 0, y: 0 });
+  });
+  it("SE handle resizes from the top-left anchor, keeping aspect (width-driven)", () => {
+    const r = dragImageRect("se", base, 2, 99, 2, 13.33, 7.5);
+    expect(r).toMatchObject({ x: 2, y: 2, w: 6 });
+    expect(r.h).toBeCloseTo(3, 5); // 6 / ar(2)
+  });
+  it("NW handle resizes from the bottom-right anchor (drag out = grow)", () => {
+    const r = dragImageRect("nw", { x: 5, y: 4, w: 4, h: 2 }, -1, 0, 2, 13.33, 7.5);
+    // anchor = (9,6); w = 4-(-1)=5, h=2.5, x=9-5=4, y=6-2.5=3.5
+    expect(r).toMatchObject({ x: 4, y: 3.5, w: 5 });
+    expect(r.h).toBeCloseTo(2.5, 5);
+  });
+  it("never shrinks below the min size", () => {
+    expect(dragImageRect("se", base, -100, 0, 2, 13.33, 7.5).w).toBeGreaterThanOrEqual(0.4);
   });
 });
 

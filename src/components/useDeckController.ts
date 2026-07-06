@@ -18,7 +18,7 @@ import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes, applyTemplateBytesWithRepair } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
-import type { DeckIR, SlideIR } from "../engine/slide-schema";
+import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
 import { useDeckIO } from "./useDeckIO";
@@ -425,6 +425,15 @@ export function useDeckController() {
     handleSlideUpdate(activeSlide, next, "commit");
   }, [deck, activeSlide, handleSlideUpdate]);
 
+  // Fine-tune the current image's geometry (案B, drag/resize on the preview or the numeric form). One
+  // undoable commit per gesture — the preview keeps the in-flight rect locally, committing on release.
+  const handleImageRectChange = useCallback((rect: ImageRect) => {
+    if (editLockedRef.current || !deck) return;
+    const slide = deck.slides[activeSlide];
+    if (!slide?.image) return;
+    handleSlideUpdate(activeSlide, { ...slide, image: { ...slide.image, rect } }, "commit");
+  }, [deck, activeSlide, handleSlideUpdate]);
+
 
   // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
   // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
@@ -643,7 +652,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleInsertImage, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)

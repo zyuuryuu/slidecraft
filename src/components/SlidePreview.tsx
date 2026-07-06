@@ -7,11 +7,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
-import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-schema";
+import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect } from "../engine/placeholder-binding";
+import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/placeholder-binding";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -116,13 +116,15 @@ interface SlideCardProps {
   onClick?: (e: React.MouseEvent) => void;
   /** When set, the embedded diagram is drag-editable and reports new YAML. */
   onDiagramChange?: (yaml: string) => void;
+  /** When set, the embedded image is drag/resize-editable and reports the new rect (inches). */
+  onImageRectChange?: (rect: ImageRect) => void;
   /** Static export mode (standalone HTML / SSR): strip all editor chrome — selection
    *  border, hover cursor, click handler, and the synthetic slide-number — so the card
    *  renders as a clean presentation slide. See docs/design/html-output.md (S1). */
   exportMode?: boolean;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, exportMode }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -140,6 +142,41 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   const imageBodyIdx = slide.image ? imagePlaceholder(layoutPhs, slide.image.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
+
+  // Image drag/resize (案B, 段階2): while a gesture is live, render from a LOCAL rect (smooth, no deck
+  // churn); commit ONCE on release (one undo entry). Pointer events (not HTML5 DnD — unreliable in the
+  // Tauri webview). Only on the active, editable card (onImageRectChange set = single-slide edit view).
+  const [dragRect, setDragRect] = useState<ImageRect | null>(null);
+  const dragRef = useRef<{ mode: "move" | "nw" | "ne" | "sw" | "se"; sx: number; sy: number; base: ImageRect; latest: ImageRect; moved: boolean } | null>(null);
+  const imgWrapRef = useRef<HTMLDivElement | null>(null);
+  const imgEditable = !!(isActive && onImageRectChange && slide.image && imageBodyIdx);
+  // Aspect to preserve on resize — the SHARED helper (imageAspectRatio) so preview drag and the form
+  // lock to the identical ratio (WYSIWYG on resize too). Uses the bound placeholder box as the fallback.
+  const imgAspect = slide.image
+    ? imageAspectRatio(slide.image, imageRect(slide.image, layoutPhs.find((p) => p.idx === imageBodyIdx)))
+    : 1;
+  const beginImageDrag = (mode: "move" | "nw" | "ne" | "sw" | "se", base: ImageRect) => (e: React.PointerEvent) => {
+    if (!imgEditable) return;
+    e.stopPropagation(); e.preventDefault();
+    imgWrapRef.current?.setPointerCapture?.(e.pointerId);
+    dragRef.current = { mode, sx: e.clientX, sy: e.clientY, base, latest: base, moved: false };
+  };
+  const onImagePointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) < 3) return; // click threshold
+    d.moved = true;
+    d.latest = dragImageRect(d.mode, d.base, (e.clientX - d.sx) / scale, (e.clientY - d.sy) / scale, imgAspect, SLIDE_W, SLIDE_H);
+    setDragRect(d.latest);
+  };
+  const endImageDrag = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    dragRef.current = null;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    if (d.moved) onImageRectChange!(d.latest);
+    setDragRect(null);
+  };
 
   // Background = the LAYOUT's own <p:bg> fill if it has one (e.g. a full-bleed cover panel),
   // else the master bg color. Decorative shapes are painted on top.
@@ -345,24 +382,47 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
           );
         }
 
-        // Image (![alt](data URI)) → <img> in its box: the manual rect (案B) or the placeholder box,
-        // with object-fit = the image's fit (contain letterboxes, cover fills+crops). object-fit mirrors
-        // the PPTX aspect math (fitImageInBox) so preview == export.
+        // Image (![alt](data URI)) → <img> in its box: the live drag rect, else the manual rect (案B),
+        // else the placeholder box. object-fit mirrors the PPTX aspect math (fitImageInBox) so preview
+        // == export. When editable (active single-slide view), the box is drag-move + corner-resize.
         if (slide.image && ph.idx === imageBodyIdx) {
-          const box = imageRect(slide.image, ph) ?? s;
+          const resolved = imageRect(slide.image, ph) ?? s;
+          const box = dragRect ?? resolved;
+          const HANDLES: { c: "nw" | "ne" | "sw" | "se"; cursor: string; pos: React.CSSProperties }[] = [
+            { c: "nw", cursor: "nwse-resize", pos: { left: -5, top: -5 } },
+            { c: "ne", cursor: "nesw-resize", pos: { right: -5, top: -5 } },
+            { c: "sw", cursor: "nesw-resize", pos: { left: -5, bottom: -5 } },
+            { c: "se", cursor: "nwse-resize", pos: { right: -5, bottom: -5 } },
+          ];
           return (
             <div
               key={`image-${ph.idx}`}
+              ref={imgWrapRef}
+              onPointerDown={imgEditable ? beginImageDrag("move", resolved) : undefined}
+              onPointerMove={imgEditable ? onImagePointerMove : undefined}
+              onPointerUp={imgEditable ? endImageDrag : undefined}
               style={{
                 position: "absolute",
                 left: `${(box.x / SLIDE_W) * 100}%`,
                 top: `${(box.y / SLIDE_H) * 100}%`,
                 width: `${(box.w / SLIDE_W) * 100}%`,
                 height: `${(box.h / SLIDE_H) * 100}%`,
-                overflow: "hidden",
+                cursor: imgEditable ? "move" : undefined,
+                touchAction: imgEditable ? "none" : undefined,
+                outline: imgEditable ? "1px solid rgba(59,130,246,0.7)" : undefined,
               }}
             >
-              <img src={slide.image.src} alt={slide.image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: slide.image.fit === "cover" ? "cover" : "contain" }} />
+              <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                <img src={slide.image.src} alt={slide.image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: slide.image.fit === "cover" ? "cover" : "contain", pointerEvents: "none" }} />
+              </div>
+              {imgEditable && HANDLES.map((h) => (
+                <div
+                  key={h.c}
+                  data-image-handle={h.c}
+                  onPointerDown={beginImageDrag(h.c, resolved)}
+                  style={{ position: "absolute", width: 9, height: 9, background: "#3B82F6", border: "1px solid #fff", borderRadius: 2, cursor: h.cursor, ...h.pos }}
+                />
+              ))}
             </div>
           );
         }
@@ -435,6 +495,8 @@ interface SlidePreviewProps {
   scale?: number;
   /** Enables drag-to-move on the active slide's diagram (Edit mode). */
   onDiagramChange?: (yaml: string) => void;
+  /** Enables drag/resize of the active slide's image, reporting the new rect (Edit mode). */
+  onImageRectChange?: (rect: ImageRect) => void;
 }
 
 export default function SlidePreview({
@@ -448,6 +510,7 @@ export default function SlidePreview({
   singleSlide = false,
   scale: scaleProp,
   onDiagramChange,
+  onImageRectChange,
 }: SlidePreviewProps) {
   // Catalog → layout selection adapts to the template (canonical = unchanged).
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
@@ -497,6 +560,7 @@ export default function SlidePreview({
         isActive={active}
         onClick={singleSlide ? undefined : () => onSlideClick?.(i)}
         onDiagramChange={singleSlide ? onDiagramChange : undefined}
+        onImageRectChange={singleSlide && active ? onImageRectChange : undefined}
       />
     );
   };
