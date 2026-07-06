@@ -48,7 +48,7 @@ Option A（単発リテイク）でも弱モデルは複雑な構造編集で取
 - **決定論採点＋選別**：`AiPanel` が各候補を**採用ゲート**（`previewSlideEdit`/`reconcileSlideEdit` の warnings 数＋全文ドリフトに大ペナルティ）でスコア化し**最良を preselect**。候補ピッカー（◀ n/N ▶・✓/⚠k）で人が見比べ→採用。**採用ゲート不変・最終は人**。選別は決定論、生成N本のみ非決定論。
 - **N は設定・HARD clamp [1,5]**（`clampBestOfN`・`MAX_BEST_OF_N=5`・永続化）。誤って 100 等でも暴走ファンアウトしない（ユーザ要望のガードレール）。N=1 で無効＝Option A（自動リテイク）に戻る（N>1 時は自動リテイク停止＝best-of-N が品質レバー）。
 - **内蔵ランタイム＝RAM 連動**（ユーザ選択「RAM見て自動」）：`local_ai.rs` `choose_parallel` が空きRAMで `--parallel N`（余裕あれば最大3・`-c`=8192·N で各スロット8K維持）、tight なら 1スロット/8K にフォールバック（**OOM を絶対に招かない**保守見積り＝weights〔gguf サイズ〕＋N·KV〔2GB/slot〕＋margin）。外部API は常に真の並列。
-- **whole-deck refine への展開＝実装済**（`61bc366`）：`refineDeck` の単発 aiFix を N候補 fan-out に、ループが既に持つ `mergeVerdicts(validateCondense＋validateStructure)` を採点に流用（no-HARD>HARD・同点は違反数最少）。`AiSlideFix` meta に `candidate`、opts に `bestOfN`、`useDeckRefine`/App が `ai.bestOfN` を配線。N=1 は従来挙動と一致。残＝`batchEditDeck`（自由編集の採点軸別・後続）。開発メモリ `backlog_ai_edit_efficiency`。
+- **whole-deck refine＋batch への展開＝実装済**（`61bc366`＋`95ef32b`）：`refineDeck` は単発 aiFix を N候補 fan-out に、ループ既存の `mergeVerdicts(validateCondense＋validateStructure)` で採点（no-HARD>HARD・同点は違反数最少）。`batchEditDeck`（free-form 一括編集）は絶対保持契約が無いので採点軸を変更＝**実変更した候補のうち fact(数値)ドリフト最少**（言語変化は指示意図の可能性ありで非減点）。`AiSlideFix` meta に `candidate`、両 opts に `bestOfN`、`useDeckRefine`(runRefine/runBatchEdit)/App が `ai.bestOfN` を配線。N=1 は従来挙動と一致。**Option B は単一/whole-deck/batch すべて完了。** 開発メモリ `backlog_ai_edit_efficiency`。
 
 #### P1 実機テスト由来の補強（2026-07-05・弱モデル granite-4.1-8b で観測）
 
