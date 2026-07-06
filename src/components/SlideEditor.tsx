@@ -175,6 +175,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
       slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
       slide.code && nthBody(bodyPhs, slide.code.placeholderIdx)?.idx,
+      slide.image && nthBody(bodyPhs, slide.image.placeholderIdx)?.idx,
     ].filter((x): x is string => !!x),
   );
 
@@ -287,6 +288,26 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           onUpdateMermaid={updateMermaid}
           onChange={onChange}
         />
+      )}
+
+      {/* Image block — the body figure isn't a text field, so the form reflects it as a thumbnail + a
+          remove (delete → the body reverts to an editable field). Replace = paste/drop another image. */}
+      {slide.image && (
+        <div className="border border-edge rounded p-2 flex items-center gap-2">
+          <img src={slide.image.src} alt={slide.image.alt} className="w-16 h-12 object-contain bg-field rounded shrink-0" />
+          <div className="flex-1 min-w-0 text-xs">
+            <div className="text-fg2">🖼 画像</div>
+            <div className="truncate text-faint">{slide.image.alt || "貼り付け/ドロップで差し替え"}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { const next = { ...slide }; delete next.image; onChange(next); }}
+            title="画像を削除"
+            className="w-6 h-6 flex items-center justify-center rounded bg-field border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-xs shrink-0"
+          >
+            🗑
+          </button>
+        </div>
       )}
     </div>
   );
