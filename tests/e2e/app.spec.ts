@@ -126,6 +126,18 @@ test.describe("SlideCraft", () => {
     await expect(del).toHaveCount(before + 1);
   });
 
+  test("slide list: drag-reorder changes the slide order", async ({ page }) => {
+    await page.waitForTimeout(1500); // sample deck
+    const drags = page.getByTitle("ドラッグで並べ替え"); // one draggable wrapper per slide
+    expect(await drags.count()).toBeGreaterThanOrEqual(3);
+    const firstBefore = (await drags.nth(0).textContent())?.trim();
+    await drags.nth(0).dragTo(drags.nth(2)); // move slide 1 → position 3 (HTML5 DnD)
+    await expect(async () => {
+      const firstAfter = (await page.getByTitle("ドラッグで並べ替え").nth(0).textContent())?.trim();
+      expect(firstAfter).not.toBe(firstBefore); // the first slot now shows a different slide
+    }).toPass({ timeout: 3000 });
+  });
+
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark"); // default

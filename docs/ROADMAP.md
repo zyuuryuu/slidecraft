@@ -52,7 +52,6 @@ named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
-| スライドの入れ替え（ドラッグ並べ替え） | 一覧でスライドをドラッグして順序変更。**エンジンは `moveSlideTo`（`deck-structure.ts`・実装済・テスト済）を再利用**、UI の drag-and-drop 配線が主（`SlideList.tsx`＋`useDeckController` に `handleMoveSlide`）。追加/複製/削除は GUI 実装済＝その後続。collab 中は observe-only で無効 | S〜M |
 | UI 日英表記切り替え（i18n） | UI 文言の 日本語⇄英語 トグル。現状は日本語ハードコード → 文字列を抽出し言語切替を提供（ユーザ要望） | M〜L |
 | 画像の Markdown 埋め込み | `![alt](path)` の画像埋め込み（**チャートは ```diagram``` の xychart/radar/kpi/pie で対応済み**、残りは画像のみ） | M |
 | ユーザ利用ガイド | 図 14 種・二段階編集・テンプレ流し込みを網羅したオンボーディング | M |
