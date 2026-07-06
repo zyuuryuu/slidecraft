@@ -113,10 +113,23 @@ export type CodeBlock = z.infer<typeof CodeBlockSchema>;
 
 // ── Image block (embedded in a slide) ──
 
+// A manual geometry override (inches on the 13.33×7.5 slide). Absent → the image fills its bound
+// placeholder box (the default). Present → the image is fine-tuned to this exact rect.
+export const ImageRectSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+});
+export type ImageRect = z.infer<typeof ImageRectSchema>;
+
 export const ImageBlockSchema = z.object({
   src: z.string(), // data URI (data:image/...;base64,…) — self-contained so the deck stays portable
   alt: z.string().default(""),
   placeholderIdx: z.string().default("1"), // which BODY region the image fills
+  rect: ImageRectSchema.optional(), // manual size/position override (inches); absent = fill placeholder box
+  fit: z.enum(["contain", "cover"]).optional(), // contain (default, letterbox) | cover (fill + crop)
+  aspect: z.number().optional(), // intrinsic w/h, measured at insert — enables aspect-lock + correct cover crop
 });
 
 export type ImageBlock = z.infer<typeof ImageBlockSchema>;

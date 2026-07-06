@@ -10,7 +10,7 @@
  *
  * Pure logic (R2): no DOM / Tauri.
  */
-import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
+import type { SlideIR, PlaceholderContent, Paragraph, ImageBlock, ImageRect } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 import { slideIdxRole, placeholderRole, type PlaceholderRole } from "./template-catalog";
 
@@ -251,4 +251,46 @@ export function imagePlaceholder(
   const pics = [...layoutPlaceholders].sort(sortByIdx).filter((p) => placeholderRole(p) === "picture");
   if (pics.length) return pics[Math.max(1, parseInt(placeholderIdx) || 1) - 1] ?? pics[0];
   return nthBody(bodyPlaceholders(layoutPlaceholders), placeholderIdx);
+}
+
+/**
+ * The image's final geometry (inches on the slide): the manual `rect` override when the user has
+ * fine-tuned it (案B), else the bound placeholder's box (the default). Shared by preview + export so
+ * a fine-tuned image lands identically in both (WYSIWYG). Undefined when neither is available. Pure.
+ */
+export function imageRect(image: ImageBlock, ph: PlaceholderInfo | undefined): ImageRect | undefined {
+  if (image.rect) return image.rect;
+  if (!ph) return undefined;
+  return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
+}
+
+/** The PPTX picture geometry for an image dropped in `box` (inches): the actual <p:pic> rect plus an
+ *  optional crop (srcRect, fractions in 1/1000 %). PowerPoint's blipFill STRETCHES to the pic rect, so
+ *  we do the aspect math here — matching the browser's object-fit so preview == export (WYSIWYG):
+ *   • aspect unknown or already == box → fill the box (no distortion, no crop);
+ *   • cover → fill the box, crop the overflow via srcRect;
+ *   • contain → shrink the pic to fit inside the box, centered (letterbox), no crop. Pure. */
+export function fitImageInBox(
+  box: ImageRect,
+  fit: "contain" | "cover" | undefined,
+  aspect: number | undefined,
+): { rect: ImageRect; srcRect?: { l: number; t: number; r: number; b: number } } {
+  if (!aspect || aspect <= 0 || box.w <= 0 || box.h <= 0) return { rect: box };
+  const boxAr = box.w / box.h;
+  if (Math.abs(boxAr - aspect) < 1e-4) return { rect: box }; // aspect-locked: box already matches
+  if (fit === "cover") {
+    if (aspect > boxAr) {
+      const c = Math.round(((1 - boxAr / aspect) / 2) * 100000); // wider → crop left+right
+      return { rect: box, srcRect: { l: c, t: 0, r: c, b: 0 } };
+    }
+    const c = Math.round(((1 - aspect / boxAr) / 2) * 100000); // taller → crop top+bottom
+    return { rect: box, srcRect: { l: 0, t: c, r: 0, b: c } };
+  }
+  // contain (default): letterbox inside the box.
+  if (aspect > boxAr) {
+    const h = box.w / aspect; // width-bound
+    return { rect: { x: box.x, y: box.y + (box.h - h) / 2, w: box.w, h } };
+  }
+  const w = box.h * aspect; // height-bound
+  return { rect: { x: box.x + (box.w - w) / 2, y: box.y, w, h: box.h } };
 }
