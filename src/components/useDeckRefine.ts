@@ -67,7 +67,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN 
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const result = await batchEditDeck(deck, catalog, { indices, instruction, aiFix, signal: controller.signal });
+        const result = await batchEditDeck(deck, catalog, { indices, instruction, aiFix, bestOfN, signal: controller.signal });
         if (!(controller.signal.aborted && result.changes.length === 0)) setProposal(result);
       } catch (e) {
         setRefineError(e instanceof Error ? e.message : String(e));
@@ -76,7 +76,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN 
         abortRef.current = null;
       }
     },
-    [deck, catalog, refining, aiFix],
+    [deck, catalog, refining, aiFix, bestOfN],
   );
 
   // Stop the loop / batch: aborts the in-flight AI task. Any changes already made still
