@@ -131,7 +131,14 @@ test.describe("SlideCraft", () => {
     const drags = page.getByTitle("ドラッグで並べ替え"); // one draggable wrapper per slide
     expect(await drags.count()).toBeGreaterThanOrEqual(3);
     const firstBefore = (await drags.nth(0).textContent())?.trim();
-    await drags.nth(0).dragTo(drags.nth(2)); // move slide 1 → position 3 (HTML5 DnD)
+    // POINTER-based drag (native HTML5 DnD is unreliable in Tauri webviews): press on slide 1, move over
+    // slide 3 in steps (past the 5px threshold → pointermove fires), release → the drop applies onMove.
+    const src = (await drags.nth(0).boundingBox())!;
+    const dst = (await drags.nth(2).boundingBox())!;
+    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height / 2, { steps: 10 });
+    await page.mouse.up();
     await expect(async () => {
       const firstAfter = (await page.getByTitle("ドラッグで並べ替え").nth(0).textContent())?.trim();
       expect(firstAfter).not.toBe(firstBefore); // the first slot now shows a different slide

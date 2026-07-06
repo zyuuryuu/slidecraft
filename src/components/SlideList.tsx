@@ -2,7 +2,7 @@
  * SlideList.tsx — Slide thumbnail list using the same SlideCard as the preview.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
@@ -39,10 +39,48 @@ export default function SlideList({
   disabled,
 }: SlideListProps) {
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
-  // Drag-reorder state: which slide is being dragged + which it's hovering over (drop target).
+  // Drag-reorder via POINTER events (NOT native HTML5 DnD — that is unreliable in the Tauri webviews:
+  // WebKitGTK on Linux, WKWebView on macOS). dragIdx/overIdx drive the visuals; the live drag lives in
+  // a ref (read synchronously on pointerup) so pointerup applies the final drop without a stale closure.
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  const dragRef = useRef<{ from: number; over: number | null; active: boolean } | null>(null);
+  const justDragged = useRef(false); // swallow the click that follows a real drag (else it re-selects a stale idx)
   const canDrag = !disabled && !!onMove;
+
+  const startDrag = (e: React.PointerEvent, from: number) => {
+    if (!canDrag || e.button !== 0) return;
+    const startY = e.clientY;
+    dragRef.current = { from, over: from, active: false };
+    const onMovePtr = (ev: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (!d.active) {
+        if (Math.abs(ev.clientY - startY) < 5) return; // below the threshold it's still a click, not a drag
+        d.active = true;
+        setDragIdx(from);
+      }
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest("[data-slide-idx]") as HTMLElement | null;
+      const over = el ? Number(el.dataset.slideIdx) : null;
+      d.over = over;
+      setOverIdx(over);
+    };
+    const onUpPtr = () => {
+      window.removeEventListener("pointermove", onMovePtr);
+      window.removeEventListener("pointerup", onUpPtr);
+      const d = dragRef.current;
+      dragRef.current = null;
+      if (d?.active) {
+        justDragged.current = true; // the trailing click must not also fire onSelect
+        if (d.over !== null && d.over !== d.from) onMove?.(d.from, d.over);
+      }
+      setDragIdx(null);
+      setOverIdx(null);
+    };
+    window.addEventListener("pointermove", onMovePtr);
+    window.addEventListener("pointerup", onUpPtr);
+  };
+
   if (!deck || deck.slides.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-faint text-xs p-2">
@@ -66,13 +104,11 @@ export default function SlideList({
         return (
           <div
             key={i}
+            data-slide-idx={i}
             className={`flex flex-col items-center ${canDrag ? "cursor-grab" : ""} ${dragIdx === i ? "opacity-40" : ""}`}
-            draggable={canDrag}
             title={canDrag ? "ドラッグで並べ替え" : undefined}
-            onDragStart={canDrag ? (e) => { setDragIdx(i); e.dataTransfer.effectAllowed = "move"; } : undefined}
-            onDragOver={canDrag ? (e) => { if (dragIdx !== null) { e.preventDefault(); setOverIdx(i); } } : undefined}
-            onDrop={canDrag ? (e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== i) onMove!(dragIdx, i); setDragIdx(null); setOverIdx(null); } : undefined}
-            onDragEnd={canDrag ? () => { setDragIdx(null); setOverIdx(null); } : undefined}
+            onPointerDown={canDrag ? (e) => startDrag(e, i) : undefined}
+            onClickCapture={(e) => { if (justDragged.current) { justDragged.current = false; e.stopPropagation(); } }} // swallow the post-drag click
           >
             <div className={`relative group rounded ${isDropTarget ? "ring-2 ring-accent" : ""}`}>
               <SlideCard
