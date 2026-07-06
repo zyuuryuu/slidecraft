@@ -20,7 +20,7 @@ import ThemeToggle from "./components/ThemeToggle";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
-import { pickBinaryFile, confirmDialog } from "./ipc/commands";
+import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
 import { describeRepairPlan } from "./components/apply-template";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
@@ -177,6 +177,54 @@ export default function App() {
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
+  }, [handleInsertImage, notify]);
+
+  // Drag & drop an image FILE onto the app → insert onto the current slide as a data URI. Desktop: the
+  // OS drop is intercepted by Tauri (HTML5 'drop' doesn't fire) → use the native onDragDropEvent + fs
+  // read. Browser: the HTML5 'drop' with dataTransfer.files. (Native HTML5 file-drop is unreliable in the
+  // Tauri webviews — same reason the slide reorder uses pointer events.)
+  useEffect(() => {
+    const IMG_MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp" };
+    if (runningInTauri()) {
+      let unlisten: (() => void) | undefined;
+      let cancelled = false;
+      void (async () => {
+        const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+        const un = await getCurrentWebview().onDragDropEvent(async (e) => {
+          if (e.payload.type !== "drop") return;
+          const { readFile } = await import("@tauri-apps/plugin-fs");
+          for (const p of e.payload.paths) {
+            const mime = IMG_MIME[p.split(".").pop()?.toLowerCase() ?? ""];
+            if (!mime) continue;
+            try {
+              const bytes = await readFile(p);
+              let bin = ""; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+              handleInsertImage(`data:${mime};base64,${btoa(bin)}`);
+              notify("画像を挿入しました");
+            } catch { notify("画像の読み込みに失敗しました"); }
+            break; // one image per drop
+          }
+        });
+        if (cancelled) un(); else unlisten = un;
+      })();
+      return () => { cancelled = true; unlisten?.(); };
+    }
+    const onDragOver = (e: DragEvent) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); };
+    const onDrop = (e: DragEvent) => {
+      const files = e.dataTransfer?.files;
+      if (!files?.length) return;
+      for (const f of Array.from(files)) {
+        if (!f.type.startsWith("image/")) continue;
+        e.preventDefault();
+        const reader = new FileReader();
+        reader.onload = () => { if (typeof reader.result === "string") { handleInsertImage(reader.result); notify("画像を挿入しました"); } };
+        reader.readAsDataURL(f);
+        break;
+      }
+    };
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    return () => { window.removeEventListener("dragover", onDragOver); window.removeEventListener("drop", onDrop); };
   }, [handleInsertImage, notify]);
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
