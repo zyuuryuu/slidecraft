@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
-import { buildFieldMap, bodyPlaceholders, nthBody, applyFieldEdit } from "../engine/placeholder-binding";
+import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, applyFieldEdit } from "../engine/placeholder-binding";
 import { groupEditorPlan } from "../engine/group-binding";
 import DiagramEditor from "./DiagramEditor";
 
@@ -175,13 +175,13 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
       slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
       slide.code && nthBody(bodyPhs, slide.code.placeholderIdx)?.idx,
-      slide.image && nthBody(bodyPhs, slide.image.placeholderIdx)?.idx,
+      slide.image && layout && imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx,
     ].filter((x): x is string => !!x),
   );
   // The concrete placeholder the image is bound to (role-resolved, as the preview/export do) — so the
-  // form can say WHICH placeholder holds it, not just that an image exists. (B: prefer a picture-type
-  // placeholder — a follow-up; today it resolves to the body region.)
-  const imagePh = slide.image && layout ? nthBody(bodyPhs, slide.image.placeholderIdx) : undefined;
+  // form can say WHICH placeholder holds it, not just that an image exists. B: a real PICTURE frame
+  // (type="pic") wins when the master has one; else it resolves to the body region as before.
+  const imagePh = slide.image && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
 
   // What the collapsed Layout header shows: the ACTIVE layout (Auto resolves to a concrete name).
   const layoutLabel = slide.layout === "auto" ? (resolvedLayout ? `自動 → ${resolvedLayout}` : "自動") : slide.layout;
