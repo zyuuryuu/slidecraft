@@ -12,7 +12,7 @@ import { loadTemplate } from "../src/engine/template-loader";
 import { bundleProject } from "../src/engine/project-io";
 import { parseMd } from "../src/engine/md-parser";
 import * as S from "../src/mcp/session";
-import { DocRegistry, commitMutation, undoDoc, redoDoc, type DocEntry } from "../src/mcp/host-core";
+import { DocRegistry, commitMutation, undoDoc, redoDoc, MemTemplateStore, type DocEntry } from "../src/mcp/host-core";
 
 const DECK_MD = "# 表紙\n\n## サブ\n\n---\n\n# 中身\n\n- 速度: 0.8秒\n- 重量: 1.2kg";
 
@@ -120,6 +120,34 @@ describe("undo / redo", () => {
     const rd = redoDoc(e);
     expect(rd.ok).toBe(false);
     expect(rd.reason).toBe("nothing-to-redo");
+  });
+});
+
+describe("MemTemplateStore", () => {
+  const bytesOf = (s: string) => new TextEncoder().encode(s);
+
+  it("register REPLACES the whole set (the GUI's registry is the truth) and lists metadata only", () => {
+    const store = new MemTemplateStore();
+    expect(store.list()).toEqual([]);
+    store.register([
+      { id: "builtin", name: "Midnight", builtin: true, bytes: bytesOf("A") },
+      { id: "m1", name: "社内テンプレ", builtin: false, bytes: bytesOf("BB") },
+    ]);
+    expect(store.list()).toEqual([
+      { id: "builtin", name: "Midnight", builtin: true },
+      { id: "m1", name: "社内テンプレ", builtin: false },
+    ]);
+    // a second register with a shorter list DROPS the missing id (removals propagate)
+    store.register([{ id: "m1", name: "社内テンプレ", builtin: false, bytes: bytesOf("CCC") }]);
+    expect(store.list().map((t) => t.id)).toEqual(["m1"]);
+    expect(store.getBytes("builtin")).toBeUndefined();
+  });
+
+  it("getBytes resolves the uploaded bytes and is undefined for an unknown id (never a fake-empty)", () => {
+    const store = new MemTemplateStore();
+    store.register([{ id: "m1", name: "T", builtin: false, bytes: bytesOf("hello") }]);
+    expect(store.getBytes("m1")).toEqual(bytesOf("hello"));
+    expect(store.getBytes("nope")).toBeUndefined();
   });
 });
 

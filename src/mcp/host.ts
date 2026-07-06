@@ -15,7 +15,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createSession } from "./session";
 import { buildServer } from "./server";
-import { DocRegistry, type HostContext } from "./host-core";
+import { DocRegistry, MemTemplateStore, type HostContext } from "./host-core";
 import { mintToken, checkRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type SecurityConfig } from "./host-security";
 import { writeHostJson, clearHostJson, type HostHandshake } from "./host-json";
 
@@ -57,6 +57,9 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
   };
 
   const registry = new DocRegistry();
+  // ONE template store shared across connections: the gui-role client uploads the master registry
+  // (register_templates), AI-role clients read it (list_templates / use_template). S2 増分2.
+  const templates = new MemTemplateStore();
   const conns = new Map<string, Conn>(); // mcpSessionId → connection
   const activeByConn = new Map<string, string>(); // mcpSessionId → active docId
 
@@ -73,6 +76,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
     active: (extra) => { const s = sidOf(extra); return s ? activeByConn.get(s) : undefined; },
     setActive: (extra, docId) => { const s = sidOf(extra); if (s) activeByConn.set(s, docId); },
     sharedOnly: aiClient,
+    templates,
     onMutated: (entry, _tool, opId) => broadcast("deckChanged", { docId: entry.docId, rev: entry.rev, opId }),
     notifyOpened: (entry) => broadcast("documentOpened", { docId: entry.docId, title: entry.title, slideCount: entry.session.deck?.slides.length ?? 0 }),
     notifyClosed: (docId) => broadcast("documentClosed", { docId }),

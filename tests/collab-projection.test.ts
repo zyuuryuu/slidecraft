@@ -138,4 +138,39 @@ describe("CollabProjection", () => {
     proj = new CollabProjection({ url: host.url, token: "wrong-token", pollMs: 0, onDeck: () => {} });
     await expect(proj.start()).rejects.toThrow();
   });
+
+  // S2 増分2: the full cross-process bridge over real HTTP+base64 — the gui-role client uploads its
+  // master registry (what useCollab does on 開始), an ai-role client discovers and starts from it.
+  it("a GUI client registers templates; an AI client lists and starts a project from one (by id, no bytes)", async () => {
+    const gui = new CollabClient({ url: host.url, token: host.token, role: "gui" });
+    await gui.connect();
+    try {
+      const reg = await gui.callTool<{ ok: boolean; count: number }>("register_templates", {
+        templates: [{ id: "m1", name: "社内テンプレ", builtin: false, bytesBase64: templateB64 }],
+      });
+      expect(reg).toEqual({ ok: true, count: 1 });
+
+      ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+      await ai.connect();
+      const list = await ai.callTool<{ templates: { id: string; name: string; builtin: boolean }[] }>("list_templates");
+      expect(list.templates).toEqual([{ id: "m1", name: "社内テンプレ", builtin: false }]);
+
+      // start a project from the registered template WITHOUT carrying its bytes
+      const made = await ai.callTool<{ docId: string; slideCount: number }>("use_template", { id: "m1", markdown: "# A\n\n- x\n\n---\n\n# B\n\n- y" });
+      expect(made.docId).toBeTruthy();
+      expect(made.slideCount).toBe(2);
+
+      // register_templates is gui-only: an AI attempt is rejected AND never pollutes the shared store.
+      let aiRegistered = false;
+      try {
+        await ai.callTool("register_templates", { templates: [{ id: "evil", name: "x", builtin: false, bytesBase64: templateB64 }] });
+        aiRegistered = true;
+      } catch { /* expected — the AI connection has no register_templates */ }
+      expect(aiRegistered).toBe(false);
+      const after = await ai.callTool<{ templates: { id: string }[] }>("list_templates");
+      expect(after.templates.map((t) => t.id)).toEqual(["m1"]);
+    } finally {
+      await gui.close();
+    }
+  });
 });
