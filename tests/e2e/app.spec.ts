@@ -169,7 +169,8 @@ test.describe("SlideCraft", () => {
       window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
     });
     await expect(page.locator('img[src^="data:image/png"]').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText("🖼 画像")).toBeVisible(); // the Slide Editor form reflects the image (no stale empty body field)
+    await expect(page.getByText(/🖼 画像/)).toBeVisible(); // the Slide Editor form reflects the image (no stale empty body field)
+    await expect(page.getByText(/→.*idx \d/)).toBeVisible(); // …and WHICH placeholder holds it (role-resolved binding)
   });
 
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {

@@ -178,6 +178,10 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       slide.image && nthBody(bodyPhs, slide.image.placeholderIdx)?.idx,
     ].filter((x): x is string => !!x),
   );
+  // The concrete placeholder the image is bound to (role-resolved, as the preview/export do) — so the
+  // form can say WHICH placeholder holds it, not just that an image exists. (B: prefer a picture-type
+  // placeholder — a follow-up; today it resolves to the body region.)
+  const imagePh = slide.image && layout ? nthBody(bodyPhs, slide.image.placeholderIdx) : undefined;
 
   // What the collapsed Layout header shows: the ACTIVE layout (Auto resolves to a concrete name).
   const layoutLabel = slide.layout === "auto" ? (resolvedLayout ? `自動 → ${resolvedLayout}` : "自動") : slide.layout;
@@ -296,8 +300,11 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
         <div className="border border-edge rounded p-2 flex items-center gap-2">
           <img src={slide.image.src} alt={slide.image.alt} className="w-16 h-12 object-contain bg-field rounded shrink-0" />
           <div className="flex-1 min-w-0 text-xs">
-            <div className="text-fg2">🖼 画像</div>
-            <div className="truncate text-faint">{slide.image.alt || "貼り付け/ドロップで差し替え"}</div>
+            <div className="text-fg2">🖼 画像{slide.image.alt ? ` — ${slide.image.alt}` : ""}</div>
+            {/* WHICH placeholder holds it (role-resolved). Falls back to the raw ordinal if no layout. */}
+            <div className="truncate text-faint" title="貼り付け/ドロップで差し替え">
+              {imagePh ? `→ ${getLabel(imagePh.idx, layout)}（idx ${imagePh.idx}）` : "貼り付け/ドロップで差し替え"}
+            </div>
           </div>
           <button
             type="button"
