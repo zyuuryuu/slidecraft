@@ -38,11 +38,11 @@ export type AiFixOutcome =
   | { ok: false; cancelled: false; retryable: boolean; message?: string }; // failed → maybe retry
 
 /** Inject the AI: a slide-fix request (slideFixRequest) → an outcome. `meta.attempt`
- *  (1-based) lets the host label/vary the retry. Keeps the loop pure/testable; stage D
- *  (MCP) re-uses it with a different backend. */
+ *  (1-based) lets the host label/vary the retry; `meta.candidate` (0-based) distinguishes the
+ *  best-of-N fan-out within one attempt. Keeps the loop pure/testable; stage D (MCP) re-uses it. */
 export type AiSlideFix = (
   request: string,
-  meta: { slideIndex: number; signal?: AbortSignal; attempt: number; kind: "condense" | "edit" },
+  meta: { slideIndex: number; signal?: AbortSignal; attempt: number; kind: "condense" | "edit"; candidate?: number },
 ) => Promise<AiFixOutcome>;
 
 export interface RefineChange {
@@ -90,10 +90,11 @@ function groupBySlide(issues: DeckIssue[]): Map<number, DeckIssue[]> {
 export async function refineDeck(
   deck: DeckIR,
   catalog: LayoutCatalog,
-  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; maxAiRetries?: number; signal?: AbortSignal },
+  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; maxAiRetries?: number; bestOfN?: number; signal?: AbortSignal },
 ): Promise<RefineResult> {
   const maxIter = opts.maxIterations ?? 6;
   const maxRetries = opts.maxAiRetries ?? 2; // up to 1 + maxRetries AI attempts per slide
+  const bestOfN = Math.max(1, Math.floor(opts.bestOfN ?? 1)); // fan out N per fix, keep the best-scoring
   const box = contentBodyBox(catalog);
   let current = deck;
   const changes: RefineChange[] = [];
@@ -136,45 +137,52 @@ export async function refineDeck(
         if (aiIssue && !aiDone.has(idx)) {
           const attempt = (aiAttempts.get(idx) ?? 0) + 1;
           aiAttempts.set(idx, attempt);
-          let outcome: AiFixOutcome;
-          try {
-            outcome = await opts.aiFix(slideFixRequest(buildSlideFix(before, slideIssues, box)), { slideIndex: idx, signal: opts.signal, attempt, kind: "condense" });
-          } catch {
-            aiDone.add(idx); // aiFix should resolve an outcome; a throw = unknown → don't retry
-            continue;
-          }
-          if (outcome.ok) {
+          const req = slideFixRequest(buildSlideFix(before, slideIssues, box));
+          // Best-of-N: fan out N candidates for this fix and keep the best-scoring one. N=1 = single-shot.
+          // The score reuses the SAME verdict the loop already computes: a no-HARD candidate always beats
+          // a HARD one; among equals, fewest violations wins. A candidate that throws is dropped.
+          const settled = await Promise.all(
+            Array.from({ length: bestOfN }, (_, k) =>
+              opts.aiFix!(req, { slideIndex: idx, signal: opts.signal, attempt, kind: "condense", candidate: k }).then((o) => o, () => undefined),
+            ),
+          );
+          let best: { after: string; afterSlide?: SlideIR; verdict: ReturnType<typeof mergeVerdicts>; score: number } | undefined;
+          let sawCancelled = false, sawRetryable = false;
+          for (const outcome of settled) {
+            if (!outcome) continue; // threw → unknown, drop this candidate
+            if (!outcome.ok) { if (outcome.cancelled) sawCancelled = true; else if (outcome.retryable) sawRetryable = true; continue; }
             const after = outcome.markdown.trim();
             const afterSlide = after ? parseMd(after).slides[0] : undefined;
             // GUARDRAIL: a small model occasionally drops a fact / drifts language / returns the wrong
-            // format — AND it can drop the slide's structure (title/figure/group). A condense returns
-            // the FULL slide and must preserve both, so merge the fact/language guard with the
-            // structure guard ('condense' strictness = every structural loss is HARD). A HARD violation
-            // is rejected + retried; the original is kept on exhaustion (flagged-unconverged, not
-            // silently mangled). A clean candidate is reconciled before apply (restores any SOFT loss).
+            // format — AND it can drop the slide's structure (title/figure/group). A condense returns the
+            // FULL slide and must preserve both, so merge the fact/language guard with the structure guard
+            // ('condense' strictness = every structural loss is HARD).
             const verdict = afterSlide
               ? mergeVerdicts(validateCondense(before, after, box), validateStructure(current.slides[idx], afterSlide, "condense"))
               : validateCondense(before, after, box);
-            if (verdict.hasHard && attempt < 1 + maxRetries) {
-              pendingRetry = true; // re-submit this slide next pass (don't settle it)
-              continue;
-            }
-            aiDone.add(idx); // succeeded (or retries exhausted) → settled
-            const newSlide = after && after !== before && !verdict.hasHard && afterSlide ? reconcileEdit(current.slides[idx], afterSlide) : undefined;
-            if (newSlide) {
-              current = replaceSlide(current, idx, newSlide);
-              changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: after });
-              changedThisPass = true;
-            }
+            const score = (verdict.hasHard ? 1e6 : 0) + verdict.violations.length;
+            if (!best || score < best.score) best = { after, afterSlide, verdict, score };
+          }
+          if (!best) {
+            // No usable candidate. Cancel → settle; a retryable failure → retry within cap; else settle.
+            if (sawCancelled) aiDone.add(idx);
+            else if (sawRetryable && attempt < 1 + maxRetries) pendingRetry = true;
+            else aiDone.add(idx);
             continue;
           }
-          if (outcome.cancelled) {
-            aiDone.add(idx); // user cancelled this slide → never retry
+          // A HARD violation is rejected + retried; the original is kept on exhaustion (flagged-unconverged,
+          // not silently mangled). A clean candidate is reconciled before apply (restores any SOFT loss).
+          if (best.verdict.hasHard && attempt < 1 + maxRetries) {
+            pendingRetry = true; // even the best candidate still HARD-violates → re-submit next pass
             continue;
           }
-          // failed: retry only if the host says it's retryable AND the cap isn't reached.
-          if (outcome.retryable && attempt < 1 + maxRetries) pendingRetry = true;
-          else aiDone.add(idx);
+          aiDone.add(idx); // succeeded (or retries exhausted) → settled
+          const newSlide = best.after && best.after !== before && !best.verdict.hasHard && best.afterSlide ? reconcileEdit(current.slides[idx], best.afterSlide) : undefined;
+          if (newSlide) {
+            current = replaceSlide(current, idx, newSlide);
+            changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: best.after });
+            changedThisPass = true;
+          }
         }
       }
     }

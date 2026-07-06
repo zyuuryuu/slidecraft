@@ -62,6 +62,28 @@ describe("refineDeck", () => {
     expect(r.converged).toBe(false);
   });
 
+  it("best-of-N picks the clean candidate over a HARD-violating one (ADR-0019 Option B, whole-deck)", async () => {
+    // candidate 0 drops the title (structure loss = HARD under 'condense'); candidate 1 keeps it (clean).
+    const seen: number[] = [];
+    const aiFix = async (_req: string, meta: { candidate?: number }) => {
+      seen.push(meta.candidate ?? -1);
+      return meta.candidate === 0
+        ? { ok: true as const, markdown: "- 旧CRMは遅い" }           // no title → HARD → rejected
+        : { ok: true as const, markdown: "# 背景\n\n- 旧CRMは遅い" }; // title kept → clean → applied
+    };
+    // N=1 only ever sees candidate 0 (HARD) → rejected every attempt → never applies / doesn't converge.
+    const one = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix, bestOfN: 1 });
+    expect(one.changes.some((c) => c.kind === "ai")).toBe(false);
+    expect(one.converged).toBe(false);
+    // N=2 also generates candidate 1 (clean) → the loop's verdict scoring picks it → applies → converges.
+    seen.length = 0;
+    const two = await refineDeck(parseMd(LONG_DECK), catalog, { level: 3, aiFix, bestOfN: 2 });
+    expect(seen).toContain(0);
+    expect(seen).toContain(1); // fanned out N candidates
+    expect(two.changes.find((c) => c.kind === "ai")?.afterMd).toContain("# 背景"); // the CLEAN one won
+    expect(two.converged).toBe(true);
+  });
+
   it("a retryable failure is retried up to the cap, then settles (bounded)", async () => {
     let calls = 0;
     const r = await refineDeck(parseMd(LONG_DECK), catalog, {

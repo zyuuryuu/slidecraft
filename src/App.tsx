@@ -95,7 +95,7 @@ export default function App() {
   const refine = useDeckRefine({
     deck, catalog, setDeck,
     aiFix: async (req, meta) => {
-      const label = `スライド${meta.slideIndex + 1}を編集${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}`;
+      const label = `スライド${meta.slideIndex + 1}を編集${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}${meta.candidate ? `・候補${meta.candidate + 1}` : ""}`;
       try {
         // The refine/condense residue uses the Markdown-ONLY sub-prompt (no JSON-ops branch)
         // so a small in-app model can't mis-pick the design-ops format; a freeform batch edit
@@ -109,6 +109,7 @@ export default function App() {
       }
     },
     aiReady: ai.connection.ok,
+    bestOfN: ai.bestOfN, // whole-deck refine reuses the best-of-N setting (ADR-0019 Option B)
   });
 
   // P2.4 collaboration: the GUI hosts a local MCP sidecar; an upstream AI connects and its edits

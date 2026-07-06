@@ -19,9 +19,10 @@ interface RefineDeps {
   setDeck: (deck: DeckIR, mode: HistoryMode) => void;
   aiFix: AiSlideFix; // ai.runOnce(req, "slide")
   aiReady: boolean; // ai.connection.ok — gates the Lv3 AI pass
+  bestOfN?: number; // best-of-N per AI fix (ai.bestOfN); 1 = single-shot (ADR-0019 Option B)
 }
 
-export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady }: RefineDeps) {
+export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN = 1 }: RefineDeps) {
   const [refining, setRefining] = useState(false);
   const [proposal, setProposal] = useState<RefineResult | null>(null);
   const [refineError, setRefineError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady }: Refine
           // Lv3 only engages the AI when a provider is actually configured; otherwise
           // the loop runs deterministic-only and reports what still needs the AI.
           aiFix: level >= 3 && aiReady ? aiFix : undefined,
+          bestOfN,
           signal: controller.signal,
         });
         // A cancel that landed before any change → just close, no empty proposal.
@@ -51,7 +53,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady }: Refine
         abortRef.current = null;
       }
     },
-    [deck, catalog, refining, aiReady, aiFix],
+    [deck, catalog, refining, aiReady, aiFix, bestOfN],
   );
 
   // Multi-select batch edit: apply ONE instruction to each selected slide → a proposal
