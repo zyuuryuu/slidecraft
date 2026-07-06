@@ -412,13 +412,15 @@ export function useDeckController() {
 
   // Insert a pasted/dropped image onto the CURRENT slide as its body figure (region 1). Replaces any
   // existing single-body figure there (only one fits) — undoable ("commit"). Disabled while collab observe-only.
-  const handleInsertImage = useCallback((src: string, alt = "") => {
+  const handleInsertImage = useCallback((src: string, alt = "", aspect?: number) => {
     if (editLockedRef.current || !deck) return;
     const slide = deck.slides[activeSlide];
     if (!slide) return;
     // layout:"auto" so a slide with no body region (e.g. a Title/cover) re-resolves to a body-bearing
-    // layout — else the image has nowhere to bind and silently won't render.
-    const next: SlideIR = { ...slide, layout: "auto", image: { src, alt, placeholderIdx: "1" } };
+    // layout — else the image has nowhere to bind and silently won't render. aspect (intrinsic w/h,
+    // measured at insert) enables aspect-lock resize + correct cover cropping (案B).
+    const image = { src, alt, placeholderIdx: "1", ...(aspect && aspect > 0 ? { aspect } : {}) };
+    const next: SlideIR = { ...slide, layout: "auto", image };
     delete next.diagram; delete next.mermaidBlock; delete next.table; delete next.code;
     handleSlideUpdate(activeSlide, next, "commit");
   }, [deck, activeSlide, handleSlideUpdate]);

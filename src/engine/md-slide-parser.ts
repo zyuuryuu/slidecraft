@@ -118,6 +118,29 @@ function extractFencedBlock(lines: string[]): { lang: string; content: string } 
   return null;
 }
 
+/** Parse an image's `{x=…,y=…,w=…,h=…,fit=cover,ar=…}` attr suffix → geometry override (案B). rect
+ *  is set only when all four of x/y/w/h are present (a partial rect is meaningless). Unknown keys are
+ *  ignored; malformed numbers are dropped. Inverse of md-serializer.imageAttrs. */
+function parseImageAttrs(s: string | undefined): Pick<ImageBlock, "rect" | "fit" | "aspect"> {
+  if (!s) return {};
+  const kv: Record<string, string> = {};
+  for (const part of s.split(",")) {
+    const eq = part.indexOf("=");
+    if (eq > 0) kv[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
+  }
+  const num = (k: string): number | undefined => {
+    const v = Number(kv[k]);
+    return kv[k] !== undefined && Number.isFinite(v) ? v : undefined;
+  };
+  const out: Pick<ImageBlock, "rect" | "fit" | "aspect"> = {};
+  const [x, y, w, h] = [num("x"), num("y"), num("w"), num("h")];
+  if (x !== undefined && y !== undefined && w !== undefined && h !== undefined) out.rect = { x, y, w, h };
+  if (kv.fit === "contain" || kv.fit === "cover") out.fit = kv.fit;
+  const ar = num("ar");
+  if (ar !== undefined && ar > 0) out.aspect = ar;
+  return out;
+}
+
 // ── Parse a single slide block ──
 
 export function parseSlideBlock(
@@ -294,10 +317,11 @@ export function parseSlideBlock(
     }
 
     // ![alt](src) ALONE on a line → an embedded image (data URI or path). Fills body region 1.
+    // An optional `{x=…,y=…,w=…,h=…,fit=cover,ar=…}` suffix carries a manual geometry override (案B).
     // Only the first one becomes the figure; further images fall through to body text.
-    const imgMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    const imgMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+?)\)(?:\{([^}]*)\})?$/);
     if (imgMatch && !image) {
-      image = { src: imgMatch[2], alt: imgMatch[1], placeholderIdx: "1" };
+      image = { src: imgMatch[2], alt: imgMatch[1], placeholderIdx: "1", ...parseImageAttrs(imgMatch[3]) };
       continue;
     }
 

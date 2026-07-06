@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
-import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, applyFieldEdit } from "../engine/placeholder-binding";
+import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, applyFieldEdit } from "../engine/placeholder-binding";
 import { groupEditorPlan } from "../engine/group-binding";
 import DiagramEditor from "./DiagramEditor";
 
@@ -98,6 +98,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   // Layout is meta/structural (which master layout), changed rarely — collapse it by default so the
   // content fields lead; the header still shows the active layout, expand to change it.
   const [layoutOpen, setLayoutOpen] = useState(false);
+  const [aspectLock, setAspectLock] = useState(true); // resize keeps the image's aspect ratio (案B)
   // ── Update a specific placeholder ──
   const updatePlaceholder = useCallback(
     (idx: string, text: string) => {
@@ -182,6 +183,27 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   // form can say WHICH placeholder holds it, not just that an image exists. B: a real PICTURE frame
   // (type="pic") wins when the master has one; else it resolves to the body region as before.
   const imagePh = slide.image && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
+  // Fine-tune geometry (案B): the manual rect override or the resolved frame box, edited via numeric
+  // fields with optional aspect-lock. Editing any field promotes the box to an explicit rect.
+  const imgBox = slide.image && imagePh ? imageRect(slide.image, imagePh) : undefined;
+  const imgAspect = slide.image?.aspect ?? (imgBox && imgBox.h ? imgBox.w / imgBox.h : undefined);
+  const updateImageRect = (k: "x" | "y" | "w" | "h", val: number) => {
+    if (!slide.image || !imgBox || !Number.isFinite(val)) return;
+    let next = { ...(slide.image.rect ?? imgBox), [k]: val };
+    if (aspectLock && imgAspect && imgAspect > 0) {
+      if (k === "w") next = { ...next, h: val / imgAspect };
+      else if (k === "h") next = { ...next, w: val * imgAspect };
+    }
+    onChange({ ...slide, image: { ...slide.image, rect: next } });
+  };
+  const toggleImageFit = () =>
+    slide.image && onChange({ ...slide, image: { ...slide.image, fit: slide.image.fit === "cover" ? "contain" : "cover" } });
+  const resetImageRect = () => {
+    if (!slide.image) return;
+    const img = { ...slide.image };
+    delete img.rect;
+    onChange({ ...slide, image: img });
+  };
 
   // What the collapsed Layout header shows: the ACTIVE layout (Auto resolves to a concrete name).
   const layoutLabel = slide.layout === "auto" ? (resolvedLayout ? `自動 → ${resolvedLayout}` : "自動") : slide.layout;
@@ -297,23 +319,66 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       {/* Image block — the body figure isn't a text field, so the form reflects it as a thumbnail + a
           remove (delete → the body reverts to an editable field). Replace = paste/drop another image. */}
       {slide.image && (
-        <div className="border border-edge rounded p-2 flex items-center gap-2">
-          <img src={slide.image.src} alt={slide.image.alt} className="w-16 h-12 object-contain bg-field rounded shrink-0" />
-          <div className="flex-1 min-w-0 text-xs">
-            <div className="text-fg2">🖼 画像{slide.image.alt ? ` — ${slide.image.alt}` : ""}</div>
-            {/* WHICH placeholder holds it (role-resolved). Falls back to the raw ordinal if no layout. */}
-            <div className="truncate text-faint" title="貼り付け/ドロップで差し替え">
-              {imagePh ? `→ ${getLabel(imagePh.idx, layout)}（idx ${imagePh.idx}）` : "貼り付け/ドロップで差し替え"}
+        <div className="border border-edge rounded p-2 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <img src={slide.image.src} alt={slide.image.alt} className="w-16 h-12 object-contain bg-field rounded shrink-0" />
+            <div className="flex-1 min-w-0 text-xs">
+              <div className="text-fg2">🖼 画像{slide.image.alt ? ` — ${slide.image.alt}` : ""}</div>
+              {/* WHICH placeholder holds it (role-resolved). Falls back to the raw ordinal if no layout. */}
+              <div className="truncate text-faint" title="貼り付け/ドロップで差し替え">
+                {imagePh ? `→ ${getLabel(imagePh.idx, layout)}（idx ${imagePh.idx}）` : "貼り付け/ドロップで差し替え"}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => { const next = { ...slide }; delete next.image; onChange(next); }}
+              title="画像を削除"
+              className="w-6 h-6 flex items-center justify-center rounded bg-field border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-xs shrink-0"
+            >
+              🗑
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => { const next = { ...slide }; delete next.image; onChange(next); }}
-            title="画像を削除"
-            className="w-6 h-6 flex items-center justify-center rounded bg-field border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-xs shrink-0"
-          >
-            🗑
-          </button>
+
+          {/* Size/position fine-tune (案B): X/Y/W/H in inches, contain/cover, aspect-lock, reset-to-frame. */}
+          {imgBox && (
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-faint">
+              {(["x", "y", "w", "h"] as const).map((k) => (
+                <label key={k} className="flex items-center gap-0.5" title={k === "w" ? "幅" : k === "h" ? "高さ" : k === "x" ? "左位置" : "上位置"}>
+                  <span className="uppercase">{k}</span>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={Number(imgBox[k].toFixed(2))}
+                    onChange={(e) => updateImageRect(k, e.target.valueAsNumber)}
+                    className="w-14 px-1 py-0.5 bg-field border border-edge rounded text-fg text-[10px]"
+                  />
+                </label>
+              ))}
+              <span>inch</span>
+              <button
+                type="button"
+                onClick={toggleImageFit}
+                title="contain=全体を余白付きで / cover=枠いっぱいに切り抜き"
+                className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
+              >
+                {slide.image.fit === "cover" ? "◱ cover" : "▭ contain"}
+              </button>
+              <label className="flex items-center gap-0.5 cursor-pointer" title="リサイズ時に縦横比を保つ">
+                <input type="checkbox" checked={aspectLock} onChange={(e) => setAspectLock(e.target.checked)} />
+                比固定
+              </label>
+              {slide.image.rect && (
+                <button
+                  type="button"
+                  onClick={resetImageRect}
+                  title="枠いっぱいに戻す（手動調整を解除）"
+                  className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
+                >
+                  ⟲ 枠にリセット
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -83,8 +83,20 @@ function figureBlock(slide: SlideIR): string | null {
   if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
   if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
   if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
-  if (slide.image) return `![${slide.image.alt}](${slide.image.src})`;
+  if (slide.image) return `![${slide.image.alt}](${slide.image.src})${imageAttrs(slide.image)}`;
   return null;
+}
+
+/** Serialize an image's geometry override as a `{x=…,y=…,w=…,h=…,fit=…,ar=…}` suffix (案B), or "" when
+ *  the image has no override (a plain image stays `![alt](src)`). Inverse of parseImageAttrs. Numbers
+ *  are rounded to 3 decimals (sub-0.001″ is below any visible tolerance) and trailing zeros trimmed. */
+function imageAttrs(image: NonNullable<SlideIR["image"]>): string {
+  const n = (v: number) => String(Math.round(v * 1000) / 1000);
+  const parts: string[] = [];
+  if (image.rect) parts.push(`x=${n(image.rect.x)}`, `y=${n(image.rect.y)}`, `w=${n(image.rect.w)}`, `h=${n(image.rect.h)}`);
+  if (image.fit) parts.push(`fit=${image.fit}`);
+  if (image.aspect !== undefined) parts.push(`ar=${n(image.aspect)}`);
+  return parts.length ? `{${parts.join(",")}}` : "";
 }
 
 // ── Determine separator type for multi-section layouts ──

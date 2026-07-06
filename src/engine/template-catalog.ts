@@ -430,17 +430,26 @@ export function pickLayout(
   catalog: LayoutCatalog,
   role: LayoutRole,
   regions?: number,
+  hasImage?: boolean,
 ): CatalogEntry | undefined {
   const candidates = catalog.filter((e) => e.role === role);
   if (candidates.length === 0) return undefined;
   const usableBody = (e: CatalogEntry) =>
     e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0);
+  const hasPictureFrame = (e: CatalogEntry) => e.placeholders.some((p) => p.role === "picture");
   const score = (e: CatalogEntry): number => {
     let s = e.name.match(/\+/g)?.length ?? 0; // prefer fewer addons
     if (regions !== undefined) s += Math.abs(e.bodyCount - regions) * 10;
-    // For text roles, AVOID picture/degenerate layouts whose "body" holds no text
-    // (e.g. an alien template's "Two Pictures" with maxLines=0) — they break split + bind.
-    if ((role === "content" || role === "columns") && !usableBody(e)) s += 1000;
+    if (hasImage) {
+      // An image slide PREFERS a layout with a real picture frame (the image binds there), and does
+      // NOT avoid picture/degenerate "bodies" — an image is happy in one (the text-body penalty below
+      // would wrongly push it back to a text layout).
+      if (hasPictureFrame(e)) s -= 100;
+    } else if ((role === "content" || role === "columns") && !usableBody(e)) {
+      // For TEXT roles, avoid picture/degenerate layouts whose "body" holds no text
+      // (e.g. an alien template's "Two Pictures" with maxLines=0) — they break split + bind.
+      s += 1000;
+    }
     if (role === "content" && !/content|body|text/i.test(e.name)) s += 1; // tie-break to an obviously-named one
     return s;
   };

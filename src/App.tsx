@@ -25,6 +25,17 @@ import { describeRepairPlan } from "./components/apply-template";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 
+/** Measure an image's intrinsic aspect (w/h) from a data URL, for aspect-lock + cover cropping (案B).
+ *  Resolves undefined if it can't decode (e.g. SVG without intrinsic size) — the image still inserts. */
+function measureImageAspect(dataUrl: string): Promise<number | undefined> {
+  return new Promise((res) => {
+    const im = new Image();
+    im.onload = () => res(im.naturalWidth && im.naturalHeight ? im.naturalWidth / im.naturalHeight : undefined);
+    im.onerror = () => res(undefined);
+    im.src = dataUrl;
+  });
+}
+
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
@@ -170,7 +181,7 @@ export default function App() {
         if (!blob) continue;
         e.preventDefault();
         const reader = new FileReader();
-        reader.onload = () => { if (typeof reader.result === "string") { handleInsertImage(reader.result); notify("画像を貼り付けました"); } };
+        reader.onload = async () => { if (typeof reader.result === "string") { handleInsertImage(reader.result, "", await measureImageAspect(reader.result)); notify("画像を貼り付けました"); } };
         reader.readAsDataURL(blob);
         return;
       }
@@ -199,7 +210,8 @@ export default function App() {
             try {
               const bytes = await readFile(p);
               let bin = ""; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-              handleInsertImage(`data:${mime};base64,${btoa(bin)}`);
+              const url = `data:${mime};base64,${btoa(bin)}`;
+              handleInsertImage(url, "", await measureImageAspect(url));
               notify("画像を挿入しました");
             } catch { notify("画像の読み込みに失敗しました"); }
             break; // one image per drop
@@ -217,7 +229,7 @@ export default function App() {
         if (!f.type.startsWith("image/")) continue;
         e.preventDefault();
         const reader = new FileReader();
-        reader.onload = () => { if (typeof reader.result === "string") { handleInsertImage(reader.result); notify("画像を挿入しました"); } };
+        reader.onload = async () => { if (typeof reader.result === "string") { handleInsertImage(reader.result, "", await measureImageAspect(reader.result)); notify("画像を挿入しました"); } };
         reader.readAsDataURL(f);
         break;
       }

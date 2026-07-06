@@ -11,7 +11,7 @@ import type { DeckIR, SlideIR, Paragraph, InlineSegment } from "../engine/slide-
 import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder } from "../engine/placeholder-binding";
+import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect } from "../engine/placeholder-binding";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -345,21 +345,24 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
           );
         }
 
-        // Image (![alt](data URI)) → <img> fit into the body box; contain keeps the aspect ratio.
+        // Image (![alt](data URI)) → <img> in its box: the manual rect (案B) or the placeholder box,
+        // with object-fit = the image's fit (contain letterboxes, cover fills+crops). object-fit mirrors
+        // the PPTX aspect math (fitImageInBox) so preview == export.
         if (slide.image && ph.idx === imageBodyIdx) {
+          const box = imageRect(slide.image, ph) ?? s;
           return (
             <div
               key={`image-${ph.idx}`}
               style={{
                 position: "absolute",
-                left: `${(s.x / SLIDE_W) * 100}%`,
-                top: `${(s.y / SLIDE_H) * 100}%`,
-                width: `${(s.w / SLIDE_W) * 100}%`,
-                height: `${(s.h / SLIDE_H) * 100}%`,
+                left: `${(box.x / SLIDE_W) * 100}%`,
+                top: `${(box.y / SLIDE_H) * 100}%`,
+                width: `${(box.w / SLIDE_W) * 100}%`,
+                height: `${(box.h / SLIDE_H) * 100}%`,
                 overflow: "hidden",
               }}
             >
-              <img src={slide.image.src} alt={slide.image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <img src={slide.image.src} alt={slide.image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: slide.image.fit === "cover" ? "cover" : "contain" }} />
             </div>
           );
         }

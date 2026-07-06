@@ -13,7 +13,7 @@ import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog } from "./template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder } from "./placeholder-binding";
+import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./placeholder-binding";
 import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
@@ -207,16 +207,22 @@ async function buildSlideXml(
   let imageRId: string | undefined;
   if (slide.image && imageBodyIdx && dataUriToImage(slide.image.src)) {
     const phInfo = imagePlaceholder(layout.placeholders, slide.image.placeholderIdx);
-    if (phInfo) {
-      const s = phInfo.style;
+    const box = imageRect(slide.image, phInfo);
+    if (box) {
+      // Fit the image into its box the same way the browser preview does (contain/cover) so preview
+      // and export agree — the manual rect (案B) or the placeholder box, then the aspect math.
+      const { rect: r, srcRect: cr } = fitImageInBox(box, slide.image.fit, slide.image.aspect);
       const EMU = (inches: number) => Math.round(inches * 914400);
+      const srcRectXml = cr
+        ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`
+        : "";
       imageRId = "rId2";
       shapes += `<p:pic>`
         + `<p:nvPicPr><p:cNvPr id="${id}" name="Image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
-        + `<p:blipFill><a:blip r:embed="${imageRId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>`
+        + `<p:blipFill><a:blip r:embed="${imageRId}"/>${srcRectXml}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
         + `<p:spPr><a:xfrm>`
-        + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
-        + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
+        + `<a:off x="${EMU(r.x)}" y="${EMU(r.y)}"/>`
+        + `<a:ext cx="${EMU(r.w)}" cy="${EMU(r.h)}"/>`
         + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
         + `</p:pic>`;
       id++;

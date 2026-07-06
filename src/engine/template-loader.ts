@@ -590,10 +590,11 @@ export function autoSelectLayout(
   if (catalog && catalog.length > 0) {
     // Degrade gracefully if THIS template lacks the ideal role (e.g. no columns):
     // ideal role → content → any layout. Never returns a name not in the template.
+    const hasImage = !!slide.image; // an image slide prefers a layout with a real picture frame
     const picked =
-      pickLayout(catalog, role, regions) ??
-      pickLayout(catalog, "content", regions) ??
-      pickLayout(catalog, "content") ??
+      pickLayout(catalog, role, regions, hasImage) ??
+      pickLayout(catalog, "content", regions, hasImage) ??
+      pickLayout(catalog, "content", undefined, hasImage) ??
       catalog[0];
     if (picked) return picked.name;
   }
@@ -619,11 +620,17 @@ export function suggestLayouts(
   const { role, regions } = slideRoleRegions(slide, slideIndex, totalSlides);
   const usableBody = (e: LayoutCatalog[number]) =>
     e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0);
+  const hasPictureFrame = (e: LayoutCatalog[number]) => e.placeholders.some((p) => p.role === "picture");
+  const hasImage = !!slide.image;
   const fit = (e: LayoutCatalog[number]): number => {
     let s = e.role === role ? 0 : 50; // same role first
     if (regions !== undefined) s += Math.abs(e.bodyCount - regions) * 5; // then region-count fit
     s += e.name.match(/\+/g)?.length ?? 0; // prefer the simpler variant
-    if ((role === "content" || role === "columns") && !usableBody(e)) s += 200; // avoid degenerate/picture bodies
+    if (hasImage) {
+      if (hasPictureFrame(e)) s -= 50; // an image slide prefers a picture-frame layout
+    } else if ((role === "content" || role === "columns") && !usableBody(e)) {
+      s += 200; // avoid degenerate/picture bodies for text
+    }
     return s;
   };
   const rest = catalog.filter((e) => e.name !== chosen).sort((a, b) => fit(a) - fit(b)).map((e) => e.name);

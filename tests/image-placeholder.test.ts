@@ -11,8 +11,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
-import { loadTemplate, type TemplateData, type LayoutInfo } from "../src/engine/template-loader";
-import { placeholderRole } from "../src/engine/template-catalog";
+import { loadTemplate, autoSelectLayout, type TemplateData, type LayoutInfo } from "../src/engine/template-loader";
+import { placeholderRole, buildCatalog } from "../src/engine/template-catalog";
 import { imagePlaceholder, bodyPlaceholders, nthBody } from "../src/engine/placeholder-binding";
 import { parseMd } from "../src/engine/md-parser";
 import { generatePptx } from "../src/engine/placeholder-filler";
@@ -81,5 +81,25 @@ describe("B: image binds to a picture placeholder when present", () => {
     expect(Number(cy)).toBe(EMU(expected.style.h));
     expect(Number(cx)).toBeGreaterThan(0); // guards the inherited-xfrm collapse-to-0×0 risk
     expect(Number(cy)).toBeGreaterThan(0);
+  });
+});
+
+describe("案B: image slides prefer a picture-frame layout (autoSelectLayout)", () => {
+  let velis: TemplateData;
+  beforeAll(async () => { velis = await loadTemplate(readFileSync(VELIS)); });
+  const titlePh = { idx: "15", paragraphs: [{ segments: [{ text: "見出し" }] }] };
+
+  it("auto-selects a layout that HAS a picture frame for an image slide", () => {
+    const catalog = buildCatalog(velis);
+    const slide = { layout: "auto", placeholders: [titlePh], image: { src: IMG, alt: "", placeholderIdx: "1" } } as never;
+    const entry = catalog.find((e) => e.name === autoSelectLayout(slide, 1, 3, catalog))!;
+    expect(entry.placeholders.some((p) => p.role === "picture")).toBe(true);
+  });
+
+  it("does NOT push a text slide to a picture layout — it keeps a real text body (regression)", () => {
+    const catalog = buildCatalog(velis);
+    const slide = { layout: "auto", placeholders: [titlePh, { idx: "1", paragraphs: [{ segments: [{ text: "本文テキスト" }] }] }] } as never;
+    const entry = catalog.find((e) => e.name === autoSelectLayout(slide, 1, 3, catalog))!;
+    expect(entry.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0)).toBe(true);
   });
 });
