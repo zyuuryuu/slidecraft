@@ -2,7 +2,7 @@
 
 前方向きの計画のみを記す。完了フェーズの履歴は **ADR ＋ git（PR）** に移管済み。決定の記録は `docs/adr/` を参照。
 
-**現在地（2026-07-06）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6・[ADR-0017](adr/0017-inapp-offline-ai-runtime.md)／AI 編集の検証は採用ゲート・[ADR-0018](adr/0018-validation-at-adoption-gate.md)）に加え、
+**現在地（2026-07-07）**：土台（テンプレ堅牢性）・差別化アーキ（内蔵 AI＝llamafile 同梱 P1〜P6・[ADR-0017](adr/0017-inapp-offline-ai-runtime.md)／AI 編集の検証は採用ゲート・[ADR-0018](adr/0018-validation-at-adoption-gate.md)）に加え、
 named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[ADR-0013](adr/0013-svg-native-text.md)／
 テーマ2「テンプレ作成補助」[ADR-0014](adr/0014-template-authoring.md)／テーマ3「MCP ブラッシュアップ」[ADR-0015](adr/0015-mcp-brushup.md)／
 テーマ4「セキュリティレビュー」[ADR-0016](adr/0016-security-review-theme4.md)。各テーマの経緯・意思決定は対応 ADR ＋ git（PR）、
@@ -11,7 +11,9 @@ named 主要テーマ **1〜4 は全て完了** — テーマ1「HTML 出力」[
 **以降の消化（〜2026-07-06）**：**AI 編集の部分生成＋自己修復＋best-of-N**（[ADR-0019](adr/0019-partial-edit-ops.md)：図コンテンツを ops 化＝drift ゼロ〔P1〕・全文逸れの単発リテイク〔Option A〕・N候補→採用ゲート選別〔best-of-N・単一/全体/一括すべて完了〕）／
 **スライド構造編集**（追加・複製・削除・pointer ドラッグ並べ替え）／
 **画像機能**（data URI 埋め込み・サイズ/位置の微調整＋サイズスライダー・pic 枠への優先バインド・最背面レイヤー＝[ADR-0020](adr/0020-image-embedding.md)）／
-UI 配色モード（Dark/Light/Modern）・MCP エラー契約統一・`useAiGeneration` 分割。
+UI 配色モード（Dark/Light/Modern）・MCP エラー契約統一・`useAiGeneration` 分割・
+**MCP テンプレ選択**（`list_templates`/`use_template`/`register_templates`＝GUI が collab 開始時に master レジストリを
+host へ upload するプロトコル越し橋渡し・[ADR-0015](adr/0015-mcp-brushup.md) S2 増分2 完了 2026-07-07）。
 テーマ4 是正は **F1〜F4 実装済**（F1/F3/F4＝PR #66、F2 svgCache XSS＝commit `20978cd`）、残は **F1'（egress hard boundary・保留）** のみ。
 
 **次の大物テーマは未定** — 下記バックログから選定する。
@@ -44,7 +46,6 @@ UI 配色モード（Dark/Light/Modern）・MCP エラー契約統一・`useAiGe
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
-| MCP: テンプレ選択（S2 増分2） | `list_templates`/`use_template(id)` で登録済みテンプレを AI が選べるように。GUI の master レジストリ（`useMasterRegistry`/`src/ipc/master-store.ts`＝Tauri fs 裏）を `HostContext` に accessor 注入する host 機能で GUI 側実装と対。stdio は `create_template`／bytes 持参で代替可。[ADR-0015](adr/0015-mcp-brushup.md) の残タスク | S〜M |
 | テンプレ作成の後続 UI | 作成モーダルの埋め込みライブプレビュー・レイアウトサブセット選択・カスタムレイアウト定義 | M |
 | 内蔵 30 レイアウトのオミット | Midnight Executive 30 種は**開発用** — 主要テーマ（＋一部バックログ）完了後にビルトイン同梱をやめ、canonical .pptx は入力サンプルとしてリポジトリ内に残置。触点: `useMasterRegistry` の `BUILTIN_URL`＋起動 fetch（→ 残置サンプル参照 or `writeTemplate` で起動時生成）・`BUILTIN_LAYOUTS` の既定セット差し替え・`LAYOUT_NAMES` フォールバックの整理・テスト fixture パス・`scripts/rebuild-template.ts` 引退。ランタイムはロールベースで 30 種非依存（alien テストでゲート済み）のため作業はこの触点に閉じる | S〜M |
 | テンプレ資産の棚卸 | `public/templates/slide/` に `.potx`（未追跡6）＋`_全レイアウト見本.pptx`（tracked）が堆積。**アプリが束ねる built-in は canonical `Midnight_Executive_30_TemplateOnly.pptx` 1本のみ**（ディレクトリ列挙なし）。棚卸：参照ゼロの見本7件＋未追跡 `.potx` を「テンプレ管理」機能で**束ねる(A)** か **整理/削除(B)** か決定。将来案：データを **`.potx` 形式に一本化**（見本は生成 or 廃止）。⚠ **テスト fixture（`lrk-slides-velis_CC0`／`報告書テンプレート_全レイアウト見本`／`配布資料_公文書高密度_全レイアウト見本`／`報告書テンプレート_官公庁_全レイアウト見本`）は削除不可**。レジストリ永続化はテーマ2 S6 で実装済み — その後続として着手 | S |

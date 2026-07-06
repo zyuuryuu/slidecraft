@@ -43,6 +43,12 @@ export interface HostContext {
   setActive(extra: unknown, docId: string): void;
   /** AI clients see only shared docs (private-by-default); the GUI sees all. */
   sharedOnly: boolean;
+  /** The template registry the AI can pick from (list_templates / use_template, S2 増分2). The
+   *  registry actually LIVES in the webview (useMasterRegistry / master-store, Tauri fs); the sidecar
+   *  is Node with no fs plugin, so the GUI PUSHES it over the protocol (register_templates) into this
+   *  shared store — the same way it seeds the deck. Absent until a GUI has registered (or in a host
+   *  that never wires it) → list/use degrade never-silently to a create_template hint. */
+  templates?: TemplateStore;
   /** A deck-changing op committed on `entry` (its docId/rev are current) — the host fans out
    *  deckChanged to every connected client (incl. undo/redo, which mint a new rev). `opId` (when the
    *  caller supplied one) rides along on the notification so the ORIGINATOR can suppress its own echo
@@ -50,6 +56,45 @@ export interface HostContext {
   onMutated?(entry: DocEntry, tool: string, opId?: string): void;
   notifyOpened?(entry: DocEntry): void;
   notifyClosed?(docId: string): void;
+}
+
+/** Metadata for one registered template, mirrored from the GUI's MasterEntry (bytes kept host-side,
+ *  never handed to the AI — it references a template by id, not by carrying its base64). */
+export interface TemplateInfo {
+  id: string;
+  name: string;
+  builtin: boolean;
+}
+
+/** The host-side view of the GUI's master registry (S2 増分2). Populated by register_templates (a
+ *  gui-role tool) and read by list_templates / use_template. */
+export interface TemplateStore {
+  /** Metadata only — the AI chooses by id/name, it never receives the bytes. */
+  list(): TemplateInfo[];
+  /** The registered template's .pptx bytes, or undefined for an unknown id (never a fake-empty). */
+  getBytes(id: string): Uint8Array | undefined;
+  /** REPLACE the whole set with the caller's registry — the GUI's list is the single truth, so a
+   *  removed master drops out and re-registers stay idempotent. */
+  register(items: { id: string; name: string; builtin: boolean; bytes: Uint8Array }[]): void;
+}
+
+/** In-memory TemplateStore owned by the collab host (host.ts) and shared across its connections.
+ *  PURE Node — no transport/fs — so it is unit-testable and keeps the sidecar fs-plugin-free. */
+export class MemTemplateStore implements TemplateStore {
+  private items = new Map<string, { info: TemplateInfo; bytes: Uint8Array }>();
+
+  register(items: { id: string; name: string; builtin: boolean; bytes: Uint8Array }[]): void {
+    this.items.clear();
+    for (const it of items) this.items.set(it.id, { info: { id: it.id, name: it.name, builtin: it.builtin }, bytes: it.bytes });
+  }
+
+  list(): TemplateInfo[] {
+    return [...this.items.values()].map((v) => v.info);
+  }
+
+  getBytes(id: string): Uint8Array | undefined {
+    return this.items.get(id)?.bytes;
+  }
 }
 
 /** A live map of docId → DocEntry. Holds NO transport/connection state (that lives in host.ts). */

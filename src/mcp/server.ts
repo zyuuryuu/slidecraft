@@ -20,7 +20,7 @@ import * as St from "./structure";
 import * as R from "./reads";
 import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
-import { type HostContext, type DocEntry, commitMutation, undoDoc, redoDoc } from "./host-core";
+import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc } from "./host-core";
 import { GuardError } from "./guard-errors";
 
 interface ToolResult {
@@ -274,6 +274,47 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         return { ...r, docId: e.docId };
       }),
     );
+
+    // ── template selection (host-only; T3/S2 増分2) ── the AI DISCOVERS registered templates
+    // (list_templates) and STARTS a project from one (use_template) without carrying bytes. The master
+    // registry lives in the webview (useMasterRegistry / Tauri fs); the sidecar is Node with no fs
+    // plugin, so the GUI PUSHES it in via register_templates (gui-role only), mirroring how it seeds
+    // the deck. stdio has neither → it uses create_template / brings bytes to new_project.
+    const requireTemplates = (): TemplateStore => {
+      if (!host.templates) throw new GuardError("テンプレレジストリが未接続です（create_template で新規作成するか、new_project に bytes を渡してください）", "template-registry-unavailable");
+      return host.templates;
+    };
+    server.registerTool("list_templates", { description: "登録済みテンプレの一覧（GUI の master レジストリ）＝{id,name,builtin}。id を use_template に渡して着手。bytes を持たない/stdio は create_template で生成" }, () => run(() => ({ templates: requireTemplates().list() })));
+    server.registerTool(
+      "use_template",
+      { description: "登録済みテンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id"), markdown: z.string().optional() } },
+      (a, extra) =>
+        openInHost(
+          withContract(async (s) => {
+            const store = requireTemplates();
+            const bytes = store.getBytes(a.id);
+            if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
+            const res = await S.newProject(s, bytes, a.markdown);
+            const name = store.list().find((t) => t.id === a.id)?.name;
+            if (name) s.meta.templateName = name; // the minted doc's tab is named after the template
+            return res;
+          }),
+          extra,
+        ),
+    );
+    if (!host.sharedOnly) {
+      // gui-role only: the human's webview uploads its registry so the AI can select from it. An AI
+      // client (sharedOnly) never gets this tool, so it can't spoof the shared template set.
+      server.registerTool(
+        "register_templates",
+        { description: "（GUI 専用）webview の master レジストリを host に登録し AI が list_templates/use_template で選べるようにする。呼ぶ度に全置換（GUI の一覧が真実）", inputSchema: { templates: z.array(z.object({ id: z.string(), name: z.string(), builtin: z.boolean(), bytesBase64: z.string() })) } },
+        (a) =>
+          run(() => {
+            requireTemplates().register(a.templates.map((t) => ({ id: t.id, name: t.name, builtin: t.builtin, bytes: unb64(t.bytesBase64) })));
+            return { ok: true as const, count: a.templates.length };
+          }),
+      );
+    }
   }
 
   // ── read-only deck state as MCP resources (deck://… , slide://{i}/markdown) ──
