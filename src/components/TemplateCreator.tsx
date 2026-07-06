@@ -6,9 +6,13 @@
  * 生成→適用後はメインプレビューが即時反映されるので、モーダル内に埋め込みプレビューは
  * 持たない（作り直しは再オープンで反復）。レイアウトは組み込み 30 種固定（サブセット UI は後続）。
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MIDNIGHT_PALETTE, type TemplateSpec } from "../engine/template-writer";
-import { PALETTE_KEYS, type PaletteKey } from "../engine/template-layout-library";
+import { BUILTIN_LAYOUTS, PALETTE_KEYS, type PaletteKey, type LayoutDef } from "../engine/template-layout-library";
+import { assessTemplateHealth, buildCatalog } from "../engine/template-catalog";
+import SlidePreview from "./SlidePreview";
+import LayoutEditor from "./LayoutEditor";
+import { combineLayouts, useTemplatePreview } from "./template-preview";
 
 interface TemplateCreatorProps {
   isOpen: boolean;
@@ -41,10 +45,36 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
   const [majorFont, setMajorFont] = useState("Georgia");
   const [minorFont, setMinorFont] = useState("Calibri");
   const [palette, setPalette] = useState<Record<PaletteKey, string>>({ ...MIDNIGHT_PALETTE });
+  // Layout subset: which of the canonical 30 to include (default all). A subset < 30 is passed as
+  // spec.layouts; the full set is left undefined so writeTemplate uses its BUILTIN_LAYOUTS default.
+  const [selected, setSelected] = useState<string[]>(() => BUILTIN_LAYOUTS.map((l) => l.name));
+  // Custom layouts (LayoutDef) appended to the chosen built-ins; each is previewed via a showcase slide.
+  const [customLayouts, setCustomLayouts] = useState<LayoutDef[]>([]);
   const [busy, setBusy] = useState(false);
   const [aiDesc, setAiDesc] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // The chosen layout set = selected built-ins + custom layouts, with names made unique/non-empty
+  // (combineLayouts). Left undefined only when it equals writeTemplate's default (all 30, no custom);
+  // otherwise the explicit combined list is passed.
+  const chosenBuiltins = selected.length === BUILTIN_LAYOUTS.length ? BUILTIN_LAYOUTS : BUILTIN_LAYOUTS.filter((l) => selected.includes(l.name));
+  const combined = combineLayouts(chosenBuiltins, customLayouts);
+  const layoutsField: LayoutDef[] | undefined = customLayouts.length === 0 && chosenBuiltins.length === BUILTIN_LAYOUTS.length ? undefined : combined.layouts;
+  const showcase = combined.customNames; // final (disambiguated) names → showcase pins resolve to the custom layouts
+  // The EFFECTIVE set is empty only when no built-in is selected AND no custom exists (all-deselected).
+  const noLayouts = layoutsField !== undefined && layoutsField.length === 0;
+
+  // Live preview: rebuild a small sample deck on the draft template (debounced) so the palette/font/
+  // layout choices are visible immediately — no need to 生成→適用→やり直し to see the effect. Custom
+  // layouts are surfaced as extra showcase slides pinned to them.
+  const previewSpec: TemplateSpec = { name: name.trim() || "T", fonts: { major: majorFont.trim() || "Georgia", minor: minorFont.trim() || "Calibri" }, palette, ...(layoutsField ? { layouts: layoutsField } : {}) };
+  const preview = useTemplatePreview(previewSpec, isOpen, showcase);
+  // Same acceptance gate applyMasterBytes uses (assessTemplateHealth over the loaded catalog) — so the
+  // create button blocks NEVER-SILENTLY on a subset missing a title/body role, instead of the modal
+  // closing with nothing registered. Reuses the built preview template = zero drift from the real gate.
+  const health = useMemo(() => (preview.template ? assessTemplateHealth(buildCatalog(preview.template)) : null), [preview.template]);
+  const rejected = health?.status === "rejected";
 
   if (!isOpen) return null;
 
@@ -73,7 +103,7 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
-      await onCreate({ name: name.trim(), fonts: { major: majorFont.trim() || "Georgia", minor: minorFont.trim() || "Calibri" }, palette });
+      await onCreate({ name: name.trim(), fonts: { major: majorFont.trim() || "Georgia", minor: minorFont.trim() || "Calibri" }, palette, ...(layoutsField ? { layouts: layoutsField } : {}) });
     } finally {
       setBusy(false);
     }
@@ -88,14 +118,15 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
         role="dialog"
         aria-modal="true"
         aria-label="テンプレを作成"
-        className="bg-void border border-accent/40 rounded-lg shadow-2xl w-full max-w-lg flex flex-col"
+        className="bg-void border border-accent/40 rounded-lg shadow-2xl w-full max-w-4xl flex flex-col"
       >
         <div className="px-4 py-2.5 border-b border-edge flex items-center justify-between">
           <span className="text-sm font-medium text-fg">🎨 テンプレを作成</span>
           <button onClick={onCancel} className="text-muted hover:text-fg2 text-sm">✕</button>
         </div>
 
-        <div className="p-4 flex flex-col gap-3 text-xs text-fg2 overflow-y-auto" style={{ maxHeight: "70vh" }}>
+        <div className="flex min-h-0 divide-x divide-edge">
+        <div className="p-4 flex flex-col gap-3 text-xs text-fg2 overflow-y-auto w-[24rem] shrink-0" style={{ maxHeight: "70vh" }}>
           {onProposeSpec && (
             <div className="flex flex-col gap-1.5 pb-3 border-b border-edge">
               <span className="text-muted">✨ AI におまかせ（雰囲気・用途を書くと下のフォームに提案を反映）</span>
@@ -159,10 +190,51 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
             ))}
           </div>
 
-          <p className="text-faint leading-relaxed">
-            レイアウトは内蔵 30 種（表紙/セクション/本文/2-3カラム/KPI/チャート/表/比較/プロセス/クロージング）。
-            作成するとこのデッキに適用され、マスター一覧にも登録されます。
-          </p>
+          <div className="flex flex-col gap-1.5 mt-1">
+            <div className="flex items-center justify-between">
+              <span className="text-muted">レイアウト（{selected.length}/{BUILTIN_LAYOUTS.length} 種）</span>
+              <div className="flex gap-2">
+                <button onClick={() => setSelected(BUILTIN_LAYOUTS.map((l) => l.name))} className="text-accent-soft hover:text-fg">全選択</button>
+                <button onClick={() => setSelected([])} className="text-accent-soft hover:text-fg">全解除</button>
+              </div>
+            </div>
+            <div className="border border-edge rounded max-h-40 overflow-y-auto p-1.5 flex flex-col gap-0.5">
+              {BUILTIN_LAYOUTS.map((l) => (
+                <label key={l.name} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-edge/50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(l.name)}
+                    onChange={(e) => setSelected((s) => (e.target.checked ? [...s, l.name] : s.filter((n) => n !== l.name)))}
+                    className="shrink-0"
+                  />
+                  <span className="truncate" title={l.name}>{l.name}</span>
+                </label>
+              ))}
+            </div>
+            {rejected ? (
+              <span className="text-red-400">{health!.findings.filter((f) => f.level === "block").map((f) => f.message).join(" / ")}</span>
+            ) : (
+              <span className="text-faint">選ばなかったレイアウトはテンプレに含まれません（タイトルと本文の枠が最低1つずつ必要）。</span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5 mt-1 pt-3 border-t border-edge">
+            <span className="text-muted">カスタムレイアウト（{customLayouts.length}）</span>
+            <LayoutEditor layouts={customLayouts} onChange={setCustomLayouts} />
+            <span className="text-faint">独自レイアウト（枠の位置・役割・配色）を定義して追加できます。編集はプレビューに即反映されます。</span>
+          </div>
+        </div>
+
+        {/* Live preview: a sample deck rendered on the draft template (debounced) — WYSIWYG with 生成して適用. */}
+        <div className="flex-1 min-w-0 flex flex-col" style={{ height: "70vh" }}>
+          <div className="px-3 py-1.5 border-b border-edge flex items-center gap-2 text-[11px] text-muted">
+            <span>プレビュー（サンプル）</span>
+            {preview.busy && <span className="text-faint">更新中…</span>}
+          </div>
+          <div className="flex-1 min-h-0 bg-void">
+            <SlidePreview deck={preview.deck} template={preview.template} error={preview.error} />
+          </div>
+        </div>
         </div>
 
         <div className="px-4 py-2.5 border-t border-edge flex justify-end gap-2">
@@ -171,7 +243,8 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
           </button>
           <button
             onClick={create}
-            disabled={!name.trim() || busy}
+            disabled={!name.trim() || busy || noLayouts || rejected || preview.busy}
+            title={rejected ? "選択レイアウトにタイトル/本文枠が不足しています" : noLayouts ? "レイアウトを1つ以上選択または追加してください" : preview.busy ? "プレビュー更新中…" : undefined}
             className="px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent-hi text-on-accent disabled:opacity-40"
           >
             {busy ? "生成中…" : "生成して適用"}
