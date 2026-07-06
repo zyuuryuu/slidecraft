@@ -12,7 +12,7 @@ import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
-import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo } from "../engine/deck-structure";
+import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -418,13 +418,11 @@ export function useDeckController() {
     if (!slide) return;
     // aspect (intrinsic w/h, measured at insert) enables aspect-lock resize + correct cover crop (案B).
     const aspectPart = aspect && aspect > 0 ? { aspect } : {};
-    // If the slide ALREADY has content (text or a figure), don't destroy it: drop the image BEHIND
-    // everything as a backmost full-slide layer (最背面). An empty slide gets the image as its body
-    // figure (occupies the frame; layout:"auto" re-resolves a Title/cover to a body-bearing layout).
-    const hasText = slide.placeholders.some((p) => p.paragraphs.some((par) => par.segments.some((s) => s.text.trim() !== "")));
-    const hasFigure = !!(slide.diagram || slide.mermaidBlock || slide.table || slide.code);
-    if (hasText || hasFigure) {
-      handleSlideUpdate(activeSlide, { ...slide, image: { src, alt, placeholderIdx: "1", behind: true, fit: "cover", ...aspectPart } }, "commit");
+    // If the slide ALREADY has content (text or a figure), don't destroy it: drop the image as a
+    // BACKMOST layer (最背面) — a normal-sized figure in the body region, just BEHIND the content (not
+    // full-bleed, not the slide background). An empty slide gets the image as its body figure instead.
+    if (slideHasContent(slide)) {
+      handleSlideUpdate(activeSlide, { ...slide, image: { src, alt, placeholderIdx: "1", behind: true, ...aspectPart } }, "commit");
       return;
     }
     const next: SlideIR = { ...slide, layout: "auto", image: { src, alt, placeholderIdx: "1", ...aspectPart } };

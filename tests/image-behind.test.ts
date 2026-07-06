@@ -57,16 +57,19 @@ describe("最背面: behind flag Markdown round-trip", () => {
   });
 });
 
-describe("最背面: imageRect defaults a behind image to the full slide", () => {
-  it("returns the full slide when a behind image has no rect", () => {
+describe("最背面: a behind image is a NORMAL-sized figure (NOT full-slide)", () => {
+  const ph = { idx: "1", type: "body", name: "Body", shapeXml: "", style: { x: 1, y: 1.5, w: 8, h: 4 } } as never;
+  it("uses its placeholder box (same as a body figure) — not the whole slide", () => {
+    expect(imageRect({ src: IMG, alt: "", placeholderIdx: "1", behind: true }, ph)).toEqual({ x: 1, y: 1.5, w: 8, h: 4 });
+  });
+  it("falls back to a centered ~70% box (NOT full-bleed) only when there is no placeholder", () => {
     const r = imageRect({ src: IMG, alt: "", placeholderIdx: "1", behind: true }, undefined)!;
-    expect(r.x).toBe(0);
-    expect(r.y).toBe(0);
-    expect(r.w).toBeCloseTo(13.3333, 3);
-    expect(r.h).toBeCloseTo(7.5, 3);
+    expect(r.w).toBeLessThan(13.3333); // NOT the full slide width
+    expect(r.w).toBeCloseTo(13.3333 * 0.7, 2);
+    expect(r.x).toBeGreaterThan(0); // centered, not at the origin
   });
   it("honors an explicit rect on a behind image", () => {
-    expect(imageRect({ src: IMG, alt: "", placeholderIdx: "1", behind: true, rect: { x: 1, y: 1, w: 5, h: 4 } }, undefined))
+    expect(imageRect({ src: IMG, alt: "", placeholderIdx: "1", behind: true, rect: { x: 1, y: 1, w: 5, h: 4 } }, ph))
       .toEqual({ x: 1, y: 1, w: 5, h: 4 });
   });
 });
@@ -89,16 +92,15 @@ describe("最背面: PPTX places the behind image at the BACKMOST z-order", () =
     expect(s1).not.toContain("<p:bg>"); // it's a shape, NOT the slide background fill
   });
 
-  it("a full-slide behind backdrop fills the whole slide (EMU)", async () => {
-    const deck = parseMd(`# T\n\n![bg](${IMG}){behind=1}`);
+  it("a behind image is NORMAL-sized, NOT full-bleed (does not blanket the whole slide)", async () => {
+    const deck = parseMd(`# 見出し\n\n- 本文A\n\n![bg](${IMG}){behind=1}`);
     deck.template = undefined;
     const zip = await JSZip.loadAsync(await generatePptx(deck, tpl));
     const s1 = await zip.file("ppt/slides/slide1.xml")!.async("string");
     const m = s1.match(/name="Image"[\s\S]*?<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"/)!;
-    expect(Number(m[1])).toBe(0);
-    expect(Number(m[2])).toBe(0);
-    expect(Number(m[3])).toBe(EMU(13.3333333)); // 12192000
-    expect(Number(m[4])).toBe(EMU(7.5)); // 6858000
+    expect(Number(m[3])).toBeGreaterThan(0);
+    expect(Number(m[3])).toBeLessThan(EMU(13.3333333)); // NOT the full slide width
+    expect(Number(m[4])).toBeLessThan(EMU(7.5)); // NOT the full slide height
   });
 
   it("a NON-behind image stays IN FRONT (after the placeholder shapes) — unchanged", async () => {

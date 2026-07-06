@@ -52,10 +52,10 @@
 
 画像挿入が本文プレースホルダを**置換**して既存内容を壊す問題。ユーザ要望で**最背面レイヤー**モードを追加。
 
-- **schema（R4・ユーザ選択で承認）**：`ImageBlock` に `behind?:boolean`。true＝プレースホルダを占めない backmost レイヤー（スライド背景 `<p:bg>` ではなく `<p:pic>`）。既定は全面（`SLIDE_IN`）、案B の rect/fit/aspect と併用可。
-- **挿入の既定**：`handleInsertImage` は対象スライドに**可視テキスト or 図があれば behind**（既存を保持＝図も消さない・layout 据置）、**空なら従来の本文図**（layout auto・他図置換）。フォームの「▤最背面⇄本文枠」トグルでいつでも切替。
+- **schema（R4・ユーザ選択で承認）**：`ImageBlock` に `behind?:boolean`。true＝プレースホルダを占めず**コンテンツの背面（最背面）に置く別シェイプ**（スライド背景 `<p:bg>` ではなく `<p:pic>`）。**大きさは本文図と同じ＝プレースホルダ領域の“普通サイズ”**（全面ではない。プレースホルダが無い場合のみ中央 ~70% にフォールバック・full-bleed 禁止）。案B の rect/fit/aspect と併用可。
+- **挿入の既定**：`handleInsertImage` は `slideHasContent`（可視テキスト or 図）が真なら **behind**（既存を保持＝図も消さない・layout 据置・fit 未指定＝contain）、**空なら従来の本文図**（layout auto・他図置換）。フォームの「▤最背面⇄本文枠」トグルでいつでも切替。
 - **z-order**：PPTX は behind の `<p:pic>` を spTree の**先頭**に emit（＝最背面）、`imageBodyIdx` は undefined でプレースホルダ非スキップ。プレビューも placeholder map の**前**に描画。mermaid PNG と共存できるよう rId 共有をやめ `buildSlideRels({rId,target}[])` 化（behind＋mermaid＝rId2/rId3）。
-- **編集**：behind の全面画像はハンドルが content 下に隠れるため preview ドラッグ非対応＝**フォームの数値（X/Y/W/H）**で調整。本文図はドラッグ/リサイズ（段階2）継続。
+- **編集**：**サイズは range スライダー**（中心固定・比維持・0.5″〜スライド幅、数値指定がやりづらい対策）＋ 数値 X/Y/W/H。behind はハンドルが content 下に隠れるため preview ドラッグ非対応＝フォームで調整。本文図はドラッグ/リサイズ（段階2）継続。
 - **Markdown**：`{behind=1}` サフィックスで往復。behind 画像は本文/図を占めず別行で emit（`imageLine`）、grouped（card/step/kpi）スライドでも `matchImageLine` で section 分割前に抽出（最終カラムに吸収されない — 敵対レビューで発見・修正）。
 - コード：`slide-schema`（behind）・`md-slide-parser`（parse/grouped 抽出）・`md-serializer`（別行 emit）・`placeholder-binding`（imageRect/SLIDE_IN）・`placeholder-filler`（z-order/rId）・`SlidePreview`（backmost 描画）・`SlideEditor`（トグル）・`useDeckController`（挿入判定）。テスト：`tests/image-behind.test.ts`（往復/共存/z-order/全面）・e2e（非破壊 drop）。16エージェント敵対レビューで確定 3件（grouped return 欠落＝往復消失〔独立発見・修正〕／型注釈／table-in-column は既存制約で範囲外）を反映。
 

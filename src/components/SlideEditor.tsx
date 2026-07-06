@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
-import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, applyFieldEdit } from "../engine/placeholder-binding";
+import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN, applyFieldEdit } from "../engine/placeholder-binding";
 import { groupEditorPlan } from "../engine/group-binding";
 import DiagramEditor from "./DiagramEditor";
 
@@ -184,9 +184,10 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   // form can say WHICH placeholder holds it, not just that an image exists. B: a real PICTURE frame
   // (type="pic") wins when the master has one; else it resolves to the body region as before.
   const imagePh = slide.image && !slide.image.behind && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
-  // Fine-tune geometry (案B): the manual rect override, else the resolved frame box (a behind image
-  // resolves to the full slide). Editing any field promotes the box to an explicit rect.
-  const imgBox = slide.image ? imageRect(slide.image, imagePh) : undefined;
+  // Fine-tune geometry (案B): the manual rect override, else the resolved placeholder box (a behind
+  // image rides the SAME box as a body figure — normal size, just at the back). Editing promotes to rect.
+  const imageBoxPh = slide.image && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
+  const imgBox = slide.image ? imageRect(slide.image, imageBoxPh) : undefined;
   const imgAspect = slide.image ? imageAspectRatio(slide.image, imgBox) : undefined;
   const updateImageRect = (k: "x" | "y" | "w" | "h", val: number) => {
     if (!slide.image || !imgBox || !Number.isFinite(val)) return;
@@ -199,6 +200,21 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       else if (k === "h") next = { ...next, w: v * imgAspect };
     }
     onChange({ ...slide, image: { ...slide.image, rect: next } });
+  };
+  // Size SLIDER: scale the image to width `w` (aspect-locked), keeping its CENTER fixed so it grows/
+  // shrinks in place. Clamped onto the slide. The numeric X/Y/W/H stay for precision.
+  const updateImageSize = (w: number) => {
+    if (!slide.image || !imgBox || !Number.isFinite(w)) return;
+    const nw = Math.max(0.3, Math.min(w, SLIDE_IN.w));
+    const nh = imgAspect && imgAspect > 0 ? nw / imgAspect : imgBox.h * (nw / imgBox.w);
+    const cx = imgBox.x + imgBox.w / 2, cy = imgBox.y + imgBox.h / 2;
+    const rect = {
+      x: Math.min(Math.max(0, cx - nw / 2), Math.max(0, SLIDE_IN.w - nw)),
+      y: Math.min(Math.max(0, cy - nh / 2), Math.max(0, SLIDE_IN.h - nh)),
+      w: nw,
+      h: nh,
+    };
+    onChange({ ...slide, image: { ...slide.image, rect } });
   };
   const toggleImageFit = () =>
     slide.image && onChange({ ...slide, image: { ...slide.image, fit: slide.image.fit === "cover" ? "contain" : "cover" } });
@@ -355,7 +371,25 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
             </button>
           </div>
 
-          {/* Size/position fine-tune (案B): X/Y/W/H in inches, contain/cover, aspect-lock, reset-to-frame. */}
+          {/* Size SLIDER — the primary size control (numeric is fiddly); scales in place, aspect-locked. */}
+          {imgBox && (
+            <div className="flex items-center gap-2 text-[10px] text-faint">
+              <span className="shrink-0">サイズ</span>
+              <input
+                type="range"
+                min={0.5}
+                max={Number(SLIDE_IN.w.toFixed(2))}
+                step={0.05}
+                value={Number(imgBox.w.toFixed(2))}
+                onChange={(e) => updateImageSize(e.target.valueAsNumber)}
+                title="ドラッグで拡大・縮小（中心を保ったまま）"
+                className="flex-1 accent-accent"
+              />
+              <span className="shrink-0 w-12 text-right tabular-nums">{Math.round((imgBox.w / SLIDE_IN.w) * 100)}%</span>
+            </div>
+          )}
+
+          {/* Position/size fine-tune (案B): X/Y/W/H in inches, contain/cover, aspect-lock, reset. */}
           {imgBox && (
             <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-faint">
               {(["x", "y", "w", "h"] as const).map((k) => (

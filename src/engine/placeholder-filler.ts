@@ -157,13 +157,13 @@ async function buildSlideXml(
   const imageBehind = !!slide.image?.behind;
   const imageBodyIdx = slide.image && !imageBehind ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx : undefined;
 
-  // Embedded-image geometry + rId, shared by the behind (backmost) and front placements. A behind
-  // backdrop fills the slide (imageRect default); a body image rides its picture/body frame. It takes
-  // rId3 when a mermaid PNG already holds rId2 (both can appear on a behind slide), else rId2.
+  // Embedded-image geometry + rId, shared by the behind (backmost) and front placements. Both use the
+  // SAME placeholder box (a behind image is a normal-sized figure, just at the back — NOT full-bleed).
+  // It takes rId3 when a mermaid PNG already holds rId2 (both can appear on a behind slide), else rId2.
   const mermaidImageRId = slide.mermaidBlock?.svgCache && visualBody(slide.mermaidBlock.placeholderIdx) ? "rId2" : undefined;
   const imageData = slide.image ? dataUriToImage(slide.image.src) : undefined;
   const imageBox = imageData && (imageBehind || imageBodyIdx)
-    ? imageRect(slide.image!, imageBehind ? undefined : imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx))
+    ? imageRect(slide.image!, imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx))
     : undefined;
   const imageRId = imageBox ? (mermaidImageRId ? "rId3" : "rId2") : undefined;
   const buildImagePic = (shapeId: number): string => {

@@ -253,19 +253,21 @@ export function imagePlaceholder(
   return nthBody(bodyPlaceholders(layoutPlaceholders), placeholderIdx);
 }
 
-/**
- * The image's final geometry (inches on the slide): the manual `rect` override when the user has
- * fine-tuned it (案B), else the bound placeholder's box (the default). Shared by preview + export so
- * a fine-tuned image lands identically in both (WYSIWYG). Undefined when neither is available. Pure.
- */
-/** 16:9 slide size in inches (12192000×6858000 EMU) — the default box for a full-slide backdrop. */
+/** 16:9 slide size in inches (12192000×6858000 EMU). */
 export const SLIDE_IN = { w: 12192000 / 914400, h: 6858000 / 914400 };
 
+/**
+ * The image's box (inches): the manual `rect` override, else its target placeholder's box. A BEHIND
+ * image is a NORMAL-sized figure that merely sits behind the content — it uses the SAME box as a body
+ * figure would (its placeholder region), NOT the whole slide. Only when a behind image has no target
+ * placeholder (e.g. a cover with no body) does it fall back to a centered ~70% box — never full-bleed.
+ * Shared by preview + export so it lands identically in both (WYSIWYG). Pure (R2).
+ */
 export function imageRect(image: ImageBlock, ph: PlaceholderInfo | undefined): ImageRect | undefined {
   if (image.rect) return image.rect;
-  if (image.behind) return { x: 0, y: 0, w: SLIDE_IN.w, h: SLIDE_IN.h }; // backmost layer fills the slide
-  if (!ph) return undefined;
-  return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
+  if (ph) return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
+  if (image.behind) return { x: SLIDE_IN.w * 0.15, y: SLIDE_IN.h * 0.15, w: SLIDE_IN.w * 0.7, h: SLIDE_IN.h * 0.7 };
+  return undefined;
 }
 
 /** The aspect ratio (w/h) to preserve when resizing an image: the measured intrinsic aspect, else the
