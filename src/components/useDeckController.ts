@@ -410,6 +410,19 @@ export function useDeckController() {
     [deck, activeSlide, handleSlideUpdate],
   );
 
+  // Insert a pasted/dropped image onto the CURRENT slide as its body figure (region 1). Replaces any
+  // existing single-body figure there (only one fits) — undoable ("commit"). Disabled while collab observe-only.
+  const handleInsertImage = useCallback((src: string, alt = "") => {
+    if (editLockedRef.current || !deck) return;
+    const slide = deck.slides[activeSlide];
+    if (!slide) return;
+    // layout:"auto" so a slide with no body region (e.g. a Title/cover) re-resolves to a body-bearing
+    // layout — else the image has nowhere to bind and silently won't render.
+    const next: SlideIR = { ...slide, layout: "auto", image: { src, alt, placeholderIdx: "1" } };
+    delete next.diagram; delete next.mermaidBlock; delete next.table; delete next.code;
+    handleSlideUpdate(activeSlide, next, "commit");
+  }, [deck, activeSlide, handleSlideUpdate]);
+
 
   // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
   // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
@@ -628,7 +641,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleInsertImage, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)

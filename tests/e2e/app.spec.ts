@@ -145,6 +145,19 @@ test.describe("SlideCraft", () => {
     }).toPass({ timeout: 3000 });
   });
 
+  test("image: pasting an image inserts it onto the current slide (renders as a data <img>)", async ({ page }) => {
+    await page.waitForTimeout(1500); // sample deck
+    await page.evaluate(() => {
+      const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const file = new File([bytes], "x.png", { type: "image/png" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await expect(page.locator('img[src^="data:image/png"]').first()).toBeVisible({ timeout: 5000 });
+  });
+
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark"); // default

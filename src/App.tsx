@@ -33,7 +33,7 @@ export default function App() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
-    handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint,
+    handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
@@ -157,6 +157,27 @@ export default function App() {
     const t = setTimeout(() => setToast(undefined), 2800);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Paste an image (⌘/Ctrl+V) → insert onto the current slide as a data URI. Only intercepts an IMAGE
+  // clipboard item; text paste (into the editor / fields) falls through untouched. Robust across webviews.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (!item.type.startsWith("image/")) continue;
+        const blob = item.getAsFile();
+        if (!blob) continue;
+        e.preventDefault();
+        const reader = new FileReader();
+        reader.onload = () => { if (typeof reader.result === "string") { handleInsertImage(reader.result); notify("画像を貼り付けました"); } };
+        reader.readAsDataURL(blob);
+        return;
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [handleInsertImage, notify]);
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
