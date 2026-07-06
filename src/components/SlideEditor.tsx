@@ -430,10 +430,10 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 <button
                   type="button"
                   onClick={resetImageRect}
-                  title={slide.image.behind ? "全面に戻す（手動調整を解除）" : "枠いっぱいに戻す（手動調整を解除）"}
+                  title="既定サイズ・位置に戻す（手動調整を解除）"
                   className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
                 >
-                  {slide.image.behind ? "⟲ 全面に戻す" : "⟲ 枠にリセット"}
+                  {slide.image.behind ? "⟲ 既定に戻す" : "⟲ 枠にリセット"}
                 </button>
               )}
             </div>
