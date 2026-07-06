@@ -121,7 +121,7 @@ function extractFencedBlock(lines: string[]): { lang: string; content: string } 
 /** Parse an image's `{x=…,y=…,w=…,h=…,fit=cover,ar=…}` attr suffix → geometry override (案B). rect
  *  is set only when all four of x/y/w/h are present (a partial rect is meaningless). Unknown keys are
  *  ignored; malformed numbers are dropped. Inverse of md-serializer.imageAttrs. */
-function parseImageAttrs(s: string | undefined): Pick<ImageBlock, "rect" | "fit" | "aspect"> {
+function parseImageAttrs(s: string | undefined): Pick<ImageBlock, "rect" | "fit" | "aspect" | "behind"> {
   if (!s) return {};
   const kv: Record<string, string> = {};
   for (const part of s.split(",")) {
@@ -132,13 +132,22 @@ function parseImageAttrs(s: string | undefined): Pick<ImageBlock, "rect" | "fit"
     const v = Number(kv[k]);
     return kv[k] !== undefined && Number.isFinite(v) ? v : undefined;
   };
-  const out: Pick<ImageBlock, "rect" | "fit" | "aspect"> = {};
+  const out: Pick<ImageBlock, "rect" | "fit" | "aspect" | "behind"> = {};
   const [x, y, w, h] = [num("x"), num("y"), num("w"), num("h")];
   if (x !== undefined && y !== undefined && w !== undefined && h !== undefined) out.rect = { x, y, w, h };
   if (kv.fit === "contain" || kv.fit === "cover") out.fit = kv.fit;
   const ar = num("ar");
   if (ar !== undefined && ar > 0) out.aspect = ar;
+  if (kv.behind === "1") out.behind = true;
   return out;
+}
+
+/** A line that is ONLY `![alt](src){…}` → an image block (with its geometry/behind attrs), else null.
+ *  The src is non-greedy so a trailing `{…}` attr suffix isn't swallowed (data URIs contain no `)`). */
+const IMAGE_LINE_RE = /^!\[([^\]]*)\]\(([^)]+?)\)(?:\{([^}]*)\})?$/;
+function matchImageLine(trimmed: string): ImageBlock | null {
+  const m = trimmed.match(IMAGE_LINE_RE);
+  return m ? { src: m[2], alt: m[1], placeholderIdx: "1", ...parseImageAttrs(m[3]) } : null;
 }
 
 // ── Parse a single slide block ──
@@ -191,8 +200,17 @@ export function parseSlideBlock(
       cursor++;
     }
 
+    // A standalone image line (e.g. a 最背面 backdrop) can appear on a GROUPED slide too — pull it out
+    // BEFORE section-splitting so it isn't absorbed into the last column's body text (round-trip).
+    const groupContent: string[] = [];
+    for (const ln of lines.slice(cursor)) {
+      const img = matchImageLine(ln.trim());
+      if (img && !image) { image = img; continue; }
+      groupContent.push(ln);
+    }
+
     // Split remaining content by separator
-    const sections = splitBySeparator(lines.slice(cursor), separatorType);
+    const sections = splitBySeparator(groupContent, separatorType);
 
     if (title) {
       placeholders.push({
@@ -225,13 +243,14 @@ export function parseSlideBlock(
       }
     });
 
-    if (placeholders.length === 0 && !diagram && !mermaidBlock) return null;
+    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image) return null;
 
     return {
       layout,
       placeholders,
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
+      ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
@@ -317,11 +336,11 @@ export function parseSlideBlock(
     }
 
     // ![alt](src) ALONE on a line → an embedded image (data URI or path). Fills body region 1.
-    // An optional `{x=…,y=…,w=…,h=…,fit=cover,ar=…}` suffix carries a manual geometry override (案B).
+    // An optional `{x=…,y=…,w=…,h=…,fit=cover,ar=…,behind=1}` suffix carries geometry/layer attrs (案B).
     // Only the first one becomes the figure; further images fall through to body text.
-    const imgMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+?)\)(?:\{([^}]*)\})?$/);
-    if (imgMatch && !image) {
-      image = { src: imgMatch[2], alt: imgMatch[1], placeholderIdx: "1", ...parseImageAttrs(imgMatch[3]) };
+    const img = matchImageLine(trimmed);
+    if (img && !image) {
+      image = img;
       continue;
     }
 

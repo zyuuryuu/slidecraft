@@ -169,12 +169,17 @@ test.describe("SlideCraft", () => {
       window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
     });
     await expect(page.locator('img[src^="data:image/png"]').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/🖼 画像/)).toBeVisible(); // the Slide Editor form reflects the image (no stale empty body field)
-    await expect(page.getByText(/→.*idx \d/)).toBeVisible(); // …and WHICH placeholder holds it (role-resolved binding)
+    await expect(page.getByText(/🖼 画像/)).toBeVisible(); // the Slide Editor form reflects the image
+    // The active (cover) slide already has content → the image goes BEHIND it (最背面), non-destructively.
+    await expect(page.getByText(/最背面レイヤー/)).toBeVisible();
   });
 
-  test("image: dragging it on the preview moves the box (pointer, not HTML5 DnD)", async ({ page }) => {
+  test("image: dropping onto a slide with body text keeps the text (behind, non-destructive)", async ({ page }) => {
     await page.waitForTimeout(1500);
+    await page.getByTitle("ドラッグで並べ替え").nth(1).click(); // select slide 2 (アジェンダ — has bullet body)
+    const body = page.locator("textarea").first(); // BODY.CENTER (idx 1) is the first field
+    await expect(body).toHaveValue(/概要|アジェンダ|システム/, { timeout: 5000 });
+    const before = await body.inputValue();
     await page.evaluate(() => {
       const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -182,21 +187,35 @@ test.describe("SlideCraft", () => {
       dt.items.add(new File([bytes], "x.png", { type: "image/png" }));
       window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
     });
-    // The active-slide preview shows the image box WITH resize handles (editable). Grab the box = a handle's parent.
+    await expect(page.getByText(/最背面レイヤー/)).toBeVisible(); // it went BEHIND, as a layer
+    await expect(body).toHaveValue(before); // …and the bullets are untouched (not replaced by the image)
+  });
+
+  test("image: resizing a body-figure image via a corner handle shrinks the box (pointer)", async ({ page }) => {
+    await page.waitForTimeout(1500);
+    await page.getByTitle(/スライドを追加/).click(); // a BLANK slide (becomes active) → a dropped image is a body figure
+    await page.evaluate(() => {
+      const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], "x.png", { type: "image/png" }));
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+    // A body-figure image shows resize handles IN FRONT (grabbable). Grab the box = a handle's parent.
     const handle = page.locator('[data-image-handle="se"]');
     await expect(handle).toBeVisible({ timeout: 5000 });
     const box = handle.locator("xpath=..");
     const before = (await box.boundingBox())!;
-    // POINTER drag (native HTML5 DnD is unreliable in Tauri webviews): press the box body, move past the
-    // 3px threshold in steps, release → onImageRectChange commits the new rect and the box re-renders moved.
-    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    // POINTER drag the SE handle INWARD (native HTML5 DnD is unreliable in Tauri webviews) → the box
+    // shrinks from the top-left anchor. Shrinking is unconstrained (unlike move), so this is robust.
+    const hb = (await handle.boundingBox())!;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
     await page.mouse.down();
-    await page.mouse.move(before.x + before.width / 2 - 70, before.y + before.height / 2 - 45, { steps: 12 });
+    await page.mouse.move(hb.x - 100, hb.y - 70, { steps: 12 });
     await page.mouse.up();
     await expect(async () => {
       const after = (await box.boundingBox())!;
-      expect(after.x).toBeLessThan(before.x - 5); // the image moved left
-      expect(after.y).toBeLessThan(before.y - 5); // …and up
+      expect(after.width).toBeLessThan(before.width - 5); // the image shrank
     }).toPass({ timeout: 3000 });
   });
 

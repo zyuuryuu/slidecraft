@@ -416,11 +416,18 @@ export function useDeckController() {
     if (editLockedRef.current || !deck) return;
     const slide = deck.slides[activeSlide];
     if (!slide) return;
-    // layout:"auto" so a slide with no body region (e.g. a Title/cover) re-resolves to a body-bearing
-    // layout — else the image has nowhere to bind and silently won't render. aspect (intrinsic w/h,
-    // measured at insert) enables aspect-lock resize + correct cover cropping (案B).
-    const image = { src, alt, placeholderIdx: "1", ...(aspect && aspect > 0 ? { aspect } : {}) };
-    const next: SlideIR = { ...slide, layout: "auto", image };
+    // aspect (intrinsic w/h, measured at insert) enables aspect-lock resize + correct cover crop (案B).
+    const aspectPart = aspect && aspect > 0 ? { aspect } : {};
+    // If the slide ALREADY has content (text or a figure), don't destroy it: drop the image BEHIND
+    // everything as a backmost full-slide layer (最背面). An empty slide gets the image as its body
+    // figure (occupies the frame; layout:"auto" re-resolves a Title/cover to a body-bearing layout).
+    const hasText = slide.placeholders.some((p) => p.paragraphs.some((par) => par.segments.some((s) => s.text.trim() !== "")));
+    const hasFigure = !!(slide.diagram || slide.mermaidBlock || slide.table || slide.code);
+    if (hasText || hasFigure) {
+      handleSlideUpdate(activeSlide, { ...slide, image: { src, alt, placeholderIdx: "1", behind: true, fit: "cover", ...aspectPart } }, "commit");
+      return;
+    }
+    const next: SlideIR = { ...slide, layout: "auto", image: { src, alt, placeholderIdx: "1", ...aspectPart } };
     delete next.diagram; delete next.mermaidBlock; delete next.table; delete next.code;
     handleSlideUpdate(activeSlide, next, "commit");
   }, [deck, activeSlide, handleSlideUpdate]);
