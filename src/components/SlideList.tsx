@@ -2,14 +2,15 @@
  * SlideList.tsx — Slide thumbnail list using the same SlideCard as the preview.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
-import { SlideCard } from "./SlidePreview";
+import { SlideCard, SLIDE_W } from "./SlidePreview";
 
 const THUMB_SCALE = 15;
+const CARD_W = SLIDE_W * THUMB_SCALE; // thumbnail px width — sizes the insertion indicator to match
 
 interface SlideListProps {
   deck: DeckIR | null;
@@ -39,19 +40,21 @@ export default function SlideList({
   disabled,
 }: SlideListProps) {
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
-  // Drag-reorder via POINTER events (NOT native HTML5 DnD — that is unreliable in the Tauri webviews:
-  // WebKitGTK on Linux, WKWebView on macOS). dragIdx/overIdx drive the visuals; the live drag lives in
-  // a ref (read synchronously on pointerup) so pointerup applies the final drop without a stale closure.
+  // Drag-reorder via POINTER events (NOT native HTML5 DnD — unreliable in the Tauri webviews: WebKitGTK
+  // on Linux, WKWebView on macOS). `insIdx` = the 0..N INSERTION gap (PowerPoint-style: an indicator line
+  // shows exactly where the slide lands, above/below the hovered slide's midpoint). The live drag lives
+  // in a ref so pointerup reads the final gap without a stale closure.
+  const slideCount = deck?.slides.length ?? 0;
   const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
-  const dragRef = useRef<{ from: number; over: number | null; active: boolean } | null>(null);
+  const [insIdx, setInsIdx] = useState<number | null>(null);
+  const dragRef = useRef<{ from: number; ins: number; active: boolean } | null>(null);
   const justDragged = useRef(false); // swallow the click that follows a real drag (else it re-selects a stale idx)
   const canDrag = !disabled && !!onMove;
 
   const startDrag = (e: React.PointerEvent, from: number) => {
     if (!canDrag || e.button !== 0) return;
     const startY = e.clientY;
-    dragRef.current = { from, over: from, active: false };
+    dragRef.current = { from, ins: from, active: false };
     const onMovePtr = (ev: PointerEvent) => {
       const d = dragRef.current;
       if (!d) return;
@@ -61,9 +64,12 @@ export default function SlideList({
         setDragIdx(from);
       }
       const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest("[data-slide-idx]") as HTMLElement | null;
-      const over = el ? Number(el.dataset.slideIdx) : null;
-      d.over = over;
-      setOverIdx(over);
+      if (el) {
+        const idx = Number(el.dataset.slideIdx);
+        const r = el.getBoundingClientRect();
+        d.ins = ev.clientY < r.top + r.height / 2 ? idx : idx + 1; // drop before/after by the midpoint
+        setInsIdx(d.ins);
+      }
     };
     const onUpPtr = () => {
       window.removeEventListener("pointermove", onMovePtr);
@@ -72,14 +78,24 @@ export default function SlideList({
       dragRef.current = null;
       if (d?.active) {
         justDragged.current = true; // the trailing click must not also fire onSelect
-        if (d.over !== null && d.over !== d.from) onMove?.(d.from, d.over);
+        // Insertion gap → final index: removing `from` shifts everything after it down by one.
+        const to = d.ins > d.from ? d.ins - 1 : d.ins;
+        if (to !== d.from && to >= 0 && to < slideCount) onMove?.(d.from, to);
       }
       setDragIdx(null);
-      setOverIdx(null);
+      setInsIdx(null);
     };
     window.addEventListener("pointermove", onMovePtr);
     window.addEventListener("pointerup", onUpPtr);
   };
+  // Show the indicator at a gap unless dropping there is a no-op (right where the slide already is).
+  const showBar = (gap: number) => canDrag && dragIdx !== null && insIdx === gap && gap !== dragIdx && gap !== dragIdx + 1;
+  const insertionBar = (
+    <div className="pointer-events-none flex items-center gap-1 my-0.5" style={{ width: CARD_W }} aria-hidden>
+      <div className="w-2 h-2 rounded-full bg-accent shrink-0" />
+      <div className="h-[3px] flex-1 rounded-full bg-accent" />
+    </div>
+  );
 
   if (!deck || deck.slides.length === 0) {
     return (
@@ -92,7 +108,7 @@ export default function SlideList({
   return (
     // select-none: thumbnails aren't selectable text, so Shift/⌘-click multi-select
     // doesn't drag a blue text-selection highlight along with it.
-    <div className="h-full overflow-auto p-2 flex flex-col gap-2 items-center select-none">
+    <div className={`h-full overflow-auto p-2 flex flex-col gap-2 items-center select-none ${dragIdx !== null ? "cursor-grabbing" : ""}`}>
       {deck.slides.map((slide, i) => {
         // ALWAYS via autoSelectLayout — it honors a valid pinned name but degrades one this template
         // lacks to a real layout (else a canonical-pinned cover on an alien master = blank thumbnail).
@@ -100,18 +116,18 @@ export default function SlideList({
         const layout = template ? findLayout(template, layoutName) : undefined;
 
         const showOps = !disabled && (onDuplicate || onDelete);
-        const isDropTarget = canDrag && overIdx === i && dragIdx !== null && dragIdx !== i;
         return (
-          <div
-            key={i}
-            data-slide-idx={i}
-            className={`flex flex-col items-center ${canDrag ? "cursor-grab" : ""} ${dragIdx === i ? "opacity-40" : ""}`}
-            title={canDrag ? "ドラッグで並べ替え" : undefined}
-            onPointerDown={canDrag ? (e) => startDrag(e, i) : undefined}
-            onClickCapture={(e) => { if (justDragged.current) { justDragged.current = false; e.stopPropagation(); } }} // swallow the post-drag click
-          >
-            <div className={`relative group rounded ${isDropTarget ? "ring-2 ring-accent" : ""}`}>
-              <SlideCard
+          <Fragment key={i}>
+            {showBar(i) && insertionBar}
+            <div
+              data-slide-idx={i}
+              className={`flex flex-col items-center transition-[transform,opacity] duration-150 ${canDrag ? "cursor-grab" : ""} ${dragIdx === i ? "opacity-40 scale-95" : ""}`}
+              title={canDrag ? "ドラッグで並べ替え" : undefined}
+              onPointerDown={canDrag ? (e) => startDrag(e, i) : undefined}
+              onClickCapture={(e) => { if (justDragged.current) { justDragged.current = false; e.stopPropagation(); } }} // swallow the post-drag click
+            >
+              <div className="relative group rounded">
+                <SlideCard
                 slide={slide}
                 slideIndex={i}
                 totalSlides={deck.slides.length}
@@ -149,11 +165,13 @@ export default function SlideList({
                   )}
                 </div>
               )}
+              </div>
+              <span className="text-[10px] text-faint mt-0.5">{i + 1}</span>
             </div>
-            <span className="text-[10px] text-faint mt-0.5">{i + 1}</span>
-          </div>
+          </Fragment>
         );
       })}
+      {showBar(slideCount) && insertionBar}
     </div>
   );
 }
