@@ -14,6 +14,14 @@ export function blankSlide(): SlideIR {
   return { layout: "auto", placeholders: [] };
 }
 
+/** Whether a slide already carries content worth preserving (any visible placeholder text OR a figure).
+ *  Drives the image-insert default: a slide with content gets the image as a BACKMOST layer (最背面, so
+ *  nothing is destroyed); an empty slide gets it as a body figure. Pure (R2). */
+export function slideHasContent(slide: SlideIR): boolean {
+  const hasText = slide.placeholders.some((p) => p.paragraphs.some((par) => par.segments.some((s) => s.text.trim() !== "")));
+  return hasText || !!(slide.diagram || slide.mermaidBlock || slide.table || slide.code);
+}
+
 /** Insert `slide` before/after `index`; the position is clamped to a valid slot. Returns the new deck
  *  and the index the slide landed at (so the caller can focus it). */
 export function insertSlideAt(deck: DeckIR, index: number, slide: SlideIR, position: "before" | "after" = "after"): { deck: DeckIR; at: number } {

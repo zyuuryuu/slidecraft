@@ -293,9 +293,10 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
         );
       })}
 
-      {/* BEHIND (最背面) image: a backmost layer painted AFTER the master/layout decorations but BEFORE
-          the placeholder shapes, so existing title/body/figures stay on top (never the slide bg). */}
-      {slide.image?.behind && renderImageBox(imageRect(slide.image, undefined)!)}
+      {/* BEHIND (最背面) image: a normal-sized figure painted AFTER the master/layout decorations but
+          BEFORE the placeholder shapes, so existing title/body/figures stay on top (never the slide bg,
+          never full-bleed — it rides its placeholder box). */}
+      {slide.image?.behind && renderImageBox(imageRect(slide.image, imagePlaceholder(layoutPhs, slide.image.placeholderIdx))!)}
 
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {
