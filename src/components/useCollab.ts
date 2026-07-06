@@ -13,6 +13,7 @@ import { CollabProjection, type CollabStatus, type DocSummary } from "../ipc/col
 import { bundleProject } from "../engine/project-io";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
+import type { MasterEntry } from "./useMasterRegistry";
 
 export interface CollabInfo {
   url: string;
@@ -43,9 +44,13 @@ export interface UseCollabArgs {
   deck: DeckIR | null;
   templateData: TemplateData | null;
   templateName: string;
+  /** The master registry (useMasterRegistry) — uploaded to the host on 開始 (register_templates) so a
+   *  connecting AI can list_templates / use_template. The bytes stay host-side; the AI selects by id. */
+  masters: MasterEntry[];
+  getMasterBytes: (id: string) => Promise<Uint8Array>;
 }
 
-export function useCollab({ applyDeck, deck, templateData, templateName }: UseCollabArgs) {
+export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes }: UseCollabArgs) {
   const available = runningInTauri();
   const [status, setStatus] = useState<CollabStatus>("idle");
   const [info, setInfo] = useState<CollabInfo | undefined>(undefined);
@@ -58,6 +63,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName }: UseCo
   const templateRef = useRef(templateData);
   const nameRef = useRef(templateName);
   const applyRef = useRef(applyDeck);
+  const mastersRef = useRef(masters);
+  const getBytesRef = useRef(getMasterBytes);
   // Sync the latest values into the refs from an EFFECT (not during render → satisfies
   // react-hooks/refs). start()/seed/onDeck all run after commit, so an effect is timely enough.
   useEffect(() => {
@@ -65,6 +72,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName }: UseCo
     templateRef.current = templateData;
     nameRef.current = templateName;
     applyRef.current = applyDeck;
+    mastersRef.current = masters;
+    getBytesRef.current = getMasterBytes;
   });
 
   const start = useCallback(async () => {
@@ -93,6 +102,25 @@ export function useCollab({ applyDeck, deck, templateData, templateName }: UseCo
       });
       projRef.current = proj;
       await proj.start();
+      // Best-effort: UPLOAD the master registry so a connecting AI can list_templates / use_template.
+      // The bytes live host-side (Node sidecar has no Tauri fs); the AI selects by id. Full-replace, so
+      // this connect-time push is the truth for the session (re-import while connected = a follow-up).
+      try {
+        const items = (
+          await Promise.all(
+            mastersRef.current.map(async (m) => {
+              // Guard each master's fetch per-item (matches App.tsx handleSelectMaster) so ONE bad
+              // master (e.g. a transient builtin fetch failure) drops only itself, not the whole set —
+              // register_templates is full-replace, so a rejected Promise.all would empty the AI picker.
+              const bytes = await getBytesRef.current(m.id).catch(() => null);
+              return bytes ? { id: m.id, name: m.name, builtin: m.builtin, bytesBase64: bytesToBase64(bytes) } : null;
+            }),
+          )
+        ).filter((x): x is NonNullable<typeof x> => x !== null);
+        if (items.length) await proj.callTool("register_templates", { templates: items });
+      } catch {
+        /* template upload is best-effort — collaboration still works without it */
+      }
       // Best-effort: SHARE the current deck as exact .slidecraft bytes (no markdown round-trip → no
       // title-slide mangling) so a connecting AI has something to edit. The projection mirrors it
       // back as the INITIAL ('silent') apply = no visible change / no undo step. If there's no deck/

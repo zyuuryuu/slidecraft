@@ -13,7 +13,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createSession } from "../src/mcp/session";
 import { buildServer } from "../src/mcp/server";
-import { DocRegistry, type HostContext, type DocEntry } from "../src/mcp/host-core";
+import { DocRegistry, MemTemplateStore, type HostContext, type DocEntry, type TemplateStore } from "../src/mcp/host-core";
 
 let templateB64: string;
 beforeAll(() => {
@@ -21,8 +21,7 @@ beforeAll(() => {
   templateB64 = tBytes.toString("base64");
 });
 
-function makeHost(sharedOnly = false) {
-  const registry = new DocRegistry();
+function makeHost(sharedOnly = false, templates?: TemplateStore, registry = new DocRegistry()) {
   let activeDocId: string | undefined;
   const opened: DocEntry[] = [];
   const closed: string[] = [];
@@ -31,6 +30,7 @@ function makeHost(sharedOnly = false) {
     active: () => activeDocId,
     setActive: (_e, id) => { activeDocId = id; },
     sharedOnly,
+    templates,
     notifyOpened: (e) => opened.push(e),
     notifyClosed: (id) => closed.push(id),
   };
@@ -134,5 +134,65 @@ describe("buildServer host mode — multi-doc lifecycle", () => {
     const ids = list.documents.map((d) => d.docId);
     expect(ids).toContain(shared.docId);
     expect(ids).not.toContain(priv.docId);
+  });
+});
+
+describe("buildServer host mode — template selection (S2 増分2)", () => {
+  it("register_templates (GUI) → list_templates → use_template MINTS a doc titled after the template", async () => {
+    const store = new MemTemplateStore();
+    const h = makeHost(false, store); // gui role
+    const client = await connect(h.host);
+    const reg = (await call(client, "register_templates", { templates: [{ id: "m1", name: "社内テンプレ", builtin: false, bytesBase64: templateB64 }] })).data as { ok: boolean; count: number };
+    expect(reg.ok).toBe(true);
+    expect(reg.count).toBe(1);
+    const list = (await call(client, "list_templates")).data as { templates: { id: string; name: string; builtin: boolean }[] };
+    expect(list.templates).toEqual([{ id: "m1", name: "社内テンプレ", builtin: false }]);
+    const used = (await call(client, "use_template", { id: "m1", markdown: NEW_MD })).data as { docId: string; slideCount: number };
+    expect(used.docId).toBeTruthy();
+    expect(used.slideCount).toBeGreaterThan(1);
+    expect(h.getActive()).toBe(used.docId); // use_template selects the minted doc
+    expect(h.opened.map((e) => e.title)).toEqual(["社内テンプレ"]); // tab named after the template
+  });
+
+  it("use_template with an unknown id is never-silent (ok:false, unknown-template) and mints nothing", async () => {
+    const store = new MemTemplateStore();
+    store.register([{ id: "m1", name: "T", builtin: false, bytes: new Uint8Array(Buffer.from(templateB64, "base64")) }]);
+    const h = makeHost(false, store);
+    const client = await connect(h.host);
+    const r = (await call(client, "use_template", { id: "zzz" })).data as { ok: boolean; code: string };
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("unknown-template");
+    expect(h.opened).toEqual([]); // no doc minted
+    expect(h.registry.size).toBe(0);
+  });
+
+  it("list_templates without a registry accessor guides to create_template (ok:false, template-registry-unavailable)", async () => {
+    const h = makeHost(false); // no templates store injected (e.g. a host that didn't wire the GUI)
+    const client = await connect(h.host);
+    const r = (await call(client, "list_templates")).data as { ok: boolean; code: string };
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("template-registry-unavailable");
+  });
+
+  it("register_templates is GUI-only; an AI client can't see it but CAN list/use what the GUI registered", async () => {
+    const store = new MemTemplateStore(); // ONE shared store, two connections
+    const gui = makeHost(false, store);
+    const ai = makeHost(true, store);
+    const guiClient = await connect(gui.host);
+    const aiClient = await connect(ai.host);
+    // tool surface differs by role
+    const guiTools = (await guiClient.listTools()).tools.map((t) => t.name);
+    const aiTools = (await aiClient.listTools()).tools.map((t) => t.name);
+    expect(guiTools).toContain("register_templates");
+    expect(aiTools).not.toContain("register_templates");
+    expect(aiTools).toContain("list_templates");
+    expect(aiTools).toContain("use_template");
+    // the GUI uploads; the AI sees it and can start from it
+    await call(guiClient, "register_templates", { templates: [{ id: "m1", name: "共有テンプレ", builtin: false, bytesBase64: templateB64 }] });
+    const seen = (await call(aiClient, "list_templates")).data as { templates: { id: string }[] };
+    expect(seen.templates.map((t) => t.id)).toEqual(["m1"]);
+    const used = (await call(aiClient, "use_template", { id: "m1", markdown: NEW_MD })).data as { docId: string; slideCount: number };
+    expect(used.docId).toBeTruthy();
+    expect(used.slideCount).toBeGreaterThan(1);
   });
 });

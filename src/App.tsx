@@ -132,6 +132,9 @@ export default function App() {
     deck,
     templateData,
     templateName,
+    // Upload the master registry to the host so a connecting AI can list_templates / use_template.
+    masters,
+    getMasterBytes,
   });
 
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
