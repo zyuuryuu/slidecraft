@@ -34,7 +34,7 @@ export default function App() {
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint,
-    handleAddSlide, handleDeleteSlide, handleDuplicateSlide,
+    handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef, collabRef,
@@ -262,7 +262,7 @@ export default function App() {
                 </div>
                 <div className="flex-1 min-h-0 bg-void">
                   <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
-                    onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} disabled={editLocked} />
+                    onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} onMove={handleMoveSlide} disabled={editLocked} />
                 </div>
               </>
             }

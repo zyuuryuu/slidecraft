@@ -12,7 +12,7 @@ import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
-import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt } from "../engine/deck-structure";
+import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -359,6 +359,18 @@ export function useDeckController() {
     setEditNotice(null);
   }, [deck, setDeck, setActiveSlide, setSelected, setEditNotice]);
 
+  // Drag-reorder: move slide `from` to position `to` (moveSlideTo = remove-then-insert; pure permutation,
+  // figures/layouts byte-identical). Selection follows the moved slide. Disabled while collab observe-only.
+  const handleMoveSlide = useCallback((from: number, to: number) => {
+    if (editLockedRef.current || !deck || from === to) return;
+    const next = moveSlideTo(deck, from, to);
+    if (next === deck) return; // out-of-range / no-op
+    setDeck(next, "commit");
+    setActiveSlide(to);
+    setSelected(new Set([to]));
+    setEditNotice(null);
+  }, [deck, setDeck, setActiveSlide, setSelected, setEditNotice]);
+
   // Deterministic "→表" in Edit (deck = source of truth): serialize the slide →
   // visualize key-value bullets → parse back → replace the slide (deck-op, undoable).
   // Reuses the same markdown lever as Import, so Initialize/Edit stay consistent.
@@ -617,7 +629,7 @@ export function useDeckController() {
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
-    handleAddSlide, handleDeleteSlide, handleDuplicateSlide,
+    handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
