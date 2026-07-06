@@ -100,12 +100,30 @@ async function extractDiagramShapes(
   return nestShapeXml(slideXml, groups);
 }
 
+/** Parse a base64 image data URI → bytes + ext + mime for OOXML media embedding. Returns null for a
+ *  non-base64 data URI or a path src (those aren't embedded — no <p:pic> is emitted for them). */
+function dataUriToImage(src: string): { bytes: Uint8Array; ext: string; mime: string } | null {
+  const m = src.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
+  if (!m) return null;
+  const mime = m[1].toLowerCase();
+  const sub = mime.slice("image/".length);
+  const ext = sub === "jpeg" ? "jpg" : sub === "svg+xml" ? "svg" : sub; // png/gif/webp/bmp pass through
+  try {
+    const bin = atob(m[2].replace(/\s/g, ""));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { bytes, ext, mime };
+  } catch {
+    return null;
+  }
+}
+
 // ── Build slide XML from layout placeholders + content ──
 
 async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
-): Promise<{ xml: string; mermaidImageRId: string | undefined }> {
+): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined }> {
   // A Mermaid block whose content is a NATIVE diagram type exports as native,
   // editable shapes (not a rasterised mermaid.js image) — matching the preview.
   if (slide.mermaidBlock && !slide.diagram) {
@@ -134,12 +152,13 @@ async function buildSlideXml(
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
   const codeBodyIdx = slide.code ? visualBody(slide.code.placeholderIdx)?.idx : undefined;
+  const imageBodyIdx = slide.image ? visualBody(slide.image.placeholderIdx)?.idx : undefined;
 
   let shapes = "";
   let id = 2;
 
   for (const ph of layout.placeholders) {
-    if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx) continue; // replaced by the visual
+    if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx || ph.idx === imageBodyIdx) continue; // replaced by the visual
     // A code/log block FILLS its body placeholder with monospace text (the placeholder's own
     // lstStyle supplies the monospace font / code-box styling — we only swap the text).
     if (ph.idx === codeBodyIdx) {
@@ -172,6 +191,28 @@ async function buildSlideXml(
         + `<p:nvPicPr><p:cNvPr id="${id}" name="MermaidImage"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
         + `<p:blipFill><a:blip r:embed="${mermaidImageRId}"/>`
         + `<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
+        + `<p:spPr><a:xfrm>`
+        + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
+        + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
+        + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
+        + `</p:pic>`;
+      id++;
+    }
+  }
+
+  // Add an embedded image (![alt](data URI)) as a <p:pic>; the bytes are written to the ZIP in the loop.
+  // Only base64 image data URIs embed — a path/other src is skipped (no dangling rId). Shares rId2 with
+  // mermaid, which is fine (a slide never has both — inserting an image strips other body figures).
+  let imageRId: string | undefined;
+  if (slide.image && imageBodyIdx && dataUriToImage(slide.image.src)) {
+    const phInfo = visualBody(slide.image.placeholderIdx);
+    if (phInfo) {
+      const s = phInfo.style;
+      const EMU = (inches: number) => Math.round(inches * 914400);
+      imageRId = "rId2";
+      shapes += `<p:pic>`
+        + `<p:nvPicPr><p:cNvPr id="${id}" name="Image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
+        + `<p:blipFill><a:blip r:embed="${imageRId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>`
         + `<p:spPr><a:xfrm>`
         + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
         + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
@@ -225,7 +266,7 @@ async function buildSlideXml(
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
     `</p:sld>`;
 
-  return { xml, mermaidImageRId };
+  return { xml, mermaidImageRId, imageRId };
 }
 
 function buildSlideRels(layoutIndex: number, imageRId?: string, imageTarget?: string): string {
@@ -276,6 +317,8 @@ export async function generatePptx(
   const sldIdEntries: string[] = [];
   const relEntries: string[] = [];
   const ctEntries: string[] = [];
+  const mediaDefaults = new Map<string, string>(); // ext → ContentType, added in the FINAL CT rebuild (an
+  // inline [Content_Types].xml write here would be clobbered by that rebuild, which reads the pristine CT).
   const slideIdBase = 256;
   // Catalog → layout selection adapts to THIS template (canonical = unchanged).
   const catalog = buildCatalog(template);
@@ -300,7 +343,7 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const { xml: slideXml, mermaidImageRId } = await buildSlideXml(layout, slide);
+    const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide);
 
     // Handle mermaid SVG → PNG image embedding (rasterized by the injected
     // UI-layer canvas rasterizer so the image matches the WYSIWYG preview).
@@ -310,16 +353,21 @@ export async function generatePptx(
       const imagePath = `ppt/media/mermaid${slideNum}.png`;
       zip.file(imagePath, pngData);
       imageTarget = `../media/mermaid${slideNum}.png`;
+      mediaDefaults.set("png", "image/png");
+    }
 
-      // Add content type for PNG if not already present
-      let ct = await zip.file("[Content_Types].xml")!.async("string");
-      if (!ct.includes('Extension="png"')) {
-        ct = ct.replace("</Types>", '<Default Extension="png" ContentType="image/png"/></Types>');
-        zip.file("[Content_Types].xml", ct);
+    // Embed a pasted/dropped image (data URI → media/image{N}.{ext} + Content-Type). Mutually exclusive
+    // with the mermaid branch (a slide has one body figure), so they share the rId2/imageTarget slot.
+    if (imageRId && slide.image) {
+      const img = dataUriToImage(slide.image.src);
+      if (img) {
+        zip.file(`ppt/media/image${slideNum}.${img.ext}`, img.bytes);
+        imageTarget = `../media/image${slideNum}.${img.ext}`;
+        mediaDefaults.set(img.ext, img.mime);
       }
     }
 
-    const slideRels = buildSlideRels(layout.index, mermaidImageRId, imageTarget);
+    const slideRels = buildSlideRels(layout.index, mermaidImageRId ?? imageRId, imageTarget);
 
     zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
     zip.file(
@@ -378,9 +426,15 @@ export async function generatePptx(
     /<Override\b[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g,
     "",
   );
+  // Default Content-Types for any embedded media (mermaid PNG / pasted images) not already declared —
+  // else PowerPoint rejects the image parts. Added HERE (not inline) so this rebuild can't clobber them.
+  const mediaDefaultXml = [...mediaDefaults]
+    .filter(([ext]) => !ct.includes(`Extension="${ext}"`))
+    .map(([ext, mime]) => `<Default Extension="${ext}" ContentType="${mime}"/>`)
+    .join("");
   ct = ct.replace(
     "</Types>",
-    `${ctEntries.join("")}</Types>`,
+    `${mediaDefaultXml}${ctEntries.join("")}</Types>`,
   );
   zip.file("[Content_Types].xml", ct);
 
