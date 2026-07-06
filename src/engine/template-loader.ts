@@ -529,8 +529,8 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   const idxs = new Set(slide.placeholders.map((p) => p.idx));
   const hasTitle = idxs.has("15");
   const hasCtrTitle = idxs.has("0");
-  // A diagram/mermaid/table/code occupies a body placeholder even though it isn't in `placeholders`.
-  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? slide.table?.placeholderIdx ?? slide.code?.placeholderIdx;
+  // A diagram/mermaid/table/code/image occupies a body placeholder even though it isn't in `placeholders`.
+  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? slide.table?.placeholderIdx ?? slide.code?.placeholderIdx ?? slide.image?.placeholderIdx;
   const hasBody = idxs.has("1") || visualIdx === "1";
   const hasIdx2 = idxs.has("2") || visualIdx === "2";
   const hasIdx3 = idxs.has("3") || visualIdx === "3";

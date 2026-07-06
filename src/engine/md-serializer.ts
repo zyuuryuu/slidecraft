@@ -83,6 +83,7 @@ function figureBlock(slide: SlideIR): string | null {
   if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
   if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
   if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
+  if (slide.image) return `![${slide.image.alt}](${slide.image.src})`;
   return null;
 }
 
@@ -160,7 +161,7 @@ function serializeSlide(
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
     // trailing table/code into the last column). So the separator branch requires no single-body figure.
     const sepType = slide.groupKind ?? getSeparatorType(layout);
-    const singleBodyFigure = !!(slide.table || slide.code);
+    const singleBodyFigure = !!(slide.table || slide.code || slide.image);
 
     if (sepType && !singleBodyFigure) {
       // Multi-section: each numbered region (column) becomes a section. A region may

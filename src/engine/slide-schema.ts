@@ -111,6 +111,16 @@ export const CodeBlockSchema = z.object({
 
 export type CodeBlock = z.infer<typeof CodeBlockSchema>;
 
+// ── Image block (embedded in a slide) ──
+
+export const ImageBlockSchema = z.object({
+  src: z.string(), // data URI (data:image/...;base64,…) — self-contained so the deck stays portable
+  alt: z.string().default(""),
+  placeholderIdx: z.string().default("1"), // which BODY region the image fills
+});
+
+export type ImageBlock = z.infer<typeof ImageBlockSchema>;
+
 // ── Single slide IR ──
 
 export const SlideIRSchema = z.object({
@@ -120,6 +130,7 @@ export const SlideIRSchema = z.object({
   mermaidBlock: MermaidBlockSchema.optional(), // embedded mermaid (raw syntax → SVG image in PPTX)
   table: TableBlockSchema.optional(), // embedded table (GFM Markdown → native OOXML table)
   code: CodeBlockSchema.optional(), // embedded code/log (```lang fence → monospace body)
+  image: ImageBlockSchema.optional(), // embedded image (![alt](data URI) → <img> / PPTX pic)
   groupKind: z.enum(["card", "step", "kpi"]).optional(), // `<!-- card/step/kpi -->` groups → layout hint
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),

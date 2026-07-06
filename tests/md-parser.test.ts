@@ -4,6 +4,24 @@
 
 import { describe, it, expect } from "vitest";
 import { parseMd } from "../src/engine/md-parser";
+import { serializeMd } from "../src/engine/md-serializer";
+
+describe("parseMd — image block", () => {
+  const DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+  it("parses a standalone ![alt](data-uri) into an image block on body region 1", () => {
+    const s = parseMd(`# 図解\n\n![社内フロー](${DATA_URI})`).slides[0];
+    expect(s.image).toEqual({ alt: "社内フロー", src: DATA_URI, placeholderIdx: "1" });
+    expect(s.placeholders.some((p) => p.idx === "15" || p.idx === "0")).toBe(true); // title still bound
+  });
+  it("round-trips: image → Markdown → image (src/alt preserved verbatim)", () => {
+    const md = `# 図解\n\n![社内フロー](${DATA_URI})`;
+    const round = parseMd(serializeMd(parseMd(md))).slides[0];
+    expect(round.image).toEqual({ alt: "社内フロー", src: DATA_URI, placeholderIdx: "1" });
+  });
+  it("a path src works too (parser is src-agnostic)", () => {
+    expect(parseMd(`# T\n\n![](assets/x.png)`).slides[0].image).toEqual({ alt: "", src: "assets/x.png", placeholderIdx: "1" });
+  });
+});
 
 describe("parseMd", () => {
   // ── Basic structure ──
