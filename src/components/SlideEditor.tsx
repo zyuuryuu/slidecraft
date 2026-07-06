@@ -176,16 +176,17 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
       slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
       slide.code && nthBody(bodyPhs, slide.code.placeholderIdx)?.idx,
-      slide.image && layout && imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx,
+      // A BEHIND image occupies no placeholder → don't suppress any field (the body text stays editable).
+      slide.image && !slide.image.behind && layout && imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx,
     ].filter((x): x is string => !!x),
   );
   // The concrete placeholder the image is bound to (role-resolved, as the preview/export do) — so the
   // form can say WHICH placeholder holds it, not just that an image exists. B: a real PICTURE frame
   // (type="pic") wins when the master has one; else it resolves to the body region as before.
-  const imagePh = slide.image && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
-  // Fine-tune geometry (案B): the manual rect override or the resolved frame box, edited via numeric
-  // fields with optional aspect-lock. Editing any field promotes the box to an explicit rect.
-  const imgBox = slide.image && imagePh ? imageRect(slide.image, imagePh) : undefined;
+  const imagePh = slide.image && !slide.image.behind && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
+  // Fine-tune geometry (案B): the manual rect override, else the resolved frame box (a behind image
+  // resolves to the full slide). Editing any field promotes the box to an explicit rect.
+  const imgBox = slide.image ? imageRect(slide.image, imagePh) : undefined;
   const imgAspect = slide.image ? imageAspectRatio(slide.image, imgBox) : undefined;
   const updateImageRect = (k: "x" | "y" | "w" | "h", val: number) => {
     if (!slide.image || !imgBox || !Number.isFinite(val)) return;
@@ -205,6 +206,16 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
     if (!slide.image) return;
     const img = { ...slide.image };
     delete img.rect;
+    onChange({ ...slide, image: img });
+  };
+  // Switch between a backmost layer (最背面, behind existing content, full-slide default) and a body
+  // figure that occupies its placeholder. Clears the manual rect so each mode gets its natural box.
+  const toggleImageBehind = () => {
+    if (!slide.image) return;
+    const img = { ...slide.image };
+    delete img.rect;
+    if (img.behind) delete img.behind;
+    else { img.behind = true; img.fit = "cover"; }
     onChange({ ...slide, image: img });
   };
 
@@ -327,9 +338,11 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
             <img src={slide.image.src} alt={slide.image.alt} className="w-16 h-12 object-contain bg-field rounded shrink-0" />
             <div className="flex-1 min-w-0 text-xs">
               <div className="text-fg2">🖼 画像{slide.image.alt ? ` — ${slide.image.alt}` : ""}</div>
-              {/* WHICH placeholder holds it (role-resolved). Falls back to the raw ordinal if no layout. */}
+              {/* WHERE it sits: a backmost layer (最背面, behind the content) or WHICH placeholder it fills. */}
               <div className="truncate text-faint" title="貼り付け/ドロップで差し替え">
-                {imagePh ? `→ ${getLabel(imagePh.idx, layout)}（idx ${imagePh.idx}）` : "貼り付け/ドロップで差し替え"}
+                {slide.image.behind
+                  ? "▤ 最背面レイヤー（既存の後ろ）"
+                  : imagePh ? `→ ${getLabel(imagePh.idx, layout)}（idx ${imagePh.idx}）` : "貼り付け/ドロップで差し替え"}
               </div>
             </div>
             <button
@@ -361,6 +374,14 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
               <span>inch</span>
               <button
                 type="button"
+                onClick={toggleImageBehind}
+                title={slide.image.behind ? "本文枠に配置し直す（前面）" : "最背面レイヤーにする（既存を壊さず後ろに敷く）"}
+                className={`px-1.5 py-0.5 rounded border ${slide.image.behind ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"}`}
+              >
+                {slide.image.behind ? "▤ 最背面" : "▤ 本文枠"}
+              </button>
+              <button
+                type="button"
                 onClick={toggleImageFit}
                 title="contain=全体を余白付きで / cover=枠いっぱいに切り抜き"
                 className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
@@ -375,10 +396,10 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 <button
                   type="button"
                   onClick={resetImageRect}
-                  title="枠いっぱいに戻す（手動調整を解除）"
+                  title={slide.image.behind ? "全面に戻す（手動調整を解除）" : "枠いっぱいに戻す（手動調整を解除）"}
                   className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
                 >
-                  ⟲ 枠にリセット
+                  {slide.image.behind ? "⟲ 全面に戻す" : "⟲ 枠にリセット"}
                 </button>
               )}
             </div>

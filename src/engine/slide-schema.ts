@@ -130,6 +130,10 @@ export const ImageBlockSchema = z.object({
   rect: ImageRectSchema.optional(), // manual size/position override (inches); absent = fill placeholder box
   fit: z.enum(["contain", "cover"]).optional(), // contain (default, letterbox) | cover (fill + crop)
   aspect: z.number().optional(), // intrinsic w/h, measured at insert — enables aspect-lock + correct cover crop
+  // BACKMOST layer: render the image BEHIND all placeholder shapes (a <p:pic> at the front of the
+  // spTree — NOT the slide background <p:bg>) so existing text/figures stay on top and aren't replaced.
+  // Absent/false = a body figure that occupies its placeholder (the default). Defaults to the full slide.
+  behind: z.boolean().optional(),
 });
 
 export type ImageBlock = z.infer<typeof ImageBlockSchema>;

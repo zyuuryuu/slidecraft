@@ -83,8 +83,15 @@ function figureBlock(slide: SlideIR): string | null {
   if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
   if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
   if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
-  if (slide.image) return `![${slide.image.alt}](${slide.image.src})${imageAttrs(slide.image)}`;
+  // A BEHIND image is a backmost layer, not a body figure — it does NOT occupy the body region, so it
+  // is emitted SEPARATELY (behindImageLine) alongside the text/figure, never replacing them.
+  if (slide.image && !slide.image.behind) return imageLine(slide.image);
   return null;
+}
+
+/** The `![alt](src){…}` line for an image (shared by the body-figure and the behind-layer paths). */
+function imageLine(image: NonNullable<SlideIR["image"]>): string {
+  return `![${image.alt}](${image.src})${imageAttrs(image)}`;
 }
 
 /** Serialize an image's geometry override as a `{x=…,y=…,w=…,h=…,fit=…,ar=…}` suffix (案B), or "" when
@@ -96,6 +103,7 @@ function imageAttrs(image: NonNullable<SlideIR["image"]>): string {
   if (image.rect) parts.push(`x=${n(image.rect.x)}`, `y=${n(image.rect.y)}`, `w=${n(image.rect.w)}`, `h=${n(image.rect.h)}`);
   if (image.fit) parts.push(`fit=${image.fit}`);
   if (image.aspect !== undefined) parts.push(`ar=${n(image.aspect)}`);
+  if (image.behind) parts.push("behind=1");
   return parts.length ? `{${parts.join(",")}}` : "";
 }
 
@@ -173,7 +181,7 @@ function serializeSlide(
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
     // trailing table/code into the last column). So the separator branch requires no single-body figure.
     const sepType = slide.groupKind ?? getSeparatorType(layout);
-    const singleBodyFigure = !!(slide.table || slide.code || slide.image);
+    const singleBodyFigure = !!(slide.table || slide.code || (slide.image && !slide.image.behind));
 
     if (sepType && !singleBodyFigure) {
       // Multi-section: each numbered region (column) becomes a section. A region may
@@ -226,6 +234,13 @@ function serializeSlide(
         }
       }
     }
+  }
+
+  // A BEHIND image is emitted last, on its own line — it's a backmost LAYER, not the body figure, so it
+  // coexists with (never replaces) the title/body/figure above. The parser re-reads it into slide.image.
+  if (slide.image?.behind) {
+    lines.push("");
+    lines.push(imageLine(slide.image));
   }
 
   return lines.join("\n");

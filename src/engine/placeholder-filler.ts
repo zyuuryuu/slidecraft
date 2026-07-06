@@ -152,11 +152,39 @@ async function buildSlideXml(
   const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
   const codeBodyIdx = slide.code ? visualBody(slide.code.placeholderIdx)?.idx : undefined;
-  // An image prefers a PICTURE frame (else the Nth body) — the diagram/table path stays body-only.
-  const imageBodyIdx = slide.image ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx : undefined;
+  // A BEHIND image is a backmost LAYER — not bound to a placeholder, so imageBodyIdx is undefined and
+  // NO placeholder is skipped (existing content stays on top). A normal image prefers a PICTURE frame.
+  const imageBehind = !!slide.image?.behind;
+  const imageBodyIdx = slide.image && !imageBehind ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx : undefined;
+
+  // Embedded-image geometry + rId, shared by the behind (backmost) and front placements. A behind
+  // backdrop fills the slide (imageRect default); a body image rides its picture/body frame. It takes
+  // rId3 when a mermaid PNG already holds rId2 (both can appear on a behind slide), else rId2.
+  const mermaidImageRId = slide.mermaidBlock?.svgCache && visualBody(slide.mermaidBlock.placeholderIdx) ? "rId2" : undefined;
+  const imageData = slide.image ? dataUriToImage(slide.image.src) : undefined;
+  const imageBox = imageData && (imageBehind || imageBodyIdx)
+    ? imageRect(slide.image!, imageBehind ? undefined : imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx))
+    : undefined;
+  const imageRId = imageBox ? (mermaidImageRId ? "rId3" : "rId2") : undefined;
+  const buildImagePic = (shapeId: number): string => {
+    // Fit the image into its box the same way the browser preview does (contain/cover) so preview and
+    // export agree — the manual rect / full-slide backdrop / placeholder box, then the aspect math.
+    const { rect: r, srcRect: cr } = fitImageInBox(imageBox!, slide.image!.fit, slide.image!.aspect);
+    const EMU = (inches: number) => Math.round(inches * 914400);
+    const srcRectXml = cr
+      ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`
+      : "";
+    return `<p:pic>`
+      + `<p:nvPicPr><p:cNvPr id="${shapeId}" name="Image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
+      + `<p:blipFill><a:blip r:embed="${imageRId}"/>${srcRectXml}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
+      + `<p:spPr><a:xfrm><a:off x="${EMU(r.x)}" y="${EMU(r.y)}"/><a:ext cx="${EMU(r.w)}" cy="${EMU(r.h)}"/></a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
+      + `</p:pic>`;
+  };
 
   let shapes = "";
   let id = 2;
+  // Backmost: the behind backdrop paints FIRST — before the placeholder shapes — never as <p:bg>.
+  if (imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
 
   for (const ph of layout.placeholders) {
     if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx || ph.idx === imageBodyIdx) continue; // replaced by the visual
@@ -179,55 +207,25 @@ async function buildSlideXml(
     id++;
   }
 
-  // Add mermaid image placeholder if present
-  // The actual image is added to the ZIP separately; here we add a <p:pic> reference
-  let mermaidImageRId: string | undefined;
-  if (slide.mermaidBlock?.svgCache) {
-    const phInfo = visualBody(slide.mermaidBlock.placeholderIdx);
-    if (phInfo) {
-      const s = phInfo.style;
-      const EMU = (inches: number) => Math.round(inches * 914400);
-      mermaidImageRId = "rId2"; // rId1 is slideLayout
-      shapes += `<p:pic>`
-        + `<p:nvPicPr><p:cNvPr id="${id}" name="MermaidImage"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
-        + `<p:blipFill><a:blip r:embed="${mermaidImageRId}"/>`
-        + `<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
-        + `<p:spPr><a:xfrm>`
-        + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
-        + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
-        + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
-        + `</p:pic>`;
-      id++;
-    }
+  // Mermaid SVG → PNG <p:pic> in its body region (a front figure; the bytes are written to the ZIP in
+  // the export loop). rId hoisted above so a behind image can take a distinct rId.
+  if (mermaidImageRId) {
+    const s = visualBody(slide.mermaidBlock!.placeholderIdx)!.style;
+    const EMU = (inches: number) => Math.round(inches * 914400);
+    shapes += `<p:pic>`
+      + `<p:nvPicPr><p:cNvPr id="${id}" name="MermaidImage"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
+      + `<p:blipFill><a:blip r:embed="${mermaidImageRId}"/>`
+      + `<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
+      + `<p:spPr><a:xfrm>`
+      + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
+      + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
+      + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
+      + `</p:pic>`;
+    id++;
   }
 
-  // Add an embedded image (![alt](data URI)) as a <p:pic>; the bytes are written to the ZIP in the loop.
-  // Only base64 image data URIs embed — a path/other src is skipped (no dangling rId). Shares rId2 with
-  // mermaid, which is fine (a slide never has both — inserting an image strips other body figures).
-  let imageRId: string | undefined;
-  if (slide.image && imageBodyIdx && dataUriToImage(slide.image.src)) {
-    const phInfo = imagePlaceholder(layout.placeholders, slide.image.placeholderIdx);
-    const box = imageRect(slide.image, phInfo);
-    if (box) {
-      // Fit the image into its box the same way the browser preview does (contain/cover) so preview
-      // and export agree — the manual rect (案B) or the placeholder box, then the aspect math.
-      const { rect: r, srcRect: cr } = fitImageInBox(box, slide.image.fit, slide.image.aspect);
-      const EMU = (inches: number) => Math.round(inches * 914400);
-      const srcRectXml = cr
-        ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`
-        : "";
-      imageRId = "rId2";
-      shapes += `<p:pic>`
-        + `<p:nvPicPr><p:cNvPr id="${id}" name="Image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
-        + `<p:blipFill><a:blip r:embed="${imageRId}"/>${srcRectXml}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
-        + `<p:spPr><a:xfrm>`
-        + `<a:off x="${EMU(r.x)}" y="${EMU(r.y)}"/>`
-        + `<a:ext cx="${EMU(r.w)}" cy="${EMU(r.h)}"/>`
-        + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
-        + `</p:pic>`;
-      id++;
-    }
-  }
+  // A NON-behind image paints LAST (in front) in its picture/body frame.
+  if (!imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
 
   // Add diagram shapes if present
   if (slide.diagram) {
@@ -276,7 +274,7 @@ async function buildSlideXml(
   return { xml, mermaidImageRId, imageRId };
 }
 
-function buildSlideRels(layoutIndex: number, imageRId?: string, imageTarget?: string): string {
+function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: string }[] = []): string {
   let rels =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
@@ -284,10 +282,10 @@ function buildSlideRels(layoutIndex: number, imageRId?: string, imageTarget?: st
     ` Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"` +
     ` Target="../slideLayouts/slideLayout${layoutIndex}.xml"/>`;
 
-  if (imageRId && imageTarget) {
-    rels += `<Relationship Id="${imageRId}"` +
+  for (const { rId, target } of imageRels) {
+    rels += `<Relationship Id="${rId}"` +
       ` Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"` +
-      ` Target="${imageTarget}"/>`;
+      ` Target="${target}"/>`;
   }
 
   rels += `</Relationships>`;
@@ -352,29 +350,25 @@ export async function generatePptx(
     // Build slide XML
     const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide);
 
-    // Handle mermaid SVG → PNG image embedding (rasterized by the injected
-    // UI-layer canvas rasterizer so the image matches the WYSIWYG preview).
-    let imageTarget: string | undefined;
+    // Embed each referenced image with its OWN rId (a behind backdrop can coexist with a mermaid PNG,
+    // so they no longer share one slot). Mermaid SVG→PNG is rasterized by the injected UI-layer canvas.
+    const imageRels: { rId: string; target: string }[] = [];
     if (mermaidImageRId && slide.mermaidBlock?.svgCache && rasterizeSvg) {
       const pngData = await rasterizeSvg(slide.mermaidBlock.svgCache);
-      const imagePath = `ppt/media/mermaid${slideNum}.png`;
-      zip.file(imagePath, pngData);
-      imageTarget = `../media/mermaid${slideNum}.png`;
+      zip.file(`ppt/media/mermaid${slideNum}.png`, pngData);
       mediaDefaults.set("png", "image/png");
+      imageRels.push({ rId: mermaidImageRId, target: `../media/mermaid${slideNum}.png` });
     }
-
-    // Embed a pasted/dropped image (data URI → media/image{N}.{ext} + Content-Type). Mutually exclusive
-    // with the mermaid branch (a slide has one body figure), so they share the rId2/imageTarget slot.
     if (imageRId && slide.image) {
       const img = dataUriToImage(slide.image.src);
       if (img) {
         zip.file(`ppt/media/image${slideNum}.${img.ext}`, img.bytes);
-        imageTarget = `../media/image${slideNum}.${img.ext}`;
         mediaDefaults.set(img.ext, img.mime);
+        imageRels.push({ rId: imageRId, target: `../media/image${slideNum}.${img.ext}` });
       }
     }
 
-    const slideRels = buildSlideRels(layout.index, mermaidImageRId ?? imageRId, imageTarget);
+    const slideRels = buildSlideRels(layout.index, imageRels);
 
     zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
     zip.file(

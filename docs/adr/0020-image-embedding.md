@@ -48,6 +48,17 @@
 - **レイアウト選択（保留分の同梱）**：画像スライドは `pickLayout`/`suggestLayouts` の `hasImage` で **pic 枠を持つレイアウトを自動優先**（text の picture-body 回避は不変＝回帰なし）。
 - コード：`placeholder-binding`（imageRect/imageAspectRatio/fitImageInBox/dragImageRect）・`placeholder-filler`（<p:pic> rect+srcRect）・`SlidePreview`（drag/resize）・`SlideEditor`（数値フォーム）・`template-catalog`/`template-loader`（hasImage）・`useDeckController`/`App`（挿入+実測+commit）。テスト：`image-geometry.test.ts`・`image-placeholder.test.ts`・e2e `image: dragging …`。多エージェント敵対レビューで確定した 2 実バグ（フォームのゼロ/負・aspect fallback の preview/form 乖離）を修正。
 
+## 追記（2026-07-06）: 最背面レイヤー（既存を壊さない挿入）
+
+画像挿入が本文プレースホルダを**置換**して既存内容を壊す問題。ユーザ要望で**最背面レイヤー**モードを追加。
+
+- **schema（R4・ユーザ選択で承認）**：`ImageBlock` に `behind?:boolean`。true＝プレースホルダを占めない backmost レイヤー（スライド背景 `<p:bg>` ではなく `<p:pic>`）。既定は全面（`SLIDE_IN`）、案B の rect/fit/aspect と併用可。
+- **挿入の既定**：`handleInsertImage` は対象スライドに**可視テキスト or 図があれば behind**（既存を保持＝図も消さない・layout 据置）、**空なら従来の本文図**（layout auto・他図置換）。フォームの「▤最背面⇄本文枠」トグルでいつでも切替。
+- **z-order**：PPTX は behind の `<p:pic>` を spTree の**先頭**に emit（＝最背面）、`imageBodyIdx` は undefined でプレースホルダ非スキップ。プレビューも placeholder map の**前**に描画。mermaid PNG と共存できるよう rId 共有をやめ `buildSlideRels({rId,target}[])` 化（behind＋mermaid＝rId2/rId3）。
+- **編集**：behind の全面画像はハンドルが content 下に隠れるため preview ドラッグ非対応＝**フォームの数値（X/Y/W/H）**で調整。本文図はドラッグ/リサイズ（段階2）継続。
+- **Markdown**：`{behind=1}` サフィックスで往復。behind 画像は本文/図を占めず別行で emit（`imageLine`）、grouped（card/step/kpi）スライドでも `matchImageLine` で section 分割前に抽出（最終カラムに吸収されない — 敵対レビューで発見・修正）。
+- コード：`slide-schema`（behind）・`md-slide-parser`（parse/grouped 抽出）・`md-serializer`（別行 emit）・`placeholder-binding`（imageRect/SLIDE_IN）・`placeholder-filler`（z-order/rId）・`SlidePreview`（backmost 描画）・`SlideEditor`（トグル）・`useDeckController`（挿入判定）。テスト：`tests/image-behind.test.ts`（往復/共存/z-order/全面）・e2e（非破壊 drop）。16エージェント敵対レビューで確定 3件（grouped return 欠落＝往復消失〔独立発見・修正〕／型注釈／table-in-column は既存制約で範囲外）を反映。
+
 ## References
 
 - コード：`slide-schema.ts`（ImageBlock）・`md-slide-parser.ts`/`md-serializer.ts`（往復）・`SlidePreview.tsx`（`<img>`）・`placeholder-filler.ts`（`dataUriToImage`/`<p:pic>`/media/CT）・`template-loader.ts`（visualIdx）・`useDeckController.ts`（handleInsertImage）・`App.tsx`（paste＋file-drop）

@@ -258,8 +258,12 @@ export function imagePlaceholder(
  * fine-tuned it (案B), else the bound placeholder's box (the default). Shared by preview + export so
  * a fine-tuned image lands identically in both (WYSIWYG). Undefined when neither is available. Pure.
  */
+/** 16:9 slide size in inches (12192000×6858000 EMU) — the default box for a full-slide backdrop. */
+export const SLIDE_IN = { w: 12192000 / 914400, h: 6858000 / 914400 };
+
 export function imageRect(image: ImageBlock, ph: PlaceholderInfo | undefined): ImageRect | undefined {
   if (image.rect) return image.rect;
+  if (image.behind) return { x: 0, y: 0, w: SLIDE_IN.w, h: SLIDE_IN.h }; // backmost layer fills the slide
   if (!ph) return undefined;
   return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
 }

@@ -138,8 +138,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
   const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
   const codeBodyIdx = slide.code ? nthBody(bodyPhs, slide.code.placeholderIdx)?.idx : undefined;
-  // An image prefers a PICTURE frame (else the Nth body) — resolved the same way as the export.
-  const imageBodyIdx = slide.image ? imagePlaceholder(layoutPhs, slide.image.placeholderIdx)?.idx : undefined;
+  // An image prefers a PICTURE frame (else the Nth body). A BEHIND image binds to NO placeholder
+  // (it's a backmost layer) → undefined, so it doesn't suppress any placeholder's content.
+  const imageBodyIdx = slide.image && !slide.image.behind ? imagePlaceholder(layoutPhs, slide.image.placeholderIdx)?.idx : undefined;
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
@@ -149,6 +150,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
   const [dragRect, setDragRect] = useState<ImageRect | null>(null);
   const dragRef = useRef<{ mode: "move" | "nw" | "ne" | "sw" | "se"; sx: number; sy: number; base: ImageRect; latest: ImageRect; moved: boolean } | null>(null);
   const imgWrapRef = useRef<HTMLDivElement | null>(null);
+  // Preview drag/resize handles are for a BODY-FIGURE image. A BEHIND backdrop's handles would sit
+  // UNDER the content (unreachable), so it is fine-tuned via the form's numeric X/Y/W/H instead.
   const imgEditable = !!(isActive && onImageRectChange && slide.image && imageBodyIdx);
   // Aspect to preserve on resize — the SHARED helper (imageAspectRatio) so preview drag and the form
   // lock to the identical ratio (WYSIWYG on resize too). Uses the bound placeholder box as the fallback.
@@ -176,6 +179,50 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
     (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     if (d.moved) onImageRectChange!(d.latest);
     setDragRect(null);
+  };
+  // The image box (drag-move + corner-resize when editable). Shared by the inline body-figure render and
+  // the behind (backmost) layer so both look/behave identically. `resolved` = the committed rect (live
+  // drag overrides it). object-fit mirrors the PPTX aspect math (fitImageInBox) so preview == export.
+  const renderImageBox = (resolved: ImageRect) => {
+    const img = slide.image!;
+    const box = dragRect ?? resolved;
+    const HANDLES: { c: "nw" | "ne" | "sw" | "se"; cursor: string; pos: React.CSSProperties }[] = [
+      { c: "nw", cursor: "nwse-resize", pos: { left: -5, top: -5 } },
+      { c: "ne", cursor: "nesw-resize", pos: { right: -5, top: -5 } },
+      { c: "sw", cursor: "nesw-resize", pos: { left: -5, bottom: -5 } },
+      { c: "se", cursor: "nwse-resize", pos: { right: -5, bottom: -5 } },
+    ];
+    return (
+      <div
+        key="image-layer"
+        ref={imgWrapRef}
+        onPointerDown={imgEditable ? beginImageDrag("move", resolved) : undefined}
+        onPointerMove={imgEditable ? onImagePointerMove : undefined}
+        onPointerUp={imgEditable ? endImageDrag : undefined}
+        style={{
+          position: "absolute",
+          left: `${(box.x / SLIDE_W) * 100}%`,
+          top: `${(box.y / SLIDE_H) * 100}%`,
+          width: `${(box.w / SLIDE_W) * 100}%`,
+          height: `${(box.h / SLIDE_H) * 100}%`,
+          cursor: imgEditable ? "move" : undefined,
+          touchAction: imgEditable ? "none" : undefined,
+          outline: imgEditable ? "1px solid rgba(59,130,246,0.7)" : undefined,
+        }}
+      >
+        <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+          <img src={img.src} alt={img.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: img.fit === "cover" ? "cover" : "contain", pointerEvents: "none" }} />
+        </div>
+        {imgEditable && HANDLES.map((h) => (
+          <div
+            key={h.c}
+            data-image-handle={h.c}
+            onPointerDown={beginImageDrag(h.c, resolved)}
+            style={{ position: "absolute", width: 9, height: 9, background: "#3B82F6", border: "1px solid #fff", borderRadius: 2, cursor: h.cursor, ...h.pos }}
+          />
+        ))}
+      </div>
+    );
   };
 
   // Background = the LAYOUT's own <p:bg> fill if it has one (e.g. a full-bleed cover panel),
@@ -245,6 +292,10 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
           </div>
         );
       })}
+
+      {/* BEHIND (最背面) image: a backmost layer painted AFTER the master/layout decorations but BEFORE
+          the placeholder shapes, so existing title/body/figures stay on top (never the slide bg). */}
+      {slide.image?.behind && renderImageBox(imageRect(slide.image, undefined)!)}
 
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {
@@ -382,49 +433,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
           );
         }
 
-        // Image (![alt](data URI)) → <img> in its box: the live drag rect, else the manual rect (案B),
-        // else the placeholder box. object-fit mirrors the PPTX aspect math (fitImageInBox) so preview
-        // == export. When editable (active single-slide view), the box is drag-move + corner-resize.
+        // Image (![alt](data URI)) as a BODY figure → rendered in its (dragged/manual/placeholder) box.
+        // A BEHIND image is NOT rendered here (imageBodyIdx is undefined for it) — it's drawn as a
+        // backmost layer BEFORE this map so existing content stays on top.
         if (slide.image && ph.idx === imageBodyIdx) {
-          const resolved = imageRect(slide.image, ph) ?? s;
-          const box = dragRect ?? resolved;
-          const HANDLES: { c: "nw" | "ne" | "sw" | "se"; cursor: string; pos: React.CSSProperties }[] = [
-            { c: "nw", cursor: "nwse-resize", pos: { left: -5, top: -5 } },
-            { c: "ne", cursor: "nesw-resize", pos: { right: -5, top: -5 } },
-            { c: "sw", cursor: "nesw-resize", pos: { left: -5, bottom: -5 } },
-            { c: "se", cursor: "nwse-resize", pos: { right: -5, bottom: -5 } },
-          ];
-          return (
-            <div
-              key={`image-${ph.idx}`}
-              ref={imgWrapRef}
-              onPointerDown={imgEditable ? beginImageDrag("move", resolved) : undefined}
-              onPointerMove={imgEditable ? onImagePointerMove : undefined}
-              onPointerUp={imgEditable ? endImageDrag : undefined}
-              style={{
-                position: "absolute",
-                left: `${(box.x / SLIDE_W) * 100}%`,
-                top: `${(box.y / SLIDE_H) * 100}%`,
-                width: `${(box.w / SLIDE_W) * 100}%`,
-                height: `${(box.h / SLIDE_H) * 100}%`,
-                cursor: imgEditable ? "move" : undefined,
-                touchAction: imgEditable ? "none" : undefined,
-                outline: imgEditable ? "1px solid rgba(59,130,246,0.7)" : undefined,
-              }}
-            >
-              <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-                <img src={slide.image.src} alt={slide.image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: slide.image.fit === "cover" ? "cover" : "contain", pointerEvents: "none" }} />
-              </div>
-              {imgEditable && HANDLES.map((h) => (
-                <div
-                  key={h.c}
-                  data-image-handle={h.c}
-                  onPointerDown={beginImageDrag(h.c, resolved)}
-                  style={{ position: "absolute", width: 9, height: 9, background: "#3B82F6", border: "1px solid #fff", borderRadius: 2, cursor: h.cursor, ...h.pos }}
-                />
-              ))}
-            </div>
-          );
+          return renderImageBox(imageRect(slide.image, ph) ?? s);
         }
 
         const content = contentFor.get(ph.idx);
