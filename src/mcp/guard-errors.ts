@@ -10,11 +10,17 @@ export type GuardCode =
   | "project-not-opened"
   | "index-out-of-range"
   | "host-mode-required"
-  | "document-not-selected";
+  | "document-not-selected"
+  | "template-registry-unavailable" // list/use_template: no GUI registry injected (→ create_template)
+  | "unknown-template"; // use_template: the id isn't in the registry (→ list_templates)
 
 export class GuardError extends Error {
-  constructor(message: string, public readonly code: GuardCode) {
+  // Explicit field (not a `public readonly code` parameter property): parameter properties emit
+  // runtime code, which erasableSyntaxOnly (tsconfig.app/mcp) forbids (TS1294).
+  readonly code: GuardCode;
+  constructor(message: string, code: GuardCode) {
     super(message);
+    this.code = code;
     this.name = "GuardError";
     // Restore the prototype chain so `instanceof GuardError` holds after transpilation.
     Object.setPrototypeOf(this, GuardError.prototype);
