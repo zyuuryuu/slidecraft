@@ -21,8 +21,12 @@ interface AiPanelProps {
   /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string, instruction?: string) => void;
   /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings).
-   *  `beforeMd` overrides the diff's LEFT side (a figure edit diffs the figure source, not the slide). */
-  onPreviewSlideEdit?: (raw: string, instruction?: string) => { afterMd: string; warnings: string[]; beforeMd?: string } | null;
+   *  `beforeMd` overrides the diff's LEFT side (a figure edit diffs the figure source, not the slide).
+   *  `shouldRetry`/`retryInstruction` drive Option A's single ops-bias auto-retry (ADR-0019 ①). */
+  onPreviewSlideEdit?: (
+    raw: string,
+    instruction?: string,
+  ) => { afterMd: string; warnings: string[]; beforeMd?: string; shouldRetry?: boolean; retryInstruction?: string } | null;
   /** Focused slide number (1-based) + how many are selected, for the scope indicator. */
   activeSlideNum?: number;
   selectedCount?: number;
