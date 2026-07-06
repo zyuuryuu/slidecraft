@@ -173,6 +173,33 @@ test.describe("SlideCraft", () => {
     await expect(page.getByText(/→.*idx \d/)).toBeVisible(); // …and WHICH placeholder holds it (role-resolved binding)
   });
 
+  test("image: dragging it on the preview moves the box (pointer, not HTML5 DnD)", async ({ page }) => {
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], "x.png", { type: "image/png" }));
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+    // The active-slide preview shows the image box WITH resize handles (editable). Grab the box = a handle's parent.
+    const handle = page.locator('[data-image-handle="se"]');
+    await expect(handle).toBeVisible({ timeout: 5000 });
+    const box = handle.locator("xpath=..");
+    const before = (await box.boundingBox())!;
+    // POINTER drag (native HTML5 DnD is unreliable in Tauri webviews): press the box body, move past the
+    // 3px threshold in steps, release → onImageRectChange commits the new rect and the box re-renders moved.
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(before.x + before.width / 2 - 70, before.y + before.height / 2 - 45, { steps: 12 });
+    await page.mouse.up();
+    await expect(async () => {
+      const after = (await box.boundingBox())!;
+      expect(after.x).toBeLessThan(before.x - 5); // the image moved left
+      expect(after.y).toBeLessThan(before.y - 5); // …and up
+    }).toPass({ timeout: 3000 });
+  });
+
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark"); // default

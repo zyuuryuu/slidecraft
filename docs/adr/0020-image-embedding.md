@@ -37,6 +37,17 @@
 - 束ねる canonical/報告書テンプレは `type="pic"` ゼロ → **全て no-op（byte-identical）**。B が効くのは pic 枠を持つ**インポート master**（velis「Two Columns, Picture Right」等）。テストは実 fixture（velis）で pic バインド＋`<p:pic>` の EMU 幾何一致を検証。
 - コード: `placeholder-binding.imagePlaceholder` ＋ `placeholder-filler`・`SlidePreview`・`SlideEditor`（3箇所を同 resolver に統一）。テスト: `tests/image-placeholder.test.ts`。
 
+## 追記（2026-07-06）: 画像のサイズ・位置微調整（案B）
+
+画像は既定で「枠いっぱい」だった。ユーザ要望で**手動ジオメトリ上書き**を追加＝枠任せから正確な位置・サイズへ。
+
+- **schema（R4・ユーザが選択で承認）**：`ImageBlock` に `rect{x,y,w,h}`(inch)・`fit`("contain"|"cover")・`aspect`(内在 w/h) を optional 追加。無指定は従来どおり枠バインド。
+- **共有解決**：`imageRect(image,ph)=rect ?? 枠box`、`imageAspectRatio(image,box)`（**プレビュー drag と フォームが同一比でロックする単一の真実**＝両者が別々に fallback を書いて食い違った不具合の根治）、`fitImageInBox` が contain=レターボックス / cover=`<a:srcRect>` クロップ を PPTX 側でも算出しブラウザ `object-fit` と一致（WYSIWYG on resize）。EMU=round(inch×914400)。
+- **Markdown**：`![alt](src){x=,y=,w=,h=,fit=,ar=}` サフィックスでロスレス往復（属性無しは素の記法・非汚染）。
+- **UX**：フォーム＝X/Y/W/H 数値＋縦横比固定＋contain/cover＋枠にリセット（W/H は正・X/Y は非負にクランプ）。プレビュー＝**pointer** でドラッグ移動＋角ハンドルのリサイズ（native DnD 不可・[[dnd_pointer_not_html5]]／ドラッグ中は local rect、pointerup で1コミット＝undo 1件）。挿入時に `naturalWidth/Height` で `aspect` を実測。
+- **レイアウト選択（保留分の同梱）**：画像スライドは `pickLayout`/`suggestLayouts` の `hasImage` で **pic 枠を持つレイアウトを自動優先**（text の picture-body 回避は不変＝回帰なし）。
+- コード：`placeholder-binding`（imageRect/imageAspectRatio/fitImageInBox/dragImageRect）・`placeholder-filler`（<p:pic> rect+srcRect）・`SlidePreview`（drag/resize）・`SlideEditor`（数値フォーム）・`template-catalog`/`template-loader`（hasImage）・`useDeckController`/`App`（挿入+実測+commit）。テスト：`image-geometry.test.ts`・`image-placeholder.test.ts`・e2e `image: dragging …`。多エージェント敵対レビューで確定した 2 実バグ（フォームのゼロ/負・aspect fallback の preview/form 乖離）を修正。
+
 ## References
 
 - コード：`slide-schema.ts`（ImageBlock）・`md-slide-parser.ts`/`md-serializer.ts`（往復）・`SlidePreview.tsx`（`<img>`）・`placeholder-filler.ts`（`dataUriToImage`/`<p:pic>`/media/CT）・`template-loader.ts`（visualIdx）・`useDeckController.ts`（handleInsertImage）・`App.tsx`（paste＋file-drop）

@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
-import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, applyFieldEdit } from "../engine/placeholder-binding";
+import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, applyFieldEdit } from "../engine/placeholder-binding";
 import { groupEditorPlan } from "../engine/group-binding";
 import DiagramEditor from "./DiagramEditor";
 
@@ -186,13 +186,16 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   // Fine-tune geometry (案B): the manual rect override or the resolved frame box, edited via numeric
   // fields with optional aspect-lock. Editing any field promotes the box to an explicit rect.
   const imgBox = slide.image && imagePh ? imageRect(slide.image, imagePh) : undefined;
-  const imgAspect = slide.image?.aspect ?? (imgBox && imgBox.h ? imgBox.w / imgBox.h : undefined);
+  const imgAspect = slide.image ? imageAspectRatio(slide.image, imgBox) : undefined;
   const updateImageRect = (k: "x" | "y" | "w" | "h", val: number) => {
     if (!slide.image || !imgBox || !Number.isFinite(val)) return;
-    let next = { ...(slide.image.rect ?? imgBox), [k]: val };
+    // W/H must stay positive and X/Y non-negative — a 0/negative dimension makes the image invisible in
+    // preview AND emits a broken 0×0 <p:pic> (the drag path already guards this via dragImageRect's MIN).
+    const v = k === "w" || k === "h" ? Math.max(0.1, val) : Math.max(0, val);
+    let next = { ...(slide.image.rect ?? imgBox), [k]: v };
     if (aspectLock && imgAspect && imgAspect > 0) {
-      if (k === "w") next = { ...next, h: val / imgAspect };
-      else if (k === "h") next = { ...next, w: val * imgAspect };
+      if (k === "w") next = { ...next, h: v / imgAspect };
+      else if (k === "h") next = { ...next, w: v * imgAspect };
     }
     onChange({ ...slide, image: { ...slide.image, rect: next } });
   };
@@ -348,6 +351,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                   <input
                     type="number"
                     step="0.05"
+                    min={k === "w" || k === "h" ? 0.1 : 0}
                     value={Number(imgBox[k].toFixed(2))}
                     onChange={(e) => updateImageRect(k, e.target.valueAsNumber)}
                     className="w-14 px-1 py-0.5 bg-field border border-edge rounded text-fg text-[10px]"
