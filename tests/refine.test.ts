@@ -136,6 +136,21 @@ describe("batchEditDeck (multi-select)", () => {
     expect(r.changes.every((c) => c.lever === "edit" && c.kind === "ai")).toBe(true);
   });
 
+  it("best-of-N picks the candidate that keeps numbers (fewest fact drift) — free-form scoring", async () => {
+    const NUM_DECK = "# 表紙\n\n---\n\n# 売上\n\n- 売上は100万円で好調";
+    const seen: number[] = [];
+    const aiFix = async (_req: string, meta: { candidate?: number }) => {
+      seen.push(meta.candidate ?? -1);
+      return meta.candidate === 0
+        ? { ok: true as const, markdown: "# 売上\n\n- 好調" }           // dropped 100 → fact drift
+        : { ok: true as const, markdown: "# 売上\n\n- 100万円で好調" }; // kept 100 → no fact drift
+    };
+    const r = await batchEditDeck(parseMd(NUM_DECK), catalog, { indices: [1], instruction: "簡潔に", aiFix, bestOfN: 2 });
+    expect(seen).toContain(0);
+    expect(seen).toContain(1); // fanned out N candidates for the one slide
+    expect(r.changes[0]?.afterMd).toContain("100"); // the number-keeping candidate was chosen
+  });
+
   it("skips a slide whose AI is cancelled/fails — not fatal", async () => {
     const aiFix = async (_req: string, meta: { slideIndex: number }) =>
       meta.slideIndex === 1

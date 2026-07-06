@@ -201,32 +201,48 @@ export async function refineDeck(
 export async function batchEditDeck(
   deck: DeckIR,
   catalog: LayoutCatalog,
-  opts: { indices: number[]; instruction: string; aiFix: AiSlideFix; signal?: AbortSignal },
+  opts: { indices: number[]; instruction: string; aiFix: AiSlideFix; bestOfN?: number; signal?: AbortSignal },
 ): Promise<RefineResult> {
+  const bestOfN = Math.max(1, Math.floor(opts.bestOfN ?? 1));
   let current = deck;
   const changes: RefineChange[] = [];
   for (const idx of opts.indices) {
     if (opts.signal?.aborted) break;
     if (!current.slides[idx]) continue;
     const before = slideToMd(current, idx, catalog);
-    try {
-      const outcome = await opts.aiFix(`Current slide:\n${before}\n\nInstruction: ${opts.instruction}`, { slideIndex: idx, signal: opts.signal, attempt: 1, kind: "edit" });
-      if (!outcome.ok) continue; // cancelled / failed → skip this slide
+    const req = `Current slide:\n${before}\n\nInstruction: ${opts.instruction}`;
+    // Best-of-N: fan out N candidates. A FREE-FORM edit has no preserve-contract (the instruction may
+    // legitimately change language, e.g. "英語にして"), so we can't score by HARD violations like the
+    // condense loop does. Instead pick the candidate that ACTUALLY applied the edit (after !== before)
+    // with the FEWEST numeric drifts — a dropped/changed number is almost always collateral damage,
+    // whatever the instruction. Language drift is NOT penalized (it may be the intent). Ties → first.
+    const settled = await Promise.all(
+      Array.from({ length: bestOfN }, (_, k) =>
+        opts.aiFix(req, { slideIndex: idx, signal: opts.signal, attempt: 1, kind: "edit", candidate: k }).then((o) => o, () => undefined),
+      ),
+    );
+    let best: { after: string; afterSlide: SlideIR; warnings: string[] } | undefined;
+    let bestScore = Infinity;
+    for (const outcome of settled) {
+      if (!outcome || !outcome.ok) continue; // threw / cancelled / failed
       const after = outcome.markdown.trim();
-      const afterSlide = after && after !== before ? parseMd(after).slides[0] : undefined;
-      // A batch instruction is FREE-FORM — it may legitimately change facts or language (e.g. "英語に
-      // して"), so we never fact/language-reject it. But it must not silently destroy the slide's
-      // STRUCTURE, so reconcile restores any layout pin / title / meta / figure the edit dropped.
-      const newSlide = afterSlide ? reconcileEdit(current.slides[idx], afterSlide) : undefined;
-      if (newSlide) {
-        current = replaceSlide(current, idx, newSlide);
-        // Surface (don't reject) a fact/language change so a silent number-swap or translation is caught.
-        const cond = validateCondense(before, after);
-        const warnings = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
-        changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: after, ...(warnings.length ? { warnings } : {}) });
+      if (!after || after === before) continue; // no-op → the edit wasn't applied, not a real candidate
+      const afterSlide = parseMd(after).slides[0];
+      if (!afterSlide) continue;
+      const cond = validateCondense(before, after);
+      const factDrift = cond.violations.filter((w) => w.kind === "fact").length;
+      if (factDrift < bestScore) {
+        bestScore = factDrift;
+        // Surface (don't reject) fact/language changes so a silent number-swap or translation is caught.
+        best = { after, afterSlide, warnings: cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail) };
       }
-    } catch {
-      continue;
+    }
+    if (!best) continue; // all candidates failed / no-op'd → skip this slide (non-fatal, as before)
+    // reconcile restores any layout pin / title / meta / figure the edit dropped (structure not rejected).
+    const newSlide = reconcileEdit(current.slides[idx], best.afterSlide);
+    if (newSlide) {
+      current = replaceSlide(current, idx, newSlide);
+      changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: best.after, ...(best.warnings.length ? { warnings: best.warnings } : {}) });
     }
   }
   return { deck: current, changes, converged: true, iterations: 1 };
