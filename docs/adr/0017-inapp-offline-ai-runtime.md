@@ -29,6 +29,7 @@
 - Windows/Linux は **env-free 配布可能**（install → 有効化 → モデル自動DL → 動く）。dev は `SLIDECRAFT_LLAMAFILE`/`SLIDECRAFT_GGUF` の escape hatch。
 - 実機検証済み（Windows 2026-07-01）：spawn → `/health` → baseURL fill → スライド編集を end-to-end 生成（~10 tok/s CPU・736 tokens）。granite Balanced tier も実機で DL 確認（PR #68）。
 - **macOS は release-time gate**：ad-hoc sign（`signingIdentity="-"`・`hardenedRuntime=false`＝llamafile の GGML JIT/exec-mem を殺さないため）＋ own Homebrew tap（cask が `com.apple.quarantine` を剥がす→notarization 不要）。branch `claude/p6-macos-signing` 実装済だが **mac runner 未検証**（Actions 無効中＝`ci_actions_billing`）。Developer-ID + notarization（$99）は defer。
+  【追記 2026-07-07】Actions 再有効化＋repo public 化済。`release.yml` を `v0.1.0` タグで実走し **macOS(arm64) を含む Win/Linux のビルド＋ad-hoc 署名が CI で成功**（installer 生成・v0.1.0 公開）。残るは **実機で `.dmg` が `killed:9` せず開くか**の確認＝ROADMAP M9（要ユーザ）。Intel(macos-13) leg は runner 枯渇で未生成。
 - **do-NOT-undo**：
   - 127.0.0.1 ハードコード・`0.0.0.0` にしない・port を world-readable file に書かない（token 無し＝Ollama parity・egress gate が真の制御）。
   - weight DL の SHA256 検証を外さない（検証**前**に実行/rename しない・不一致は `.part` 削除）。

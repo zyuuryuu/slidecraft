@@ -1,0 +1,79 @@
+---
+name: slidecraft
+description: >-
+  Author polished PowerPoint (.pptx) decks from Markdown via SlideCraft's MCP server. Use when the
+  user wants slides/a presentation built or edited from text, with a company template's fonts, colours
+  and layouts preserved. You write Markdown + pick diagram types; SlideCraft's deterministic engine
+  fills the template, keeps everything on-budget, and exports native (editable) PPTX shapes.
+---
+
+# SlideCraft — authoring skill for upstream AI
+
+SlideCraft turns **Markdown/YAML → PowerPoint**, filling a template's placeholders so **fonts and
+layouts never break**. You (the AI) are the language model; the MCP tools are the deterministic engine
+ops — the server never calls a model. Your job: acquire a template, learn its authoring contract,
+write slide Markdown, and follow the never-silent feedback loop until the deck is clean.
+
+## Connect
+
+- **Headless (stdio)**: run `slidecraft serve` and speak MCP over stdio (e.g. Claude Desktop / Claude
+  Code MCP config). Bytes cross as base64. No filesystem unless started without `--no-fs`.
+- **Collab host (GUI open)**: the desktop app launches a loopback MCP host; connect as an `ai` client.
+  The human sees your edits live. You pick the doc the GUI opened via `select_document` (or the sole
+  doc resolves automatically).
+
+## Core contracts (read once)
+
+- **Never-silent**: a modelled precondition failure returns `{ ok:false, error, code }` (a normal
+  result, not a crash). `isError:true` is reserved for genuine crashes. Never assume a no-op succeeded.
+- **Mutation envelope**: content mutations return `{ ok, changed, beforeMd?, afterMd?, diagnostics,
+  budget?, hints, ... }`. `changed:false` = a real no-op (nothing to undo). `hints` tells you the next tool.
+- **schema is frozen**: you author *content*; you cannot change slide roles/layout names arbitrarily —
+  `autoSelectLayout` resolves any template role-based (alien-safe).
+- **Budget-aware**: each `get_deck_issues` / envelope carries the deck's body budget. Author within it;
+  when a slide overflows, use the deterministic split lever rather than shrinking fonts.
+
+## The authoring loop
+
+1. **Acquire a template** (one of):
+   - `new_project(templateBase64, markdown?)` — you bring `.pptx` bytes.
+   - `create_template(spec?)` — no bytes: author name + 2 fonts + a 9-colour palette (or `{}` for the
+     MIDNIGHT preset); the harness contrast-guards + writes the PPTX. Then `new_project(templateBase64)`.
+     Format via `get_template_spec_guide`.
+   - **(collab host)** `list_templates` → `use_template(id, markdown?)` — start from a registered template.
+2. **Read the contract**: `get_authoring_guide()` — this template's resolved layout names, the Markdown
+   rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code), body budget, and
+   pointers. This is your single entry point; read it before authoring.
+3. **Write slides**: `set_slide_markdown(index, markdown)` per slide (figures/mermaid on a slide are
+   auto-preserved). `get_slide(index)` gives a one-call structured edit plan (resolvedLayout, hasFigure,
+   bulletCount, budget, overBudget, this slide's issues, markdown).
+4. **Add figures**: `get_diagram_types()` → pick from the **12 authorable types** (flowchart, network,
+   orgchart, sequence, timeline, quadrant, pie, gantt, journey, xychart, radar, kpi) → `get_diagram_guide(type)`
+   for its syntax → `set_slide_diagram(index, source, "yaml"|"json"|"mermaid")`. class/state/ER/mindmap are
+   Mermaid-only. Positioning/layout of a figure = `apply_design_intent` (regionSplit/emphasize/relayout).
+5. **Structure ops** (figures preserved, unlike a whole-deck rewrite): `insert_slide` / `delete_slide`
+   (last slide never-silent refused) / `move_slide` / `duplicate_slide`.
+6. **Feedback loop**: after edits call `get_deck_issues()` → it returns CONTENT levers (split / condense /
+   visualize / title) + budget + `hints`. Apply the deterministic levers where they fit —
+   `split_overflowing_slides()` (overflow), `convert_bullets_to_table(index)` (key-value bullets) — then
+   fix the rest as content. Re-diagnose. Repeat until clean.
+7. **Validate + export**: `validate_deck()` (EXPORT gate: schema + unsupported-mermaid scan →
+   `exportReadiness`) → `export_pptx(onUnsupportedMermaid?)`. Native-vector only; unconvertible Mermaid
+   (gitGraph/sankey/C4) is `reject` (default, precise error) or `skip` (drops that slide + reports it) —
+   **never silently lost**. `save_project()` returns the round-trippable `.slidecraft` bytes.
+
+## Rules of thumb
+
+- Embedded images are **`data:image/…` data URIs only** (portable, XSS-safe). Other schemes become text.
+- Prefer `set_slide_markdown` (surgical, figure-preserving) over `set_deck_markdown` (whole-deck replace,
+  drops figures) for single-slide edits.
+- Trust the harness: it guarantees "right layout, fonts kept, template-compliant". Keep the Markdown
+  clean and on-budget; let the engine place it.
+
+## References
+
+- Full tool list, envelope spec, resources, typical loop: [`docs/mcp-server.md`](docs/mcp-server.md)
+- End-user context (what the deck/app can do): [ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)
+  ／[MCP ガイド](https://zyuuryuu.github.io/slidecraft/guide/mcp.html)
+- The authoring contract is self-describing at runtime via `get_authoring_guide` — always prefer it over
+  this file for the *current* template's exact rules.
