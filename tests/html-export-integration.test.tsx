@@ -48,4 +48,10 @@ describe("HTML export S3: end-to-end orchestrator", () => {
     const html = await renderDeckToHtml(parseMd("# A\n\n- x"), tpl, { transition: "push" });
     expect(html).toMatch(/<html[^>]*data-transition="push"/);
   });
+
+  it("ALWAYS locks the exported document under a CSP (M6 — the export path never ships nonce-less)", async () => {
+    const html = await renderDeckToHtml(parseMd("# A\n\n- x"), tpl, {});
+    expect(html).toMatch(/<meta http-equiv="Content-Security-Policy"[^>]*default-src 'none'/);
+    expect(html).toMatch(/script-src 'nonce-[A-Za-z0-9+/]+'/); // scripts only via the per-export nonce
+  });
 });

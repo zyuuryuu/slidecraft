@@ -5,6 +5,7 @@
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
 import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
@@ -147,7 +148,10 @@ function parseImageAttrs(s: string | undefined): Pick<ImageBlock, "rect" | "fit"
 const IMAGE_LINE_RE = /^!\[([^\]]*)\]\(([^)]+?)\)(?:\{([^}]*)\})?$/;
 function matchImageLine(trimmed: string): ImageBlock | null {
   const m = trimmed.match(IMAGE_LINE_RE);
-  return m ? { src: m[2], alt: m[1], placeholderIdx: "1", ...parseImageAttrs(m[3]) } : null;
+  // Only a SAFE data:image src becomes an image; an unsafe src (javascript:/remote/relative) returns
+  // null → the line falls through to plain text, never a rendered <img> (M6 — see isSafeImageSrc).
+  if (!m || !isSafeImageSrc(m[2])) return null;
+  return { src: m[2], alt: m[1], placeholderIdx: "1", ...parseImageAttrs(m[3]) };
 }
 
 // ── Parse a single slide block ──
