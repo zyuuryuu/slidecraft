@@ -96,6 +96,7 @@
 
 ## UX・配布
 
+- **UI 日英切替（i18n・react-i18next）** — JA\|EN トグル（テーマトグル隣・localStorage 永続・既定 ja）で UI 全体が日⇄英に切替。25 コンポーネント・320 キー（29 名前空間）を `t()` 化し `ja/en.json` に集約。型安全キー（`i18next.d.ts` で ja.json に対して `t()` を型検査）・補間 {{var}}・動的キーは enum 配列 `as const` で narrow。全展開はワークフロー並列（1エージェント=1コンポーネント）＋決定論マージ。実 HTML/アプリ実レンダで全画面の切替を目視確認。残＝.ts 状態文言（→ROADMAP） （2026-07-07）
 - **デフォルトのサンプル Markdown 廃止＝空起動** — 起動時に読み込んでいたサンプルデッキ（`sample-deck.ts`）を削除し、アプリは空状態で開始（既存のプレースホルダで graceful）。あわせて**空デッキで「＋ スライド追加」が no-op だった不具合を修正**（純粋 `addBlankSlide` が deck=null なら1スライドを mint）。vite preview＋Playwright で実操作確認 （2026-07-07）
 
 - **`.scft` アプリ関連付け（ダブルクリックで開く）＋拡張子短縮** — プロジェクト拡張子を `.slidecraft`→`.scft` に短縮し、OS 関連付けで**ダブルクリック/「プログラムから開く」**が起動＝新タブで開く。Win/Linux ウォーム起動は `single-instance` で単一ウィンドウ、macOS は open イベント、Win/Linux コールドは argv。fs スコープ動的付与でダイアログ選択と同じ信頼境界 （ADR-0024・2026-07-07）

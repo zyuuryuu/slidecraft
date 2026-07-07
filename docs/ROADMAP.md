@@ -52,7 +52,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
-| UI 日英表記切り替え（i18n） | UI 文言の 日本語⇄英語 トグル。現状は日本語ハードコード → 文字列を抽出し言語切替を提供（ユーザ要望・初回リリースは日本語ファースト） | M〜L |
+| UI 日英表記切り替え（i18n）の残 | 本体は**出荷済**（react-i18next・JA\|EN トグル・25 コンポーネント/320 キー・[shipped](shipped.md)）。残：**.ts 由来の状態/通知文言**（`ai-generation-types.ts` の接続ステータス「接続OK/接続を確認中…」等・`useCollab.ts`「未接続」・フック/エンジンのユーザ向け notice）を t() 化。.tsx と違いフック/モジュール文脈なので individual に対応。触点: `ai-generation-types.ts`・`useCollab.ts`・`useDeckController` notice 系 | S |
 | 完全な署名付き自動アップデート | 初回は軽量通知（M12）で代替。出荷後：`tauri signer` 署名鍵ペア＋`plugins.updater`＋4-OS の `latest.json` 集約＋draft/publish フロー再設計。鍵は回転不可の不可逆判断（ADR 化） | M |
 
 ### 🔒 セキュリティ
