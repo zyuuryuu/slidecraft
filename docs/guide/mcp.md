@@ -91,6 +91,28 @@ claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js
 
 ---
 
+## スキル（SKILL.md）のセットアップ
+
+MCP 接続で渡るのは**ツール**（エンジンの操作）です。加えて、エージェントに**「どう著作するか」の手順**を渡すと、
+狙いどおりのデッキが安定して作れます。そのための手順書が
+[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) です — 接続 → テンプレ調達 →
+`get_authoring_guide` → `set_slide_markdown` → 図 → `get_deck_issues` フィードバックループ →
+`validate_deck`/`export_pptx` の流れと、never-silent・envelope・`data:image` のみ、等の契約を1枚にまとめています。
+
+**渡し方（エージェント別）:**
+
+- **Claude Code / Agent Skills** — `SKILL.md` を**スキルとして配置**します（frontmatter に `name` / `description` 付き）。
+  リポジトリ内で作業させる場合はそのまま読まれます。
+- **Claude Desktop など** — 会話の冒頭で `SKILL.md` の内容を**システム指示／コンテキストとして渡す**（貼り付け・添付）。
+
+::: tip 実行時の契約が最優先
+`SKILL.md` は**汎用の手順**です。いま読み込んでいるテンプレの**正確な書式・レイアウト名・本文 budget** は、
+実行時に `get_authoring_guide()` が返す**自己記述コントラクト**が常に最新・正典です。エージェントには
+「まず `get_authoring_guide` を読む」と伝えてください（`SKILL.md` にもそう明記しています）。
+:::
+
+---
+
 ## 主要ツールの概観
 
 サーバは多数のツールを公開しますが、覚えるべき流れはシンプルです。まず **`get_authoring_guide`**
