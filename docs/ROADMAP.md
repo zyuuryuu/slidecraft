@@ -2,7 +2,7 @@
 
 **前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
 
-**現在地（2026-07-07）**：named 主要テーマ 1〜4＋差別化アーキ（内蔵 AI・AI 編集の採用ゲート・協働ホスト）まで完了（[shipped.md](shipped.md)）。**いま：初回パブリックリリース（v0.1.0）に向けた工程化フェーズ** — 下記マイルストーン参照（**M0 バージョン・M1 ci.yml 軽量化・M2 npm audit・M4 LICENSE・M6 セキュリティ再チェック 完了 → 残るクリティカルパスは M3 Actions 再有効化＝要ユーザ操作**）。リリース後の将来テーマは「バックログ」へ。
+**現在地（2026-07-07）**：named 主要テーマ 1〜4＋差別化アーキ（内蔵 AI・AI 編集の採用ゲート・協働ホスト）まで完了（[shipped.md](shipped.md)）。**いま：初回パブリックリリース（v0.1.0）に向けた工程化フェーズ** — 下記マイルストーン参照（**M0-M8・M11 完了：CI 再有効化＋public 化済／release.yml 実証済で draft installers 生成／マニュアル・セキュリティ・法務 完了 → 残るは M9 実機テスト・M10 PowerPoint 開封・M5 アイコン＝要ユーザ、M12 軽量自動更新＝ローカル**）。リリース後の将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 
@@ -23,11 +23,11 @@
 | M4 | LICENSE＋第三者/モデル重み attribution | root に LICENSE 新設・README「Private」是正・`package.json` license。`THIRD-PARTY-NOTICES`（npm/crate/**llamafile〔Apache-2.0＋llama.cpp MIT の NOTICE 伝播〕/Node/DL モデル重み〔Phi-3.5=MIT・Granite 4.1=Apache-2.0〕**）・CREDITS 拡張・`bundle.license/copyright` | — | M | 🏁 完了（PR #79） |
 | M5 | 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | — | S | 💬 DISCUSS |
 | M6 | セキュリティ再チェック（新3面） | ADR-0016 以降の新サーフェスを是正：**画像 `src` を `data:image` に zod 制約**（現状 `z.string()`＝`javascript:`/remote 永続化 XSS 経路）・export HTML の nonce-CSP を全経路で常時付与アサート・画像 data-URI サイズ上限（DoS）・`register_templates` store 上限・新面（画像/MCP/カスタムレイアウト OOXML）を敵対再監査 → **ADR-0016 addendum** | M0 | M | 🏁 完了（PR #80） |
-| M7 | ユーザマニュアル | コアループ Draft→Edit→export／Markdown 基本（区切り・`<!-- col/kpi/step -->`・表・画像・図フェンス）／**authorable 12種＋mermaid 限定4種**（先に「図12 vs 14」記述矛盾を正典 `VALID_TYPES` で統一）／二段階編集／テンプレ取込・修復・作成／内蔵 AI 有効化＋初回モデル自動DL／HTML・PPTX export。アプリ内 Help/? 導線＋サンプル明示 | 図本数統一 | L | ✅ READY |
-| M8 | release.yml 実走（dry-run） | v-tag を1本 push し、4-OS installer＋draft release が実際に通ることを実証（tag 実績 0＝未検証） | M3, M0 | M | 🔗 DEPENDS |
+| M7 | ユーザマニュアル | コアループ Draft→Edit→export／Markdown 基本（区切り・`<!-- col/kpi/step -->`・表・画像・図フェンス）／**authorable 12種＋mermaid 限定4種**（先に「図12 vs 14」記述矛盾を正典 `VALID_TYPES` で統一）／二段階編集／テンプレ取込・修復・作成／内蔵 AI 有効化＋初回モデル自動DL／HTML・PPTX export。アプリ内 Help/? 導線＋サンプル明示 | 図本数統一 | L | 🏁 完了（PR は docs 直コミット・[docs/user-guide.md](user-guide.md)・アプリ内 Help は opener 未配線で follow-up） |
+| M8 | release.yml 実走（dry-run） | v-tag を1本 push し、4-OS installer＋draft release が実際に通ることを実証。**v0.1.0-rc.1 で実証済：Win(msi/exe)・mac arm64(dmg)・Linux(deb/rpm/AppImage) 成功、Intel mac のみ runner 待ち。draft "SlideCraft v0.1.0" 生成** | M3, M0 | M | 🏁 実証（Intel mac 残） |
 | M9 | 実機検証（Win/mac） | インストーラ起動・**mac ad-hoc 署名 .dmg が `killed:9` せず開く**・F3 keychain round-trip（WSL 未検証）・モデル自動DL UX・レジストリ永続化 E2E | M8 | M | 🔗 DEPENDS |
 | M10 | PowerPoint 実機開封チェック | 生成 PPTX を実 PowerPoint / PowerPoint for the web で開き見た目確認（現状 python-pptx＋wellformed-gate のみ） | — | S | ✅ READY |
-| M11 | レンダ品質1周 | 実 render（Playwright `page.pdf`）で高インパクト UX バグを掃討：不可視の締めスライド・低コントラスト図ラベル等（`図/テンプレ品質の磨き込み` の先行分） | — | S | ✅ READY |
+| M11 | レンダ品質1周 | 実 render（Playwright `page.pdf`）で高インパクト UX バグを掃討：不可視の締めスライド・低コントラスト図ラベル等（`図/テンプレ品質の磨き込み` の先行分） | — | S | 🏁 BUG2完了（エッジラベル可読化・PR #83）／BUG1 不可視締めは v0.1.1 |
 | M12 | 自動更新（軽量版・ADR 化） | 完全署名 Updater は見送り、GitHub Releases API ポーリングで「新版あり」通知のみ（鍵不要）＋mac は brew・Win/Linux 手動再DL。**この選択を ADR 化** | M8 | S | 💬 DISCUSS |
 | M13 | 出荷（v0.1.0） | `RELEASING.md` 手順：bump→CHANGELOG→tag→draft レビュー→cask 更新→publish | 全 Must 完了 | S | 🔗 DEPENDS |
 
