@@ -38,6 +38,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | --- | --- | --- |
 | 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。※ 高インパクト分は初回リリース M11 で先行 | M |
 | @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
+| プレビュー図形描画の残（グループ / arcTo / グラデ） | preset 図形（楕円・矢印・三角ほか）・custGeom パスは SVG 描画済（c1d5423）。残：**グループ図形（`<p:grpSp>`）** は子図形の座標変換（chOff/chExt→off/ext）が要り現状は矩形化 or 脱落（velis に 28 個）／custGeom の **arcTo セグメント**は変換 skip 中／**グラデ塗り（`gradFill`）** はフラット単色化。触点: `template-loader.ts extractDecorations`（grpSp は再帰抽出＋座標変換）・`SlidePreview.tsx renderDeco`。プレビュー限定（PPTX はネイティブなので不変） | S〜M |
 
 ### 📄 テンプレ / マスター
 
@@ -69,3 +70,4 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 - **未追跡テンプレ資産** — `public/templates/slide/` に会社系 `.potx`（未追跡6）＋`CX_sample_MSGothic.pptx`（gitignore 済のローカル fixture）が残置。↑「テンプレ資産の棚卸」で束ねる/整理を決める（scratch の一時テストは都度削除済）。
 - **column 内 table の認識（小改修）** — separator レイアウト（col/card/kpi/step）の各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`extractFencedBlock` のみ・`findTableInLines` 未適用）。列内テーブルを native table として拾う（[ADR-0020](adr/0020-image-embedding.md) 敵対レビューで確認・画像とは独立）。触点: `md-slide-parser.ts` separator 分岐。
 - **最背面画像のプレビュー直接ドラッグ（小）** — 最背面レイヤーはハンドルが content の下に隠れるため現状フォーム編集のみ。編集 chrome（枠線＋角ハンドル）だけを前面 overlay 化してドラッグ/リサイズを再有効化（[ADR-0020](adr/0020-image-embedding.md)）。
+- **ステップ/グループセル内の Markdown 整形（要調査）** — separator レイアウト（`<!-- step -->` 等）の各セル内で `## 見出し` が生の `##` のまま表示され、箇条書きの記号（`-`）も落ちて見える（プレビュー実レンダで確認・図形描画の検証中に発見）。セル本文を素テキスト化しているためと推測。**仕様か不具合か切り分けが要る**。触点: `md-slide-parser.ts` の separator 分岐＋group セルのレンダリング。
