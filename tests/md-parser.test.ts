@@ -18,8 +18,10 @@ describe("parseMd — image block", () => {
     const round = parseMd(serializeMd(parseMd(md))).slides[0];
     expect(round.image).toEqual({ alt: "社内フロー", src: DATA_URI, placeholderIdx: "1" });
   });
-  it("a path src works too (parser is src-agnostic)", () => {
-    expect(parseMd(`# T\n\n![](assets/x.png)`).slides[0].image).toEqual({ alt: "", src: "assets/x.png", placeholderIdx: "1" });
+  it("a non-data:image src is NOT embedded (M6 security — the line degrades to text, never an <img>)", () => {
+    // Was previously src-agnostic; now only a self-contained data:image URI is embedded (isSafeImageSrc)
+    // so a relative/remote/javascript src can't reach <img> or the exported HTML.
+    expect(parseMd(`# T\n\n![](assets/x.png)`).slides[0].image).toBeUndefined();
   });
 });
 
