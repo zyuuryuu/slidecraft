@@ -123,8 +123,21 @@ export const ImageRectSchema = z.object({
 });
 export type ImageRect = z.infer<typeof ImageRectSchema>;
 
+/** Cap on an embedded image's data-URI string (~12 MB image after base64) — bounds a data-URI DoS. */
+export const MAX_IMAGE_DATA_URI = 16 * 1024 * 1024;
+
+/** A SAFE embedded-image src: a self-contained `data:image/…` URI within the size cap. Images are
+ *  ALWAYS data URIs by design (portable decks), so this ALLOWLIST rejects the XSS vectors an arbitrary
+ *  string allowed — `javascript:` / `vbscript:` / `http(s):` / `file:` / `data:text/html` — plus a
+ *  giant blob. Exported so md-slide-parser can DROP an unsafe src instead of embedding it (M6). */
+export function isSafeImageSrc(src: string): boolean {
+  return /^data:image\//i.test(src) && src.length <= MAX_IMAGE_DATA_URI;
+}
+
 export const ImageBlockSchema = z.object({
-  src: z.string(), // data URI (data:image/...;base64,…) — self-contained so the deck stays portable
+  // data URI (data:image/…;base64,…) — self-contained so the deck stays portable AND an untrusted
+  // string can't inject an active-content src into <img> / exported HTML (M6, ADR-0016 addendum).
+  src: z.string().refine(isSafeImageSrc, { message: "画像 src は data:image のデータ URI のみ（サイズ上限内）" }),
   alt: z.string().default(""),
   placeholderIdx: z.string().default("1"), // which BODY region the image fills
   rect: ImageRectSchema.optional(), // manual size/position override (inches); absent = fill placeholder box
