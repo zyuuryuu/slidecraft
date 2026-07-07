@@ -50,3 +50,7 @@ docs/.vitepress/cache
 
 # Local-only company template fixture (IP-stripped shell; not committed)
 public/templates/slide/CX_sample_MSGothic.pptx
+
+# Company source templates (.potx) — real IP, kept LOCAL only, never committed.
+# Some tests reference them via skipIf(existsSync) so they simply skip in CI.
+public/templates/slide/*.potx
