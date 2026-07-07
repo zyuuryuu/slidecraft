@@ -24,6 +24,7 @@ import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
 import { describeRepairPlan } from "./components/apply-template";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
+import { openProject } from "./engine/project-io";
 
 /** Measure an image's intrinsic aspect (w/h) from a data URL, for aspect-lock + cover cropping (案B).
  *  Resolves undefined if it can't decode (e.g. SVG without intrinsic size) — the image still inserts. */
@@ -48,7 +49,7 @@ export default function App() {
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
-    catalog, setDeck, docs, activeId, switchDoc, closeDoc, editLockedRef, collabRef,
+    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
 
   // Master registry (Slice 1a): the global set of slide masters the draft can pick from (bundled
@@ -145,11 +146,33 @@ export default function App() {
     // Upload the master registry to the host so a connecting AI can list_templates / use_template.
     masters,
     getMasterBytes,
+    // Link the tab that was active on 開始 to the seed's host doc (so switching back re-targets here).
+    onSeedDoc: (docId) => linkHostDoc(activeId, docId),
+    // Mode (b): an AI-created deck opens as a BACKGROUND tab (no view switch). Unbundle the full
+    // .slidecraft (deck + template) so the new tab renders with its OWN master, not the current one.
+    onNewHostDoc: async (docId, title, dataBase64) => {
+      try {
+        const bytes = Uint8Array.from(atob(dataBase64), (c) => c.charCodeAt(0));
+        const { deck: d, template, meta } = await openProject(bytes);
+        openDoc({ deck: d, templateData: template, templateName: meta.templateName ?? title, title: title || "AI", hostDocId: docId, activate: false });
+      } catch {
+        /* couldn't materialize the tab — the doc still lives host-side; a reconnect can retry */
+      }
+    },
   });
 
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
   // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
   const editLocked = collab.status === "connected";
+
+  // Switch tabs; if the target tab mirrors a host doc, re-point the collab projection at it so the
+  // GUI live-mirrors THAT doc (the seed and each AI-created deck are separate host docs).
+  const handleSwitchDoc = useCallback((id: string) => {
+    switchDoc(id);
+    const target = docs.find((d) => d.id === id);
+    // host tab → mirror it; local tab (no hostDocId) → pause the projection so it isn't clobbered.
+    collab.setActiveHostDoc(target?.hostDocId ?? null);
+  }, [switchDoc, docs, collab]);
 
   // P2.5 collaboration bridge + transient toast: while connected, per-slide edits and Undo/Redo are
   // routed to the host (single truth); stale/empty results surface a never-silent toast.
@@ -323,7 +346,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
         {/* Multi-document tabs — only rendered when >1 project is open */}
         {/* While connected, switching/closing tabs would repoint the projection onto another doc → pinned. */}
-        <DocTabs docs={docs} activeId={activeId} onSwitch={editLocked ? () => {} : switchDoc} onClose={editLocked ? () => {} : closeDoc} />
+        <DocTabs docs={docs} activeId={activeId} onSwitch={handleSwitchDoc} onClose={editLocked ? () => {} : closeDoc} />
         {/* Non-destructive review, where you work — fix in deck (undoable) */}
         <ReviewBar
           warnIssues={warn(editIssues)}

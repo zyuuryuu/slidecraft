@@ -73,6 +73,22 @@ describe("documentReducer — document collection + ISOLATION", () => {
     expect(byId(s, "a").history.past.length).toBe(1);
   });
 
+  it("newDoc with activate:false opens a BACKGROUND tab (collab mode b — no view switch)", () => {
+    let s = one();
+    s = documentReducer(s, { type: "newDoc", doc: makeDoc({ id: "b", title: "AI", hostDocId: "H-B" }), activate: false });
+    expect(s.docs.map((d) => d.id)).toEqual(["a", "b"]); // tab added…
+    expect(s.activeId).toBe("a"); // …but the active view did NOT switch
+    expect(byId(s, "b").hostDocId).toBe("H-B");
+  });
+
+  it("patchDoc links a SPECIFIC (non-active) tab to a host doc — race-free", () => {
+    let s: Store = { docs: [makeDoc({ id: "a" }), makeDoc({ id: "b" })], activeId: "b" };
+    s = documentReducer(s, { type: "patchDoc", id: "a", patch: { hostDocId: "SEED" } });
+    expect(byId(s, "a").hostDocId).toBe("SEED"); // the seed tab is linked…
+    expect(byId(s, "b").hostDocId).toBeUndefined(); // …not the active one
+    expect(s.activeId).toBe("b");
+  });
+
   it("switchDoc changes the active doc; closeDoc removes it and reactivates a neighbor; the last doc is never closed", () => {
     let s: Store = { docs: [makeDoc({ id: "a" }), makeDoc({ id: "b" }), makeDoc({ id: "c" })], activeId: "c" };
     s = documentReducer(s, { type: "switchDoc", id: "a" });

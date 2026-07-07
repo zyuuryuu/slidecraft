@@ -48,9 +48,15 @@ export interface UseCollabArgs {
    *  connecting AI can list_templates / use_template. The bytes stay host-side; the AI selects by id. */
   masters: MasterEntry[];
   getMasterBytes: (id: string) => Promise<Uint8Array>;
+  /** The SEEDED doc's host id (from open_project). App links the tab that was active on 開始 to it, so
+   *  switching back to that tab re-targets the projection at the seed. */
+  onSeedDoc?: (docId: string) => void;
+  /** A NEW host doc appeared (the AI ran new_project). App opens it as a BACKGROUND tab — mode (b):
+   *  a tab shows up but the view doesn't switch. `dataBase64` is the full .slidecraft (deck+template). */
+  onNewHostDoc?: (docId: string, title: string, dataBase64: string) => void;
 }
 
-export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes }: UseCollabArgs) {
+export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes, onSeedDoc, onNewHostDoc }: UseCollabArgs) {
   const available = runningInTauri();
   const [status, setStatus] = useState<CollabStatus>("idle");
   const [info, setInfo] = useState<CollabInfo | undefined>(undefined);
@@ -65,6 +71,13 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   const applyRef = useRef(applyDeck);
   const mastersRef = useRef(masters);
   const getBytesRef = useRef(getMasterBytes);
+  const onSeedDocRef = useRef(onSeedDoc);
+  const onNewHostDocRef = useRef(onNewHostDoc);
+  // Collab multi-doc bookkeeping: which host docs we've already surfaced as tabs, the seeded doc, and
+  // whether the seed is resolved (until then we don't classify docs — avoids a duplicate seed tab).
+  const knownDocsRef = useRef<Set<string>>(new Set());
+  const seedDocIdRef = useRef<string | undefined>(undefined);
+  const seedReadyRef = useRef(false);
   // Sync the latest values into the refs from an EFFECT (not during render → satisfies
   // react-hooks/refs). start()/seed/onDeck all run after commit, so an effect is timely enough.
   useEffect(() => {
@@ -74,6 +87,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     applyRef.current = applyDeck;
     mastersRef.current = masters;
     getBytesRef.current = getMasterBytes;
+    onSeedDocRef.current = onSeedDoc;
+    onNewHostDocRef.current = onNewHostDoc;
   });
 
   const start = useCallback(async () => {
@@ -98,7 +113,23 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
             projRef.current = null; // the projection tore itself down → 開始 can re-establish
           }
         },
-        onDocs: (docs: DocSummary[]) => setDocCount(docs.length),
+        onDocs: (docs: DocSummary[]) => {
+          setDocCount(docs.length);
+          // Surface AI-created docs as tabs (mode b: background — no view switch). Wait until the
+          // seed is resolved so the seeded doc isn't mistaken for a new one. Mark known BEFORE the
+          // async save_project so a burst of onDocs doesn't open the same doc twice.
+          if (!seedReadyRef.current) return;
+          for (const d of docs) {
+            if (d.docId === seedDocIdRef.current || knownDocsRef.current.has(d.docId)) continue;
+            knownDocsRef.current.add(d.docId);
+            projRef.current
+              ?.callTool<{ dataBase64: string }>("save_project", { docId: d.docId })
+              .then((r) => onNewHostDocRef.current?.(d.docId, d.title, r.dataBase64))
+              .catch(() => {
+                /* best-effort: the doc still exists host-side; a later reconnect can pick it up */
+              });
+          }
+        },
       });
       projRef.current = proj;
       await proj.start();
@@ -130,11 +161,18 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       if (curDeck && curTemplate) {
         try {
           const bytes = await bundleProject(curDeck, curTemplate, { templateName: nameRef.current, savedAt: new Date().toISOString() });
-          await proj.callTool("open_project", { dataBase64: bytesToBase64(bytes) });
+          const r = await proj.callTool<{ docId?: string }>("open_project", { dataBase64: bytesToBase64(bytes) });
+          // Link the tab that was active on 開始 to the seed's host doc, so switching back to it
+          // re-targets the projection here (rather than stranding it on an AI doc).
+          if (r?.docId) {
+            seedDocIdRef.current = r.docId;
+            onSeedDocRef.current?.(r.docId);
+          }
         } catch {
           /* seed is best-effort */
         }
       }
+      seedReadyRef.current = true; // seed resolved (or none) → onDocs may now surface AI docs as tabs
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : String(e));
@@ -164,6 +202,9 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     setStatus("idle");
     setInfo(undefined);
     setDocCount(0);
+    knownDocsRef.current.clear();
+    seedDocIdRef.current = undefined;
+    seedReadyRef.current = false;
   }, []);
 
   // P2.5 round-trip: per-slide human edits + Undo/Redo go through the projection to the host (the
@@ -174,6 +215,10 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   );
   const serverUndo = useCallback(() => projRef.current?.serverUndo() ?? Promise.resolve({ ok: false as const, reason: "未接続" }), []);
   const serverRedo = useCallback(() => projRef.current?.serverRedo() ?? Promise.resolve({ ok: false as const, reason: "未接続" }), []);
+  // Point the projection's mirror at a specific host doc — called when the user switches tabs so the
+  // GUI live-mirrors THAT doc. `null` = the active tab is local (no host doc) → the projection pauses
+  // (never clobbers the local tab). No-op when disconnected (projRef is null).
+  const setActiveHostDoc = useCallback((docId: string | null) => projRef.current?.setTargetDoc(docId), []);
 
   // Tear down the projection (poll interval + MCP client) on unmount / Vite HMR so dev reloads don't
   // accumulate zombie pollers. (Production App never unmounts; this is dev-loop hygiene.)
@@ -195,5 +240,6 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     sendSlideMarkdown,
     serverUndo,
     serverRedo,
+    setActiveHostDoc,
   };
 }

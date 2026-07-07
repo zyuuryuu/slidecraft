@@ -75,6 +75,10 @@ export class CollabProjection {
   private targetDocId: string | null = null;
   private lastDocId: string | null = null;
   private lastRev = -1;
+  // Explicit pause: the GUI's active tab mirrors NO host doc (a local-only tab). Distinct from the
+  // initial targetDocId=null (which auto-picks a doc) — while paused, tick() applies nothing so the
+  // local tab is never clobbered by a host deck.
+  private mirrorPaused = false;
   private poll: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private pending = false;
@@ -122,6 +126,11 @@ export class CollabProjection {
 
   /** Pin which doc to mirror; null = auto-adopt the first available. Triggers a reconcile. */
   setTargetDoc(docId: string | null): void {
+    if (docId === null) {
+      this.mirrorPaused = true; // a local/no-host tab is active → stop mirroring (don't clobber it)
+      return;
+    }
+    this.mirrorPaused = false;
     this.targetDocId = docId;
     this.scheduleTick();
   }
@@ -255,7 +264,7 @@ export class CollabProjection {
   }
 
   private async tick(): Promise<void> {
-    if (this.closed || this.sending) return; // don't pull mid-send (would re-clobber our optimistic edit)
+    if (this.closed || this.sending || this.mirrorPaused) return; // paused = active tab is local (no host doc)
     let listed: { documents: DocSummary[]; activeDocId: string | null };
     try {
       listed = await this.client.callTool<{ documents: DocSummary[]; activeDocId: string | null }>("list_documents");

@@ -44,6 +44,7 @@ export interface DocState {
   gotoLine?: { line: number; ts: number };
   subMode: MarkdownSubMode;
   filePath: string | null;
+  hostDocId?: string; // collab: the host DocRegistry doc this tab mirrors (undefined = local-only)
 }
 
 export interface Store {
@@ -54,6 +55,7 @@ export interface Store {
 type Action =
   | { type: "history"; action: HAction<DeckIR | null> }
   | { type: "patchActiveFn"; fn: (d: DocState) => Partial<DocState> }
+  | { type: "patchDoc"; id: string; patch: Partial<DocState> } // patch a SPECIFIC doc (race-free, e.g. link hostDocId)
   | { type: "newDoc"; doc: DocState; activate: boolean }
   | { type: "switchDoc"; id: string }
   | { type: "closeDoc"; id: string };
@@ -78,6 +80,7 @@ export function makeDoc(init: Partial<DocState> = {}): DocState {
     gotoLine: init.gotoLine,
     subMode: init.subMode ?? "edit",
     filePath: init.filePath ?? null,
+    hostDocId: init.hostDocId,
   };
 }
 
@@ -91,6 +94,8 @@ export function documentReducer(s: Store, a: Action): Store {
       return mapActive(s, (d) => ({ ...d, history: historyReducer(d.history, a.action) }));
     case "patchActiveFn":
       return mapActive(s, (d) => ({ ...d, ...a.fn(d) }));
+    case "patchDoc":
+      return { ...s, docs: s.docs.map((d) => (d.id === a.id ? { ...d, ...a.patch } : d)) };
     case "newDoc": {
       const docs = [...s.docs, a.doc];
       return { docs, activeId: a.activate ? a.doc.id : s.activeId };
@@ -169,6 +174,8 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
       mdText?: string;
       filePath?: string | null;
       title?: string;
+      hostDocId?: string; // collab: link this tab to a host doc
+      activate?: boolean; // default true; false = open in the background (a collab-created deck — (b))
     }) => {
       const doc = makeDoc({
         history: { past: [], present: init.deck, future: [], lastTs: 0 },
@@ -177,14 +184,17 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
         mdText: init.mdText ?? "",
         filePath: init.filePath ?? null,
         title: init.title ?? "Untitled",
+        hostDocId: init.hostDocId,
       });
-      dispatch({ type: "newDoc", doc, activate: true });
+      dispatch({ type: "newDoc", doc, activate: init.activate ?? true });
       return doc.id;
     },
     [],
   );
   const switchDoc = useCallback((id: string) => dispatch({ type: "switchDoc", id }), []);
   const closeDoc = useCallback((id: string) => dispatch({ type: "closeDoc", id }), []);
+  /** Link a specific tab to a host doc (collab): race-free (targets by id, not "active"). */
+  const linkHostDoc = useCallback((id: string, hostDocId: string) => dispatch({ type: "patchDoc", id, patch: { hostDocId } }), []);
 
   return {
     // active-document flat API (names match the old useDeckController state exactly)
@@ -212,5 +222,6 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
     openDoc,
     switchDoc,
     closeDoc,
+    linkHostDoc,
   };
 }

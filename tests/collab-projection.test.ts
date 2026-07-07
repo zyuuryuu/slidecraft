@@ -134,6 +134,35 @@ describe("CollabProjection", () => {
     expect(JSON.stringify(applied.find((p) => p.rev === 2)!.deck)).toContain("元のタイトル");
   });
 
+  it("multi-doc: setTargetDoc follows the switched-to host doc, and setTargetDoc(null) PAUSES mirroring", async () => {
+    // The GUI-side of collab mode (b): each tab is a host doc; switching a tab re-targets the mirror,
+    // and switching to a LOCAL (no-host) tab pauses it so it isn't clobbered by a host deck.
+    const applied: ProjectedDeck[] = [];
+    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    await proj.start();
+    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    await ai.connect();
+    const a = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# Doc A\n\n- a" });
+    const b = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# Doc B\n\n- b" });
+
+    // Target A + edit it → the mirror shows A's content.
+    proj.setTargetDoc(a.docId);
+    await ai.callTool("set_slide_markdown", { index: 0, markdown: "# A2\n\n- a", docId: a.docId });
+    await waitFor(() => applied.some((p) => p.docId === a.docId && JSON.stringify(p.deck).includes("A2")));
+
+    // Switch the target to B + edit it → the mirror follows to B.
+    proj.setTargetDoc(b.docId);
+    await ai.callTool("set_slide_markdown", { index: 0, markdown: "# B2\n\n- b", docId: b.docId });
+    await waitFor(() => applied.some((p) => p.docId === b.docId && JSON.stringify(p.deck).includes("B2")));
+
+    // PAUSE (a local tab is active) → a further edit to B produces NO apply.
+    proj.setTargetDoc(null);
+    const n = applied.length;
+    await ai.callTool("set_slide_markdown", { index: 0, markdown: "# B3\n\n- z", docId: b.docId });
+    await new Promise((r) => setTimeout(r, 250));
+    expect(applied.length).toBe(n); // paused → never clobbers the local tab
+  });
+
   it("surfaces an unauthorized connection as an error (bad token never silently no-ops)", async () => {
     proj = new CollabProjection({ url: host.url, token: "wrong-token", pollMs: 0, onDeck: () => {} });
     await expect(proj.start()).rejects.toThrow();

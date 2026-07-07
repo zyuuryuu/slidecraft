@@ -65,7 +65,7 @@ export function useDeckController() {
     mdText, setMdText, templateData, setTemplateData, templateName, setTemplateName,
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
-    docs, activeId, createDoc, openDoc, switchDoc, closeDoc,
+    docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
   } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "サンプル" });
 
   // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
@@ -668,7 +668,7 @@ export function useDeckController() {
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
-    docs, activeId, createDoc, switchDoc, closeDoc, // multi-document collection (tabs, P0.2)
+    docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc, // multi-document collection (tabs, P0.2)
     editLockedRef, // App syncs this from collab.status to drive observe-only locking
     collabRef, // App injects the P2.5 collaboration bridge here when connected
   };
