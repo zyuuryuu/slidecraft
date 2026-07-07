@@ -20,6 +20,7 @@ import * as St from "./structure";
 import * as R from "./reads";
 import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
+import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc } from "./host-core";
 import { GuardError } from "./guard-errors";
 
@@ -131,7 +132,9 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     run(async () => {
       const s = S.createSession(null);
       const res = await load(s);
-      const entry = host!.registry.create(s, s.meta.templateName || "Untitled", true); // AI-created = shared
+      // Tab name: the template name if known (open_project / use_template), else derive from the deck's
+      // first-slide heading (an AI's new_project brings no template name → was always "Untitled"), else fall back.
+      const entry = host!.registry.create(s, s.meta.templateName || deckTitle(s.deck) || "Untitled", true); // AI-created = shared
       host!.setActive(extra, entry.docId);
       host!.notifyOpened?.(entry);
       return { ...(res as object), docId: entry.docId };

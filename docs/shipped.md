@@ -67,6 +67,7 @@
 
 ## 協働・MCP
 
+- **host `new_project` のタブ名を先頭見出しから導出（B4）** — host モードで AI が作った Deck のタブが常に「Untitled」だった（`session.ts` が templateName を "" にリセット）のを、純粋ヘルパ `deckTitle`（先頭スライドの title placeholder＝idx 0/15）で先頭見出しから命名。`use_template`/`open_project` は既存の templateName 名が優先、見出し無しは「Untitled」にフォールバック。golden 非影響 （他AIレポート・2026-07-07）
 - **Live MCP で AI が作った Deck を GUI タブに（モード b）** — 協働ホストの multi-doc を GUI に橋渡し。AI が `new_project` で作った Deck を**背景タブ**として開く（表示は切り替えない＝押すと開く）。タブ切替で projection のミラー先を `setTargetDoc`、ローカルタブは pause して clobber 防止。seed は `open_project` の戻り docId で race-free に link。`makeDoc` が新フィールドを落とすバグをテストで検出→修正 （2026-07-07）
 - **MCP CLI 同梱（ビルド不要のエージェント駆動）** — 自己完結 `cli.cjs`＋Node ランタイムをインストーラに同梱、macOS は Homebrew cask が `slidecraft-mcp` を PATH 登録。ソース build もシステム Node も不要で上流 AI（Claude Code/Cursor/Claude Desktop）が駆動可。update-cask に fail-closed guard （ADR-0022・2026-07-07）
 - **MCP テンプレ選択 list/use/register_templates** — GUI が collab 開始時に master レジストリを host へ upload するプロトコル越し橋渡し（S2 増分2） （ADR-0015・PR #76・2026-07-07）

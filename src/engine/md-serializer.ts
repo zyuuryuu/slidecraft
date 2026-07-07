@@ -72,6 +72,17 @@ function getPlaceholderText(slide: SlideIR, idx: string): string | undefined {
   return serializeParagraphs(ph.paragraphs);
 }
 
+/** The deck's display title for a tab/label = the FIRST slide's title placeholder text (canonical
+ *  title namespaces: title-layout idx "0", else content-layout idx "15"), first non-empty line only.
+ *  undefined for an empty / title-less deck. Pure — used to name a tab when no template name is known
+ *  (e.g. an AI's `new_project`, whose `meta.templateName` is empty), instead of a bare "Untitled". */
+export function deckTitle(deck: DeckIR | null): string | undefined {
+  const slide = deck?.slides[0];
+  if (!slide) return undefined;
+  const raw = getPlaceholderText(slide, TITLE_NS.title) ?? getPlaceholderText(slide, CONTENT_NS.title);
+  return raw?.split("\n").map((l) => l.trim()).find((l) => l.length > 0) || undefined;
+}
+
 // ── Single-body FIGURE (table / diagram / mermaid / code) → its fenced Markdown block ──
 // A table/diagram/mermaid/code is a slide-level, single-body figure — it is NOT tied to the layout
 // name. Emitting it must happen in EVERY layout branch (title / separator / single-body), else a
