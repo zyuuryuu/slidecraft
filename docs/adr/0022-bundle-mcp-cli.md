@@ -26,8 +26,8 @@
 
 ## Consequences
 
-- **v0.1.1 以降で有効**。同梱物は再ビルドが要るため、現在出荷済みの v0.1.0 では従来どおりソースビルドが必要。cask の `binary` スタンザは v0.1.1+ の .dmg にのみ載せる（wrapper を含まない .dmg を指す cask に付けると `brew install` が binary 不在で失敗するため、live tap は次リリースまで現状維持）。
-- **PATH ランチャ（`slidecraft-mcp`）は v0.1.1 で macOS/Homebrew のみ**。Windows/Linux は同梱 node ＋ `cli.cjs` の直接登録になるが、**正確な絶対パスはインストーラ・バージョン依存で現状デバイス未検証**（アプリのバイナリ名は productName ではなく Cargo 名 `diagram-pipeline-desktop`。Linux `.deb`/`.rpm` はこの名前のディレクトリ配下の可能性が高いが未確認）。したがって Windows/Linux 直接パスはドキュメント上「未検証・インストール先を要確認」とし、不明ならソース版（B）を案内。AppImage は展開先が可変なため直接パス非推奨 → B。将来 Windows `.cmd` / Linux 相当の PATH shim ＋ 実機でのパス検証は follow-up。
+- **v0.2.0 以降で有効**。同梱物は再ビルドが要るため、現在出荷済みの v0.1.0 では従来どおりソースビルドが必要。cask の `binary` スタンザは v0.2.0+ の .dmg にのみ載せる（wrapper を含まない .dmg を指す cask に付けると `brew install` が binary 不在で失敗するため、live tap は次リリースまで現状維持）。
+- **PATH ランチャ（`slidecraft-mcp`）は v0.2.0 で macOS/Homebrew のみ**。Windows/Linux は同梱 node ＋ `cli.cjs` の直接登録になるが、**正確な絶対パスはインストーラ・バージョン依存で現状デバイス未検証**（アプリのバイナリ名は productName ではなく Cargo 名 `diagram-pipeline-desktop`。Linux `.deb`/`.rpm` はこの名前のディレクトリ配下の可能性が高いが未確認）。したがって Windows/Linux 直接パスはドキュメント上「未検証・インストール先を要確認」とし、不明ならソース版（B）を案内。AppImage は展開先が可変なため直接パス非推奨 → B。将来 Windows `.cmd` / Linux 相当の PATH shim ＋ 実機でのパス検証は follow-up。
 - 自己完結 `cli.cjs` は約 2.5 MB（`host.cjs` と同オーダー）。依存は `host.cjs` の閉包の部分集合で、既に production でバンドル実績があるため低リスク。スモークテスト（`node cli.cjs` を素の cwd で起動 → MCP `initialize` 往復）で外部化ゼロを継続検証（`tests/mcp-cli-bundle.test.ts`）。
 - 副次修正：`update-cask.mjs` が arm64-only（sha256 が 1 行）に非対応で次リリースで失敗する潜在バグを是正（1 行＝arm のみ、2 行＝arm+intel を許容）。
 - 将来：GUI に「登録コマンドをコピー」ボタン（アプリが自分の resource/node 実パスを解決して提示）を出せば、直接パス方式のパス調べが不要になる。

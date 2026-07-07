@@ -5,11 +5,15 @@
 
 出荷済み機能の網羅的な履歴は [docs/shipped.md](docs/shipped.md)、決定の記録は [docs/adr/](docs/adr/) を参照。
 
-## [Unreleased]
+## [0.2.0] - 2026-07-07
+
+早期版（0.x）。**第三者スライドマスター対応**と、上流 AI 向けの **MCP CLI 同梱**が目玉。
 
 ### Added
 
 - **MCP サーバをアプリに同梱**（ADR-0022）— 配布インストーラに自己完結した MCP サーバ（`cli.cjs`）と Node ランタイムを同梱。上流 AI（Claude Code / Cursor / Claude Desktop）から **ソースのビルドもシステム Node も不要**で SlideCraft を駆動できる。macOS は Homebrew cask が `slidecraft-mcp` を PATH に登録（`claude mcp add slidecraft -- slidecraft-mcp`）。Windows/Linux は同梱 node ＋ `cli.cjs` を直接登録（正確なパスはインストール先を要確認・現状未検証）。
+- **スライドマスター Re-make（テーマだけ取り込む）**（ADR-0023）— 実マスターの構造を忠実に活かす従来の「取り込み」に加え、**フォント・配色・背景・ロゴだけ抽出して SlideCraft 自前レイアウトで作り直す**第2の取り込み口を追加（両方の口を提供）。第三者マスターの idx/テーマの癖を構造的に回避。ロゴ継承、フラット設計（ヘッダーバー有無）の吸収、コントラスト安全な配色マッピング付き。
+- **プレビュー/HTML でスライドマスターのロゴ・図版（`<p:pic>`）を描画** — 従来はレイアウト/マスターの画像をプレビューで落としていたのを data-URI として描画。忠実取り込みでも会社ロゴが見えるように。
 
 ### Fixed
 

@@ -6,11 +6,15 @@ SlideCraft の主要な変更点です。形式は [Keep a Changelog](https://ke
 - 完全な変更履歴：[CHANGELOG.md](https://github.com/zyuuryuu/slidecraft/blob/main/CHANGELOG.md)
 - 出荷済み機能の網羅ログ：[shipped.md](https://github.com/zyuuryuu/slidecraft/blob/main/docs/shipped.md)
 
-## [Unreleased]
+## [0.2.0] — 2026-07-07
+
+第三者スライドマスター対応と、上流 AI 向け MCP CLI 同梱が目玉。
 
 ### 追加
 
 - **MCP サーバをアプリに同梱** — 配布インストーラに自己完結した MCP サーバと Node ランタイムを同梱。上流 AI（Claude Code / Cursor / Claude Desktop）から**ソースのビルドもシステム Node も不要**で SlideCraft を駆動できるように。macOS は Homebrew が `slidecraft-mcp` を PATH に登録（`claude mcp add slidecraft -- slidecraft-mcp`）。詳細は [MCP ガイド](/guide/mcp)。
+- **スライドマスター Re-make（テーマだけ取り込む）** — 会社テンプレのフォント・配色・背景・ロゴだけ受け継いで SlideCraft 自前レイアウトで作り直す第2の取り込み口。忠実取り込みと両立。詳細は [テンプレート](/guide/templates)。
+- **プレビューでスライドマスターのロゴ・図版を描画** — 従来落ちていたテンプレのロゴがプレビュー/HTML に出るように。
 
 ## [0.1.0] — 2026-07-07
 

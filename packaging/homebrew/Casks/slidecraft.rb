@@ -13,7 +13,7 @@
 #   shasum -a 256 SlideCraft_<version>_aarch64.dmg
 # (`scripts/update-cask.mjs` automates this against a GitHub release — see packaging/homebrew/README.md.)
 cask "slidecraft" do
-  version "0.1.0"
+  version "0.2.0"
   sha256 "118df00267d97307a9157caa1520793c619d2134a388a70dff2e4dde53bfc3fb"
 
   url "https://github.com/zyuuryuu/slidecraft/releases/download/v#{version}/SlideCraft_#{version}_aarch64.dmg"
@@ -36,7 +36,7 @@ cask "slidecraft" do
   # Desktop) can drive SlideCraft with NO source build and NO system Node — `slidecraft-mcp` execs the
   # Node runtime + the self-contained MCP server (cli.cjs) that ship inside the .app. Register with:
   #   claude mcp add slidecraft -- slidecraft-mcp
-  # NOTE: the wrapper exists only in v0.1.1+ .dmgs. Do NOT ship this stanza in a cask that still points
+  # NOTE: the wrapper exists only in v0.2.0+ .dmgs. Do NOT ship this stanza in a cask that still points
   # at the v0.1.0 .dmg (which lacks it) — `brew install` fails on the missing binary target.
   binary "#{appdir}/SlideCraft.app/Contents/Resources/slidecraft-mcp"
 

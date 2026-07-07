@@ -48,10 +48,10 @@ async function sha256(arch, localPath) {
 let cask = readFileSync(caskPath, "utf8");
 
 // Fail-closed guard: the `slidecraft-mcp` binary stanza only works on .dmgs that BUNDLE the wrapper,
-// which first ships in v0.1.1 (ADR-0022). Refuse to emit a cask that pairs that stanza with an older
+// which first ships in v0.2.0 (ADR-0022). Refuse to emit a cask that pairs that stanza with an older
 // version — otherwise `brew install` would fail on the missing binary target. Blocks the footgun of
 // re-cutting the cask for v0.1.0 while the source template already carries the stanza.
-const MIN_LAUNCHER_VERSION = [0, 1, 1];
+const MIN_LAUNCHER_VERSION = [0, 2, 0];
 const hasLauncherStanza = /binary\s+["'][^"']*slidecraft-mcp["']/.test(cask);
 const semver = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10));
 // negative if a < b, 0 if equal, positive if a > b (missing components treated as 0)
