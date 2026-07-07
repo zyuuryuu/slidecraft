@@ -28,7 +28,7 @@
 | M9 | 実機検証（Win/mac） | インストーラ起動・**mac ad-hoc 署名 .dmg が `killed:9` せず開く**・F3 keychain round-trip（WSL 未検証）・モデル自動DL UX・レジストリ永続化 E2E | M8 | M | 🔗 DEPENDS |
 | M10 | PowerPoint 実機開封チェック | 生成 PPTX を実 PowerPoint / PowerPoint for the web で開き見た目確認（現状 python-pptx＋wellformed-gate のみ） | — | S | ✅ READY |
 | M11 | レンダ品質1周 | 実 render（Playwright `page.pdf`）で高インパクト UX バグを掃討：不可視の締めスライド・低コントラスト図ラベル等（`図/テンプレ品質の磨き込み` の先行分） | — | S | 🏁 BUG2完了（エッジラベル可読化・PR #83）／BUG1 不可視締めは v0.1.1 |
-| M12 | 自動更新（軽量版・ADR 化） | 完全署名 Updater は見送り、GitHub Releases API ポーリングで「新版あり」通知のみ（鍵不要）＋mac は brew・Win/Linux 手動再DL。**この選択を ADR 化** | M8 | S | 💬 DISCUSS |
+| M12 | 自動更新（軽量版・ADR 化） | 完全署名 Updater は見送り、GitHub Releases API ポーリングで「新版あり」通知のみ（鍵不要）＋mac は brew・Win/Linux 手動再DL。**この選択を ADR 化** | M8 | S | 🏁 決定を [ADR-0021](adr/0021-auto-update-strategy.md) に記録／**通知バナー実装は v0.1.x follow-up**（CSP egress＋版数取得＋実ポーリング検証を要す・v0.1.0 は brew/手動でブロックせず） |
 | M13 | 出荷（v0.1.0） | `RELEASING.md` 手順：bump→CHANGELOG→tag→draft レビュー→cask 更新→publish | 全 Must 完了 | S | 🔗 DEPENDS |
 
 **クリティカルパス**：M0・M1・M2（並行）→ M3 → M8 → M9 → M11 → M13。M4/M5/M6/M7/M10/M12 は M3 と並行進行可。
