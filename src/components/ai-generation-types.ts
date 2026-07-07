@@ -17,6 +17,7 @@ import { parseTemplateSpecResponse } from "../engine/template-spec-prompts";
 import { PROVIDERS, type ProviderId } from "../ipc/ai";
 import type { DiagramType } from "../engine/llm-prompts";
 import { AI_CONFIG_STORAGE } from "../ipc/key-store";
+import i18n from "../i18n";
 
 /** Diagram-mode type choice: a concrete shape, or "auto" → Stage-1 routing picks it. */
 export type DiagramTypeChoice = DiagramType | "auto";
@@ -64,14 +65,12 @@ export interface AiTask {
 
 export const MAX_TASKS = 50; // keep the most recent N in history
 
-export const MODE_LABEL: Record<AiMode, string> = {
-  slides: "デッキ生成",
-  slide: "スライド整形",
-  condense: "本文を要約",
-  diagram: "図の生成",
-  "diagram-edit": "図の編集",
-  "template-spec": "テンプレ提案",
-};
+/** The user-visible label for an AI mode (shown in the task list). i18n-resolved at call
+ *  time — a function (not a const map) so it reflects the current language, not the one
+ *  loaded at module-eval. Keys mirror the AiMode union under the `aiMode` namespace. */
+export function modeLabel(mode: AiMode): string {
+  return i18n.t(`aiMode.${mode}`);
+}
 
 /** Classify a failed AI call so the refine loop can decide whether to retry: a cancel
  *  never retries; config/auth errors won't fix themselves; transient failures (network,
@@ -134,7 +133,7 @@ export function postProcessAiResult(mode: AiMode, raw: string, catalog?: LayoutC
     const md = sanitizeSlideEditOutput(stripMarkdownFence(raw));
     return md
       ? { result: md }
-      : { error: "有効な編集が生成できませんでした。具体的な指示（例: 要約 / 箇条書きに整形 / 図を追加 / 英語に翻訳）でお試しください。" };
+      : { error: i18n.t("aiStatus.noValidEdit") };
   }
   if (mode === "diagram-edit") {
     const r = parseJsonLoose(raw);
@@ -170,35 +169,35 @@ export function computeConnection(a: {
   const { provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsLoading, modelsError, models } = a;
   const isOllama = provider === "ollama";
   if (preset.native) {
-    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: "APIキー未設定", hint: "下の設定に Anthropic の API キーを入力" };
-    if (!cfg.model.trim()) return { ok: false, tone: "warn", label: "モデル未選択" };
-    return { ok: true, tone: "ok", label: `${cfg.model} を使用` };
+    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint") };
+    if (!cfg.model.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.modelNotSelected") };
+    return { ok: true, tone: "ok", label: i18n.t("aiStatus.usingModel", { model: cfg.model }) };
   }
   if (provider === "builtin") {
-    if (builtinStatus.kind === "downloading") return { ok: false, tone: "checking", label: `${builtinModel?.display ?? "モデル"} をダウンロード中… ${builtinStatus.pct ?? 0}%` };
-    if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: "オフラインAIを起動中…（初回は数十秒）" };
-    if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: "オフラインAIの起動に失敗", hint: builtinStatus.message };
+    if (builtinStatus.kind === "downloading") return { ok: false, tone: "checking", label: i18n.t("aiStatus.downloadingModel", { model: builtinModel?.display ?? i18n.t("aiStatus.modelFallback"), pct: builtinStatus.pct ?? 0 }) };
+    if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: i18n.t("aiStatus.offlineStarting") };
+    if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: i18n.t("aiStatus.offlineStartFailed"), hint: builtinStatus.message };
     if (!cfg.baseURL.trim()) {
       return weightsPresent === false
-        ? { ok: false, tone: "warn", label: `${builtinModel?.display ?? "オフラインAI"} 未取得`, hint: `⬇ ボタンで初回ダウンロード（約${builtinModel ? (builtinModel.sizeMb / 1024).toFixed(1) : "?"}GB）` }
-        : { ok: false, tone: "warn", label: "オフラインAI 未起動", hint: "そのまま生成すると自動で起動します（初回は数十秒）" };
+        ? { ok: false, tone: "warn", label: i18n.t("aiStatus.modelNotFetched", { model: builtinModel?.display ?? i18n.t("aiStatus.offlineAiFallback") }), hint: i18n.t("aiStatus.downloadFirstHint", { gb: builtinModel ? (builtinModel.sizeMb / 1024).toFixed(1) : "?" }) }
+        : { ok: false, tone: "warn", label: i18n.t("aiStatus.offlineNotStarted"), hint: i18n.t("aiStatus.offlineAutoStartHint") };
     }
     // baseURL is set but the runtime isn't answering (a stale port from a past session, or it stopped).
     // Give the ACTIONABLE fix instead of the generic "接続できません".
-    if (modelsError) return { ok: false, tone: "err", label: "オフラインAIが応答しません", hint: "設定の「💻 起動」で再起動できます（または、そのまま生成すると自動で起動します）" };
+    if (modelsError) return { ok: false, tone: "err", label: i18n.t("aiStatus.offlineNotResponding"), hint: i18n.t("aiStatus.offlineRestartHint") };
     // baseURL filled + reachable → fall through to the generic model checks below.
   }
-  if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: "Base URL 未設定" };
-  if (modelsLoading) return { ok: false, tone: "checking", label: "接続を確認中…" };
+  if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.baseUrlMissing") };
+  if (modelsLoading) return { ok: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };
   if (modelsError) {
     return isOllama
-      ? { ok: false, tone: "err", label: "Ollama に接続できません", hint: "`ollama serve` で起動（既定 localhost:11434）" }
-      : { ok: false, tone: "err", label: "接続できません", hint: `エンドポイントを確認（${modelsError}）` };
+      ? { ok: false, tone: "err", label: i18n.t("aiStatus.ollamaCantConnect"), hint: i18n.t("aiStatus.ollamaServeHint") }
+      : { ok: false, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: i18n.t("aiStatus.checkEndpointHint", { error: modelsError }) };
   }
   if (models.length === 0) {
-    return { ok: false, tone: "warn", label: "利用可能なモデルがありません", hint: isOllama ? "`ollama pull qwen2.5` 等でモデルを取得" : "モデル名を確認" };
+    return { ok: false, tone: "warn", label: i18n.t("aiStatus.noModelsAvailable"), hint: isOllama ? i18n.t("aiStatus.ollamaPullHint") : i18n.t("aiStatus.checkModelNameHint") };
   }
-  if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: "APIキー未設定" };
-  if (!cfg.model.trim() || !models.includes(cfg.model)) return { ok: false, tone: "warn", label: "モデルを選択", hint: `${models.length} 個のモデルが利用可` };
-  return { ok: true, tone: "ok", label: `${cfg.model}（接続OK・${models.length} モデル）` };
+  if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing") };
+  if (!cfg.model.trim() || !models.includes(cfg.model)) return { ok: false, tone: "warn", label: i18n.t("aiStatus.selectModel"), hint: i18n.t("aiStatus.modelsAvailableHint", { count: models.length }) };
+  return { ok: true, tone: "ok", label: i18n.t("aiStatus.connectedOk", { model: cfg.model, count: models.length }) };
 }

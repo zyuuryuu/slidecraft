@@ -7,6 +7,7 @@
  * (useTemplatePreview) debounces regeneration so it doesn't rebuild the PPTX on every keystroke.
  */
 import { useEffect, useRef, useState } from "react";
+import i18n from "../i18n";
 import { writeTemplate, type TemplateSpec } from "../engine/template-writer";
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
@@ -25,7 +26,7 @@ export function combineLayouts(builtins: LayoutDef[], customs: LayoutDef[]): { l
   const layouts = [...builtins];
   const customNames: string[] = [];
   customs.forEach((l, i) => {
-    const base = l.name.trim() || `カスタム${i + 1}`;
+    const base = l.name.trim() || i18n.t("templatePreview.defaultCustomLayoutName", { n: i + 1 });
     let name = base;
     for (let n = 2; taken.has(name); n++) name = `${base} (${n})`;
     taken.add(name);

@@ -9,6 +9,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import i18n from "../i18n";
 import type { LayoutCatalog } from "../engine/template-catalog";
 import { generateWithAI, listProviderModels, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
 import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
@@ -17,7 +18,7 @@ import { ensureEgressConsent } from "../ipc/egress-consent";
 import { saveAiConfig, loadAiConfig, clearAiConfig } from "../ipc/key-store";
 import {
   type AiProviderConfig, type AiConfigMap, type AiMode, type AiTask, type DiagramTypeChoice,
-  LOCAL_ONLY_STORAGE, BEST_OF_N_STORAGE, clampBestOfN, MAX_TASKS, MODE_LABEL, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection, freshBuiltin,
+  LOCAL_ONLY_STORAGE, BEST_OF_N_STORAGE, clampBestOfN, MAX_TASKS, modeLabel, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection, freshBuiltin,
 } from "./ai-generation-types";
 import { useBuiltinRuntime } from "./useBuiltinRuntime";
 
@@ -307,7 +308,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       persistConfig();
       supersedeBestOf(); // abort + invalidate any in-flight best-of-N so its late resolution can't repopulate
       setCandidates([]); // a fresh single generation supersedes any prior best-of-N candidate set
-      const task = enqueue(userRequest, mode, MODE_LABEL[mode], diagramType);
+      const task = enqueue(userRequest, mode, modeLabel(mode), diagramType);
       setActiveTaskId(task.id);
       void runTask(task).catch(() => {});
     },
@@ -320,7 +321,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   // Caller (AiPanel) enforces "once per user-generate" so this never loops.
   const retry = useCallback(
     (prompt: string) => {
-      const task = enqueue(prompt, "slide", "🔁 opsで再生成");
+      const task = enqueue(prompt, "slide", i18n.t("aiGen.retryWithOps"));
       setActiveTaskId(task.id);
       void runTask(task).catch(() => {});
     },
@@ -339,7 +340,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
       const gen = ++bestOfGen.current; // this batch's token
       setCandidates([]);
       setBestOfRunning(true);
-      const batch = Array.from({ length: n }, (_, i) => enqueue(userRequest, mode, `${MODE_LABEL[mode]} 候補${i + 1}/${n}`));
+      const batch = Array.from({ length: n }, (_, i) => enqueue(userRequest, mode, `${modeLabel(mode)} ${i18n.t("aiGen.candidateOfN", { i: i + 1, n })}`));
       bestOfTaskIds.current = batch.map((t) => t.id);
       setActiveTaskId(batch[0].id); // stream the first into the foreground while the rest run
       try {
@@ -367,7 +368,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   const reset = useCallback(() => { supersedeBestOf(); setActiveTaskId(null); setCandidates([]); }, [supersedeBestOf]);
   // Back-compat for LlmAssist's manual paste: record it as a done task + make it active.
   const setResult = useCallback((text: string) => {
-    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode: "slides", label: "手動入力", prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
+    const task: AiTask = { id: `t${++idCounter.current}`, docId: activeDocIdRef.current, mode: "slides", label: i18n.t("aiGen.manualInput"), prompt: "(manual)", status: "done", result: text, startedAt: Date.now(), finishedAt: Date.now() };
     setTasks((ts) => [task, ...ts].slice(0, MAX_TASKS));
     setActiveTaskId(task.id);
   }, []);
@@ -376,7 +377,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : undefined;
   const result = activeTask?.result ?? "";
   const generating = activeTask?.status === "running";
-  const error = activeTask?.status === "error" ? (activeTask.error ?? "エラー") : null;
+  const error = activeTask?.status === "error" ? (activeTask.error ?? i18n.t("aiGen.error")) : null;
   // Non-blocking 告知 for a completed task (e.g. a corrupt unit was dropped by deterministic repair).
   const notice = activeTask?.status === "done" ? (activeTask.notice ?? null) : null;
 

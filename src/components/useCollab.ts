@@ -8,6 +8,7 @@
  * Desktop-only: collaboration needs the spawned sidecar, so `available` is false in a plain browser.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import i18n from "../i18n";
 import { runningInTauri } from "../ipc/commands";
 import { CollabProjection, type CollabStatus, type DocSummary } from "../ipc/collab-projection";
 import { bundleProject } from "../engine/project-io";
@@ -210,11 +211,11 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   // P2.5 round-trip: per-slide human edits + Undo/Redo go through the projection to the host (the
   // single truth). Stable identities (projRef is read at call time); no-op shape when disconnected.
   const sendSlideMarkdown = useCallback(
-    (index: number, markdown: string) => projRef.current?.sendSlideMarkdown(index, markdown) ?? Promise.resolve({ ok: false as const, message: "未接続" }),
+    (index: number, markdown: string) => projRef.current?.sendSlideMarkdown(index, markdown) ?? Promise.resolve({ ok: false as const, message: i18n.t("collab.notConnected") }),
     [],
   );
-  const serverUndo = useCallback(() => projRef.current?.serverUndo() ?? Promise.resolve({ ok: false as const, reason: "未接続" }), []);
-  const serverRedo = useCallback(() => projRef.current?.serverRedo() ?? Promise.resolve({ ok: false as const, reason: "未接続" }), []);
+  const serverUndo = useCallback(() => projRef.current?.serverUndo() ?? Promise.resolve({ ok: false as const, reason: i18n.t("collab.notConnected") }), []);
+  const serverRedo = useCallback(() => projRef.current?.serverRedo() ?? Promise.resolve({ ok: false as const, reason: i18n.t("collab.notConnected") }), []);
   // Point the projection's mirror at a specific host doc — called when the user switches tabs so the
   // GUI live-mirrors THAT doc. `null` = the active tab is local (no host doc) → the projection pauses
   // (never clobbers the local tab). No-op when disconnected (projRef is null).

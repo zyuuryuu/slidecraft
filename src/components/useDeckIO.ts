@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback } from "react";
+import i18n from "../i18n";
 import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../ipc/commands";
 import { renderDeckToPptxBytes } from "./deck-export";
 import { renderDeckToHtml } from "./deck-html-export";
@@ -95,7 +96,7 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
         title: projectTitleFromFileName(name),
       });
     } catch (e) {
-      setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
+      setParseError(i18n.t("deckIo.projectOpenFailed", { error: e instanceof Error ? e.message : String(e) }));
     }
   }, [openDoc, setParseError]);
 
@@ -111,7 +112,7 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     try {
       await openProjectBytes(await readProjectFileBytes(path), path);
     } catch (e) {
-      setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
+      setParseError(i18n.t("deckIo.projectOpenFailed", { error: e instanceof Error ? e.message : String(e) }));
     }
   }, [openProjectBytes, setParseError]);
 

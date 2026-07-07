@@ -1,39 +1,17 @@
 {
-  "lang": {
-    "name": "English",
-    "switchTo": "日本語",
-    "aria": "Switch language"
+  "aiGen": {
+    "retryWithOps": "🔁 Regenerate with ops",
+    "candidateOfN": "candidate {{i}}/{{n}}",
+    "manualInput": "Manual input",
+    "error": "Error"
   },
-  "panel": {
-    "slides": "Slides",
-    "slideEditor": "Slide Editor",
-    "preview": "Preview",
-    "previewSlide": "Preview — Slide {{n}}"
-  },
-  "preview": {
-    "emptyHeading": "Slide preview",
-    "emptyHint": "Type Markdown and the preview appears here",
-    "noSlides": "No slides",
-    "selectSlide": "Select a slide"
-  },
-  "slides": {
-    "add": "Add a slide (after the selected one)"
-  },
-  "app": {
-    "repairTemplateTitle": "Auto-repair template",
-    "remakeSuffix": " (Re-make)",
-    "taskTemplateProposal": "Template proposal",
-    "taskEditSlide": "Edit slide {{n}}",
-    "taskRetrySuffix": " (retry {{attempt}})",
-    "taskCandidateSuffix": " · candidate {{candidate}}",
-    "nothingToUndo": "Nothing to undo",
-    "nothingToRedo": "Nothing to redo",
-    "imagePasted": "Image pasted",
-    "imageInserted": "Image inserted",
-    "imageLoadFailed": "Failed to load image",
-    "draftLockedTitle": "Editing is locked while collaborating",
-    "draftButtonTitle": "Create or import slides from a draft (text)",
-    "viewForm": "Form"
+  "aiMode": {
+    "slides": "Generate deck",
+    "slide": "Format slide",
+    "condense": "Condense text",
+    "diagram": "Generate diagram",
+    "diagram-edit": "Edit diagram",
+    "template-spec": "Suggest template"
   },
   "aiPanel": {
     "resizeHint": "Drag to resize (double-click to reset)",
@@ -76,6 +54,343 @@
     "adoptToSlide": "Adopt → this slide",
     "applyToEdit": "Apply → to editor"
   },
+  "aiSettings": {
+    "title": "AI Settings",
+    "provider": "Provider",
+    "switchToOllama": "🦙 Ollama → Use",
+    "switchToOllamaTitle": "Switch to local Ollama",
+    "startBuiltinTitle": "Start the offline built-in model (first run auto-downloads the model)",
+    "downloadBuiltin": "⬇ {{model}} (first download {{gb}}GB)",
+    "startBuiltin": "💻 Start offline AI",
+    "useBuiltin": "💻 Use offline AI",
+    "offlineAiName": "Offline AI",
+    "stopBuiltin": "⏹ Stop",
+    "stopBuiltinTitle": "Stop the built-in AI to free memory (auto-starts on next generation)",
+    "bestOfNTitle": "Produce multiple candidates per generation and surface the best via the adoption gate (single-slide edit). 1 disables it. Higher means better quality but slower / more memory.",
+    "bestOfNLabel": "Candidates (Best-of-N)",
+    "bestOfNRange": "1–{{max}}",
+    "builtinModel": "Built-in model",
+    "modelNotInstalled": "{{model}} (not installed)",
+    "refreshModels": "Fetch installed models",
+    "apiKeyOptional": "API key (optional)",
+    "rememberKey": "Remember key"
+  },
+  "aiStatus": {
+    "noValidEdit": "Couldn't generate a valid edit. Try a specific instruction (e.g. summarize / format as bullets / add a diagram / translate to English).",
+    "apiKeyMissing": "API key not set",
+    "apiKeyMissingHint": "Enter your Anthropic API key in the settings below",
+    "modelNotSelected": "No model selected",
+    "usingModel": "Using {{model}}",
+    "downloadingModel": "Downloading {{model}}… {{pct}}%",
+    "modelFallback": "model",
+    "offlineStarting": "Starting offline AI… (first launch takes tens of seconds)",
+    "offlineStartFailed": "Failed to start offline AI",
+    "modelNotFetched": "{{model}} not downloaded",
+    "offlineAiFallback": "Offline AI",
+    "downloadFirstHint": "Use the ⬇ button for the first download (about {{gb}} GB)",
+    "offlineNotStarted": "Offline AI not started",
+    "offlineAutoStartHint": "It starts automatically when you generate (first launch takes tens of seconds)",
+    "offlineNotResponding": "Offline AI is not responding",
+    "offlineRestartHint": "Restart it via “💻 Start” in the settings (or just generate to auto-start it)",
+    "baseUrlMissing": "Base URL not set",
+    "checkingConnection": "Checking connection…",
+    "ollamaCantConnect": "Can't connect to Ollama",
+    "ollamaServeHint": "Start it with `ollama serve` (default localhost:11434)",
+    "cantConnect": "Can't connect",
+    "checkEndpointHint": "Check the endpoint ({{error}})",
+    "noModelsAvailable": "No models available",
+    "ollamaPullHint": "Pull a model with e.g. `ollama pull qwen2.5`",
+    "checkModelNameHint": "Check the model name",
+    "selectModel": "Select a model",
+    "modelsAvailableHint": "{{count}} models available",
+    "connectedOk": "{{model}} (connected · {{count}} models)"
+  },
+  "aiTasks": {
+    "taskCount": "{{count}} tasks",
+    "clearHistory": "Clear History",
+    "empty": "No AI tasks yet",
+    "rowExpandHint": "Click to view the sent prompt / result",
+    "cancel": "Cancel",
+    "systemPrompt": "System prompt (mode: {{mode}})",
+    "userMessage": "User message",
+    "result": "Result"
+  },
+  "app": {
+    "repairTemplateTitle": "Auto-repair template",
+    "remakeSuffix": " (Re-make)",
+    "taskTemplateProposal": "Template proposal",
+    "taskEditSlide": "Edit slide {{n}}",
+    "taskRetrySuffix": " (retry {{attempt}})",
+    "taskCandidateSuffix": " · candidate {{candidate}}",
+    "nothingToUndo": "Nothing to undo",
+    "nothingToRedo": "Nothing to redo",
+    "imagePasted": "Image pasted",
+    "imageInserted": "Image inserted",
+    "imageLoadFailed": "Failed to load image",
+    "draftLockedTitle": "Editing is locked while collaborating",
+    "draftButtonTitle": "Create or import slides from a draft (text)",
+    "viewForm": "Form"
+  },
+  "applyTemplate": {
+    "templateUnusable": "This template can't be used: {{reason}}",
+    "remakeFailedValidation": "Re-make failed (the generated template did not pass validation).",
+    "remakeFailed": "Re-make failed: {{error}}",
+    "remakeName": "{{name}} (Re-make)",
+    "repairTitleFrames": "{{n}} title placeholder(s)",
+    "repairBodyFrames": "{{n}} body placeholder(s)",
+    "repairPartSeparator": ", ",
+    "repairPlanHeader": "This template can't be used as-is:\n{{blocks}}\n\n",
+    "repairPlanProposal": "Auto-repair proposal: assign types to {{total}} placeholder(s) in total ({{parts}}).\n",
+    "repairPlanConfirm": "Format and import it?"
+  },
+  "builtinRuntime": {
+    "desktopOnly": "The built-in model is only available in the desktop app."
+  },
+  "collab": {
+    "notConnected": "Not connected"
+  },
+  "collabPanel": {
+    "copy": "Copy",
+    "copied": "Copied",
+    "statusConnected": "Connected",
+    "statusConnecting": "Connecting…",
+    "statusError": "Error",
+    "statusDisconnected": "Not connected",
+    "headerTitle": "Collaborate (AI live editing)",
+    "close": "Close",
+    "unavailableBefore": "Collaboration works only in the desktop app (",
+    "unavailableAfter": " / built version). It starts a local MCP sidecar and connects the upstream AI and the webview to the same deck.",
+    "introBefore": "When you start, a local MCP host (sidecar) launches. Pass the URL and token below to the upstream AI, and the AI's edits will ",
+    "introHighlight": "appear live on this screen",
+    "introAfter": ".",
+    "startButton": "Start collaboration",
+    "liveViewing": "Connected — showing the host's deck live",
+    "documentCount": "Documents: {{docCount}}",
+    "coEditNotice": "Co-editing: your edits are sent to the host (the single source of truth) and shared live with the AI. The AI's edits appear here too. Undo (⌘Z) runs against the host's history (structure changes, templates, and tab switching are locked while connected).",
+    "endpointLabel": "MCP endpoint",
+    "tokenLabel": "Token (per-launch)",
+    "addToClaudeCode": "Add to Claude Code (copy & paste)",
+    "stopButton": "Stop"
+  },
+  "controller": {
+    "untitledDoc": "Untitled",
+    "nothingToRedo": "Nothing to redo",
+    "nothingToUndo": "Nothing to undo",
+    "slideEditSendFailed": "Could not send the edit to the host",
+    "cannotDeleteLastSlide": "You can't delete the last slide (a deck needs at least one slide)."
+  },
+  "deckIo": {
+    "projectOpenFailed": "Couldn't open the project: {{error}}"
+  },
+  "diagramEditor": {
+    "mermaidIncompatibleHint": "This diagram contains icons or kpi/radar and can't be converted to Mermaid. Please edit it in YAML / JSON.",
+    "selectEditFormat": "Select edit format",
+    "mermaidNotConvertible": "MERMAID (not convertible)"
+  },
+  "diagramOverlay": {
+    "resizeDragHint": "Drag to resize",
+    "resetToAutoLayout": "Reset to auto layout",
+    "moveArrowStartHint": "Drag to move the arrow's start point"
+  },
+  "diffView": {
+    "changes": "Changes:",
+    "noChanges": "(no changes)"
+  },
+  "docTabs": {
+    "close": "Close"
+  },
+  "edgeStyle": {
+    "arrowStyle": "Arrow Style",
+    "width": "Width",
+    "dashed": "Dashed",
+    "color": "Color",
+    "startPosition": "Start Position",
+    "resetStartPosition": "Reset start position"
+  },
+  "initModal": {
+    "dialogLabel": "Draft — Build slides from your draft",
+    "importMarkdown": "📄 Import Markdown",
+    "importMarkdownTitle": "Import a .md / .yaml file",
+    "generateAi": "✨ Generate with AI",
+    "generateAiTitle": "Generate a deck with AI",
+    "tidyDraft": "🧹 Tidy draft",
+    "tidyDraftTitle": "Split the raw draft into slides by heading, break up overpacked slides, and turn key-value pairs into tables (no AI, undoable)",
+    "close": "Cancel",
+    "editorHint": "• You can paste or type directly here",
+    "previewHeader": "Slide Preview (split result)",
+    "parseError": "Couldn't parse Markdown: {{parseError}}",
+    "emptyContent": "Content is empty — paste or import something",
+    "cancel": "Cancel",
+    "commit": "✓ Make slides"
+  },
+  "lang": {
+    "name": "English",
+    "switchTo": "日本語",
+    "aria": "Switch language"
+  },
+  "layoutEditor": {
+    "phType": {
+      "ctrTitle": "Title",
+      "body": "Body",
+      "subTitle": "Subtitle",
+      "sldNum": "Page number"
+    },
+    "align": {
+      "l": "Left",
+      "ctr": "Center",
+      "r": "Right"
+    },
+    "layoutNamePlaceholder": "Layout name",
+    "familyLight": "Light background",
+    "familyDark": "Dark background",
+    "deleteLayout": "Delete this layout",
+    "fontMajor": "Heading",
+    "fontMinor": "Body",
+    "bold": "Bold",
+    "deletePlaceholder": "Delete placeholder",
+    "addPlaceholder": "+ Add placeholder",
+    "addCustomLayout": "+ Add custom layout"
+  },
+  "llmAssist": {
+    "title": "✨ Generate with AI — Build a deck from your draft",
+    "diagramTypeLabel": "Diagram type",
+    "diagramTypeAuto": "Auto (let AI choose)",
+    "requestPlaceholderSlides": "e.g. Progress report for a CRM migration project (about 10 slides, including current-state analysis, comparison, and a roadmap)",
+    "requestPlaceholderDiagram": "e.g. Network diagram for a 3-tier web app (LB→Web→App→DB, with a DMZ)",
+    "switchToOllamaTitle": "Switch to local Ollama",
+    "ollamaDetected": "🦙 Ollama detected ({{count}}) → Use it",
+    "useBuiltinTitle": "Use the offline built-in model (downloads automatically the first time)",
+    "builtinDownload": "⬇ Offline AI (first download 2.4GB)",
+    "builtinUse": "💻 Use offline AI",
+    "stopBuiltinTitle": "Stop the built-in AI and free memory (restarts automatically on the next generation)",
+    "stopBuiltin": "⏹ Stop",
+    "modelNotInstalled": "{{model}} (not installed)",
+    "refreshModelsTitle": "Fetch installed models",
+    "modelsFetchError": "Couldn't fetch the model list ({{error}}). Check the Base URL, retry with ↻, or type a name manually.",
+    "modelsEmpty": "No installed models found. Confirm a model has been pulled to this Ollama and that the Base URL points to the right Ollama, then retry with ↻."
+  },
+  "localOnly": {
+    "advancedSettings": "Advanced Settings",
+    "cloudBlockedBadge": "Cloud Sending Blocked",
+    "toggleTitle": "Block sending to cloud providers/endpoints and allow only local targets (Ollama / localhost / LAN)",
+    "localModelOnly": "Local Models Only"
+  },
+  "masterPicker": {
+    "buttonTitle": "Slide master used for this deck",
+    "selectMaster": "Select master",
+    "builtinSuffix": " (built-in)",
+    "importTitle": "Import a .pptx keeping its layouts and placeholders as-is",
+    "importLabel": "Import master (.pptx)",
+    "remakeTitle": "Inherit only fonts, colors, and background from a .pptx and rebuild with SlideCraft's layouts",
+    "remakeLabel": "Import theme only (Re-make)",
+    "createTitle": "Pick colors and fonts to generate a new template",
+    "createLabel": "Create template…"
+  },
+  "masterReg": {
+    "defaultName": "Template",
+    "builtinLoadFailed": "Failed to load the built-in template ({{status}})"
+  },
+  "panel": {
+    "slides": "Slides",
+    "slideEditor": "Slide Editor",
+    "preview": "Preview",
+    "previewSlide": "Preview — Slide {{n}}"
+  },
+  "preview": {
+    "emptyHeading": "Slide preview",
+    "emptyHint": "Type Markdown and the preview appears here",
+    "noSlides": "No slides",
+    "selectSlide": "Select a slide"
+  },
+  "refineProposal": {
+    "leverVisualize": "Convert to table",
+    "leverCondense": "Condense",
+    "leverTitle": "Title",
+    "leverSplit": "Split",
+    "leverEdit": "AI edit",
+    "dialogLabel": "Refine proposal",
+    "heading": "Review refinements",
+    "nothingConverged": "Everything is already tidy. No changes to apply.",
+    "nothingNotConverged": "No changes could be fixed automatically (remaining issues need manual / upstream handling).",
+    "countSlides": "{{count}} slides",
+    "willTidy": "will be tidied",
+    "breakdownWithAi": " (deterministic {{detCount}} · AI {{aiCount}})",
+    "breakdownDetOnly": " (deterministic {{detCount}})",
+    "someIssuesRemain": " · some issues remain",
+    "slideN": "Slide {{n}}",
+    "kindAi": "AI",
+    "kindDeterministic": "Deterministic",
+    "close": "Close",
+    "cancel": "Cancel",
+    "accept": "✓ Accept ({{count}})"
+  },
+  "reviewBar": {
+    "warnCount": "⚠ Issues {{n}}",
+    "tipCount": "💡 Tips {{n}}",
+    "collapse": "Collapse",
+    "showDetails": "Show details",
+    "recommend": "Recommended: {{levers}}",
+    "toTable": "→ Table",
+    "toTableTitle": "Convert to a table (deterministic, undoable)",
+    "aiFix": "✨ Fix",
+    "aiFixTitle": "Open AI Assist to fix (prompt preset — review/edit, then generate)",
+    "promptTitle": "Give this slide a concise title that describes its content.",
+    "promptSplit": "There is too much information to fit on one slide. Focus on the key points and make each bullet a short key phrase (aim for 28 characters or fewer). Do not omit information.",
+    "promptCondense": "Summarize each bullet into a short key phrase (aim for 28 characters or fewer). Key points, not sentences. Do not omit information.",
+    "promptTidy": "Tidy this slide up concisely so it fits within the layout."
+  },
+  "seqOverlay": {
+    "reorderHint": "Drag left/right to reorder participants"
+  },
+  "slideEditor": {
+    "auto": "Auto",
+    "autoResolvedTo": "Auto → {{layout}}",
+    "candidates": "Candidates:",
+    "topCandidateTitle": "Auto's top pick (best score)",
+    "nextCandidateTitle": "Next-best candidate layout",
+    "resetToAutoTitle": "Return to auto-select (always picks the best score)",
+    "group": "Group {{n}}",
+    "groupOverflow": "⚠ Overflow (won't be exported)",
+    "groupPlaceholder": "### Heading\nBody…",
+    "image": "🖼 Image",
+    "replaceByPasteDrop": "Paste/drop to replace",
+    "backmostLayer": "▤ Backmost layer (behind existing content)",
+    "boundToPlaceholder": "→ {{label}} (idx {{idx}})",
+    "deleteImage": "Delete image",
+    "size": "Size",
+    "sizeSliderTitle": "Drag to resize (keeps the center fixed)",
+    "width": "Width",
+    "height": "Height",
+    "left": "Left position",
+    "top": "Top position",
+    "replaceIntoBodyTitle": "Place back into the body frame (front)",
+    "makeBackmostTitle": "Make it the backmost layer (laid behind without breaking existing content)",
+    "backmost": "▤ Backmost",
+    "bodyFrame": "▤ Body frame",
+    "fitTitle": "contain = whole image with padding / cover = cropped to fill the frame",
+    "aspectLockTitle": "Keep the aspect ratio when resizing",
+    "aspectLock": "Lock ratio",
+    "resetRectTitle": "Reset to default size and position (clear manual adjustments)",
+    "resetToDefault": "⟲ Reset to default",
+    "resetToFrame": "⟲ Reset to frame"
+  },
+  "slideList": {
+    "dragToReorder": "Drag to reorder",
+    "duplicateSlide": "Duplicate this slide",
+    "deleteSlide": "Delete this slide"
+  },
+  "slideMdEditor": {
+    "placeholder": "# Heading\n> Subtitle\n\n- Bullet\n- Bullet"
+  },
+  "slidePreview": {
+    "dismiss": "Dismiss",
+    "zoomOut": "Zoom out",
+    "resetZoom": "Reset to fit",
+    "zoomIn": "Zoom in"
+  },
+  "slides": {
+    "add": "Add a slide (after the selected one)"
+  },
   "templateCreator": {
     "defaultTemplateName": "My Template",
     "paletteBackground": "Background (Cover / Header Bar)",
@@ -116,103 +431,14 @@
     "creating": "Generating…",
     "createAndApply": "Generate & Apply"
   },
-  "slideEditor": {
-    "auto": "Auto",
-    "autoResolvedTo": "Auto → {{layout}}",
-    "candidates": "Candidates:",
-    "topCandidateTitle": "Auto's top pick (best score)",
-    "nextCandidateTitle": "Next-best candidate layout",
-    "resetToAutoTitle": "Return to auto-select (always picks the best score)",
-    "group": "Group {{n}}",
-    "groupOverflow": "⚠ Overflow (won't be exported)",
-    "groupPlaceholder": "### Heading\nBody…",
-    "image": "🖼 Image",
-    "replaceByPasteDrop": "Paste/drop to replace",
-    "backmostLayer": "▤ Backmost layer (behind existing content)",
-    "boundToPlaceholder": "→ {{label}} (idx {{idx}})",
-    "deleteImage": "Delete image",
-    "size": "Size",
-    "sizeSliderTitle": "Drag to resize (keeps the center fixed)",
-    "width": "Width",
-    "height": "Height",
-    "left": "Left position",
-    "top": "Top position",
-    "replaceIntoBodyTitle": "Place back into the body frame (front)",
-    "makeBackmostTitle": "Make it the backmost layer (laid behind without breaking existing content)",
-    "backmost": "▤ Backmost",
-    "bodyFrame": "▤ Body frame",
-    "fitTitle": "contain = whole image with padding / cover = cropped to fill the frame",
-    "aspectLockTitle": "Keep the aspect ratio when resizing",
-    "aspectLock": "Lock ratio",
-    "resetRectTitle": "Reset to default size and position (clear manual adjustments)",
-    "resetToDefault": "⟲ Reset to default",
-    "resetToFrame": "⟲ Reset to frame"
+  "templatePreview": {
+    "defaultCustomLayoutName": "Custom {{n}}"
   },
-  "layoutEditor": {
-    "phType": {
-      "ctrTitle": "Title",
-      "body": "Body",
-      "subTitle": "Subtitle",
-      "sldNum": "Page number"
-    },
-    "align": {
-      "l": "Left",
-      "ctr": "Center",
-      "r": "Right"
-    },
-    "layoutNamePlaceholder": "Layout name",
-    "familyLight": "Light background",
-    "familyDark": "Dark background",
-    "deleteLayout": "Delete this layout",
-    "fontMajor": "Heading",
-    "fontMinor": "Body",
-    "bold": "Bold",
-    "deletePlaceholder": "Delete placeholder",
-    "addPlaceholder": "+ Add placeholder",
-    "addCustomLayout": "+ Add custom layout"
-  },
-  "aiSettings": {
-    "title": "AI Settings",
-    "provider": "Provider",
-    "switchToOllama": "🦙 Ollama → Use",
-    "switchToOllamaTitle": "Switch to local Ollama",
-    "startBuiltinTitle": "Start the offline built-in model (first run auto-downloads the model)",
-    "downloadBuiltin": "⬇ {{model}} (first download {{gb}}GB)",
-    "startBuiltin": "💻 Start offline AI",
-    "useBuiltin": "💻 Use offline AI",
-    "offlineAiName": "Offline AI",
-    "stopBuiltin": "⏹ Stop",
-    "stopBuiltinTitle": "Stop the built-in AI to free memory (auto-starts on next generation)",
-    "bestOfNTitle": "Produce multiple candidates per generation and surface the best via the adoption gate (single-slide edit). 1 disables it. Higher means better quality but slower / more memory.",
-    "bestOfNLabel": "Candidates (Best-of-N)",
-    "bestOfNRange": "1–{{max}}",
-    "builtinModel": "Built-in model",
-    "modelNotInstalled": "{{model}} (not installed)",
-    "refreshModels": "Fetch installed models",
-    "apiKeyOptional": "API key (optional)",
-    "rememberKey": "Remember key"
-  },
-  "refineProposal": {
-    "leverVisualize": "Convert to table",
-    "leverCondense": "Condense",
-    "leverTitle": "Title",
-    "leverSplit": "Split",
-    "leverEdit": "AI edit",
-    "dialogLabel": "Refine proposal",
-    "heading": "Review refinements",
-    "nothingConverged": "Everything is already tidy. No changes to apply.",
-    "nothingNotConverged": "No changes could be fixed automatically (remaining issues need manual / upstream handling).",
-    "countSlides": "{{count}} slides",
-    "willTidy": "will be tidied",
-    "breakdownWithAi": " (deterministic {{detCount}} · AI {{aiCount}})",
-    "breakdownDetOnly": " (deterministic {{detCount}})",
-    "someIssuesRemain": " · some issues remain",
-    "slideN": "Slide {{n}}",
-    "kindAi": "AI",
-    "kindDeterministic": "Deterministic",
-    "close": "Close",
-    "cancel": "Cancel",
-    "accept": "✓ Accept ({{count}})"
+  "themeToggle": {
+    "groupLabel": "Color theme",
+    "dark": "Dark",
+    "light": "Light",
+    "modern": "Modern (Slate)"
   },
   "toolbar": {
     "undo": "Undo (⌘/Ctrl+Z)",
@@ -233,152 +459,5 @@
     "transitionFade": "Fade",
     "transitionZoom": "Zoom",
     "transitionPush": "Push"
-  },
-  "reviewBar": {
-    "warnCount": "⚠ Issues {{n}}",
-    "tipCount": "💡 Tips {{n}}",
-    "collapse": "Collapse",
-    "showDetails": "Show details",
-    "recommend": "Recommended: {{levers}}",
-    "toTable": "→ Table",
-    "toTableTitle": "Convert to a table (deterministic, undoable)",
-    "aiFix": "✨ Fix",
-    "aiFixTitle": "Open AI Assist to fix (prompt preset — review/edit, then generate)",
-    "promptTitle": "Give this slide a concise title that describes its content.",
-    "promptSplit": "There is too much information to fit on one slide. Focus on the key points and make each bullet a short key phrase (aim for 28 characters or fewer). Do not omit information.",
-    "promptCondense": "Summarize each bullet into a short key phrase (aim for 28 characters or fewer). Key points, not sentences. Do not omit information.",
-    "promptTidy": "Tidy this slide up concisely so it fits within the layout."
-  },
-  "collabPanel": {
-    "copy": "Copy",
-    "copied": "Copied",
-    "statusConnected": "Connected",
-    "statusConnecting": "Connecting…",
-    "statusError": "Error",
-    "statusDisconnected": "Not connected",
-    "headerTitle": "Collaborate (AI live editing)",
-    "close": "Close",
-    "unavailableBefore": "Collaboration works only in the desktop app (",
-    "unavailableAfter": " / built version). It starts a local MCP sidecar and connects the upstream AI and the webview to the same deck.",
-    "introBefore": "When you start, a local MCP host (sidecar) launches. Pass the URL and token below to the upstream AI, and the AI's edits will ",
-    "introHighlight": "appear live on this screen",
-    "introAfter": ".",
-    "startButton": "Start collaboration",
-    "liveViewing": "Connected — showing the host's deck live",
-    "documentCount": "Documents: {{docCount}}",
-    "coEditNotice": "Co-editing: your edits are sent to the host (the single source of truth) and shared live with the AI. The AI's edits appear here too. Undo (⌘Z) runs against the host's history (structure changes, templates, and tab switching are locked while connected).",
-    "endpointLabel": "MCP endpoint",
-    "tokenLabel": "Token (per-launch)",
-    "addToClaudeCode": "Add to Claude Code (copy & paste)",
-    "stopButton": "Stop"
-  },
-  "llmAssist": {
-    "title": "✨ Generate with AI — Build a deck from your draft",
-    "diagramTypeLabel": "Diagram type",
-    "diagramTypeAuto": "Auto (let AI choose)",
-    "requestPlaceholderSlides": "e.g. Progress report for a CRM migration project (about 10 slides, including current-state analysis, comparison, and a roadmap)",
-    "requestPlaceholderDiagram": "e.g. Network diagram for a 3-tier web app (LB→Web→App→DB, with a DMZ)",
-    "switchToOllamaTitle": "Switch to local Ollama",
-    "ollamaDetected": "🦙 Ollama detected ({{count}}) → Use it",
-    "useBuiltinTitle": "Use the offline built-in model (downloads automatically the first time)",
-    "builtinDownload": "⬇ Offline AI (first download 2.4GB)",
-    "builtinUse": "💻 Use offline AI",
-    "stopBuiltinTitle": "Stop the built-in AI and free memory (restarts automatically on the next generation)",
-    "stopBuiltin": "⏹ Stop",
-    "modelNotInstalled": "{{model}} (not installed)",
-    "refreshModelsTitle": "Fetch installed models",
-    "modelsFetchError": "Couldn't fetch the model list ({{error}}). Check the Base URL, retry with ↻, or type a name manually.",
-    "modelsEmpty": "No installed models found. Confirm a model has been pulled to this Ollama and that the Base URL points to the right Ollama, then retry with ↻."
-  },
-  "initModal": {
-    "dialogLabel": "Draft — Build slides from your draft",
-    "importMarkdown": "📄 Import Markdown",
-    "importMarkdownTitle": "Import a .md / .yaml file",
-    "generateAi": "✨ Generate with AI",
-    "generateAiTitle": "Generate a deck with AI",
-    "tidyDraft": "🧹 Tidy draft",
-    "tidyDraftTitle": "Split the raw draft into slides by heading, break up overpacked slides, and turn key-value pairs into tables (no AI, undoable)",
-    "close": "Cancel",
-    "editorHint": "・ You can paste or type directly here",
-    "previewHeader": "Slide Preview (split result)",
-    "parseError": "Couldn't parse Markdown: {{parseError}}",
-    "emptyContent": "Content is empty — paste or import something",
-    "cancel": "Cancel",
-    "commit": "✓ Make slides"
-  },
-  "masterPicker": {
-    "buttonTitle": "Slide master used for this deck",
-    "selectMaster": "Select master",
-    "builtinSuffix": " (built-in)",
-    "importTitle": "Import a .pptx keeping its layouts and placeholders as-is",
-    "importLabel": "Import master (.pptx)",
-    "remakeTitle": "Inherit only fonts, colors, and background from a .pptx and rebuild with SlideCraft's layouts",
-    "remakeLabel": "Import theme only (Re-make)",
-    "createTitle": "Pick colors and fonts to generate a new template",
-    "createLabel": "Create template…"
-  },
-  "aiTasks": {
-    "taskCount": "{{count}} tasks",
-    "clearHistory": "Clear History",
-    "empty": "No AI tasks yet",
-    "rowExpandHint": "Click to view the sent prompt / result",
-    "cancel": "Cancel",
-    "systemPrompt": "System prompt (mode: {{mode}})",
-    "userMessage": "User message",
-    "result": "Result"
-  },
-  "slidePreview": {
-    "dismiss": "Dismiss",
-    "zoomOut": "Zoom out",
-    "resetZoom": "Reset to fit",
-    "zoomIn": "Zoom in"
-  },
-  "edgeStyle": {
-    "arrowStyle": "Arrow Style",
-    "width": "Width",
-    "dashed": "Dashed",
-    "color": "Color",
-    "startPosition": "Start Position",
-    "resetStartPosition": "Reset start position"
-  },
-  "localOnly": {
-    "advancedSettings": "Advanced Settings",
-    "cloudBlockedBadge": "Cloud Sending Blocked",
-    "toggleTitle": "Block sending to cloud providers/endpoints and allow only local targets (Ollama / localhost / LAN)",
-    "localModelOnly": "Local Models Only"
-  },
-  "slideList": {
-    "dragToReorder": "Drag to reorder",
-    "duplicateSlide": "Duplicate this slide",
-    "deleteSlide": "Delete this slide"
-  },
-  "diagramOverlay": {
-    "resizeDragHint": "Drag to resize",
-    "resetToAutoLayout": "Reset to auto layout",
-    "moveArrowStartHint": "Drag to move the arrow's start point"
-  },
-  "diffView": {
-    "changes": "Changes:",
-    "noChanges": "(no changes)"
-  },
-  "diagramEditor": {
-    "mermaidIncompatibleHint": "This diagram contains icons or kpi/radar and can't be converted to Mermaid. Please edit it in YAML / JSON.",
-    "selectEditFormat": "Select edit format",
-    "mermaidNotConvertible": "MERMAID (not convertible)"
-  },
-  "themeToggle": {
-    "groupLabel": "Color theme",
-    "dark": "Dark",
-    "light": "Light",
-    "modern": "Modern (Slate)"
-  },
-  "slideMdEditor": {
-    "placeholder": "# Heading\n> Subtitle\n\n- Bullet\n- Bullet"
-  },
-  "seqOverlay": {
-    "reorderHint": "Drag left/right to reorder participants"
-  },
-  "docTabs": {
-    "close": "Close"
   }
 }

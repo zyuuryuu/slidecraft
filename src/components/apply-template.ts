@@ -8,6 +8,7 @@
  * confirm で同意されたら修復済み bytes を適用する（「整形して取り込む」）。同意 UI（Tauri ダイアログ等）
  * はここに置かず confirm コールバックで注入 — このモジュールは unit-testable のまま。
  */
+import i18n from "../i18n";
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
@@ -71,7 +72,7 @@ export async function applyTemplateBytesWithRepair(
     }
 
     const reason = health.findings.filter((f) => f.level === "block").map((f) => f.message).join(" ");
-    setters.setParseError(`このテンプレートは使用できません: ${reason}`);
+    setters.setParseError(i18n.t("applyTemplate.templateUnusable", { reason }));
     return { ok: false, health, repair: plan };
   } catch (err) {
     setters.setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -98,21 +99,27 @@ export async function applyTemplateBytesAsRemake(
   try {
     const source = await loadTemplate(buf);
     const cleanName = name.replace(/\.pptx$/i, "");
-    const spec = masterToTemplateSpec(source, { name: `${cleanName}（Re-make）` });
+    const spec = masterToTemplateSpec(source, {
+      name: i18n.t("applyTemplate.remakeName", { name: cleanName }),
+    });
     const logo = await extractLogo(source); // lift the source's logo onto the minted layouts
     const remadeBytes = await writeTemplate(logo ? { ...spec, logo } : spec);
     const remade = await loadTemplate(remadeBytes);
     const health = assessTemplateHealth(buildCatalog(remade));
     if (health.status === "rejected") {
       // Shouldn't happen (canonical layouts always pass), but never silently apply a bad one.
-      setters.setParseError("Re-make に失敗しました（生成テンプレートが検証を通りませんでした）。");
+      setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
       return { ok: false, health };
     }
     setters.setTemplateData(remade);
     setters.setTemplateName(spec.name);
     return { ok: true, health, remadeBytes };
   } catch (err) {
-    setters.setParseError(`Re-make に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
+    setters.setParseError(
+      i18n.t("applyTemplate.remakeFailed", {
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     return { ok: false };
   }
 }
@@ -123,12 +130,12 @@ export function describeRepairPlan(plan: RepairPlan): string {
   const titles = plan.ops.filter((o) => o.setType === "title").length;
   const bodies = plan.ops.filter((o) => o.setType === "body").length;
   const parts = [
-    titles > 0 ? `タイトル枠 ${titles} 件` : "",
-    bodies > 0 ? `本文枠 ${bodies} 件` : "",
-  ].filter(Boolean).join("・");
+    titles > 0 ? i18n.t("applyTemplate.repairTitleFrames", { n: titles }) : "",
+    bodies > 0 ? i18n.t("applyTemplate.repairBodyFrames", { n: bodies }) : "",
+  ].filter(Boolean).join(i18n.t("applyTemplate.repairPartSeparator"));
   return (
-    `このテンプレートはそのままでは使用できません:\n${blocks.join("\n")}\n\n` +
-    `自動修復の提案: 計 ${plan.ops.length} 件（${parts}）のプレースホルダに種別を付与します。\n` +
-    `整形して取り込みますか？`
+    i18n.t("applyTemplate.repairPlanHeader", { blocks: blocks.join("\n") }) +
+    i18n.t("applyTemplate.repairPlanProposal", { total: plan.ops.length, parts }) +
+    i18n.t("applyTemplate.repairPlanConfirm")
   );
 }

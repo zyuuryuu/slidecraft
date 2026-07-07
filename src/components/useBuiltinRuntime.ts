@@ -8,6 +8,7 @@
  * setConfigs/setProvider so this owns only the runtime state, not the whole config store.
  */
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
+import i18n from "../i18n";
 import { runningInTauri } from "../ipc/commands";
 import { listProviderModels, type ProviderId } from "../ipc/ai";
 import type { AiConfigMap, BuiltinModelInfo } from "./ai-generation-types";
@@ -49,7 +50,7 @@ export function useBuiltinRuntime(deps: {
   }, []);
 
   const startBuiltin = useCallback(async (): Promise<string> => {
-    if (!runningInTauri()) throw new Error("組み込みモデルはデスクトップ版でのみ利用できます。");
+    if (!runningInTauri()) throw new Error(i18n.t("builtinRuntime.desktopOnly"));
     setBuiltinStatus({ kind: "starting" });
     const { invoke } = await import("@tauri-apps/api/core");
     const info = await invoke<{ baseUrl: string }>("start_local_ai");
@@ -70,7 +71,7 @@ export function useBuiltinRuntime(deps: {
   // Explicit enable: download the model on first use (streamed, with progress), then spawn + select.
   const switchToBuiltin = useCallback(async () => {
     if (!runningInTauri()) {
-      setBuiltinStatus({ kind: "error", message: "組み込みモデルはデスクトップ版でのみ利用できます。" });
+      setBuiltinStatus({ kind: "error", message: i18n.t("builtinRuntime.desktopOnly") });
       return;
     }
     try {

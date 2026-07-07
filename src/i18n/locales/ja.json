@@ -1,39 +1,17 @@
 {
-  "lang": {
-    "name": "日本語",
-    "switchTo": "English",
-    "aria": "言語を切り替え"
+  "aiGen": {
+    "retryWithOps": "🔁 opsで再生成",
+    "candidateOfN": "候補{{i}}/{{n}}",
+    "manualInput": "手動入力",
+    "error": "エラー"
   },
-  "panel": {
-    "slides": "スライド",
-    "slideEditor": "スライドエディタ",
-    "preview": "プレビュー",
-    "previewSlide": "プレビュー — スライド {{n}}"
-  },
-  "preview": {
-    "emptyHeading": "スライドプレビュー",
-    "emptyHint": "Markdown を入力するとここにプレビューが表示されます",
-    "noSlides": "スライドがありません",
-    "selectSlide": "スライドを選択"
-  },
-  "slides": {
-    "add": "スライドを追加（選択中のスライドの後ろに）"
-  },
-  "app": {
-    "repairTemplateTitle": "テンプレートの自動修復",
-    "remakeSuffix": "（Re-make）",
-    "taskTemplateProposal": "テンプレ提案",
-    "taskEditSlide": "スライド{{n}}を編集",
-    "taskRetrySuffix": "（再試行{{attempt}}）",
-    "taskCandidateSuffix": "・候補{{candidate}}",
-    "nothingToUndo": "戻せる操作がありません",
-    "nothingToRedo": "やり直せる操作がありません",
-    "imagePasted": "画像を貼り付けました",
-    "imageInserted": "画像を挿入しました",
-    "imageLoadFailed": "画像の読み込みに失敗しました",
-    "draftLockedTitle": "協働接続中は編集ロック中",
-    "draftButtonTitle": "原稿（テキスト）からスライドを作る・取り込む",
-    "viewForm": "フォーム"
+  "aiMode": {
+    "slides": "デッキ生成",
+    "slide": "スライド整形",
+    "condense": "本文を要約",
+    "diagram": "図の生成",
+    "diagram-edit": "図の編集",
+    "template-spec": "テンプレ提案"
   },
   "aiPanel": {
     "resizeHint": "ドラッグで高さ変更（ダブルクリックでリセット）",
@@ -76,6 +54,343 @@
     "adoptToSlide": "採用 → このスライド",
     "applyToEdit": "適用 → 編集へ"
   },
+  "aiSettings": {
+    "title": "AI 設定",
+    "provider": "プロバイダ",
+    "switchToOllama": "🦙 Ollama → 使う",
+    "switchToOllamaTitle": "ローカルの Ollama に切り替え",
+    "startBuiltinTitle": "オフラインの組み込みモデルを起動（初回はモデルを自動ダウンロード）",
+    "downloadBuiltin": "⬇ {{model}}（初回DL {{gb}}GB）",
+    "startBuiltin": "💻 オフラインAIを起動",
+    "useBuiltin": "💻 オフラインAIを使う",
+    "offlineAiName": "オフラインAI",
+    "stopBuiltin": "⏹ 停止",
+    "stopBuiltinTitle": "組み込みAIを停止してメモリを解放（次の生成で自動起動）",
+    "bestOfNTitle": "1回の生成で候補を複数出し、採用ゲートで最良を提示（単一スライド編集）。1で無効。大きいほど品質↑・遅い/メモリ↑。",
+    "bestOfNLabel": "候補数 (Best-of-N)",
+    "bestOfNRange": "1〜{{max}}",
+    "builtinModel": "組み込みモデル",
+    "modelNotInstalled": "{{model}}（未インストール）",
+    "refreshModels": "インストール済みモデルを取得",
+    "apiKeyOptional": "API key (任意)",
+    "rememberKey": "キーを記憶"
+  },
+  "aiStatus": {
+    "noValidEdit": "有効な編集が生成できませんでした。具体的な指示（例: 要約 / 箇条書きに整形 / 図を追加 / 英語に翻訳）でお試しください。",
+    "apiKeyMissing": "APIキー未設定",
+    "apiKeyMissingHint": "下の設定に Anthropic の API キーを入力",
+    "modelNotSelected": "モデル未選択",
+    "usingModel": "{{model}} を使用",
+    "downloadingModel": "{{model}} をダウンロード中… {{pct}}%",
+    "modelFallback": "モデル",
+    "offlineStarting": "オフラインAIを起動中…（初回は数十秒）",
+    "offlineStartFailed": "オフラインAIの起動に失敗",
+    "modelNotFetched": "{{model}} 未取得",
+    "offlineAiFallback": "オフラインAI",
+    "downloadFirstHint": "⬇ ボタンで初回ダウンロード（約{{gb}}GB）",
+    "offlineNotStarted": "オフラインAI 未起動",
+    "offlineAutoStartHint": "そのまま生成すると自動で起動します（初回は数十秒）",
+    "offlineNotResponding": "オフラインAIが応答しません",
+    "offlineRestartHint": "設定の「💻 起動」で再起動できます（または、そのまま生成すると自動で起動します）",
+    "baseUrlMissing": "Base URL 未設定",
+    "checkingConnection": "接続を確認中…",
+    "ollamaCantConnect": "Ollama に接続できません",
+    "ollamaServeHint": "`ollama serve` で起動（既定 localhost:11434）",
+    "cantConnect": "接続できません",
+    "checkEndpointHint": "エンドポイントを確認（{{error}}）",
+    "noModelsAvailable": "利用可能なモデルがありません",
+    "ollamaPullHint": "`ollama pull qwen2.5` 等でモデルを取得",
+    "checkModelNameHint": "モデル名を確認",
+    "selectModel": "モデルを選択",
+    "modelsAvailableHint": "{{count}} 個のモデルが利用可",
+    "connectedOk": "{{model}}（接続OK・{{count}} モデル）"
+  },
+  "aiTasks": {
+    "taskCount": "{{count}} 件のタスク",
+    "clearHistory": "履歴をクリア",
+    "empty": "まだ AI タスクはありません",
+    "rowExpandHint": "クリックで送信プロンプト/結果を表示",
+    "cancel": "中止",
+    "systemPrompt": "System プロンプト（mode: {{mode}}）",
+    "userMessage": "User メッセージ",
+    "result": "結果"
+  },
+  "app": {
+    "repairTemplateTitle": "テンプレートの自動修復",
+    "remakeSuffix": "（Re-make）",
+    "taskTemplateProposal": "テンプレ提案",
+    "taskEditSlide": "スライド{{n}}を編集",
+    "taskRetrySuffix": "（再試行{{attempt}}）",
+    "taskCandidateSuffix": "・候補{{candidate}}",
+    "nothingToUndo": "戻せる操作がありません",
+    "nothingToRedo": "やり直せる操作がありません",
+    "imagePasted": "画像を貼り付けました",
+    "imageInserted": "画像を挿入しました",
+    "imageLoadFailed": "画像の読み込みに失敗しました",
+    "draftLockedTitle": "協働接続中は編集ロック中",
+    "draftButtonTitle": "原稿（テキスト）からスライドを作る・取り込む",
+    "viewForm": "フォーム"
+  },
+  "applyTemplate": {
+    "templateUnusable": "このテンプレートは使用できません: {{reason}}",
+    "remakeFailedValidation": "Re-make に失敗しました（生成テンプレートが検証を通りませんでした）。",
+    "remakeFailed": "Re-make に失敗しました: {{error}}",
+    "remakeName": "{{name}}（Re-make）",
+    "repairTitleFrames": "タイトル枠 {{n}} 件",
+    "repairBodyFrames": "本文枠 {{n}} 件",
+    "repairPartSeparator": "・",
+    "repairPlanHeader": "このテンプレートはそのままでは使用できません:\n{{blocks}}\n\n",
+    "repairPlanProposal": "自動修復の提案: 計 {{total}} 件（{{parts}}）のプレースホルダに種別を付与します。\n",
+    "repairPlanConfirm": "整形して取り込みますか？"
+  },
+  "builtinRuntime": {
+    "desktopOnly": "組み込みモデルはデスクトップ版でのみ利用できます。"
+  },
+  "collab": {
+    "notConnected": "未接続"
+  },
+  "collabPanel": {
+    "copy": "コピー",
+    "copied": "コピー済",
+    "statusConnected": "接続中",
+    "statusConnecting": "接続中…",
+    "statusError": "エラー",
+    "statusDisconnected": "未接続",
+    "headerTitle": "協働（AI ライブ編集）",
+    "close": "閉じる",
+    "unavailableBefore": "協働機能はデスクトップアプリ（",
+    "unavailableAfter": " / ビルド版）でのみ動作します。ローカルの MCP サイドカーを起動して、上流 AI と webview を同じデッキへ接続します。",
+    "introBefore": "開始すると、ローカルに MCP ホスト（サイドカー）を起動します。下の URL とトークンを上流 AI に渡すと、AI の編集が ",
+    "introHighlight": "この画面にライブ反映",
+    "introAfter": " されます。",
+    "startButton": "協働を開始",
+    "liveViewing": "接続中・ホストの deck をライブ表示中",
+    "documentCount": "ドキュメント: {{docCount}}",
+    "coEditNotice": "協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレ・タブ切替は接続中ロック）。",
+    "endpointLabel": "MCP エンドポイント",
+    "tokenLabel": "トークン（per-launch）",
+    "addToClaudeCode": "Claude Code に追加（コピペ）",
+    "stopButton": "停止"
+  },
+  "controller": {
+    "untitledDoc": "無題",
+    "nothingToRedo": "やり直せる操作がありません",
+    "nothingToUndo": "戻せる操作がありません",
+    "slideEditSendFailed": "編集を host に送れませんでした",
+    "cannotDeleteLastSlide": "最後の1枚は削除できません（スライドは最低1枚必要です）。"
+  },
+  "deckIo": {
+    "projectOpenFailed": "プロジェクトを開けません: {{error}}"
+  },
+  "diagramEditor": {
+    "mermaidIncompatibleHint": "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。",
+    "selectEditFormat": "編集フォーマットを選択",
+    "mermaidNotConvertible": "MERMAID（変換不可）"
+  },
+  "diagramOverlay": {
+    "resizeDragHint": "ドラッグでリサイズ",
+    "resetToAutoLayout": "自動配置に戻す",
+    "moveArrowStartHint": "ドラッグで矢印の始点を移動"
+  },
+  "diffView": {
+    "changes": "変更:",
+    "noChanges": "（変更なし）"
+  },
+  "docTabs": {
+    "close": "閉じる"
+  },
+  "edgeStyle": {
+    "arrowStyle": "矢印スタイル",
+    "width": "太さ",
+    "dashed": "点線",
+    "color": "色",
+    "startPosition": "始点位置",
+    "resetStartPosition": "始点位置をリセット"
+  },
+  "initModal": {
+    "dialogLabel": "Draft — 原稿からスライドを作る",
+    "importMarkdown": "📄 Markdown を取込む",
+    "importMarkdownTitle": ".md / .yaml を取り込む",
+    "generateAi": "✨ AIで生成",
+    "generateAiTitle": "AI でデッキを生成",
+    "tidyDraft": "🧹 原稿を整形",
+    "tidyDraftTitle": "生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）",
+    "close": "キャンセル",
+    "editorHint": "・ ここに直接貼り付け／入力してもOK",
+    "previewHeader": "Slide Preview（分割結果）",
+    "parseError": "Markdown を解析できません: {{parseError}}",
+    "emptyContent": "内容が空です — 貼り付けるか取り込んでください",
+    "cancel": "キャンセル",
+    "commit": "✓ スライドにする"
+  },
+  "lang": {
+    "name": "日本語",
+    "switchTo": "English",
+    "aria": "言語を切り替え"
+  },
+  "layoutEditor": {
+    "phType": {
+      "ctrTitle": "タイトル",
+      "body": "本文",
+      "subTitle": "サブタイトル",
+      "sldNum": "ページ番号"
+    },
+    "align": {
+      "l": "左",
+      "ctr": "中央",
+      "r": "右"
+    },
+    "layoutNamePlaceholder": "レイアウト名",
+    "familyLight": "明るい背景",
+    "familyDark": "暗い背景",
+    "deleteLayout": "このレイアウトを削除",
+    "fontMajor": "見出し",
+    "fontMinor": "本文",
+    "bold": "太字",
+    "deletePlaceholder": "枠を削除",
+    "addPlaceholder": "＋ 枠を追加",
+    "addCustomLayout": "＋ カスタムレイアウトを追加"
+  },
+  "llmAssist": {
+    "title": "✨ AIで生成 — 原稿からデッキを生成",
+    "diagramTypeLabel": "図の種類",
+    "diagramTypeAuto": "おまかせ（AIが選ぶ）",
+    "requestPlaceholderSlides": "例: CRM移行プロジェクトの進捗報告（10枚程度、現状分析・比較・ロードマップを含む）",
+    "requestPlaceholderDiagram": "例: 3層Webアプリのネットワーク構成図（LB→Web→App→DB、DMZあり）",
+    "switchToOllamaTitle": "ローカルの Ollama に切り替え",
+    "ollamaDetected": "🦙 Ollama検出（{{count}}）→ 使う",
+    "useBuiltinTitle": "オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）",
+    "builtinDownload": "⬇ オフラインAI（初回DL 2.4GB）",
+    "builtinUse": "💻 オフラインAIを使う",
+    "stopBuiltinTitle": "組み込みAIを停止してメモリを解放（次の生成で自動起動）",
+    "stopBuiltin": "⏹ 停止",
+    "modelNotInstalled": "{{model}}（未インストール）",
+    "refreshModelsTitle": "インストール済みモデルを取得",
+    "modelsFetchError": "モデル一覧を取得できません（{{error}}）。Base URL を確認、↻ で再取得。手入力も可。",
+    "modelsEmpty": "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。"
+  },
+  "localOnly": {
+    "advancedSettings": "上級設定",
+    "cloudBlockedBadge": "クラウド送信ブロック中",
+    "toggleTitle": "クラウドのプロバイダ/エンドポイントへの送信をブロックし、ローカル（Ollama / localhost / LAN）のみ許可します",
+    "localModelOnly": "ローカルモデル限定"
+  },
+  "masterPicker": {
+    "buttonTitle": "このデッキで使うスライドマスター",
+    "selectMaster": "マスター選択",
+    "builtinSuffix": "（内蔵）",
+    "importTitle": ".pptx のレイアウト・プレースホルダをそのまま活かして取り込む",
+    "importLabel": "マスターを取り込む（.pptx）",
+    "remakeTitle": ".pptx からフォント・配色・背景だけを受け継ぎ、SlideCraft のレイアウトで作り直す",
+    "remakeLabel": "テーマだけ取り込む（Re-make）",
+    "createTitle": "配色とフォントを選んで新しいテンプレを生成する",
+    "createLabel": "テンプレを作成…"
+  },
+  "masterReg": {
+    "defaultName": "テンプレート",
+    "builtinLoadFailed": "内蔵テンプレートの読み込みに失敗しました ({{status}})"
+  },
+  "panel": {
+    "slides": "スライド",
+    "slideEditor": "スライドエディタ",
+    "preview": "プレビュー",
+    "previewSlide": "プレビュー — スライド {{n}}"
+  },
+  "preview": {
+    "emptyHeading": "スライドプレビュー",
+    "emptyHint": "Markdown を入力するとここにプレビューが表示されます",
+    "noSlides": "スライドがありません",
+    "selectSlide": "スライドを選択"
+  },
+  "refineProposal": {
+    "leverVisualize": "表に変換",
+    "leverCondense": "要約",
+    "leverTitle": "タイトル",
+    "leverSplit": "分割",
+    "leverEdit": "AI編集",
+    "dialogLabel": "整形プロポーザル",
+    "heading": "整形の確認",
+    "nothingConverged": "すべて整っています。適用する変更はありません。",
+    "nothingNotConverged": "自動で直せる変更はありませんでした（残る課題は手動 / 上流で対応）。",
+    "countSlides": "{{count}} 枚",
+    "willTidy": "を整えます",
+    "breakdownWithAi": "（決定論 {{detCount}} ・ AI {{aiCount}}）",
+    "breakdownDetOnly": "（決定論 {{detCount}}）",
+    "someIssuesRemain": " ・ 一部の課題は残ります",
+    "slideN": "スライド {{n}}",
+    "kindAi": "AI",
+    "kindDeterministic": "決定論",
+    "close": "閉じる",
+    "cancel": "キャンセル",
+    "accept": "✓ 採用（{{count}} 件）"
+  },
+  "reviewBar": {
+    "warnCount": "⚠ 課題 {{n}}",
+    "tipCount": "💡 提案 {{n}}",
+    "collapse": "閉じる",
+    "showDetails": "詳細を見る",
+    "recommend": "推奨: {{levers}}",
+    "toTable": "→表",
+    "toTableTitle": "表に変換（決定論・元に戻せます）",
+    "aiFix": "✨直す",
+    "aiFixTitle": "AI Assist を開いて直す（指示プリセット・確認/編集してから生成）",
+    "promptTitle": "このスライドに、内容を表す簡潔なタイトルを付けてください。",
+    "promptSplit": "情報が多すぎて1スライドに収まりません。要点に絞り、各箇条書きを短いキーフレーズ（目安28字以内）にしてください。情報は省かないでください。",
+    "promptCondense": "各箇条書きを短いキーフレーズ（目安28字以内）に要約してください。文章ではなく要点に。情報は省かないでください。",
+    "promptTidy": "このスライドを、レイアウトに収まるよう簡潔に整えてください。"
+  },
+  "seqOverlay": {
+    "reorderHint": "左右にドラッグで参加者を並べ替え"
+  },
+  "slideEditor": {
+    "auto": "自動",
+    "autoResolvedTo": "自動 → {{layout}}",
+    "candidates": "候補:",
+    "topCandidateTitle": "Auto の第一候補（最良評価）",
+    "nextCandidateTitle": "次点の候補レイアウト",
+    "resetToAutoTitle": "自動選択に戻す（常に最良評価を選ぶ）",
+    "group": "グループ {{n}}",
+    "groupOverflow": "⚠超過（出力されません）",
+    "groupPlaceholder": "### 見出し\n本文…",
+    "image": "🖼 画像",
+    "replaceByPasteDrop": "貼り付け/ドロップで差し替え",
+    "backmostLayer": "▤ 最背面レイヤー（既存の後ろ）",
+    "boundToPlaceholder": "→ {{label}}（idx {{idx}}）",
+    "deleteImage": "画像を削除",
+    "size": "サイズ",
+    "sizeSliderTitle": "ドラッグで拡大・縮小（中心を保ったまま）",
+    "width": "幅",
+    "height": "高さ",
+    "left": "左位置",
+    "top": "上位置",
+    "replaceIntoBodyTitle": "本文枠に配置し直す（前面）",
+    "makeBackmostTitle": "最背面レイヤーにする（既存を壊さず後ろに敷く）",
+    "backmost": "▤ 最背面",
+    "bodyFrame": "▤ 本文枠",
+    "fitTitle": "contain=全体を余白付きで / cover=枠いっぱいに切り抜き",
+    "aspectLockTitle": "リサイズ時に縦横比を保つ",
+    "aspectLock": "比固定",
+    "resetRectTitle": "既定サイズ・位置に戻す（手動調整を解除）",
+    "resetToDefault": "⟲ 既定に戻す",
+    "resetToFrame": "⟲ 枠にリセット"
+  },
+  "slideList": {
+    "dragToReorder": "ドラッグで並べ替え",
+    "duplicateSlide": "このスライドを複製",
+    "deleteSlide": "このスライドを削除"
+  },
+  "slideMdEditor": {
+    "placeholder": "# 見出し\n> サブタイトル\n\n- 箇条書き\n- 箇条書き"
+  },
+  "slidePreview": {
+    "dismiss": "閉じる",
+    "zoomOut": "縮小",
+    "resetZoom": "フィットに戻す",
+    "zoomIn": "拡大"
+  },
+  "slides": {
+    "add": "スライドを追加（選択中のスライドの後ろに）"
+  },
   "templateCreator": {
     "defaultTemplateName": "マイテンプレート",
     "paletteBackground": "背景（カバー/ヘッダーバー）",
@@ -116,103 +431,14 @@
     "creating": "生成中…",
     "createAndApply": "生成して適用"
   },
-  "slideEditor": {
-    "auto": "自動",
-    "autoResolvedTo": "自動 → {{layout}}",
-    "candidates": "候補:",
-    "topCandidateTitle": "Auto の第一候補（最良評価）",
-    "nextCandidateTitle": "次点の候補レイアウト",
-    "resetToAutoTitle": "自動選択に戻す（常に最良評価を選ぶ）",
-    "group": "グループ {{n}}",
-    "groupOverflow": "⚠超過（出力されません）",
-    "groupPlaceholder": "### 見出し\n本文…",
-    "image": "🖼 画像",
-    "replaceByPasteDrop": "貼り付け/ドロップで差し替え",
-    "backmostLayer": "▤ 最背面レイヤー（既存の後ろ）",
-    "boundToPlaceholder": "→ {{label}}（idx {{idx}}）",
-    "deleteImage": "画像を削除",
-    "size": "サイズ",
-    "sizeSliderTitle": "ドラッグで拡大・縮小（中心を保ったまま）",
-    "width": "幅",
-    "height": "高さ",
-    "left": "左位置",
-    "top": "上位置",
-    "replaceIntoBodyTitle": "本文枠に配置し直す（前面）",
-    "makeBackmostTitle": "最背面レイヤーにする（既存を壊さず後ろに敷く）",
-    "backmost": "▤ 最背面",
-    "bodyFrame": "▤ 本文枠",
-    "fitTitle": "contain=全体を余白付きで / cover=枠いっぱいに切り抜き",
-    "aspectLockTitle": "リサイズ時に縦横比を保つ",
-    "aspectLock": "比固定",
-    "resetRectTitle": "既定サイズ・位置に戻す（手動調整を解除）",
-    "resetToDefault": "⟲ 既定に戻す",
-    "resetToFrame": "⟲ 枠にリセット"
+  "templatePreview": {
+    "defaultCustomLayoutName": "カスタム{{n}}"
   },
-  "layoutEditor": {
-    "phType": {
-      "ctrTitle": "タイトル",
-      "body": "本文",
-      "subTitle": "サブタイトル",
-      "sldNum": "ページ番号"
-    },
-    "align": {
-      "l": "左",
-      "ctr": "中央",
-      "r": "右"
-    },
-    "layoutNamePlaceholder": "レイアウト名",
-    "familyLight": "明るい背景",
-    "familyDark": "暗い背景",
-    "deleteLayout": "このレイアウトを削除",
-    "fontMajor": "見出し",
-    "fontMinor": "本文",
-    "bold": "太字",
-    "deletePlaceholder": "枠を削除",
-    "addPlaceholder": "＋ 枠を追加",
-    "addCustomLayout": "＋ カスタムレイアウトを追加"
-  },
-  "aiSettings": {
-    "title": "AI 設定",
-    "provider": "プロバイダ",
-    "switchToOllama": "🦙 Ollama → 使う",
-    "switchToOllamaTitle": "ローカルの Ollama に切り替え",
-    "startBuiltinTitle": "オフラインの組み込みモデルを起動（初回はモデルを自動ダウンロード）",
-    "downloadBuiltin": "⬇ {{model}}（初回DL {{gb}}GB）",
-    "startBuiltin": "💻 オフラインAIを起動",
-    "useBuiltin": "💻 オフラインAIを使う",
-    "offlineAiName": "オフラインAI",
-    "stopBuiltin": "⏹ 停止",
-    "stopBuiltinTitle": "組み込みAIを停止してメモリを解放（次の生成で自動起動）",
-    "bestOfNTitle": "1回の生成で候補を複数出し、採用ゲートで最良を提示（単一スライド編集）。1で無効。大きいほど品質↑・遅い/メモリ↑。",
-    "bestOfNLabel": "候補数 (Best-of-N)",
-    "bestOfNRange": "1〜{{max}}",
-    "builtinModel": "組み込みモデル",
-    "modelNotInstalled": "{{model}}（未インストール）",
-    "refreshModels": "インストール済みモデルを取得",
-    "apiKeyOptional": "API key (任意)",
-    "rememberKey": "キーを記憶"
-  },
-  "refineProposal": {
-    "leverVisualize": "表に変換",
-    "leverCondense": "要約",
-    "leverTitle": "タイトル",
-    "leverSplit": "分割",
-    "leverEdit": "AI編集",
-    "dialogLabel": "整形プロポーザル",
-    "heading": "整形の確認",
-    "nothingConverged": "すべて整っています。適用する変更はありません。",
-    "nothingNotConverged": "自動で直せる変更はありませんでした（残る課題は手動 / 上流で対応）。",
-    "countSlides": "{{count}} 枚",
-    "willTidy": "を整えます",
-    "breakdownWithAi": "（決定論 {{detCount}} ・ AI {{aiCount}}）",
-    "breakdownDetOnly": "（決定論 {{detCount}}）",
-    "someIssuesRemain": " ・ 一部の課題は残ります",
-    "slideN": "スライド {{n}}",
-    "kindAi": "AI",
-    "kindDeterministic": "決定論",
-    "close": "閉じる",
-    "cancel": "キャンセル",
-    "accept": "✓ 採用（{{count}} 件）"
+  "themeToggle": {
+    "groupLabel": "配色モード",
+    "dark": "Dark",
+    "light": "Light",
+    "modern": "Modern（Slate）"
   },
   "toolbar": {
     "undo": "元に戻す (⌘/Ctrl+Z)",
@@ -233,152 +459,5 @@
     "transitionFade": "フェード",
     "transitionZoom": "ズーム",
     "transitionPush": "プッシュ"
-  },
-  "reviewBar": {
-    "warnCount": "⚠ 課題 {{n}}",
-    "tipCount": "💡 提案 {{n}}",
-    "collapse": "閉じる",
-    "showDetails": "詳細を見る",
-    "recommend": "推奨: {{levers}}",
-    "toTable": "→表",
-    "toTableTitle": "表に変換（決定論・元に戻せます）",
-    "aiFix": "✨直す",
-    "aiFixTitle": "AI Assist を開いて直す（指示プリセット・確認/編集してから生成）",
-    "promptTitle": "このスライドに、内容を表す簡潔なタイトルを付けてください。",
-    "promptSplit": "情報が多すぎて1スライドに収まりません。要点に絞り、各箇条書きを短いキーフレーズ（目安28字以内）にしてください。情報は省かないでください。",
-    "promptCondense": "各箇条書きを短いキーフレーズ（目安28字以内）に要約してください。文章ではなく要点に。情報は省かないでください。",
-    "promptTidy": "このスライドを、レイアウトに収まるよう簡潔に整えてください。"
-  },
-  "collabPanel": {
-    "copy": "コピー",
-    "copied": "コピー済",
-    "statusConnected": "接続中",
-    "statusConnecting": "接続中…",
-    "statusError": "エラー",
-    "statusDisconnected": "未接続",
-    "headerTitle": "協働（AI ライブ編集）",
-    "close": "閉じる",
-    "unavailableBefore": "協働機能はデスクトップアプリ（",
-    "unavailableAfter": " / ビルド版）でのみ動作します。ローカルの MCP サイドカーを起動して、上流 AI と webview を同じデッキへ接続します。",
-    "introBefore": "開始すると、ローカルに MCP ホスト（サイドカー）を起動します。下の URL とトークンを上流 AI に渡すと、AI の編集が ",
-    "introHighlight": "この画面にライブ反映",
-    "introAfter": " されます。",
-    "startButton": "協働を開始",
-    "liveViewing": "接続中・ホストの deck をライブ表示中",
-    "documentCount": "ドキュメント: {{docCount}}",
-    "coEditNotice": "協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレ・タブ切替は接続中ロック）。",
-    "endpointLabel": "MCP エンドポイント",
-    "tokenLabel": "トークン（per-launch）",
-    "addToClaudeCode": "Claude Code に追加（コピペ）",
-    "stopButton": "停止"
-  },
-  "llmAssist": {
-    "title": "✨ AIで生成 — 原稿からデッキを生成",
-    "diagramTypeLabel": "図の種類",
-    "diagramTypeAuto": "おまかせ（AIが選ぶ）",
-    "requestPlaceholderSlides": "例: CRM移行プロジェクトの進捗報告（10枚程度、現状分析・比較・ロードマップを含む）",
-    "requestPlaceholderDiagram": "例: 3層Webアプリのネットワーク構成図（LB→Web→App→DB、DMZあり）",
-    "switchToOllamaTitle": "ローカルの Ollama に切り替え",
-    "ollamaDetected": "🦙 Ollama検出（{{count}}）→ 使う",
-    "useBuiltinTitle": "オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）",
-    "builtinDownload": "⬇ オフラインAI（初回DL 2.4GB）",
-    "builtinUse": "💻 オフラインAIを使う",
-    "stopBuiltinTitle": "組み込みAIを停止してメモリを解放（次の生成で自動起動）",
-    "stopBuiltin": "⏹ 停止",
-    "modelNotInstalled": "{{model}}（未インストール）",
-    "refreshModelsTitle": "インストール済みモデルを取得",
-    "modelsFetchError": "モデル一覧を取得できません（{{error}}）。Base URL を確認、↻ で再取得。手入力も可。",
-    "modelsEmpty": "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。"
-  },
-  "initModal": {
-    "dialogLabel": "Draft — 原稿からスライドを作る",
-    "importMarkdown": "📄 Markdown を取込む",
-    "importMarkdownTitle": ".md / .yaml を取り込む",
-    "generateAi": "✨ AIで生成",
-    "generateAiTitle": "AI でデッキを生成",
-    "tidyDraft": "🧹 原稿を整形",
-    "tidyDraftTitle": "生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）",
-    "close": "キャンセル",
-    "editorHint": "・ ここに直接貼り付け／入力してもOK",
-    "previewHeader": "Slide Preview（分割結果）",
-    "parseError": "Markdown を解析できません: {{parseError}}",
-    "emptyContent": "内容が空です — 貼り付けるか取り込んでください",
-    "cancel": "キャンセル",
-    "commit": "✓ スライドにする"
-  },
-  "masterPicker": {
-    "buttonTitle": "このデッキで使うスライドマスター",
-    "selectMaster": "マスター選択",
-    "builtinSuffix": "（内蔵）",
-    "importTitle": ".pptx のレイアウト・プレースホルダをそのまま活かして取り込む",
-    "importLabel": "マスターを取り込む（.pptx）",
-    "remakeTitle": ".pptx からフォント・配色・背景だけを受け継ぎ、SlideCraft のレイアウトで作り直す",
-    "remakeLabel": "テーマだけ取り込む（Re-make）",
-    "createTitle": "配色とフォントを選んで新しいテンプレを生成する",
-    "createLabel": "テンプレを作成…"
-  },
-  "aiTasks": {
-    "taskCount": "{{count}} 件のタスク",
-    "clearHistory": "履歴をクリア",
-    "empty": "まだ AI タスクはありません",
-    "rowExpandHint": "クリックで送信プロンプト/結果を表示",
-    "cancel": "中止",
-    "systemPrompt": "System プロンプト（mode: {{mode}}）",
-    "userMessage": "User メッセージ",
-    "result": "結果"
-  },
-  "slidePreview": {
-    "dismiss": "閉じる",
-    "zoomOut": "縮小",
-    "resetZoom": "フィットに戻す",
-    "zoomIn": "拡大"
-  },
-  "edgeStyle": {
-    "arrowStyle": "矢印スタイル",
-    "width": "太さ",
-    "dashed": "点線",
-    "color": "色",
-    "startPosition": "始点位置",
-    "resetStartPosition": "始点位置をリセット"
-  },
-  "localOnly": {
-    "advancedSettings": "上級設定",
-    "cloudBlockedBadge": "クラウド送信ブロック中",
-    "toggleTitle": "クラウドのプロバイダ/エンドポイントへの送信をブロックし、ローカル（Ollama / localhost / LAN）のみ許可します",
-    "localModelOnly": "ローカルモデル限定"
-  },
-  "slideList": {
-    "dragToReorder": "ドラッグで並べ替え",
-    "duplicateSlide": "このスライドを複製",
-    "deleteSlide": "このスライドを削除"
-  },
-  "diagramOverlay": {
-    "resizeDragHint": "ドラッグでリサイズ",
-    "resetToAutoLayout": "自動配置に戻す",
-    "moveArrowStartHint": "ドラッグで矢印の始点を移動"
-  },
-  "diffView": {
-    "changes": "変更:",
-    "noChanges": "（変更なし）"
-  },
-  "diagramEditor": {
-    "mermaidIncompatibleHint": "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。",
-    "selectEditFormat": "編集フォーマットを選択",
-    "mermaidNotConvertible": "MERMAID（変換不可）"
-  },
-  "themeToggle": {
-    "groupLabel": "配色モード",
-    "dark": "Dark",
-    "light": "Light",
-    "modern": "Modern（Slate）"
-  },
-  "slideMdEditor": {
-    "placeholder": "# 見出し\n> サブタイトル\n\n- 箇条書き\n- 箇条書き"
-  },
-  "seqOverlay": {
-    "reorderHint": "左右にドラッグで参加者を並べ替え"
-  },
-  "docTabs": {
-    "close": "閉じる"
   }
 }

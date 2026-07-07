@@ -5,6 +5,7 @@
  * within the 400-line rule (R1). App.tsx renders; this hook owns the behaviour.
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import i18n from "../i18n";
 import { type HistoryMode } from "./useHistoryState";
 import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
@@ -65,7 +66,7 @@ export function useDeckController() {
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
-  } = useDocumentStore({ mdText: "", templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "無題" });
+  } = useDocumentStore({ mdText: "", templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: i18n.t("controller.untitledDoc") });
 
   // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
   // a broken figure kept as-is). Kept SEPARATE from parseError: the slide is valid and MUST still
@@ -139,7 +140,7 @@ export function useDeckController() {
       if (bridge) {
         // P2.5: reroute Undo/Redo to the host's server-side history (single truth).
         void (wantRedo ? bridge.serverRedo() : bridge.serverUndo()).then((r) => {
-          if (!r.ok) bridge.notify(wantRedo ? "やり直せる操作がありません" : "戻せる操作がありません");
+          if (!r.ok) bridge.notify(wantRedo ? i18n.t("controller.nothingToRedo") : i18n.t("controller.nothingToUndo"));
         });
       } else if (wantRedo) {
         redoDeck();
@@ -308,7 +309,7 @@ export function useDeckController() {
       const resolved = slide.layout === "auto" ? autoSelectLayout(slide, index, count, catalog) : slide.layout;
       const md = serializeMd({ slides: [{ ...slide, layout: resolved }] });
       const r = await bridge.sendSlideMarkdown(index, md);
-      if (!r.ok) bridge.notify(r.message ?? "編集を host に送れませんでした");
+      if (!r.ok) bridge.notify(r.message ?? i18n.t("controller.slideEditSendFailed"));
     }
   }, [catalog]);
   const scheduleHostSend = useCallback(
@@ -345,7 +346,7 @@ export function useDeckController() {
   const handleDeleteSlide = useCallback((index: number) => {
     if (editLockedRef.current || !deck) return;
     const next = deleteSlideAt(deck, index);
-    if (!next) { setEditNotice("最後の1枚は削除できません（スライドは最低1枚必要です）。"); return; }
+    if (!next) { setEditNotice(i18n.t("controller.cannotDeleteLastSlide")); return; }
     setDeck(next, "commit");
     const focus = Math.min(index, next.slides.length - 1); // keep the selection on a valid slide
     setActiveSlide(focus);

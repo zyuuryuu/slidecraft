@@ -9,6 +9,7 @@
  * ブラウザ実行では in-memory 動作のみに縮退する（UI・配線は不変）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import i18n from "../i18n";
 import { loadPersistedMasters, persistMaster, unpersistMaster } from "../ipc/master-store";
 
 export interface MasterEntry {
@@ -36,7 +37,7 @@ export const BUILTIN_MASTER: MasterEntry = BUILTIN_ENTRIES[0];
 
 /** Disambiguate a display name against the ones already registered: "Deck" → "Deck (2)". Pure. */
 export function uniqueName(name: string, existing: readonly string[]): string {
-  const base = name.trim() || "テンプレート";
+  const base = name.trim() || i18n.t("masterReg.defaultName");
   if (!existing.includes(base)) return base;
   for (let n = 2; ; n++) {
     const cand = `${base} (${n})`;
@@ -97,7 +98,7 @@ export function useMasterRegistry() {
     const builtinUrl = BUILTIN_URLS.get(id);
     if (builtinUrl) {
       const res = await fetch(builtinUrl);
-      if (!res.ok) throw new Error(`内蔵テンプレートの読み込みに失敗しました (${res.status})`);
+      if (!res.ok) throw new Error(i18n.t("masterReg.builtinLoadFailed", { status: res.status }));
       const bytes = new Uint8Array(await res.arrayBuffer());
       bytesRef.current.set(id, bytes);
       return bytes;
