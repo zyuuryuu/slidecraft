@@ -38,6 +38,18 @@ describe("usesMetaIdxConvention — only OUR masters opt in", () => {
   });
 });
 
+describe("CX Sample master — preview/HTML background (inverted theme)", () => {
+  it("masterBgColor comes from the real <p:bg> (bg2→lt2=white), NOT themeColors.bg1 (lt1=navy)", async () => {
+    // CX inverts the theme: clrMap bg1→lt1=#0D274D(dark), bg2→lt2=#FFFFFF(white); the master's actual
+    // <p:bg> is schemeClr bg2 = white. Deriving the preview bg from themeColors.bg1 painted every
+    // content slide (which inherits the master bg) dark-navy with near-invisible dark text, while the
+    // exported PPTX was white — the reported "HTML preview is broken".
+    const tpl = await loadTemplate(readFileSync(CX));
+    expect(tpl.masterBgColor).toBe("FFFFFF");
+    expect(tpl.masterBgColor).not.toBe("0D274D");
+  });
+});
+
 describe("CX Sample master flows through the harness", () => {
   let tpl: TemplateData;
   let cat: LayoutCatalog;

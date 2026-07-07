@@ -508,8 +508,13 @@ export async function loadTemplate(
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);
   const contentTypes = await readEntryString(zip, "[Content_Types].xml", ZIP_LIMITS.xmlEntry);
 
-  // ── Master background color (bg1 via the clrMap, else the theme lt1) ──
-  const masterBgColor = themeColors.bg1 ?? themeColors.lt1 ?? "FFFFFF";
+  // ── Master background color ──
+  // The master's OWN <p:bg> is authoritative (it resolves through the clrMap). A template can INVERT
+  // the theme — CX Sample maps bg1→lt1=dark-navy while its real master bg is bg2→lt2=white — so
+  // guessing from themeColors.bg1 paints inheriting content slides dark even though the master and the
+  // exported PPTX are white. Read the real <p:bg> first; fall back to the theme's light slot only when
+  // the master declares no background. (Layouts with their OWN <p:bg> already override this per-layout.)
+  const masterBgColor = extractBackground(masterXml, themeColors) ?? themeColors.bg1 ?? themeColors.lt1 ?? "FFFFFF";
   // The master's OWN non-placeholder shapes (logos, header/footer bars) — the same extractor as the
   // layouts, run on the master. Shown as a base layer under every layout (previously never read).
   const masterDecorations = extractDecorations(masterXml, themeColors);
