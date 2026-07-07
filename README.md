@@ -1,4 +1,7 @@
-[English](README.en.md) · **日本語**
+<p align="right">
+  <kbd><b>日本語</b></kbd>
+  <a href="README.en.md"><kbd>English</kbd></a>
+</p>
 
 # SlideCraft
 
