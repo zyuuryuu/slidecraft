@@ -17,6 +17,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | 項目 | 内容 | 状態 |
 | --- | --- | --- |
 | 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | 💬 DISCUSS（要ユーザ） |
+| **Windows コード署名（Authenticode）** | **実ユーザがインストール時にブロックされた**（SmartScreen「WindowsによってPCが保護されました」＝不明な発行元）。回避は「詳細情報→実行」だが離脱要因。選択肢: (1) **Azure Trusted Signing** ≈$10/月・最安だが**登録3年以上の組織 or 本人確認要**／(2) **OV 証明書** ≈$200-400/年・ただし SmartScreen 評価は DL 実績で蓄積＝当面は警告残／(3) **EV 証明書** ≈$300-700/年・HSM＋組織必須・警告消えやすい／(4) 当面は**回避手順を install ガイドに明記**のみ。※updater の minisign 署名（↓「完全な署名付き自動アップデート」）とは別物。鍵/証明書は不可逆＋費用＋事業体の有無に依存 → ADR 化 | 💬 DISCUSS（要ユーザ・事業体/予算） |
 | Intel Mac (.dmg) | v0.1.0 は runner 都合で arm64 のみ。x64 dmg 生成後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（runner） |
 | 通知バナー（軽量自動更新） | 方針は [ADR-0021](adr/0021-auto-update-strategy.md) で決定済。GitHub Releases API ポーリングで「新版あり」通知（CSP egress＋版数取得＋実ポーリング検証を要す） | ✅ READY |
 | 不可視の締めスライド（旧 M11 BUG1） | Closing レイアウトが白地に薄色文字で不可視（背景/コントラスト抽出）。「図/テンプレ品質磨き込み」の一部 | ✅ READY |
