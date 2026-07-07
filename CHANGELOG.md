@@ -7,6 +7,10 @@
 
 ## [Unreleased]
 
+### Security
+
+- 開発ツール鎖の依存脆弱性を解消（出荷アプリには非含有）: `vitepress` 1.6.4 → 2.0.0-alpha.18 で脆弱な `vite@5.4.21`（high: `server.fs.deny` bypass ほか）/ `esbuild@0.21.5` を排除（`npm audit` = 0）、Rust の `rand` 0.8.5 → 0.8.6。残る `glib`（medium）は gtk-rs/Tauri スタックに固定のため Tauri 更新待ち。
+
 ## [0.2.1] - 2026-07-07
 
 早期版（0.x）。**UI の日英切替（i18n）と英語ドキュメント**、**`.scft` ファイル関連付け**、**プレビュー/HTML 描画の忠実化**が目玉。
