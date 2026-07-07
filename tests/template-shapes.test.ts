@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { loadTemplate } from "../src/engine/template-loader";
 
-const DIR = resolve(__dirname, "../public/templates/slide");
+const DIR = resolve(__dirname, "fixtures/templates");
 const REPORT = resolve(DIR, "報告書テンプレート_全レイアウト見本.pptx"); // tracked fixture: has ellipse + rightArrow
 const CX = resolve(DIR, "CX_sample_MSGothic.pptx"); // gitignored local fixture: has custGeom brand shapes
 const VELIS = resolve(DIR, "lrk-slides-velis_CC0.pptx"); // tracked CC0 fixture: 26 <p:grpSp> groups

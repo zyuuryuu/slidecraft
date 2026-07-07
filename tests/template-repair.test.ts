@@ -14,7 +14,7 @@ import { loadTemplate } from "../src/engine/template-loader";
 import { buildCatalog, assessTemplateHealth, placeholderRole } from "../src/engine/template-catalog";
 import { planRepairs, applyRepairs, repairTemplate } from "../src/engine/template-repair";
 
-const dir = "../public/templates/slide/";
+const dir = "fixtures/templates/";
 const bytesOf = (f: string) => readFileSync(resolve(__dirname, dir + f));
 const CANON = "Midnight_Executive_30_TemplateOnly.pptx";
 

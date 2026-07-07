@@ -21,7 +21,7 @@ describe("condense mode wiring", () => {
 
   let catalog: LayoutCatalog;
   beforeAll(async () => {
-    catalog = buildCatalog(await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"))));
+    catalog = buildCatalog(await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"))));
   });
 
   it("refineDeck hands the aiFix kind 'condense' (→ Markdown-only prompt)", async () => {

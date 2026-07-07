@@ -12,7 +12,7 @@ import { CollabClient, type DeckChangedEvent, type DocumentOpenedEvent } from ".
 
 let templateB64: string;
 beforeAll(() => {
-  templateB64 = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")).toString("base64");
+  templateB64 = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")).toString("base64");
 });
 
 let host: CollabHost;

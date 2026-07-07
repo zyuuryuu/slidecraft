@@ -22,7 +22,7 @@ import { bindContentByRole, contentIdxForPlaceholder, buildFieldMap, bodyPlaceho
 import { placeholderRole } from "../src/engine/template-catalog";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const DIR = resolve(__dirname, "../public/templates/slide");
+const DIR = resolve(__dirname, "fixtures/templates");
 const T = {
   kokko: "報告書テンプレート_官公庁_全レイアウト見本.pptx",
   report: "報告書テンプレート_全レイアウト見本.pptx",

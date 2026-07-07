@@ -17,7 +17,7 @@ import { DocRegistry, type HostContext } from "../src/mcp/host-core";
 
 let templateBytes: Buffer;
 beforeAll(() => {
-  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
 });
 
 // A 3-slide deck (A / B / C) with a NATIVE diagram grafted onto slide 1 (B), to prove figures survive.

@@ -14,11 +14,11 @@ import { parseMd } from "../src/engine/md-parser";
 import { distillDeck } from "../src/engine/distill";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
-const WITH_SLIDES = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
-const SLIDE_FREE = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const WITH_SLIDES = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
+const SLIDE_FREE = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 // This master's presentation.xml OMITS <p:sldIdLst> entirely (a hand-authored template) — the
 // generatePptx sldIdLst-insert path must fire so exported slides are listed.
-const NO_SLDIDLST = resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx");
+const NO_SLDIDLST = resolve(__dirname, "fixtures/templates/lrk-slides-velis_CC0.pptx");
 const MD = "# 表紙\n\n## サブ\n\n---\n\n# 本文\n\n- A\n- B\n\n---\n\n# まとめ\n\n- おわり";
 
 async function assemble(tpl: TemplateData) {

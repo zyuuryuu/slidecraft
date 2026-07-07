@@ -11,7 +11,7 @@ import { loadTemplate, type TemplateData, type LayoutInfo } from "../src/engine/
 import { detectGroups, groupEditorPlan } from "../src/engine/group-binding";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
 const cardSlide = (layout: string): SlideIR => ({
   layout, groupKind: "card",
   placeholders: [

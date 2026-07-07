@@ -18,7 +18,7 @@ import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
 
-const DIR = resolve(__dirname, "../public/templates/slide");
+const DIR = resolve(__dirname, "fixtures/templates");
 
 async function slideXml(tpl: TemplateData, md: string, n = 1): Promise<string> {
   const zip = await JSZip.loadAsync(await generatePptx(parseMd(md), tpl));

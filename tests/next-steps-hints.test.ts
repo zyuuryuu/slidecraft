@@ -16,7 +16,7 @@ import { buildServer } from "../src/mcp/server";
 
 let templateBytes: Buffer;
 beforeAll(() => {
-  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
 });
 
 const iss = (slideIndex: number, levers: DeckIssue["levers"], message = "m"): DeckIssue => ({ slideIndex, title: "", level: "warn", message, levers });

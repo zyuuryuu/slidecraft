@@ -13,7 +13,7 @@ import { buildCatalog, type LayoutCatalog } from "../src/engine/template-catalog
 import { parseMd } from "../src/engine/md-parser";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
 const CARD_MD = `# 表紙
 
 ---

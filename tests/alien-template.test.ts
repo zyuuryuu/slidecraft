@@ -14,7 +14,7 @@ import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const ALIEN = resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx");
+const ALIEN = resolve(__dirname, "fixtures/templates/lrk-slides-velis_CC0.pptx");
 const mk = (phs: SlideIR["placeholders"]): SlideIR => ({ layout: "auto", placeholders: phs });
 const ph = (idx: string, t = "x") => ({ idx, paragraphs: [{ segments: [{ text: t }] }] });
 

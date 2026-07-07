@@ -17,7 +17,7 @@ import { loadTemplate, autoSelectLayout, findLayout, type TemplateData } from ".
 import { buildCatalog } from "../src/engine/template-catalog";
 import { parseMd } from "../src/engine/md-parser";
 
-const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 const MD = "# 四半期レビュー\n\n- 売上は前年比120%\n- 新規顧客が32社増加";
 // A native ```diagram slide — double-quoted so the literal ``` fences don't close a template literal.
 const DIAGRAM_MD =

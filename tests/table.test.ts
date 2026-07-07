@@ -66,7 +66,7 @@ describe("table OOXML", () => {
 
 describe("table in a real PPTX deck", () => {
   it("exports as a native <a:tbl> (no image), valid zip", async () => {
-    const tpl = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")));
+    const tpl = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")));
     const zip = await JSZip.loadAsync(await generatePptx(parseMd(MD), tpl));
     const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
     expect(xml).toContain("<a:tbl>");

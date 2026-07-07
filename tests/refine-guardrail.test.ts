@@ -14,7 +14,7 @@ import { buildCatalog, type LayoutCatalog } from "../src/engine/template-catalog
 
 let catalog: LayoutCatalog;
 beforeAll(async () => {
-  const tpl = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")));
+  const tpl = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")));
   catalog = buildCatalog(tpl);
 });
 

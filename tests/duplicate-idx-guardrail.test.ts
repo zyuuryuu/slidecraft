@@ -12,7 +12,7 @@ import { loadTemplate, type TemplateData, type LayoutInfo } from "../src/engine/
 import { bindContentByRole, buildFieldMap } from "../src/engine/placeholder-binding";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const HD = resolve(__dirname, "../public/templates/slide/配布資料_公文書高密度_全レイアウト見本.pptx");
+const HD = resolve(__dirname, "fixtures/templates/配布資料_公文書高密度_全レイアウト見本.pptx");
 
 describe("duplicate placeholder idx guardrail", () => {
   let tpl: TemplateData;

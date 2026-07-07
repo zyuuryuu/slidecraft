@@ -8,7 +8,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { applyTemplateBytes } from "../src/components/apply-template";
 
-const CANONICAL = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANONICAL = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 function setters() {
   return {

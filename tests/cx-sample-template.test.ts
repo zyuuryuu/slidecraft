@@ -18,7 +18,7 @@ import { buildCatalog, usesMetaIdxConvention, type LayoutCatalog } from "../src/
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
 
-const DIR = resolve(__dirname, "../public/templates/slide");
+const DIR = resolve(__dirname, "fixtures/templates");
 const CX = resolve(DIR, "CX_sample_MSGothic.pptx");
 const CANON = resolve(DIR, "Midnight_Executive_30_TemplateOnly.pptx");
 const REPORT = resolve(DIR, "報告書テンプレート.potx");

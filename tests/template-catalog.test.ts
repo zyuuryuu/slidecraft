@@ -15,7 +15,7 @@ const ph = (idx: string, text = "x") => ({ idx, paragraphs: [{ segments: [{ text
 
 const TEMPLATE_PATH = resolve(
   __dirname,
-  "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
+  "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx",
 );
 
 let tpl: TemplateData;

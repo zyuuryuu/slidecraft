@@ -11,7 +11,7 @@ import { renderDeckToHtml } from "../src/components/deck-html-export";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { parseMd } from "../src/engine/md-parser";
 
-const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 const DECK_MD = [
   "# 四半期レビュー\n> Q4 Review\n\n- 売上は前年比120%\n- 新規顧客が32社増加",

@@ -14,7 +14,7 @@ import { loadTemplate, type TemplateData, type LayoutInfo } from "../src/engine/
 import { detectGroups, expandGroups } from "../src/engine/group-binding";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const DIR = resolve(__dirname, "../public/templates/slide");
+const DIR = resolve(__dirname, "fixtures/templates");
 const find = (t: TemplateData, re: RegExp) => t.layouts.find((l) => re.test(l.name))!;
 const txt = (c: { paragraphs: { segments: { text: string }[] }[] } | undefined) =>
   (c?.paragraphs ?? []).flatMap((p) => p.segments.map((s) => s.text)).join("");

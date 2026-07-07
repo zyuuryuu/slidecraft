@@ -413,11 +413,17 @@ async function rebuild() {
     console.log(`  Layout ${layoutIndex}: ${layout.name} (${decoShapes.length} decos + ${layout.placeholders.length} phs)`);
   }
 
-  // Save the rebuilt template back to public/ (the single source the app fetches).
+  // Save the rebuilt template back to public/ (the source the app fetches at runtime) AND to the
+  // test-fixtures copy (tests read from tests/fixtures/, isolated from public/) so they never drift.
   const buf = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
-  const out = "public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx";
-  writeFileSync(resolve(out), buf);
-  console.log(`  Saved: ${out}`);
+  const outs = [
+    "public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
+    "tests/fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx",
+  ];
+  for (const out of outs) {
+    writeFileSync(resolve(out), buf);
+    console.log(`  Saved: ${out}`);
+  }
 
   // Verify
   const verify = await JSZip.loadAsync(buf);

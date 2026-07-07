@@ -11,7 +11,7 @@ import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 
 let template: TemplateData;
 beforeAll(async () => {
-  template = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")));
+  template = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")));
 });
 
 describe("project-io (.scft bundle)", () => {

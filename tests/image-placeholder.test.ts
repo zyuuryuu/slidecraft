@@ -17,8 +17,8 @@ import { imagePlaceholder, bodyPlaceholders, nthBody } from "../src/engine/place
 import { parseMd } from "../src/engine/md-parser";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
-const VELIS = resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx"); // has type="pic"
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx"); // body-only
+const VELIS = resolve(__dirname, "fixtures/templates/lrk-slides-velis_CC0.pptx"); // has type="pic"
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx"); // body-only
 const IMG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 const EMU = (inches: number) => Math.round(inches * 914400);
 const pics = (l: LayoutInfo) => l.placeholders.filter((p) => placeholderRole(p) === "picture");

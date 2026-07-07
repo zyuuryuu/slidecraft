@@ -13,7 +13,7 @@ import { VALID_TYPES } from "../src/engine/schema-constants";
 
 let templateBytes: Buffer;
 beforeAll(() => {
-  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
 });
 
 describe("get_diagram_types — L2 menu (stage 1)", () => {

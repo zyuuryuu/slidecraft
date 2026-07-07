@@ -16,10 +16,10 @@ import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
 import { luminance } from "../src/engine/ooxml-resolve";
 
-const CX = resolve(__dirname, "../public/templates/slide/CX_sample_MSGothic.pptx");
+const CX = resolve(__dirname, "fixtures/templates/CX_sample_MSGothic.pptx");
 // CX Sample is a LOCAL-ONLY, IP-stripped company template (gitignored) — skip when absent (CI).
 const HAS_CX = existsSync(CX);
-const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 const contrast = (a: string, b: string) => Math.abs(luminance(a) - luminance(b));
 
 // CI-covered path using a TRACKED master (canonical), so Re-make is verified without the CX fixture.

@@ -12,7 +12,7 @@ import { buildCatalog } from "../src/engine/template-catalog";
 import { bindContentByRole } from "../src/engine/placeholder-binding";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const ALIEN = resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx");
+const ALIEN = resolve(__dirname, "fixtures/templates/lrk-slides-velis_CC0.pptx");
 
 // A content slide authored with CANONICAL idxs (15=title, 1=body) — what the DeckPlan/sample path emits.
 const slide: SlideIR = {

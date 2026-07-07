@@ -14,7 +14,7 @@ import type { SlideIR } from "../src/engine/slide-schema";
 
 const TEMPLATE_PATH = resolve(
   __dirname,
-  "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx",
+  "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx",
 );
 
 let tpl: TemplateData;

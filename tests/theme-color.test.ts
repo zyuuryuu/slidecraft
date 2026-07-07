@@ -10,7 +10,7 @@ import { resolve } from "path";
 import { loadTemplate } from "../src/engine/template-loader";
 import { placeholderRole } from "../src/engine/template-catalog";
 
-const ROOT = "../public/templates/slide";
+const ROOT = "fixtures/templates";
 const load = (f: string) => loadTemplate(readFileSync(resolve(__dirname, `${ROOT}/${f}`)));
 
 function titleColorOf(tpl: Awaited<ReturnType<typeof loadTemplate>>, layoutName: string): string | undefined {

@@ -19,7 +19,7 @@ let template: TemplateData;
 let templateBytes: Buffer;
 let bundle: Uint8Array;
 beforeAll(async () => {
-  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
   template = await loadTemplate(templateBytes);
   bundle = await bundleProject(parseMd(DECK_MD), template, { templateName: "Midnight Executive", savedAt: "2026-06-27T00:00:00Z" });
 });

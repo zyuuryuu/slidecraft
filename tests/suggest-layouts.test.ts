@@ -10,7 +10,7 @@ import { loadTemplate, autoSelectLayout, suggestLayouts, type TemplateData } fro
 import { buildCatalog, type LayoutCatalog } from "../src/engine/template-catalog";
 import { parseMd } from "../src/engine/md-parser";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
 const content = () => parseMd("# 本日のアジェンダ\n\n- A\n- B\n- C").slides[0];
 
 describe("suggestLayouts", () => {

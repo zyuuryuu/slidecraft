@@ -12,7 +12,7 @@ import { applyTemplateBytesWithRepair, describeRepairPlan } from "../src/compone
 import { loadTemplate } from "../src/engine/template-loader";
 import { planRepairs } from "../src/engine/template-repair";
 
-const CANONICAL = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANONICAL = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 function setters() {
   return { setTemplateData: vi.fn(), setTemplateName: vi.fn(), setParseError: vi.fn() };

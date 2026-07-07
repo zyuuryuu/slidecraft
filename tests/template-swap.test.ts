@@ -23,7 +23,7 @@ async function slideText(bytes: Uint8Array): Promise<string> {
   return (await Promise.all(names.map((n) => zip.files[n].async("string")))).join("");
 }
 
-const dir = "../public/templates/slide/";
+const dir = "fixtures/templates/";
 async function load(f: string): Promise<{ template: TemplateData; catalog: LayoutCatalog }> {
   const template = await loadTemplate(readFileSync(resolve(__dirname, dir + f)));
   return { template, catalog: buildCatalog(template) };

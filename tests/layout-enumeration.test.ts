@@ -9,8 +9,8 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { loadTemplate } from "../src/engine/template-loader";
 
-const GAPPED = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
-const CONTIGUOUS = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const GAPPED = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
+const CONTIGUOUS = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 describe("slideLayout enumeration is gap-tolerant", () => {
   it("loads ALL layouts even when file numbers are non-contiguous (1-6,8,12-17)", async () => {

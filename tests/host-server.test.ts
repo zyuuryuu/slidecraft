@@ -17,7 +17,7 @@ import { DocRegistry, MemTemplateStore, type HostContext, type DocEntry, type Te
 
 let templateB64: string;
 beforeAll(() => {
-  const tBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  const tBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
   templateB64 = tBytes.toString("base64");
 });
 

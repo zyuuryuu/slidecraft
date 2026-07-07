@@ -13,7 +13,7 @@ import { parseMd } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
 const MD = "# 検知ルールの実装例\n> Sigma 形式\n\n```yaml\ndetection:\n  selection:\n    EventID: 4688\n  condition: selection\n```";
 
 describe("fenced code/log block", () => {

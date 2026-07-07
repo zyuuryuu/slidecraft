@@ -44,7 +44,7 @@ describe("host new_project → tab title (real MCP path)", () => {
   let host: CollabHost;
   let ai: CollabClient | undefined;
   beforeAll(() => {
-    templateB64 = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")).toString("base64");
+    templateB64 = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")).toString("base64");
   });
   afterEach(async () => {
     try { await ai?.close(); } catch { /* ignore */ }

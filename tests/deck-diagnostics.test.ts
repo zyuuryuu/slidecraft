@@ -41,7 +41,7 @@ describe("diagnoseDeck", () => {
   });
 
   it("flags overflow against the real template (split/condense/visualize)", async () => {
-    const tpl = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")));
+    const tpl = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")));
     const bullets = Array.from({ length: 30 }, (_, i) => `- 項目${i} の説明テキストをそれなりの長さで書く`).join("\n");
     const issues = diagnoseDeck(parseMd(`# 詰め込み\n\n${bullets}`), buildCatalog(tpl));
     expect(issues.some((x) => x.levers.includes("split"))).toBe(true);

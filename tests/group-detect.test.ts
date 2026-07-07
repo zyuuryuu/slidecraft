@@ -12,7 +12,7 @@ import { resolve } from "path";
 import { loadTemplate, type TemplateData, type LayoutInfo } from "../src/engine/template-loader";
 import { detectGroups } from "../src/engine/group-binding";
 
-const DIR = resolve(__dirname, "../public/templates/slide");
+const DIR = resolve(__dirname, "fixtures/templates");
 const load = (f: string) => loadTemplate(readFileSync(resolve(DIR, f)));
 const find = (t: TemplateData, re: RegExp): LayoutInfo | undefined => t.layouts.find((l) => re.test(l.name));
 const roles = (shape: NonNullable<ReturnType<typeof detectGroups>>, col = 0) => shape.groups[col].map((s) => s.role);

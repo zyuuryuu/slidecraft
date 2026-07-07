@@ -11,7 +11,7 @@ import { classifyLayout, buildCatalog } from "../src/engine/template-catalog";
 import { loadTemplate, autoSelectLayout, type TemplateData } from "../src/engine/template-loader";
 import { parseMd } from "../src/engine/md-parser";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
 const info = { hasTitle: true, hasSubtitle: false, bodyCount: 1 };
 
 describe("classifyLayout recognizes Japanese role keywords", () => {

@@ -13,7 +13,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { writeTemplate, MIDNIGHT_PALETTE } from "../src/engine/template-writer";
 
-const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 /**
  * 最小の整形式チェック: タグの開閉が prefix 込みで対応しているか（属性値内の <> はクォートで保護）。

@@ -12,7 +12,7 @@ import { renderDeckToHtml } from "../src/components/deck-html-export";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { parseMd } from "../src/engine/md-parser";
 
-const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 const DECK = parseMd("# 表紙\n\n- 項目A\n- 項目B");
 
 let tpl: TemplateData;

@@ -14,7 +14,7 @@ import { imageRect } from "../src/engine/placeholder-binding";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
 const IMG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 const EMU = (n: number) => Math.round(n * 914400);
 

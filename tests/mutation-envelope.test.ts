@@ -13,7 +13,7 @@ import { autoSelectLayout } from "../src/engine/template-loader";
 
 let templateBytes: Buffer;
 beforeAll(() => {
-  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
 });
 
 async function opened() {

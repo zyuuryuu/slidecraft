@@ -21,7 +21,7 @@ type EntryResult = { docId?: string; documents?: { contract?: Contract }[]; cont
 let templateBytes: Buffer;
 let templateB64: string;
 beforeAll(() => {
-  templateBytes = readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"));
+  templateBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
   templateB64 = templateBytes.toString("base64");
 });
 

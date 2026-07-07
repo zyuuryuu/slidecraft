@@ -17,7 +17,7 @@ import { parseMd } from "../src/engine/md-parser";
 import { distillDeck } from "../src/engine/distill";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
-const dir = "../public/templates/slide/";
+const dir = "fixtures/templates/";
 const bytesOf = (f: string) => readFileSync(resolve(__dirname, dir + f));
 const CANON = "Midnight_Executive_30_TemplateOnly.pptx";
 const ALIEN = "lrk-slides-velis_CC0.pptx";

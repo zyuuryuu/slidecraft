@@ -156,8 +156,8 @@ describe("end-to-end: a design-edited slide still renders on both templates", ()
   let canonical: TemplateData;
   let alien: TemplateData;
   beforeAll(async () => {
-    canonical = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")));
-    alien = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx")));
+    canonical = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx")));
+    alien = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/lrk-slides-velis_CC0.pptx")));
   });
   it.each([["canonical"], ["alien"]])("%s renders an emphasized + region-split slide", async (which) => {
     const tpl = which === "canonical" ? canonical : alien;

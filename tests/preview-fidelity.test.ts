@@ -13,8 +13,8 @@ import { loadTemplate, autoSelectLayout, findLayout, type TemplateData } from ".
 import { buildCatalog } from "../src/engine/template-catalog";
 import { parseMd } from "../src/engine/md-parser";
 
-const REPORT = resolve(__dirname, "../public/templates/slide/報告書テンプレート_全レイアウト見本.pptx");
-const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
+const REPORT = resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx");
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 describe("preview fidelity: layout background + decorations", () => {
   let report: TemplateData;
@@ -41,7 +41,7 @@ describe("preview fidelity: layout background + decorations", () => {
 
   it("renders non-placeholder static TEXT labels (design labels), none spurious on the canonical", async () => {
     // A real design label is a non-placeholder <p:sp> with text — the velis master carries some.
-    const velis = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/lrk-slides-velis_CC0.pptx")));
+    const velis = await loadTemplate(readFileSync(resolve(__dirname, "fixtures/templates/lrk-slides-velis_CC0.pptx")));
     const labels = velis.layouts.flatMap((l) => l.staticTexts);
     expect(labels.length).toBeGreaterThan(0);
     expect(labels.every((t) => t.text.trim().length > 0)).toBe(true);

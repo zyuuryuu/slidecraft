@@ -18,7 +18,7 @@ import { bindContentByRole } from "../src/engine/placeholder-binding";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import type { SlideIR, PlaceholderContent } from "../src/engine/slide-schema";
 
-const KOKKO = resolve(__dirname, "../public/templates/slide/報告書テンプレート_官公庁_全レイアウト見本.pptx");
+const KOKKO = resolve(__dirname, "fixtures/templates/報告書テンプレート_官公庁_全レイアウト見本.pptx");
 
 function content(idx: string, text: string): PlaceholderContent {
   return { idx, paragraphs: [{ segments: [{ text }] }] };
