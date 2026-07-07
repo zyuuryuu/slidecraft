@@ -17,9 +17,22 @@ export interface MasterEntry {
   builtin: boolean; // the bundled sample — always present, never removable
 }
 
-/** The bundled sample master — the default entry, so a first-run draft still has a template. */
-export const BUILTIN_MASTER: MasterEntry = { id: "builtin", name: "Midnight Executive", builtin: true };
-const BUILTIN_URL = "/templates/slide/Midnight_Executive_30_TemplateOnly.pptx";
+/** A bundled built-in template: id + display name + the public URL of its TemplateOnly .pptx. */
+export interface BuiltinDef { id: string; name: string; url: string; }
+
+/** The bundled built-in templates. The FIRST is the default (a first-run draft starts on it).
+ *  All are content-free "TemplateOnly" masters served from public/templates/slide/. */
+export const BUILTIN_MASTERS: readonly BuiltinDef[] = [
+  { id: "builtin", name: "Midnight Executive", url: "/templates/slide/Midnight_Executive_30_TemplateOnly.pptx" },
+  { id: "builtin-koubunsho", name: "配布資料 公文書高密度", url: "/templates/slide/配布資料_公文書高密度_TemplateOnly.pptx" },
+  { id: "builtin-magazine", name: "ビジュアルデッキ マガジン", url: "/templates/slide/ビジュアルデッキ_マガジン_TemplateOnly.pptx" },
+  { id: "builtin-gijutsu", name: "技術報告 スタンダード水色", url: "/templates/slide/技術報告_スタンダード水色_TemplateOnly.pptx" },
+];
+const BUILTIN_URLS: ReadonlyMap<string, string> = new Map(BUILTIN_MASTERS.map((b) => [b.id, b.url]));
+const BUILTIN_ENTRIES: MasterEntry[] = BUILTIN_MASTERS.map((b) => ({ id: b.id, name: b.name, builtin: true }));
+
+/** The default built-in (first entry) — App uses this as the initial masterId. */
+export const BUILTIN_MASTER: MasterEntry = BUILTIN_ENTRIES[0];
 
 /** Disambiguate a display name against the ones already registered: "Deck" → "Deck (2)". Pure. */
 export function uniqueName(name: string, existing: readonly string[]): string {
@@ -34,10 +47,10 @@ export function uniqueName(name: string, existing: readonly string[]): string {
 let seq = 0;
 
 export function useMasterRegistry() {
-  const [masters, setMasters] = useState<MasterEntry[]>([BUILTIN_MASTER]);
+  const [masters, setMasters] = useState<MasterEntry[]>(BUILTIN_ENTRIES);
   // Mirror the list so importMaster computes the unique name off the LATEST list without a stale
   // closure or a state-updater side effect (which StrictMode would double-run).
-  const mastersRef = useRef<MasterEntry[]>([BUILTIN_MASTER]);
+  const mastersRef = useRef<MasterEntry[]>(BUILTIN_ENTRIES);
   const bytesRef = useRef<Map<string, Uint8Array>>(new Map());
 
   // Slice 1b: 起動時に保存済みマスターをハイドレート（デスクトップのみ・ブラウザは即 []）。
@@ -81,8 +94,9 @@ export function useMasterRegistry() {
   const getBytes = useCallback(async (id: string): Promise<Uint8Array> => {
     const cached = bytesRef.current.get(id);
     if (cached) return cached;
-    if (id === BUILTIN_MASTER.id) {
-      const res = await fetch(BUILTIN_URL);
+    const builtinUrl = BUILTIN_URLS.get(id);
+    if (builtinUrl) {
+      const res = await fetch(builtinUrl);
       if (!res.ok) throw new Error(`内蔵テンプレートの読み込みに失敗しました (${res.status})`);
       const bytes = new Uint8Array(await res.arrayBuffer());
       bytesRef.current.set(id, bytes);
@@ -91,9 +105,9 @@ export function useMasterRegistry() {
     throw new Error(`master not found: ${id}`);
   }, []);
 
-  /** Remove an imported master (the bundled sample can't be removed). */
+  /** Remove an imported master (bundled built-ins can't be removed). */
   const removeMaster = useCallback((id: string) => {
-    if (id === BUILTIN_MASTER.id) return;
+    if (BUILTIN_URLS.has(id)) return;
     const next = mastersRef.current.filter((m) => m.id !== id);
     mastersRef.current = next;
     setMasters(next);
