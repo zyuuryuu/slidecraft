@@ -1,8 +1,11 @@
 name: Security audit
 
-# Surfaces known-vulnerable dependencies. INFORMATIONAL (continue-on-error) so it
-# never blocks the build — Dependabot alerts/updates do the enforcing side. Make a
-# step "required" later once the current advisories are triaged.
+# Surfaces known-vulnerable dependencies. npm-audit is now REQUIRED (M2/ADR-0016 F4): the high+
+# advisories were triaged and resolved via non-breaking `npm audit fix` (2026-07-07), so `npm audit
+# --audit-level=high` passes today and BLOCKS on any future high. One dev-only LOW remains (esbuild
+# dev-server file-read on Windows — not reachable in the packaged app; fixing needs a breaking esbuild
+# bump), which is below the `high` threshold. cargo-audit stays informational until its advisories are
+# triaged the same way.
 on:
   push:
     branches: [main]
@@ -24,9 +27,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: npm audit (high and above)
+      - name: npm audit (high and above — REQUIRED, blocks on any high+)
         run: npm audit --audit-level=high
-        continue-on-error: true
 
   cargo-audit:
     runs-on: ubuntu-latest
