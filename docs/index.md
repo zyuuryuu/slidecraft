@@ -4,7 +4,7 @@ layout: home
 hero:
   name: SlideCraft
   text: Markdown → PowerPoint
-  tagline: テンプレートに流し込むだけ。フォントもレイアウトも崩さず、整ったスライドを。
+  tagline: テンプレートは変えない。編集は変わらない。仕上がりだけ、人が作ったように。
   actions:
     - theme: brand
       text: スターターガイド
