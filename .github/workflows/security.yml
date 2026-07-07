@@ -1,11 +1,10 @@
 name: Security audit
 
-# Surfaces known-vulnerable dependencies. npm-audit is now REQUIRED (M2/ADR-0016 F4): the high+
-# advisories were triaged and resolved via non-breaking `npm audit fix` (2026-07-07), so `npm audit
-# --audit-level=high` passes today and BLOCKS on any future high. One dev-only LOW remains (esbuild
-# dev-server file-read on Windows — not reachable in the packaged app; fixing needs a breaking esbuild
-# bump), which is below the `high` threshold. cargo-audit stays informational until its advisories are
-# triaged the same way.
+# Surfaces known-vulnerable dependencies. npm-audit is REQUIRED (M2/ADR-0016 F4) but scoped to
+# PRODUCTION deps (`--omit=dev`) — the gate blocks on any vuln that SHIPS in the app, and ignores
+# dev-only tooling (vitepress/vite dev-server, esbuild dev-server, etc.) that never reaches an end user.
+# The prod-only high+ set was triaged/resolved via non-breaking `npm audit fix` (2026-07-07), so it
+# passes today and blocks on any future SHIPPED high. cargo-audit stays informational until triaged.
 on:
   push:
     branches: [main]
@@ -27,8 +26,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: npm audit (high and above — REQUIRED, blocks on any high+)
-        run: npm audit --audit-level=high
+      - name: npm audit — PRODUCTION deps, high and above (REQUIRED, blocks on any shipped high+)
+        run: npm audit --omit=dev --audit-level=high
 
   cargo-audit:
     runs-on: ubuntu-latest

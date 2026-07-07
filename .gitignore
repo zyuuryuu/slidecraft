@@ -43,3 +43,7 @@ src-tauri/*.cdx.json
 # Test outputs
 /test-results/
 /playwright-report/
+
+# VitePress build output
+docs/.vitepress/dist
+docs/.vitepress/cache
