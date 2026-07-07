@@ -64,6 +64,7 @@
 
 ## 協働・MCP
 
+- **Live MCP で AI が作った Deck を GUI タブに（モード b）** — 協働ホストの multi-doc を GUI に橋渡し。AI が `new_project` で作った Deck を**背景タブ**として開く（表示は切り替えない＝押すと開く）。タブ切替で projection のミラー先を `setTargetDoc`、ローカルタブは pause して clobber 防止。seed は `open_project` の戻り docId で race-free に link。`makeDoc` が新フィールドを落とすバグをテストで検出→修正 （2026-07-07）
 - **MCP CLI 同梱（ビルド不要のエージェント駆動）** — 自己完結 `cli.cjs`＋Node ランタイムをインストーラに同梱、macOS は Homebrew cask が `slidecraft-mcp` を PATH 登録。ソース build もシステム Node も不要で上流 AI（Claude Code/Cursor/Claude Desktop）が駆動可。update-cask に fail-closed guard （ADR-0022・2026-07-07）
 - **MCP テンプレ選択 list/use/register_templates** — GUI が collab 開始時に master レジストリを host へ upload するプロトコル越し橋渡し（S2 増分2） （ADR-0015・PR #76・2026-07-07）
 - **MCP エラー契約統一** — guard 失敗を `{ok:false,code}` に、isError=crash 専用 （2026-07-05）
