@@ -6,25 +6,23 @@
 #   "unidentified developer" block never fires — the app opens cleanly. An own tap
 #   (`brew tap zyuuryuu/slidecraft`) has no notarization requirement (unlike official homebrew-cask).
 #
-# Per release, update `version` and BOTH sha256 values. Compute them from the published .dmg assets:
-#   shasum -a 256 SlideCraft_<version>_aarch64.dmg   # -> on_arm  sha256
-#   shasum -a 256 SlideCraft_<version>_x64.dmg       # -> on_intel sha256
+# v0.1.0 ships **Apple Silicon (arm64) only** — the Intel (x64) .dmg isn't built yet (CI runner
+# scarcity). When an x64 .dmg is published, restore the on_arm/on_intel split and drop `depends_on arch`.
+#
+# Per release, update `version` + `sha256`. Compute it from the published .dmg:
+#   shasum -a 256 SlideCraft_<version>_aarch64.dmg
 # (`scripts/update-cask.mjs` automates this against a GitHub release — see packaging/homebrew/README.md.)
 cask "slidecraft" do
   version "0.1.0"
+  sha256 "118df00267d97307a9157caa1520793c619d2134a388a70dff2e4dde53bfc3fb"
 
-  on_arm do
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000" # TODO: aarch64 .dmg sha256
-    url "https://github.com/zyuuryuu/slidecraft/releases/download/v#{version}/SlideCraft_#{version}_aarch64.dmg"
-  end
-  on_intel do
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000" # TODO: x64 .dmg sha256
-    url "https://github.com/zyuuryuu/slidecraft/releases/download/v#{version}/SlideCraft_#{version}_x64.dmg"
-  end
-
+  url "https://github.com/zyuuryuu/slidecraft/releases/download/v#{version}/SlideCraft_#{version}_aarch64.dmg"
   name "SlideCraft"
-  desc "YAML/JSON to PPTX diagram slide generator (Tauri desktop app)"
+  desc "Markdown/YAML to PPTX slide generator (Tauri desktop app)"
   homepage "https://github.com/zyuuryuu/slidecraft"
+
+  # v0.1.0 は Apple Silicon (arm64) のみ配布。Intel Mac 版は未生成なので明示的に拒否する。
+  depends_on arch: :arm64
 
   # Track the latest GitHub release tag so `brew livecheck` / autobump can flag new versions.
   livecheck do
