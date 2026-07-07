@@ -114,6 +114,7 @@ public/templates/    # スライドマスター (.pptx)
 - [実装済みログ](docs/shipped.md) — 出荷済み機能の履歴
 - [詳細設計](docs/design/) — 補助設計資料
 - [MCP サーバの使い方](docs/mcp-server.md)
+- [SKILL.md](SKILL.md) — 上流 AI 向けの利用スキル（MCP 経由でデッキを著作する手順・契約）
 - [リリース手順](RELEASING.md) — バージョニング方針とリリース手順
 
 ## ライセンス
