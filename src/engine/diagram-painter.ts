@@ -15,6 +15,7 @@
 
 import type { DiagramSpec, EdgeStyle } from "./schema";
 import { DEFAULT_THEME } from "./theme";
+import { luminance } from "./ooxml-resolve";
 import {
   computeLayout,
   computeLayoutWithLanes,
@@ -293,6 +294,10 @@ export function paintDiagram(
     const es: Partial<EdgeStyle> = edge.style ?? {};
     const color = es.color ?? ds.edge_color;
     const width = es.width ?? ds.edge_width;
+    // Edge LABEL color: readable on the SLIDE background. The line's subtle gray (edge_color) was too
+    // light for text on a light slide (M11 — ~2.4:1). Contrast-adaptive so it also stays readable on a
+    // dark-bg diagram; a per-edge custom `color` still applies to its own label.
+    const labelColor = es.color ?? (luminance(ds.slide_bg ?? "#FFFFFF") < 0.5 ? "#F1F5F9" : "#1E293B");
     const arrow = isFlowchart ? (es.arrow ?? true) : false;
     const dash = es.dash ?? false;
 
@@ -346,7 +351,7 @@ export function paintDiagram(
       }
       const edgeFs = scaledFontSize(ds.edge_label_font_size, layoutScale);
       dt.text(
-        [{ text: edge.label, fontSize: edgeFs, fontFace: fonts.body, color, bold: true }],
+        [{ text: edge.label, fontSize: edgeFs, fontFace: fonts.body, color: labelColor, bold: true }],
         labelPos,
         {},
       );
