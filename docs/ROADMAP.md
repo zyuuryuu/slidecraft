@@ -2,7 +2,7 @@
 
 **前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
 
-**現在地（2026-07-07）**：named 主要テーマ 1〜4＋差別化アーキ（内蔵 AI・AI 編集の採用ゲート・協働ホスト）まで完了（[shipped.md](shipped.md)）。**いま：初回パブリックリリース（v0.1.0）に向けた工程化フェーズ** — 下記マイルストーン参照（**M0 バージョン単一ソース化・M4 LICENSE/attribution・M6 セキュリティ再チェック 完了**）。リリース後の将来テーマは「バックログ」へ。
+**現在地（2026-07-07）**：named 主要テーマ 1〜4＋差別化アーキ（内蔵 AI・AI 編集の採用ゲート・協働ホスト）まで完了（[shipped.md](shipped.md)）。**いま：初回パブリックリリース（v0.1.0）に向けた工程化フェーズ** — 下記マイルストーン参照（**M0 バージョン・M1 ci.yml 軽量化・M2 npm audit・M4 LICENSE・M6 セキュリティ再チェック 完了 → 残るクリティカルパスは M3 Actions 再有効化＝要ユーザ操作**）。リリース後の将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 
@@ -17,8 +17,8 @@
 | # | 項目 | 内容の核 | 依存 | Size | 状態 |
 | --- | --- | --- | --- | --- | --- |
 | M0 | バージョン単一ソース化 | `package.json 0.0.0→0.1.0`（現行ドリフト是正）。単一ソース＝`tauri.conf.json`、bump スクリプトで3 config＋ハードコード2箇所（`mcp/server.ts`・`ipc/collab-client.ts`）＋cask へ伝播。`CHANGELOG.md`（Keep-a-Changelog）＋`RELEASING.md`＋semver 方針（crate 名リネームは cosmetic follow-up として分離） | — | M | 🏁 完了（PR #78） |
-| M1 | ci.yml 軽量化 | push/PR 毎の 3-OS Tauri build を **release/tag 限定へ移設**（cross-OS packaging は `release.yml` に既存）。push CI は Linux のみ＋test/e2e/lint 維持・`paths-ignore`(docs)・`timeout-minutes`・`permissions: contents:read`・rust-cache | — | M | ✅ READY |
-| M2 | npm audit triage（ADR-0016 F4） | high 7件を triage。実行時到達は `mermaid→chevrotain/langium→lodash-es` のみ・vite/esbuild は dev-only（`--omit=dev` 除外）。解決 or 明示受容後に security ゲートを required 化 | — | S | ✅ READY |
+| M1 | ci.yml 軽量化 | push/PR 毎の 3-OS Tauri build を **release/tag 限定へ移設**（cross-OS packaging は `release.yml` に既存）。push CI は Linux のみ＋test/e2e/lint 維持・`paths-ignore`(docs)・`timeout-minutes`・`permissions: contents:read`（rust-cache は follow-up） | — | M | 🏁 完了（PR #81） |
+| M2 | npm audit triage（ADR-0016 F4） | high 7件を triage。実行時到達は `mermaid→chevrotain/langium→lodash-es` のみ・vite/esbuild は dev-only（`--omit=dev` 除外）。解決 or 明示受容後に security ゲートを required 化。**npm audit fix で high 7＋mod 4 解消・残 dev-only 1 low 受容・gate required 化済** | — | S | 🏁 完了（PR #81） |
 | M3 | GitHub Actions 再有効化 | 軽量化後に `actions/permissions enabled=true`、小 push で per-push コストが Linux 限定になったことを確認（現在も無効・[[ci_actions_billing]]） | M1, M2 | S | 🔗 DEPENDS |
 | M4 | LICENSE＋第三者/モデル重み attribution | root に LICENSE 新設・README「Private」是正・`package.json` license。`THIRD-PARTY-NOTICES`（npm/crate/**llamafile〔Apache-2.0＋llama.cpp MIT の NOTICE 伝播〕/Node/DL モデル重み〔Phi-3.5=MIT・Granite 4.1=Apache-2.0〕**）・CREDITS 拡張・`bundle.license/copyright` | — | M | 🏁 完了（PR #79） |
 | M5 | 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | — | S | 💬 DISCUSS |
