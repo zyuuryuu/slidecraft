@@ -17,7 +17,6 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | 項目 | 内容 | 状態 |
 | --- | --- | --- |
 | 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | 💬 DISCUSS（要ユーザ） |
-| PowerPoint 実機開封チェック | 生成 PPTX を実 PowerPoint / PowerPoint for the web で開き見た目確認（現状 python-pptx＋wellformed-gate のみ） | ✅ READY |
 | Intel Mac (.dmg) | v0.1.0 は runner 都合で arm64 のみ。x64 dmg 生成後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（runner） |
 | 通知バナー（軽量自動更新） | 方針は [ADR-0021](adr/0021-auto-update-strategy.md) で決定済。GitHub Releases API ポーリングで「新版あり」通知（CSP egress＋版数取得＋実ポーリング検証を要す） | ✅ READY |
 | 不可視の締めスライド（旧 M11 BUG1） | Closing レイアウトが白地に薄色文字で不可視（背景/コントラスト抽出）。「図/テンプレ品質磨き込み」の一部 | ✅ READY |

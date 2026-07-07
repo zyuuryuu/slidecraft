@@ -86,6 +86,7 @@
 
 ## リリース・配布
 
+- **生成 PPTX の PowerPoint 実機開封チェック** — 出力 .pptx を実 PowerPoint / PowerPoint for the web で開き見た目を確認済（従来の python-pptx＋wellformed-gate に加え実機で確認・ユーザ確認 2026-07-07）
 - **v0.1.0 初回パブリックリリース＋工程化（M0–M13）** — バージョン単一ソース化（`bump-version.mjs`）・CI 軽量化（push=Linux 限定・release は tag 限定）＆再有効化・`npm audit` triage＋security ゲート required・LICENSE(Apache-2.0)＋第三者/モデル重み attribution（THIRD-PARTY-NOTICES）・セキュリティ再チェック（画像 `src` を data:image 制約・export nonce-CSP・data-URI サイズ上限）・ユーザマニュアル＋VitePress ドキュメントサイト（GitHub Pages）＋上流 AI 向け SKILL.md・`release.yml` 4-OS installer 実走・軽量自動更新方針・Homebrew tap/cask 構築 （ADR-0021・2026-07-07）
 
 ## UX・配布
