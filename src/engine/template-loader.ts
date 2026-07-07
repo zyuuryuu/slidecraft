@@ -88,6 +88,7 @@ export interface TemplateData {
   masterDecorations: DecoRect[]; // the master's OWN non-placeholder shapes (logos/bars) — a base layer
                                  // shown UNDER every layout (the preview never read these before)
   masterStaticTexts: StaticText[]; // the master's own static text labels (base layer)
+  themeColors: Record<string, string>; // scheme token → hex (bg1/bg2/tx1/tx2/accent1-6…), clrMap-resolved
 }
 
 // ── Namespace normalization ──
@@ -523,6 +524,7 @@ export async function loadTemplate(
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
     masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts,
+    themeColors,
   };
 }
 
