@@ -3,6 +3,7 @@
  */
 
 import { Fragment, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
@@ -39,6 +40,7 @@ export default function SlideList({
   onMove,
   disabled,
 }: SlideListProps) {
+  const { t } = useTranslation();
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
   // Drag-reorder via POINTER events (NOT native HTML5 DnD — unreliable in the Tauri webviews: WebKitGTK
   // on Linux, WKWebView on macOS). `insIdx` = the 0..N INSERTION gap (PowerPoint-style: an indicator line
@@ -100,7 +102,7 @@ export default function SlideList({
   if (!deck || deck.slides.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-faint text-xs p-2">
-        No slides
+        {t("preview.noSlides")}
       </div>
     );
   }

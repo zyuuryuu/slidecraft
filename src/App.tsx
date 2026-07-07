@@ -17,6 +17,8 @@ import { useDeckController } from "./components/useDeckController";
 import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
 import MasterPicker from "./components/MasterPicker";
 import ThemeToggle from "./components/ThemeToggle";
+import LanguageToggle from "./components/LanguageToggle";
+import { useTranslation } from "react-i18next";
 import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
@@ -52,6 +54,7 @@ export default function App() {
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
+  const { t } = useTranslation();
 
   // Master registry (Slice 1a): the global set of slide masters the draft can pick from (bundled
   // sample + any imported this session). Selecting/importing applies it to the active doc (gated).
@@ -360,6 +363,7 @@ export default function App() {
             onCreate={() => setShowTemplateCreator(true)}
             disabled={editLocked}
           />
+          <LanguageToggle />
           <ThemeToggle />
         </div>
       </div>
@@ -388,12 +392,12 @@ export default function App() {
             left={
               <>
                 <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge flex items-center justify-between">
-                  <span>Slides</span>
+                  <span>{t("panel.slides")}</span>
                   {!editLocked && (
                     <button
                       type="button"
                       onClick={handleAddSlide}
-                      title="スライドを追加（選択中のスライドの後ろに）"
+                      title={t("slides.add")}
                       className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none"
                     >
                       ＋
@@ -415,7 +419,7 @@ export default function App() {
                 <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge flex items-center justify-between">
                   {/* Show the resolved layout in the title ONLY in Markdown view — the form view's
                       LAYOUT row already shows it (avoid duplicating the layout name). */}
-                  <span>Slide Editor{slideEditView === "markdown" && currentLayoutName ? ` — ${currentLayoutName}` : ""}</span>
+                  <span>{t("panel.slideEditor")}{slideEditView === "markdown" && currentLayoutName ? ` — ${currentLayoutName}` : ""}</span>
                   <div className="flex items-center gap-0.5">
                     <button
                       onClick={() => setSlideEditView("form")}
@@ -434,7 +438,7 @@ export default function App() {
                 <div className="flex-1 min-h-0 bg-canvas">
                   {!currentSlide ? (
                     <div className="h-full flex items-center justify-center text-faint text-sm">
-                      Select a slide
+                      {t("preview.selectSlide")}
                     </div>
                   ) : slideEditView === "markdown" ? (
                     <SlideMarkdownEditor key={activeSlide} md={currentSlideMd ?? ""} onChange={handleSlideMdChange} />
@@ -447,7 +451,7 @@ export default function App() {
             right={
               <>
                 <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">
-                  Preview — Slide {activeSlide + 1}
+                  {t("panel.previewSlide", { n: activeSlide + 1 })}
                 </div>
                 <div className="flex-1 min-h-0 bg-canvas">
                   <SlidePreview deck={deck} template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} onImageRectChange={handleImageRectChange} />

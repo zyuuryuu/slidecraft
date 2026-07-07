@@ -1,0 +1,22 @@
+{
+  "lang": {
+    "name": "日本語",
+    "switchTo": "English",
+    "aria": "言語を切り替え"
+  },
+  "panel": {
+    "slides": "スライド",
+    "slideEditor": "スライドエディタ",
+    "preview": "プレビュー",
+    "previewSlide": "プレビュー — スライド {{n}}"
+  },
+  "preview": {
+    "emptyHeading": "スライドプレビュー",
+    "emptyHint": "Markdown を入力するとここにプレビューが表示されます",
+    "noSlides": "スライドがありません",
+    "selectSlide": "スライドを選択"
+  },
+  "slides": {
+    "add": "スライドを追加（選択中のスライドの後ろに）"
+  }
+}

@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
@@ -611,6 +612,7 @@ export default function SlidePreview({
   onDiagramChange,
   onImageRectChange,
 }: SlidePreviewProps) {
+  const { t } = useTranslation();
   // Catalog → layout selection adapts to the template (canonical = unchanged).
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
 
@@ -688,9 +690,8 @@ export default function SlidePreview({
       ) : !hasSlides ? (
         <div className="h-full flex items-center justify-center text-faint">
           <div className="text-center">
-            <p className="text-lg mb-2">スライドプレビュー</p>
-            <p className="text-sm">Markdown を入力すると</p>
-            <p className="text-sm">ここにプレビューが表示されます</p>
+            <p className="text-lg mb-2">{t("preview.emptyHeading")}</p>
+            <p className="text-sm">{t("preview.emptyHint")}</p>
           </div>
         </div>
       ) : singleSlide ? (

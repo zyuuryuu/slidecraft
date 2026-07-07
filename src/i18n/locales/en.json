@@ -1,0 +1,22 @@
+{
+  "lang": {
+    "name": "English",
+    "switchTo": "日本語",
+    "aria": "Switch language"
+  },
+  "panel": {
+    "slides": "Slides",
+    "slideEditor": "Slide Editor",
+    "preview": "Preview",
+    "previewSlide": "Preview — Slide {{n}}"
+  },
+  "preview": {
+    "emptyHeading": "Slide preview",
+    "emptyHint": "Type Markdown and the preview appears here",
+    "noSlides": "No slides",
+    "selectSlide": "Select a slide"
+  },
+  "slides": {
+    "add": "Add a slide (after the selected one)"
+  }
+}
