@@ -30,8 +30,8 @@ features:
     title: 内蔵オフライン AI
     details: llamafile を同梱。クラウドに送らず手元で生成・編集を補助。外部プロバイダ（Anthropic/OpenAI/OpenRouter/Ollama）も選べます。
   - icon: 🖥
-    title: 出力と同じ見た目でプレビュー
-    details: プレビューは書き出す .pptx / HTML と同じ見た目——「プレビューと本番が違う」がありません。内容とデザインを分けて、崩さず調整できます。
+    title: 思い通りに手直し
+    details: AI や engine が組んだ結果で終わりではありません。スライドを見ながら、内容とデザインを分けて調整でき、体裁は保ったまま最後の仕上げを自分で決められます。
   - icon: 🔌
     title: エージェント連携（MCP）
     details: slidecraft serve で上流 AI（Claude 等）が Tools 経由で編集。GUI がライブ反映する協働ホストにも対応。
@@ -44,7 +44,7 @@ features:
 配置・装飾はテンプレートとエンジンにまかせる分業で、**フォントやレイアウトを崩さずに**整ったスライドを作れます。
 
 - **書く** — Markdown（[執筆ガイド](/guide/markdown-authoring)・[図](/guide/diagrams)）
-- **見る** — テンプレートの色・フォントを反映した、出力と同じ見た目のプレビュー（[二段階編集](/guide/editing-and-export)）
+- **見る／直す** — テンプレートの色・フォントを反映したプレビューで、内容とデザインを分けて手直し（[二段階編集](/guide/editing-and-export)）
 - **出す** — 編集可能な図形で構成された `.pptx`、または遷移つきスタンダロン HTML
 
 まずは [インストール](/guide/installation) → [スターターガイド](/guide/getting-started) へ。
