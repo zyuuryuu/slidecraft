@@ -41,6 +41,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "license": "Apache-2.0",
+    "licenseFile": "../LICENSE",
+    "copyright": "Copyright © 2026 The SlideCraft Authors — Apache-2.0",
+    "publisher": "The SlideCraft Authors",
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",

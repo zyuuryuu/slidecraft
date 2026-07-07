@@ -1,0 +1,16 @@
+SlideCraft
+Copyright 2026 The SlideCraft Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes third-party software and, at runtime, downloads
+third-party AI model weights. The full list of components and their licenses
+— including the attribution notices required by their respective licenses
+(e.g. Apache-2.0 Section 4(d)) — is in THIRD-PARTY-NOTICES.md.
+
+Notable bundled/downloaded third-party components:
+  - llamafile (Mozilla-Ocho) — Apache-2.0; bundles llama.cpp — MIT.
+  - Node.js — MIT and related licenses (see THIRD-PARTY-NOTICES.md).
+  - Phi-3.5-mini-instruct model weights (Microsoft) — MIT (downloaded at runtime).
+  - Granite 4.1 model weights (IBM) — Apache-2.0 (downloaded at runtime).
+  - Bundled sample slide templates — see public/templates/slide/CREDITS.md.

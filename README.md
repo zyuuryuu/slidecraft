@@ -110,9 +110,12 @@ public/templates/    # スライドマスター (.pptx)
 
 - [アーキテクチャ決定記録 (ADR)](docs/adr/) — 決定済み＆実装済みの設計判断
 - [ロードマップ](docs/ROADMAP.md) — 前方向きの計画
+- [実装済みログ](docs/shipped.md) — 出荷済み機能の履歴
 - [詳細設計](docs/design/) — 補助設計資料
 - [MCP サーバの使い方](docs/mcp-server.md)
+- [リリース手順](RELEASING.md) — バージョニング方針とリリース手順
 
 ## ライセンス
 
-Private
+**Apache License 2.0** — 全文は [LICENSE](LICENSE)。第三者コンポーネント・同梱バイナリ・
+実行時にダウンロードする AI モデル重みの帰属表示は [NOTICE](NOTICE) ／ [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) を参照。
