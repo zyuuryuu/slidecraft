@@ -90,7 +90,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
               title=".pptx からフォント・配色・背景だけを受け継ぎ、SlideCraft のレイアウトで作り直す"
               className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
-              <span className="w-3 shrink-0 text-center">✨</span>
+              <span className="w-3 shrink-0 text-center">＋</span>
               <span>テーマだけ取り込む（Re-make）</span>
             </button>
           )}
