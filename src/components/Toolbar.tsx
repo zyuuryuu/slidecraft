@@ -14,7 +14,7 @@ interface ToolbarProps {
   onGenerate: () => void;
   /** Export a self-contained standalone HTML presentation (.html) with the chosen transition. */
   onExportHtml?: (transition?: Transition) => void;
-  /** Save / open the editable PROJECT (.slidecraft = deck + template). */
+  /** Save / open the editable PROJECT (.scft = deck + template). */
   onSaveProject?: () => void;
   onOpenProject?: () => void;
   onAiAssist?: () => void;
@@ -94,7 +94,7 @@ export default function Toolbar({
 
       <div className="flex-1" />
 
-      {/* File menu — project save/open (.slidecraft = editable) + export (PPTX / Markdown). */}
+      {/* File menu — project save/open (.scft = editable) + export (PPTX / Markdown). */}
       <div className="relative">
         <button
           onClick={() => { setExportOpen((v) => !v); setHtmlSub(false); }}
@@ -113,7 +113,7 @@ export default function Toolbar({
                   className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
                 >
                   <span>📂 プロジェクトを開く</span>
-                  <span className="text-faint text-xs">.slidecraft</span>
+                  <span className="text-faint text-xs">.scft</span>
                 </button>
               )}
               {onSaveProject && (
@@ -123,7 +123,7 @@ export default function Toolbar({
                   className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                 >
                   <span>💾 プロジェクトを保存</span>
-                  <span className="text-faint text-xs">.slidecraft</span>
+                  <span className="text-faint text-xs">.scft</span>
                 </button>
               )}
               <div className="my-1 border-t border-edge" />

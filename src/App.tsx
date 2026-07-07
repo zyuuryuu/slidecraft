@@ -21,6 +21,7 @@ import { useCollab } from "./components/useCollab";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
+import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { describeRepairPlan } from "./components/apply-template";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
@@ -43,7 +44,7 @@ export default function App() {
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
-    handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
+    handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
@@ -149,7 +150,7 @@ export default function App() {
     // Link the tab that was active on 開始 to the seed's host doc (so switching back re-targets here).
     onSeedDoc: (docId) => linkHostDoc(activeId, docId),
     // Mode (b): an AI-created deck opens as a BACKGROUND tab (no view switch). Unbundle the full
-    // .slidecraft (deck + template) so the new tab renders with its OWN master, not the current one.
+    // .scft (deck + template) so the new tab renders with its OWN master, not the current one.
     onNewHostDoc: async (docId, title, dataBase64) => {
       try {
         const bytes = Uint8Array.from(atob(dataBase64), (c) => c.charCodeAt(0));
@@ -225,6 +226,27 @@ export default function App() {
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   }, [handleInsertImage, notify]);
+
+  // OS file association (ADR-0024): a .scft opened via double-click / "open with" is handed to us by
+  // the Rust side (argv on Win/Linux, the Apple open event on macOS) and queued. Drain it on mount
+  // (cold launch — whatever the app was opened WITH) and on every "scft://open-file" poke (warm
+  // launch — app already running). The drain is the source of truth; the event is just a wake-up, so
+  // overlapping signals still open each file exactly once (the queue empties on first drain).
+  useEffect(() => {
+    let cancelled = false;
+    const drainAndOpen = async () => {
+      for (const path of await takePendingOpenPaths()) {
+        if (cancelled) return;
+        await handleOpenProjectFile(path);
+      }
+    };
+    void drainAndOpen();
+    let unlisten: (() => void) | undefined;
+    void onOpenFileRequested(() => { void drainAndOpen(); }).then((un) => {
+      if (cancelled) un(); else unlisten = un;
+    });
+    return () => { cancelled = true; unlisten?.(); };
+  }, [handleOpenProjectFile]);
 
   // Drag & drop an image FILE onto the app → insert onto the current slide as a data URI. Desktop: the
   // OS drop is intercepted by Tauri (HTML5 'drop' doesn't fire) → use the native onDragDropEvent + fs

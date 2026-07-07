@@ -2,7 +2,7 @@
  * useCollab.ts — the P2.4 React binding for GUI-hosted collaboration. On 開始 it asks Rust to spawn
  * the collab sidecar (start_collab → {url,token}), connects a gui-role CollabProjection over the
  * Tauri plugin-http fetch, and mirrors the host's truth into the active deck via setDeck(next,
- * 'commit') on every change. It also SEEDS the current deck (as exact .slidecraft bytes) so a
+ * 'commit') on every change. It also SEEDS the current deck (as exact .scft bytes) so a
  * connecting AI has something to edit without a lossy markdown round-trip.
  *
  * Desktop-only: collaboration needs the spawned sidecar, so `available` is false in a plain browser.
@@ -39,7 +39,7 @@ export interface UseCollabArgs {
    *  'silent' : 'commit') — a freshly-adopted/seeded doc replaces the view WITHOUT an undo step;
    *  subsequent AI edits are undoable. */
   applyDeck: (deck: DeckIR | null, isInitial: boolean) => void;
-  /** The current local deck + its template — seeded (as exact .slidecraft bytes) to the host on
+  /** The current local deck + its template — seeded (as exact .scft bytes) to the host on
    *  開始 so an AI has something to edit, without a lossy markdown round-trip. */
   deck: DeckIR | null;
   templateData: TemplateData | null;
@@ -52,7 +52,7 @@ export interface UseCollabArgs {
    *  switching back to that tab re-targets the projection at the seed. */
   onSeedDoc?: (docId: string) => void;
   /** A NEW host doc appeared (the AI ran new_project). App opens it as a BACKGROUND tab — mode (b):
-   *  a tab shows up but the view doesn't switch. `dataBase64` is the full .slidecraft (deck+template). */
+   *  a tab shows up but the view doesn't switch. `dataBase64` is the full .scft (deck+template). */
   onNewHostDoc?: (docId: string, title: string, dataBase64: string) => void;
 }
 
@@ -152,7 +152,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       } catch {
         /* template upload is best-effort — collaboration still works without it */
       }
-      // Best-effort: SHARE the current deck as exact .slidecraft bytes (no markdown round-trip → no
+      // Best-effort: SHARE the current deck as exact .scft bytes (no markdown round-trip → no
       // title-slide mangling) so a connecting AI has something to edit. The projection mirrors it
       // back as the INITIAL ('silent') apply = no visible change / no undo step. If there's no deck/
       // template or the seed fails, collaboration still works (the AI can open its own doc).

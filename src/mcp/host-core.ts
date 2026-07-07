@@ -5,7 +5,7 @@
  * this — it keeps its single Session.
  *
  * Model: ONE DocEntry per OPEN document, keyed by an EPHEMERAL docId (crypto.randomUUID — the
- * same scheme the GUI uses for tab ids; durable identity stays the .slidecraft FILE). Each entry
+ * same scheme the GUI uses for tab ids; durable identity stays the .scft FILE). Each entry
  * carries its own deck Session, a forward-only `rev`, and a full undo HISTORY (shared
  * history-core reducer). Because BOTH AI tool calls and (relayed) human GUI edits commit through
  * `commitMutation`, there is ONE unified undo timeline per doc.

@@ -1,7 +1,7 @@
 /**
  * project-io.ts — save / open a SlideCraft PROJECT (the editable source of truth).
  *
- * A `.slidecraft` file is a self-contained zip:
+ * A `.scft` file is a self-contained zip:
  *   deck.json      — the DeckIR (lossless; the canonical serialization, NOT Markdown)
  *   template.pptx  — the template bytes (re-emitted from the retained TemplateData.zip)
  *   meta.json      — { version, templateName, savedAt }
@@ -17,6 +17,19 @@ import { loadTemplate, type TemplateData } from "./template-loader";
 import { loadZipSafe, readCappedString, readCappedBytes, readEntryString, ZIP_LIMITS } from "./zip-safe";
 
 const PROJECT_VERSION = 1;
+
+/** The project file extension (no dot). One constant so the picker, save name, and
+ *  the OS file-association / launch-open path can never drift apart. */
+export const PROJECT_EXT = "scft";
+
+/** Derive a document title from a project file's name/path by stripping the `.scft`
+ *  extension (case-insensitive). Shared by the "open" dialog and the launch-open
+ *  (double-click a .scft) path so both name the tab identically. Accepts a full path
+ *  or a bare name; returns the last path segment sans extension. */
+export function projectTitleFromFileName(nameOrPath: string): string {
+  const base = nameOrPath.split(/[\\/]/).pop() ?? nameOrPath;
+  return base.replace(new RegExp(`\\.${PROJECT_EXT}$`, "i"), "");
+}
 
 const ProjectMetaSchema = z.object({
   version: z.number(),
@@ -50,7 +63,7 @@ function stripSvgCache(deck: DeckIR): DeckIR {
   };
 }
 
-/** Bundle the deck + its template into a `.slidecraft` zip (Uint8Array). */
+/** Bundle the deck + its template into a `.scft` zip (Uint8Array). */
 export async function bundleProject(
   deck: DeckIR,
   template: TemplateData,
@@ -64,14 +77,14 @@ export async function bundleProject(
   return zip.generateAsync({ type: "uint8array" });
 }
 
-/** Open a `.slidecraft` zip → the full editing state. Throws on a malformed bundle or a
+/** Open a `.scft` zip → the full editing state. Throws on a malformed bundle or a
  *  deck.json that doesn't match the current schema. */
 export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ deck: DeckIR; template: TemplateData; meta: ProjectMeta }> {
   const zip = await loadZipSafe(bytes); // input-size + entry-count guard (cheap header parse)
   const deckFile = zip.file("deck.json");
   const tplFile = zip.file("template.pptx");
   if (!deckFile || !tplFile) {
-    throw new Error("不正な .slidecraft ファイルです（deck.json / template.pptx が見つかりません）");
+    throw new Error("不正な .scft ファイルです（deck.json / template.pptx が見つかりません）");
   }
   // Stream-capped decompression (zip-bomb safe) → schema validation → bounds.
   const parsed = DeckIRSchema.parse(JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson)));

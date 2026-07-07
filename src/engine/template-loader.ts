@@ -529,7 +529,7 @@ export async function loadTemplate(
   pptxBuffer: Buffer | ArrayBuffer | Uint8Array,
 ): Promise<TemplateData> {
   // Hardened against zip bombs / oversized input (the .pptx is untrusted: "Load
-  // Template" or the nested template.pptx in a .slidecraft). See [[zip-safe]].
+  // Template" or the nested template.pptx in a .scft). See [[zip-safe]].
   const zip = await loadZipSafe(pptxBuffer, { maxInputBytes: ZIP_LIMITS.templatePptx });
 
   // ── Extract master styles ──

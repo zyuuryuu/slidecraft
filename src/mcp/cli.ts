@@ -1,7 +1,7 @@
 /**
  * cli.ts — `slidecraft serve`: the headless stdio MCP entry an upstream agent spawns.
  *
- * v1 is --no-fs (the default and only mode): the .slidecraft / .pptx bytes flow as base64
+ * v1 is --no-fs (the default and only mode): the .scft / .pptx bytes flow as base64
  * over stdio, so the server reads/writes NO files — the trust boundary is just the agent
  * that spawned it (OS-user / inherited stdio). A scoped --root mode is reserved for later.
  */

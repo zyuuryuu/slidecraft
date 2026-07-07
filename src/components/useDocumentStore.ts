@@ -29,7 +29,7 @@ export type MarkdownSubMode = "import" | "edit";
 const COALESCE_MS = 600; // match useHistoryState's default typing-coalesce window
 
 /** Everything that belongs to ONE document. templateData is per-doc because a
- *  .slidecraft is self-contained (its own template), so two open projects can use
+ *  .scft is self-contained (its own template), so two open projects can use
  *  different templates. */
 export interface DocState {
   id: string;
@@ -164,7 +164,7 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
     dispatch({ type: "newDoc", doc, activate: true });
     return doc.id;
   }, []);
-  /** Open a fully-formed document (e.g. a .slidecraft project) as a NEW active doc —
+  /** Open a fully-formed document (e.g. a .scft project) as a NEW active doc —
    *  wraps the deck into a fresh history so it never destroys the current document. */
   const openDoc = useCallback(
     (init: {

@@ -90,6 +90,8 @@
 
 ## UX・配布
 
+- **`.scft` アプリ関連付け（ダブルクリックで開く）＋拡張子短縮** — プロジェクト拡張子を `.slidecraft`→`.scft` に短縮し、OS 関連付けで**ダブルクリック/「プログラムから開く」**が起動＝新タブで開く。Win/Linux ウォーム起動は `single-instance` で単一ウィンドウ、macOS は open イベント、Win/Linux コールドは argv。fs スコープ動的付与でダイアログ選択と同じ信頼境界 （ADR-0024・2026-07-07）
+- **AI が Live MCP で作った Deck を GUI 背景タブに出す（モード b）** — 協働中に上流 AI が `new_project` すると背景タブとして出現（表示は切替えない）。マルチドキュメント基盤（`openDoc` activate:false）＋ミラー先の per-tab 切替 （2026-07-07）
 - **改行を LF 固定（.gitattributes）** — Windows CRLF churn を .gitattributes で根治 （PR #69・2026-07-05）
 - **配布 — パッケージ版で collab を動かす** — node externalBin 同梱＋host.cjs resource でパッケージ版 collab を稼働 （PR #37・2026-06-30）
 - **配布をクロスプラットフォーム化＋CI で node 同梱** — mac/linux 対応の土台として配布をクロスプラットフォーム化 （PR #39・2026-06-30）

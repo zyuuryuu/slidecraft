@@ -153,7 +153,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // ── entry: open / new ──
   server.registerTool(
     "open_project",
-    { description: "base64 の .slidecraft を開く（host では新しいドキュメントとして開く）", inputSchema: { dataBase64: z.string() } },
+    { description: "base64 の .scft を開く（host では新しいドキュメントとして開く）", inputSchema: { dataBase64: z.string() } },
     (a, extra) => (host ? openInHost(withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))), extra) : mutate(extra, undefined, "open_project", withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))))),
   );
   server.registerTool(
@@ -212,7 +212,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues", inputSchema: doc }, (a, extra) => run(() => S.validate(sessionOf(extra, a.docId))));
 
   // ── persist / export (base64 over stdio) ──
-  server.registerTool("save_project", { description: ".slidecraft を生成し base64 で返す", inputSchema: doc }, (a, extra) => run(async () => ({ dataBase64: b64(await S.saveProjectBytes(sessionOf(extra, a.docId))) })));
+  server.registerTool("save_project", { description: ".scft を生成し base64 で返す", inputSchema: doc }, (a, extra) => run(async () => ({ dataBase64: b64(await S.saveProjectBytes(sessionOf(extra, a.docId))) })));
   server.registerTool(
     "export_pptx",
     { description: ".pptx を native-vector で headless 生成し base64 で返す（変換不能 mermaid は default reject / skip）", inputSchema: { onUnsupportedMermaid: z.enum(["reject", "skip"]).optional(), ...doc } },

@@ -1,5 +1,5 @@
 /**
- * project-io.test.ts — a `.slidecraft` bundle round-trips the full editing state
+ * project-io.test.ts — a `.scft` bundle round-trips the full editing state
  * (deck + template) losslessly: bundle → open → same deck, working template.
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -14,7 +14,7 @@ beforeAll(async () => {
   template = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")));
 });
 
-describe("project-io (.slidecraft bundle)", () => {
+describe("project-io (.scft bundle)", () => {
   const DECK_MD = "# 表紙\n\n## サブ\n\n---\n\n# 中身\n\n- 速度: 0.8秒\n- 重量: 1.2kg";
 
   it("bundle → open restores the SAME deck (lossless, not via Markdown)", async () => {
@@ -36,7 +36,7 @@ describe("project-io (.slidecraft bundle)", () => {
   it("rejects a malformed bundle (missing deck.json / template.pptx)", async () => {
     const JSZip = (await import("jszip")).default;
     const empty = await new JSZip().generateAsync({ type: "uint8array" });
-    await expect(openProject(empty)).rejects.toThrow(/slidecraft/);
+    await expect(openProject(empty)).rejects.toThrow(/scft/);
   });
 
   it("strips a persisted svgCache on open (F2 XSS carrier — ADR-0016)", async () => {

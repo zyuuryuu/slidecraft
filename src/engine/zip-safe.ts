@@ -1,5 +1,5 @@
 /**
- * zip-safe.ts — hardened zip reads for UNTRUSTED input (.slidecraft, .pptx templates).
+ * zip-safe.ts — hardened zip reads for UNTRUSTED input (.scft, .pptx templates).
  *
  * The real zip-bomb defense is here: `readCappedBytes` STREAM-decompresses one entry and
  * aborts the instant the OUTPUT exceeds the cap — so a small-in/huge-out bomb is caught

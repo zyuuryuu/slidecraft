@@ -6,6 +6,17 @@ SlideCraft の主要な変更点です。形式は [Keep a Changelog](https://ke
 - 完全な変更履歴：[CHANGELOG.md](https://github.com/zyuuryuu/slidecraft/blob/main/CHANGELOG.md)
 - 出荷済み機能の網羅ログ：[shipped.md](https://github.com/zyuuryuu/slidecraft/blob/main/docs/shipped.md)
 
+## [Unreleased]
+
+### 追加
+
+- **`.scft` をアプリに関連付け（ダブルクリックで開く）** — プロジェクトファイル（`.scft`）を**ダブルクリック / 「プログラムから開く」**で SlideCraft が起動して開くように。起動済みなら**新しいタブ**として開き、いま開いているものは壊しません。
+- **AI が Live MCP で作ったデッキを GUI の背景タブに出す** — 協働中に上流 AI が新しいデッキを作ると、GUI に背景タブとして現れます（表示は切り替わりません）。
+
+### 変更
+
+- **プロジェクトファイルの拡張子を `.slidecraft` → `.scft` に短縮** — 短く扱いやすい 4 文字に。
+
 ## [0.2.0] — 2026-07-07
 
 第三者スライドマスター対応と、上流 AI 向け MCP CLI 同梱が目玉。

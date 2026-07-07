@@ -17,7 +17,7 @@ import type { MermaidConfig } from "mermaid";
 export const MERMAID_CONFIG: MermaidConfig = {
   startOnLoad: false,
   theme: "dark",
-  // Mermaid syntax can come from an untrusted .slidecraft. Its rendered SVG is injected
+  // Mermaid syntax can come from an untrusted .scft. Its rendered SVG is injected
   // via dangerouslySetInnerHTML (SlidePreview), so pin securityLevel:"strict" — entity-
   // encodes label text and disables click/script — instead of relying on the default.
   securityLevel: "strict",

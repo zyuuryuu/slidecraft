@@ -45,6 +45,15 @@
     "licenseFile": "../LICENSE",
     "copyright": "Copyright © 2026 The SlideCraft Authors — Apache-2.0",
     "publisher": "The SlideCraft Authors",
+    "fileAssociations": [
+      {
+        "ext": ["scft"],
+        "name": "SlideCraft Project",
+        "description": "SlideCraft project (deck + template)",
+        "role": "Editor",
+        "mimeType": "application/x-slidecraft"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",

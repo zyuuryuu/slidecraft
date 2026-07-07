@@ -11,7 +11,8 @@ import { renderDeckToPptxBytes } from "./deck-export";
 import { renderDeckToHtml } from "./deck-html-export";
 import type { Transition } from "../engine/html-shell";
 import { serializeMd } from "../engine/md-serializer";
-import { bundleProject, openProject } from "../engine/project-io";
+import { bundleProject, openProject, projectTitleFromFileName, PROJECT_EXT } from "../engine/project-io";
+import { readProjectFileBytes } from "../ipc/file-open";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 
@@ -26,7 +27,7 @@ interface IODeps {
   /** Current file path is per-document (lives in the document store). */
   filePath: string | null;
   setFilePath: (n: string | null) => void;
-  /** Open a .slidecraft project as a NEW document (never destroys the current one). */
+  /** Open a .scft project as a NEW document (never destroys the current one). */
   openDoc: (init: { deck: DeckIR | null; templateData?: TemplateData | null; templateName?: string; mdText?: string; filePath?: string | null; title?: string }) => string;
 }
 
@@ -71,32 +72,48 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
     await saveTextFile(html, `${base}.html`, ["html"], "HTML");
   }, [deck, templateData, filePath]);
 
-  // Save the PROJECT — deck + template in one self-contained .slidecraft (reopen losslessly).
+  // Save the PROJECT — deck + template in one self-contained .scft (reopen losslessly).
   const handleSaveProject = useCallback(async () => {
     if (!deck || !templateData) return;
     const bytes = await bundleProject(deck, templateData, { templateName, savedAt: new Date().toISOString() });
     const base = (filePath ?? "project").replace(/\.[^./\\]+$/, "");
-    await saveBinaryFile(bytes, `${base}.slidecraft`, ["slidecraft"], "SlideCraft Project");
+    await saveBinaryFile(bytes, `${base}.${PROJECT_EXT}`, [PROJECT_EXT], "SlideCraft Project");
   }, [deck, templateData, templateName, filePath]);
 
-  // Open a .slidecraft as a NEW document (a tab) so the current project is preserved.
-  const handleOpenProject = useCallback(async () => {
-    const picked = await pickBinaryFile(["slidecraft"], "SlideCraft Project");
-    if (!picked) return;
+  // Unbundle .scft bytes → a NEW background-agnostic document (a tab), preserving the current one.
+  // Shared by the picker (handleOpenProject) and the OS file-association launch path
+  // (handleOpenProjectFile), so both name the tab and sync the Markdown view identically.
+  const openProjectBytes = useCallback(async (bytes: Uint8Array, name: string) => {
     try {
-      const { deck: openedDeck, template, meta } = await openProject(picked.bytes);
+      const { deck: openedDeck, template, meta } = await openProject(bytes);
       openDoc({
         deck: openedDeck,
         templateData: template,
         templateName: meta.templateName ?? "",
         mdText: serializeMd(openedDeck), // keep the Markdown view in sync
-        filePath: picked.name,
-        title: picked.name.replace(/\.slidecraft$/i, ""),
+        filePath: name,
+        title: projectTitleFromFileName(name),
       });
     } catch (e) {
       setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [openDoc, setParseError]);
 
-  return { generating, handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject };
+  // Open a .scft as a NEW document (a tab) via the file picker.
+  const handleOpenProject = useCallback(async () => {
+    const picked = await pickBinaryFile([PROJECT_EXT], "SlideCraft Project");
+    if (picked) await openProjectBytes(picked.bytes, picked.name);
+  }, [openProjectBytes]);
+
+  // Open a .scft handed to us by the OS (double-click / "open with") at a concrete path.
+  // The launch path was granted to the fs scope by the Rust side, so readFile is allowed.
+  const handleOpenProjectFile = useCallback(async (path: string) => {
+    try {
+      await openProjectBytes(await readProjectFileBytes(path), path);
+    } catch (e) {
+      setParseError(`プロジェクトを開けません: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [openProjectBytes, setParseError]);
+
+  return { generating, handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile };
 }
