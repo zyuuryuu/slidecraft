@@ -23,8 +23,9 @@ SlideCraft の主要な変更点です。形式は [Keep a Changelog](https://ke
 ### 注意
 
 ::: warning macOS
-ad-hoc 署名（未ノータライズ・本ビルドは実機未検証）。初回起動は Finder で右クリック →「開く」、または
-`xattr -dr com.apple.quarantine /Applications/SlideCraft.app`。不具合は [Issue](/guide/reporting-issues) で歓迎します。
+ad-hoc 署名（未ノータライズ）。**Apple Silicon での起動は確認済み**。新しめの macOS（15 Sequoia 以降）では
+初回に未ノータライズ警告が出るため、**システム設定 → プライバシーとセキュリティ →「このまま開く」**で開いてください
+（右クリック→「開く」だけでは通らない場合があります）。Intel Mac 版は未提供。不具合は [Issue](/guide/reporting-issues) で歓迎します。
 :::
 
 更新は当面**手動**です（macOS は将来 Homebrew cask 予定）。詳細は

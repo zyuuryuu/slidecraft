@@ -82,8 +82,13 @@ brew tap zyuuryuu/slidecraft
 brew install --cask slidecraft
 ```
 
-`brew install --cask` はインストール時に `com.apple.quarantine` 属性を剥がすため、
-Gatekeeper の「開発元を確認できません」ブロックが発生せず、**初回起動の警告なしで開けます**。
+`brew install --cask` はインストール時に `com.apple.quarantine` 属性を剥がします。多くの環境ではこれで初回警告なしに開けますが、**新しめの macOS（Sequoia 15 以降）では未ノータライズのため、初回に「"SlideCraft" は Mac に問題を起こす可能性がある…」という警告が出ることがあります**（破損ではありません）。その場合は次で開けます:
+
+**システム設定 → プライバシーとセキュリティ →（下の方の）「"SlideCraft" は…ブロックされました」→「このまま開く」** → 再確認ダイアログで「開く」。一度許可すれば次回以降は通常起動できます。
+
+::: tip macOS 15 以降のヒント
+macOS 15（Sequoia）以降では、従来の「右クリック →『開く』」だけでは通らなくなっており、上記の **システム設定 →「このまま開く」** が確実な方法です。これは未ノータライズアプリ全般の挙動で、根本解決は Developer-ID 署名＋ノータライズ（$99・下記「将来」）です。
+:::
 
 ::: warning macOS で直接 .dmg を開く場合の初回注意
 Homebrew を使わず `.dmg` を直接ダウンロードすると quarantine 属性が残るため、Gatekeeper が
