@@ -87,6 +87,10 @@ xychart:
 
 記法の全体像（表・画像・多カラム・KPI・コードフェンス）は [Markdown 執筆ガイド](/guide/markdown-authoring) にまとまっています。図の 12 種と `mermaid` 経由の 4 種は [図（ダイアグラム）](/guide/diagrams) を参照してください。
 
+::: tip 全機能デモを丸ごと試す
+もっと盛りだくさんの例として、**全機能デモデッキ**（ネイティブ図・`mermaid`・表・多カラム・各種レイアウトを一通り収録した約 30 枚）を用意しています。[**`examples/sample-deck.md`**](https://github.com/zyuuryuu/slidecraft/blob/main/examples/sample-deck.md) を Draft に丸ごと貼り付けて「スライドにする」だけで、SlideCraft の表現力を一度に確認できます（v0.2.0 まで起動時に表示していたサンプルです）。
+:::
+
 ## ② スライドにする — テンプレートを選んで変換
 
 Markdown を書いたら、テンプレートを選んで「スライドにする」を実行します。ここで起きることは次の通りです。

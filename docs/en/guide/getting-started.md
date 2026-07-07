@@ -87,6 +87,10 @@ On the title slide, lines like `Category:` / `Date:` / `Footer:` are treated as 
 
 The full picture of the syntax (tables, images, multi-column, KPIs, code fences) is collected in the [Markdown Authoring Guide](/en/guide/markdown-authoring). For the 12 diagram types and the 4 available via `mermaid`, see [Diagrams](/en/guide/diagrams).
 
+::: tip Try the full showcase deck
+For a richer example, there's a **full showcase deck** (~30 slides covering native diagrams, `mermaid`, tables, multi-column, and every layout). Paste [**`examples/sample-deck.md`**](https://github.com/zyuuryuu/slidecraft/blob/main/examples/sample-deck.md) into Draft and hit "Turn it into slides" to see SlideCraft's full range at once. (This is the sample that used to load on startup through v0.2.0. Its content is in Japanese — feel free to replace the text.)
+:::
+
 ## ② Turn it into slides — Pick a template and convert
 
 Once you've written your Markdown, pick a template and run "Turn it into slides." Here's what happens.
