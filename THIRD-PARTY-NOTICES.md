@@ -1,3 +1,5 @@
+[English](THIRD-PARTY-NOTICES.en.md) · **日本語**
+
 # Third-Party Notices
 
 SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・同梱し、また実行時に AI モデル重みを
