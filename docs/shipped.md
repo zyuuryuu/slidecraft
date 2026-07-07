@@ -37,6 +37,8 @@
 
 ## テンプレ・マスター
 
+- **スライドマスター Re-make（テーマ抽出→自前レイアウト決め打ち）** — `masterToTemplateSpec` が入力マスターからフォント＋コントラスト安全 9色 palette を抽出→`writeTemplate` で自前 canonical レイアウトに載せる新しい取り込みモード（純粋 Import と両立）。ロゴ継承（元マスターの `<p:pic>` を dark 系レイアウトへ再埋め込み）・フラット設計の吸収（ソースがバー無しなら light 系のヘッダーバーを外す）・EA/CJK フォントと dark ロゴ変種は残 （ADR-0023・2026-07-07）
+- **第三者マスターの本文束縛＋反転テーマ背景 修正＋プレビュー画像描画** — idx-META 規約を自前マスター（dotted 名 or 型付き sldNum/dt/ftr メタ）限定にし、素の PowerPoint マスターの idx-10+ body を本文として束縛（プレビュー追随＋PPTX 充填）。反転テーマで暗転していたプレビュー背景を実 `<p:bg>` から解決。layout/master の `<p:pic>` ロゴ/図版をプレビュー描画（従来は全テンプレで pic 落ち） （ADR-0023・2026-07-07）
 - **テンプレ作成モーダルのライブプレビュー・サブセット選択・カスタムレイアウト** — 作成モーダルに live preview（`buildTemplatePreview`＝writeTemplate→loadTemplate→distill を SlidePreview 再利用）＋レイアウトサブセット選択＋カスタム `LayoutEditor` を追加 （ADR-0014・PR #77・2026-07-07）
 - **テンプレ作成補助 — 修復オファー・ゼロから生成・永続化** — `template-repair.ts` がゲート拒否を最小 type-patch 修復オファーに変換、`template-writer.ts` が TemplateSpec から 30 canonical レイアウトのフル OOXML を生成、`master-store.ts` が masters を永続化、AI は spec のみ提案（contrast-guarded） （ADR-0014・PR #64・2026-07-04）
 - **マスター Initialize ゲート配線＋prompt 連動＋段組み幾何分類** — Initialize ゲートを prompt に連動、段組み幾何を分類 （PR #44・2026-07-01）
@@ -62,6 +64,7 @@
 
 ## 協働・MCP
 
+- **MCP CLI 同梱（ビルド不要のエージェント駆動）** — 自己完結 `cli.cjs`＋Node ランタイムをインストーラに同梱、macOS は Homebrew cask が `slidecraft-mcp` を PATH 登録。ソース build もシステム Node も不要で上流 AI（Claude Code/Cursor/Claude Desktop）が駆動可。update-cask に fail-closed guard （ADR-0022・2026-07-07）
 - **MCP テンプレ選択 list/use/register_templates** — GUI が collab 開始時に master レジストリを host へ upload するプロトコル越し橋渡し（S2 増分2） （ADR-0015・PR #76・2026-07-07）
 - **MCP エラー契約統一** — guard 失敗を `{ok:false,code}` に、isError=crash 専用 （2026-07-05）
 - **MCP ブラッシュアップ — 統一 mutation envelope・構造操作・read 粒度** — S1–S6：自己記述契約（get_authoring_guide/get_diagram_types/get_diagram_guide）、テンプレ調達（create_template＋list/use/register_templates）、統一 envelope `{ok,changed,...}`＋commitMutation no-op 修正、4 構造 ops（insert/delete/move/duplicate）、get_slide＋text-slide figure-add、決定論 hints （ADR-0015・PR #65・2026-07-04）
@@ -79,6 +82,10 @@
   - P2.1a host-core（DocRegistry＋server-side undo/redo） （PR #27・2026-06-29）
   - P2.0 シーム（history-core 共有化＋onMutate/resources opt-out） （PR #26・2026-06-29）
   - MCP deck:// resources（read-only deck 状態の公開） （PR #24・2026-06-29）
+
+## リリース・配布
+
+- **v0.1.0 初回パブリックリリース＋工程化（M0–M13）** — バージョン単一ソース化（`bump-version.mjs`）・CI 軽量化（push=Linux 限定・release は tag 限定）＆再有効化・`npm audit` triage＋security ゲート required・LICENSE(Apache-2.0)＋第三者/モデル重み attribution（THIRD-PARTY-NOTICES）・セキュリティ再チェック（画像 `src` を data:image 制約・export nonce-CSP・data-URI サイズ上限）・ユーザマニュアル＋VitePress ドキュメントサイト（GitHub Pages）＋上流 AI 向け SKILL.md・`release.yml` 4-OS installer 実走・軽量自動更新方針・Homebrew tap/cask 構築 （ADR-0021・2026-07-07）
 
 ## UX・配布
 

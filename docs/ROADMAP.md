@@ -2,42 +2,28 @@
 
 **前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
 
-**現在地（2026-07-07）**：named 主要テーマ 1〜4＋差別化アーキ（内蔵 AI・AI 編集の採用ゲート・協働ホスト）まで完了（[shipped.md](shipped.md)）。**いま：初回パブリックリリース（v0.1.0）に向けた工程化フェーズ** — 下記マイルストーン参照（**M0-M8・M11 完了：CI 再有効化＋public 化済／release.yml 実証済で draft installers 生成／マニュアル・セキュリティ・法務 完了 → 残るは M9 実機テスト・M10 PowerPoint 開封・M5 アイコン＝要ユーザ、M12 軽量自動更新＝ローカル**）。リリース後の将来テーマは「バックログ」へ。
+**現在地（2026-07-07）**：**v0.1.0 出荷済**（初回パブリックリリース — 工程化 M0–M13 完了・[shipped.md](shipped.md)）。以降 v0.1.x で**第三者マスター対応**（Re-make／素マスターの本文束縛／プレビュー画像描画）＋**MCP CLI 同梱**（ビルド不要のエージェント駆動）を積み増し。**いま：次バージョンのリリース準備。** 残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 
 ---
 
-## 🚀 初回リリース（v0.1.0）マイルストーン
+## 🔻 リリース後の残タスク（v0.1.x）
 
-リリース準備監査（2026-07-07・7観点）に基づく工程。**バージョン統一 → CI 軽量化＆再有効化 → release.yml 実走 → 実機検証 → 品質1周 → 出荷**をクリティカルパスに、法務/ブランド/セキュリティ/マニュアルは並行。方針決定（ユーザ 2026-07-07）：**バージョン＝v0.1.0（pre-1.0＝早期・API 不安定を明示）／自動更新＝初回は軽量通知のみ・完全署名 Updater は出荷後（不可逆な鍵コミット回避）**。
+v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md)）。残る細部のみ：
 
-状態: **✅ READY**（着手可）／**🔗 DEPENDS**（先行あり）／**💬 DISCUSS**（設計/デザイン未確定）。Size: S<1日・M 2-3日・L 1週。
-
-| # | 項目 | 内容の核 | 依存 | Size | 状態 |
-| --- | --- | --- | --- | --- | --- |
-| M0 | バージョン単一ソース化 | `package.json 0.0.0→0.1.0`（現行ドリフト是正）。単一ソース＝`tauri.conf.json`、bump スクリプトで3 config＋ハードコード2箇所（`mcp/server.ts`・`ipc/collab-client.ts`）＋cask へ伝播。`CHANGELOG.md`（Keep-a-Changelog）＋`RELEASING.md`＋semver 方針（crate 名リネームは cosmetic follow-up として分離） | — | M | 🏁 完了（PR #78） |
-| M1 | ci.yml 軽量化 | push/PR 毎の 3-OS Tauri build を **release/tag 限定へ移設**（cross-OS packaging は `release.yml` に既存）。push CI は Linux のみ＋test/e2e/lint 維持・`paths-ignore`(docs)・`timeout-minutes`・`permissions: contents:read`（rust-cache は follow-up） | — | M | 🏁 完了（PR #81） |
-| M2 | npm audit triage（ADR-0016 F4） | high 7件を triage。実行時到達は `mermaid→chevrotain/langium→lodash-es` のみ・vite/esbuild は dev-only（`--omit=dev` 除外）。解決 or 明示受容後に security ゲートを required 化。**npm audit fix で high 7＋mod 4 解消・残 dev-only 1 low 受容・gate required 化済** | — | S | 🏁 完了（PR #81） |
-| M3 | GitHub Actions 再有効化 | 軽量化後に `actions/permissions enabled=true`、小 push で per-push コストが Linux 限定になったことを確認（現在も無効・[[ci_actions_billing]]） | M1, M2 | S | 🔗 DEPENDS |
-| M4 | LICENSE＋第三者/モデル重み attribution | root に LICENSE 新設・README「Private」是正・`package.json` license。`THIRD-PARTY-NOTICES`（npm/crate/**llamafile〔Apache-2.0＋llama.cpp MIT の NOTICE 伝播〕/Node/DL モデル重み〔Phi-3.5=MIT・Granite 4.1=Apache-2.0〕**）・CREDITS 拡張・`bundle.license/copyright` | — | M | 🏁 完了（PR #79） |
-| M5 | 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | — | S | 💬 DISCUSS |
-| M6 | セキュリティ再チェック（新3面） | ADR-0016 以降の新サーフェスを是正：**画像 `src` を `data:image` に zod 制約**（現状 `z.string()`＝`javascript:`/remote 永続化 XSS 経路）・export HTML の nonce-CSP を全経路で常時付与アサート・画像 data-URI サイズ上限（DoS）・`register_templates` store 上限・新面（画像/MCP/カスタムレイアウト OOXML）を敵対再監査 → **ADR-0016 addendum** | M0 | M | 🏁 完了（PR #80） |
-| M7 | ユーザマニュアル | コアループ Draft→Edit→export／Markdown 基本（区切り・`<!-- col/kpi/step -->`・表・画像・図フェンス）／**authorable 12種＋mermaid 限定4種**（先に「図12 vs 14」記述矛盾を正典 `VALID_TYPES` で統一）／二段階編集／テンプレ取込・修復・作成／内蔵 AI 有効化＋初回モデル自動DL／HTML・PPTX export。アプリ内 Help/? 導線＋サンプル明示 | 図本数統一 | L | 🏁 完了（PR は docs 直コミット・[docs/user-guide.md](user-guide.md)・アプリ内 Help は opener 未配線で follow-up） |
-| M8 | release.yml 実走（dry-run） | v-tag を1本 push し、4-OS installer＋draft release が実際に通ることを実証。**v0.1.0-rc.1 で実証済：Win(msi/exe)・mac arm64(dmg)・Linux(deb/rpm/AppImage) 成功、Intel mac のみ runner 待ち。draft "SlideCraft v0.1.0" 生成** | M3, M0 | M | 🏁 実証（Intel mac 残） |
-| M9 | 実機検証（Win/mac） | インストーラ起動・**mac ad-hoc 署名 .dmg が `killed:9` せず開く**・F3 keychain round-trip（WSL 未検証）・モデル自動DL UX・レジストリ永続化 E2E | M8 | M | 🔗 DEPENDS |
-| M10 | PowerPoint 実機開封チェック | 生成 PPTX を実 PowerPoint / PowerPoint for the web で開き見た目確認（現状 python-pptx＋wellformed-gate のみ） | — | S | ✅ READY |
-| M11 | レンダ品質1周 | 実 render（Playwright `page.pdf`）で高インパクト UX バグを掃討：不可視の締めスライド・低コントラスト図ラベル等（`図/テンプレ品質の磨き込み` の先行分） | — | S | 🏁 BUG2完了（エッジラベル可読化・PR #83）／BUG1 不可視締めは v0.1.1 |
-| M12 | 自動更新（軽量版・ADR 化） | 完全署名 Updater は見送り、GitHub Releases API ポーリングで「新版あり」通知のみ（鍵不要）＋mac は brew・Win/Linux 手動再DL。**この選択を ADR 化** | M8 | S | 🏁 決定を [ADR-0021](adr/0021-auto-update-strategy.md) に記録／**通知バナー実装は v0.1.x follow-up**（CSP egress＋版数取得＋実ポーリング検証を要す・v0.1.0 は brew/手動でブロックせず） |
-| M13 | 出荷（v0.1.0） | `RELEASING.md` 手順：bump→CHANGELOG→tag→draft レビュー→cask 更新→publish | 全 Must 完了 | S | 🔗 DEPENDS |
-
-**クリティカルパス**：M0・M1・M2（並行）→ M3 → M8 → M9 → M11 → M13。M4/M5/M6/M7/M10/M12 は M3 と並行進行可。
-**Must（初回ブロッカー）**：M0–M4, M6–M11, M13。**含める任意**：M5（アイコン）・M12（軽量自動更新）。
-**Defer（出荷後）**：完全署名 Tauri Updater・i18n（日英）・F1'（egress hard boundary）・`.slidecraft` 形式バージョニング・partial-gen P2〜P4・`SlidePreview.tsx` 分割（631行）。
+| 項目 | 内容 | 状態 |
+| --- | --- | --- |
+| 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | 💬 DISCUSS（要ユーザ） |
+| PowerPoint 実機開封チェック | 生成 PPTX を実 PowerPoint / PowerPoint for the web で開き見た目確認（現状 python-pptx＋wellformed-gate のみ） | ✅ READY |
+| Intel Mac (.dmg) | v0.1.0 は runner 都合で arm64 のみ。x64 dmg 生成後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（runner） |
+| 通知バナー（軽量自動更新） | 方針は [ADR-0021](adr/0021-auto-update-strategy.md) で決定済。GitHub Releases API ポーリングで「新版あり」通知（CSP egress＋版数取得＋実ポーリング検証を要す） | ✅ READY |
+| 不可視の締めスライド（旧 M11 BUG1） | Closing レイアウトが白地に薄色文字で不可視（背景/コントラスト抽出）。「図/テンプレ品質磨き込み」の一部 | ✅ READY |
+| アプリ内 Help/? 導線 | opener プラグイン未配線 → ドキュメントサイトへ誘導 | 🔗 DEPENDS |
 
 ---
 
-## バックログ（リリース後・将来）
+## バックログ（将来）
 
 ### 🧠 AI 編集の深化
 
@@ -59,7 +45,7 @@
 | --- | --- | --- |
 | 内蔵 30 レイアウトのオミット | Midnight Executive 30 種は**開発用** — 主要テーマ（＋一部バックログ）完了後にビルトイン同梱をやめ、canonical .pptx は入力サンプルとしてリポジトリ内に残置。触点: `useMasterRegistry` の `BUILTIN_URL`＋起動 fetch（→ 残置サンプル参照 or `writeTemplate` で起動時生成）・`BUILTIN_LAYOUTS` の既定セット差し替え・`LAYOUT_NAMES` フォールバックの整理・テスト fixture パス・`scripts/rebuild-template.ts` 引退。ランタイムはロールベースで 30 種非依存（alien テストでゲート済み）のため作業はこの触点に閉じる | S〜M |
 | テンプレ資産の棚卸 | `public/templates/slide/` に `.potx`（未追跡6）＋`_全レイアウト見本.pptx`（tracked）が堆積。**アプリが束ねる built-in は canonical `Midnight_Executive_30_TemplateOnly.pptx` 1本のみ**（ディレクトリ列挙なし）。棚卸：参照ゼロの見本7件＋未追跡 `.potx` を「テンプレ管理」機能で**束ねる(A)** か **整理/削除(B)** か決定。将来案：データを **`.potx` 形式に一本化**（見本は生成 or 廃止）。⚠ **テスト fixture（`lrk-slides-velis_CC0`／`報告書テンプレート_全レイアウト見本`／`配布資料_公文書高密度_全レイアウト見本`／`報告書テンプレート_官公庁_全レイアウト見本`）は削除不可** | S |
-| **スライドマスター Re-make（テーマ抽出→自前レイアウト決め打ち）** 🏁 大半完了（ロゴ残） | 実マスターの構造を忠実に踏襲せず、テーマ（フォント/背景/配色）だけ抽出し SlideCraft 自前 canonical レイアウトで埋める**取り込みモード**。第三者マスターの idx 衝突（[ADR-0023](adr/0023-third-party-master-idx-convention.md) 残存エッジ）を構造的に回避。**両立確定**＝純粋 Import と Re-make の両方の口。**実装済（main）**：`master-remake.ts masterToTemplateSpec`（フォント＋コントラスト安全 9色 palette）＋`applyTemplateBytesAsRemake`＋取り込みメニュー配線（トップバー＋Initialize 両方に「テーマだけ取り込む（Re-make）」）。CX 実データで抽出 palette／round-trip health／実 HTML レンダを検証。**残**：**(A) ロゴ/背景画像の注入**（`writer` が image part を受ける拡張・現状は色/フォントのみ）**(B) EA/CJK フォント分類**（`<a:ea>` 抽出）**(C)** 出荷ログ移行（要リリース）。関連 [[master_intake_workflow]] [[third_party_master_idx_fix]] | S〜M |
+| スライドマスター Re-make の残（本体は [shipped](shipped.md)） | Re-make 本体（テーマ抽出→自前レイアウト・ロゴ継承・フラット設計吸収・純粋 Import 両立）は出荷済（[ADR-0023](adr/0023-third-party-master-idx-convention.md)）。残る磨き込み：**(A) EA/CJK フォント分類**（`<a:ea>` 抽出＝latin 名流用の解消）・**(B) dark ロゴ変種の per-background 選択**（現状は最頻1枚）。関連 [[third_party_master_idx_fix]] | S |
 
 ### 🖥 UX / オンボーディング / 配布
 
@@ -80,6 +66,6 @@
 
 - **js-yaml v5 更新** — dependabot **PR #13（OPEN）**：`js-yaml` 4.3.0 → 5.2.0。破壊的変更の確認待ち。
 - **`.slidecraft` 形式バージョニング（前方互換保険）** — deck/project バンドルに schema version を埋め込む。後付けは困難だが初回リリースのスコープ外（着手時に検討）。
-- **実験用一時ファイルの後始末** — テンプレ検証・headless 生成で散らかった temp 出力（`_probe.ts`・未追跡 `.potx` 等）を整理（↑「テンプレ資産の棚卸」と関連・出荷前 M13 で掃除）。
+- **未追跡テンプレ資産** — `public/templates/slide/` に会社系 `.potx`（未追跡6）＋`CX_sample_MSGothic.pptx`（gitignore 済のローカル fixture）が残置。↑「テンプレ資産の棚卸」で束ねる/整理を決める（scratch の一時テストは都度削除済）。
 - **column 内 table の認識（小改修）** — separator レイアウト（col/card/kpi/step）の各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`extractFencedBlock` のみ・`findTableInLines` 未適用）。列内テーブルを native table として拾う（[ADR-0020](adr/0020-image-embedding.md) 敵対レビューで確認・画像とは独立）。触点: `md-slide-parser.ts` separator 分岐。
 - **最背面画像のプレビュー直接ドラッグ（小）** — 最背面レイヤーはハンドルが content の下に隠れるため現状フォーム編集のみ。編集 chrome（枠線＋角ハンドル）だけを前面 overlay 化してドラッグ/リサイズを再有効化（[ADR-0020](adr/0020-image-embedding.md)）。
