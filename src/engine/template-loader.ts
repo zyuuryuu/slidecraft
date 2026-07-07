@@ -12,6 +12,7 @@ import { LAYOUT_NAMES } from "./slide-schema";
 import { pickLayout, usesMetaIdxConvention, type LayoutCatalog, type LayoutRole } from "./template-catalog";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
+import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
 
 // ── Types ──
 
@@ -351,84 +352,99 @@ function cornerRadius(spPr: string, w: number, h: number): number | undefined {
   return undefined; // ellipse now renders as a true ellipse (prst-driven), not a px radius
 }
 
-/** Convert a shape's <a:custGeom> pathLst into an SVG path (+ its path-space viewBox), so a
- *  brand's freeform decoration renders faithfully instead of collapsing to a rectangle. Handles
- *  moveTo / lnTo / cubic|quadBezTo / close; arcTo segments are skipped (rare in design shapes). */
+/** Convert a shape's <a:custGeom> pathLst into an SVG path (+ its path-space viewBox), so a brand's
+ *  freeform decoration renders faithfully instead of collapsing to a rectangle. Handles
+ *  moveTo / lnTo / cubic|quadBezTo / arcTo / close. The pen position is tracked numerically so an
+ *  arcTo (which is relative to the current point) resolves to an absolute SVG "A …" segment. */
 function parseCustGeom(spPr: string): { path: string; viewBox: string } | undefined {
   const pathEl = spPr.match(/<a:custGeom>[\s\S]*?<a:path\b([^>]*)>([\s\S]*?)<\/a:path>/);
   if (!pathEl) return undefined;
   const w = pathEl[1].match(/\bw="(\d+)"/)?.[1];
   const h = pathEl[1].match(/\bh="(\d+)"/)?.[1];
   if (!w || !h || w === "0" || h === "0") return undefined;
-  const pts = (s: string) => [...s.matchAll(/<a:pt x="(-?\d+)" y="(-?\d+)"\s*\/>/g)].map((m) => `${m[1]} ${m[2]}`);
+  const pts = (s: string) => [...s.matchAll(/<a:pt x="(-?\d+)" y="(-?\d+)"\s*\/>/g)].map((m) => ({ x: +m[1], y: +m[2] }));
   let d = "";
+  let cur: { x: number; y: number } | null = null; // pen position (path-space units)
   for (const cmd of pathEl[2].match(/<a:(moveTo|lnTo|cubicBezTo|quadBezTo|arcTo|close)\b[^>]*(?:\/>|>[\s\S]*?<\/a:\1>)/g) || []) {
     const type = cmd.match(/<a:(\w+)/)?.[1];
     const p = pts(cmd);
-    if (type === "moveTo" && p[0]) d += `M${p[0]} `;
-    else if (type === "lnTo" && p[0]) d += `L${p[0]} `;
-    else if (type === "cubicBezTo" && p.length >= 3) d += `C${p[0]} ${p[1]} ${p[2]} `;
-    else if (type === "quadBezTo" && p.length >= 2) d += `Q${p[0]} ${p[1]} `;
-    else if (type === "close") d += "Z ";
+    if (type === "moveTo" && p[0]) { d += `M${p[0].x} ${p[0].y} `; cur = p[0]; }
+    else if (type === "lnTo" && p[0]) { d += `L${p[0].x} ${p[0].y} `; cur = p[0]; }
+    else if (type === "cubicBezTo" && p.length >= 3) { d += `C${p[0].x} ${p[0].y} ${p[1].x} ${p[1].y} ${p[2].x} ${p[2].y} `; cur = p[2]; }
+    else if (type === "quadBezTo" && p.length >= 2) { d += `Q${p[0].x} ${p[0].y} ${p[1].x} ${p[1].y} `; cur = p[1]; }
+    else if (type === "arcTo" && cur) {
+      const n = (a: string) => +(cmd.match(new RegExp(`\\b${a}="(-?\\d+)"`))?.[1] ?? 0);
+      const arc = arcToSvg(cur, n("wR"), n("hR"), n("stAng"), n("swAng"));
+      d += arc.seg; cur = arc.end;
+    } else if (type === "close") d += "Z ";
   }
   return d.trim() ? { path: d.trim(), viewBox: `0 0 ${w} ${h}` } : undefined;
 }
 
+/** One panel/bar/card (<p:sp>) → a DecoRect, its off/ext mapped through `xf` (identity for a top-level
+ *  shape; a group's composed transform for a child). undefined = a placeholder or a bare text box. */
+function spToDeco(sp: string, theme: Record<string, string>, xf: Xf): DecoRect | undefined {
+  if (sp.includes("<p:ph")) return undefined; // placeholders are rendered separately
+  const spPr = sp.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? "";
+  const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
+  const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+  if (!offMatch || !extMatch) return undefined;
+
+  const fill = shapeFillColor(spPr, theme);
+  const border = shapeLineColor(spPr, theme);
+  // A gradient-filled panel/bar has no solidFill → scope to the fill region (before <a:ln>) so a
+  // gradient LINE isn't mistaken for the fill, and keep the shape instead of dropping it (A3).
+  const grad = fill ? undefined : gradFillCss(spPr.split(/<a:ln\b/)[0], theme);
+  if (!fill && !border && !grad) return undefined; // a noFill text box with no outline is not decoration
+
+  const r = transformRect(xf, +offMatch[1], +offMatch[2], +extMatch[1], +extMatch[2]);
+  const prst = spPr.match(/<a:prstGeom prst="(\w+)"/)?.[1];
+  const cust = !prst || prst === "custGeom" ? parseCustGeom(spPr) : undefined;
+  return {
+    x: r.x, y: r.y, w: r.w, h: r.h,
+    color: fill ?? grad?.first ?? "FFFFFF", // gradient → first stop (SVG shapes); border-only → white
+    radius: cornerRadius(spPr, r.w, r.h),
+    border,
+    ...(prst && prst !== "rect" && prst !== "roundRect" ? { prst } : {}),
+    ...(cust ? { path: cust.path, pathViewBox: cust.viewBox } : {}),
+    ...(grad ? { gradient: grad.css } : {}),
+  };
+}
+
+/** One connector line (<p:cxnSp>) → a DecoRect, mapped through `xf`. A horizontal line has cy=0, so
+ *  give it a visible thickness from <a:ln w>. Colored by the LINE fill, not a shape fill. */
+function cxnToDeco(cx: string, theme: Record<string, string>, xf: Xf): DecoRect | undefined {
+  const spPr = cx.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? cx;
+  const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
+  const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+  const color = shapeLineColor(spPr, theme);
+  if (!offMatch || !extMatch || !color) return undefined;
+  const lnW = spPr.match(/<a:ln\b[^>]*\bw="(\d+)"/)?.[1];
+  const thick = lnW ? emuToInch(lnW) : 0.02; // EMU→in (fallback ≈ 1.5px at preview scale)
+  const r = transformRect(xf, +offMatch[1], +offMatch[2], +extMatch[1], +extMatch[2]);
+  return { x: r.x, y: r.y, w: Math.max(r.w, thick), h: Math.max(r.h, thick), color };
+}
+
+/** Walk shapes at one nesting level: recurse into each <p:grpSp> with its composed child→slide
+ *  transform (so a group's children land at their real slide positions instead of raw child-space
+ *  coords — they used to be matched by the flat <p:sp> regex and mis-placed), then process the
+ *  top-level <p:sp>/<p:cxnSp> left after the groups are removed. */
+function walkShapes(xml: string, theme: Record<string, string>, xf: Xf, out: DecoRect[]): void {
+  let rest = xml;
+  for (const grp of topLevelBlocks(xml, "p:grpSp")) {
+    rest = rest.replace(grp, "");
+    const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
+    const gx = parseGroupXf(grpSpPr);
+    if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
+    walkShapes(grp.replace(grpSpPr, ""), theme, composeXf(xf, gx), out); // children minus the group's own xfrm
+  }
+  for (const sp of rest.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) { const d = spToDeco(sp, theme, xf); if (d) out.push(d); }
+  for (const cx of rest.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || []) { const d = cxnToDeco(cx, theme, xf); if (d) out.push(d); }
+}
+
 function extractDecorations(layoutXml: string, theme: Record<string, string>): DecoRect[] {
-  const normalized = normalizeNs(layoutXml);
   const decos: DecoRect[] = [];
-
-  // ── Panels / bars / cards (<p:sp>) ──
-  for (const sp of normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
-    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
-    const spPr = sp.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? "";
-    const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
-    const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
-    if (!offMatch || !extMatch) continue;
-
-    const fill = shapeFillColor(spPr, theme);
-    const border = shapeLineColor(spPr, theme);
-    // A gradient-filled panel/bar has no solidFill → scope to the fill region (before <a:ln>) so a
-    // gradient LINE isn't mistaken for the fill, and keep the shape instead of dropping it (A3).
-    const grad = fill ? undefined : gradFillCss(spPr.split(/<a:ln\b/)[0], theme);
-    if (!fill && !border && !grad) continue; // a noFill text box with no outline is not decoration
-
-    const w = emuToInch(extMatch[1]);
-    const h = emuToInch(extMatch[2]);
-    const prst = spPr.match(/<a:prstGeom prst="(\w+)"/)?.[1];
-    const cust = !prst || prst === "custGeom" ? parseCustGeom(spPr) : undefined;
-    decos.push({
-      x: emuToInch(offMatch[1]),
-      y: emuToInch(offMatch[2]),
-      w,
-      h,
-      color: fill ?? grad?.first ?? "FFFFFF", // gradient → first stop (SVG shapes); border-only → white
-      radius: cornerRadius(spPr, w, h),
-      border,
-      ...(prst && prst !== "rect" && prst !== "roundRect" ? { prst } : {}),
-      ...(cust ? { path: cust.path, pathViewBox: cust.viewBox } : {}),
-      ...(grad ? { gradient: grad.css } : {}),
-    });
-  }
-
-  // ── Connector lines (<p:cxnSp>) — title/footer rules etc. A horizontal line has cy=0, so give it
-  // a visible thickness from <a:ln w>. Colored by the LINE fill, not a shape fill. ──
-  for (const cx of normalized.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || []) {
-    const spPr = cx.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? cx;
-    const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
-    const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
-    const color = shapeLineColor(spPr, theme);
-    if (!offMatch || !extMatch || !color) continue;
-    const lnW = spPr.match(/<a:ln\b[^>]*\bw="(\d+)"/)?.[1];
-    const thick = lnW ? emuToInch(lnW) : 0.02; // EMU→in (fallback ≈ 1.5px at preview scale)
-    decos.push({
-      x: emuToInch(offMatch[1]),
-      y: emuToInch(offMatch[2]),
-      w: Math.max(emuToInch(extMatch[1]), thick),
-      h: Math.max(emuToInch(extMatch[2]), thick),
-      color,
-    });
-  }
+  walkShapes(normalizeNs(layoutXml), theme, IDENTITY_XF, decos);
 
   return decos;
 }
