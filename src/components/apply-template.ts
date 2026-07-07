@@ -11,6 +11,8 @@
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
+import { masterToTemplateSpec } from "../engine/master-remake";
+import { writeTemplate } from "../engine/template-writer";
 
 export interface TemplateSetters {
   setTemplateData: (t: TemplateData) => void;
@@ -73,6 +75,43 @@ export async function applyTemplateBytesWithRepair(
     return { ok: false, health, repair: plan };
   } catch (err) {
     setters.setParseError(`Template load failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { ok: false };
+  }
+}
+
+export interface RemakeResult extends ApplyTemplateResult {
+  remadeBytes?: Uint8Array; // the minted canonical template — register THESE bytes (not the source)
+}
+
+/**
+ * Re-make intake (the SECOND import path, coexisting with faithful applyTemplateBytes): instead of
+ * adopting the source master's own placeholder structure, extract its THEME (fonts + colors) and
+ * re-emit SlideCraft's canonical layouts wearing it (master-remake → writeTemplate). Sidesteps the
+ * third-party idx/theme quirks (ADR-0023) entirely. The minted template is canonical-healthy, so
+ * there's no repair branch. Returns remadeBytes for the caller to register in the master registry.
+ */
+export async function applyTemplateBytesAsRemake(
+  buf: ArrayBuffer | Uint8Array,
+  name: string,
+  setters: TemplateSetters,
+): Promise<RemakeResult> {
+  try {
+    const source = await loadTemplate(buf);
+    const cleanName = name.replace(/\.pptx$/i, "");
+    const spec = masterToTemplateSpec(source, { name: `${cleanName}（Re-make）` });
+    const remadeBytes = await writeTemplate(spec);
+    const remade = await loadTemplate(remadeBytes);
+    const health = assessTemplateHealth(buildCatalog(remade));
+    if (health.status === "rejected") {
+      // Shouldn't happen (canonical layouts always pass), but never silently apply a bad one.
+      setters.setParseError("Re-make に失敗しました（生成テンプレートが検証を通りませんでした）。");
+      return { ok: false, health };
+    }
+    setters.setTemplateData(remade);
+    setters.setTemplateName(spec.name);
+    return { ok: true, health, remadeBytes };
+  } catch (err) {
+    setters.setParseError(`Re-make に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false };
   }
 }

@@ -11,14 +11,16 @@ interface MasterPickerProps {
   masters: MasterEntry[];
   activeId: string;
   onSelect: (id: string) => void;
-  /** Import a new master (.pptx). Omit to render the SELECT only (no import item). */
+  /** Import a new master (.pptx) FAITHFULLY — keep its own layouts/placeholders. Omit → SELECT only. */
   onImport?: () => void;
+  /** Re-make: import a .pptx but keep only its THEME (fonts/colors) and use SlideCraft's own layouts. */
+  onRemake?: () => void;
   /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
   onCreate?: () => void;
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, onCreate, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onCreate, disabled }: MasterPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -71,15 +73,25 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
               </button>
             );
           })}
-          {(onImport || onCreate) && <div className="my-1 h-px bg-edge" />}
+          {(onImport || onRemake || onCreate) && <div className="my-1 h-px bg-edge" />}
           {onImport && (
             <button
               onClick={() => { onImport(); setOpen(false); }}
-              title=".pptx をスライドマスターとして取り込む"
+              title=".pptx のレイアウト・プレースホルダをそのまま活かして取り込む"
               className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
               <span className="w-3 shrink-0 text-center">＋</span>
               <span>マスターを取り込む（.pptx）</span>
+            </button>
+          )}
+          {onRemake && (
+            <button
+              onClick={() => { onRemake(); setOpen(false); }}
+              title=".pptx からフォント・配色・背景だけを受け継ぎ、SlideCraft のレイアウトで作り直す"
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
+            >
+              <span className="w-3 shrink-0 text-center">✨</span>
+              <span>テーマだけ取り込む（Re-make）</span>
             </button>
           )}
           {onCreate && (

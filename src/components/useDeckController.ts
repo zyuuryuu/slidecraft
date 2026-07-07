@@ -16,7 +16,7 @@ import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes, applyTemplateBytesWithRepair } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
 import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
@@ -192,6 +192,13 @@ export function useDeckController() {
   const applyMasterBytesWithRepair = useCallback(
     (buf: ArrayBuffer | Uint8Array, name: string, confirm: (plan: RepairPlan) => Promise<boolean>) =>
       applyTemplateBytesWithRepair(buf, name, { setTemplateData, setTemplateName, setParseError }, confirm),
+    [setTemplateData, setTemplateName, setParseError],
+  );
+  // Re-make（第2の取り込み口）: 入力マスターのテーマ（フォント・配色）だけ抽出し SlideCraft 自前の
+  // レイアウトで作り直す。第三者マスターの idx/テーマの癖（ADR-0023）を構造的に回避する。
+  const applyMasterBytesAsRemake = useCallback(
+    (buf: ArrayBuffer | Uint8Array, name: string) =>
+      applyTemplateBytesAsRemake(buf, name, { setTemplateData, setTemplateName, setParseError }),
     [setTemplateData, setTemplateName, setParseError],
   );
 
@@ -654,7 +661,7 @@ export function useDeckController() {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,

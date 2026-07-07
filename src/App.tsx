@@ -41,7 +41,7 @@ export default function App() {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
@@ -74,6 +74,16 @@ export default function App() {
     const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
     setMasterId(entry.id);
   }, [registerMaster, applyMasterBytesWithRepair]);
+  // Re-make（第2の口）: .pptx を取り込むが、フォント・配色・背景だけ受け継いで SlideCraft 自前の
+  // レイアウトで作り直す。生成された canonical テンプレの bytes をレジストリに登録する。
+  const handleRemakeMaster = useCallback(async () => {
+    const picked = await pickBinaryFile(["pptx"], "PowerPoint");
+    if (!picked) return;
+    const r = await applyMasterBytesAsRemake(picked.bytes, picked.name);
+    if (!r.ok || !r.remadeBytes) return;
+    const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + "（Re-make）", r.remadeBytes);
+    setMasterId(entry.id);
+  }, [registerMaster, applyMasterBytesAsRemake]);
   // 新規テンプレ作成（テーマ2 S4）: スペック → template-writer で生成 → 通常のゲート経由で適用＋登録。
   const [showTemplateCreator, setShowTemplateCreator] = useState(false);
   const handleCreateTemplate = useCallback(async (spec: TemplateSpec) => {
@@ -301,6 +311,7 @@ export default function App() {
             activeId={masterId}
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
+            onRemake={handleRemakeMaster}
             onCreate={() => setShowTemplateCreator(true)}
             disabled={editLocked}
           />
@@ -450,6 +461,7 @@ export default function App() {
         activeMasterId={masterId}
         onSelectMaster={handleSelectMaster}
         onImportMaster={handleImportMaster}
+        onRemakeMaster={handleRemakeMaster}
         deck={deck}
         templateData={templateData}
         parseError={parseError}
