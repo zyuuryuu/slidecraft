@@ -96,6 +96,8 @@
 
 ## UX・配布
 
+- **デフォルトのサンプル Markdown 廃止＝空起動** — 起動時に読み込んでいたサンプルデッキ（`sample-deck.ts`）を削除し、アプリは空状態で開始（既存のプレースホルダで graceful）。あわせて**空デッキで「＋ スライド追加」が no-op だった不具合を修正**（純粋 `addBlankSlide` が deck=null なら1スライドを mint）。vite preview＋Playwright で実操作確認 （2026-07-07）
+
 - **`.scft` アプリ関連付け（ダブルクリックで開く）＋拡張子短縮** — プロジェクト拡張子を `.slidecraft`→`.scft` に短縮し、OS 関連付けで**ダブルクリック/「プログラムから開く」**が起動＝新タブで開く。Win/Linux ウォーム起動は `single-instance` で単一ウィンドウ、macOS は open イベント、Win/Linux コールドは argv。fs スコープ動的付与でダイアログ選択と同じ信頼境界 （ADR-0024・2026-07-07）
 - **AI が Live MCP で作った Deck を GUI 背景タブに出す（モード b）** — 協働中に上流 AI が `new_project` すると背景タブとして出現（表示は切替えない）。マルチドキュメント基盤（`openDoc` activate:false）＋ミラー先の per-tab 切替 （2026-07-07）
 - **改行を LF 固定（.gitattributes）** — Windows CRLF churn を .gitattributes で根治 （PR #69・2026-07-05）
