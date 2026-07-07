@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, type LayoutCatalog, type LayoutRole } from "./template-catalog";
+import { pickLayout, usesMetaIdxConvention, type LayoutCatalog, type LayoutRole } from "./template-catalog";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 
 // ── Types ──
@@ -33,6 +33,11 @@ export interface PlaceholderInfo {
   name: string; // shape name from cNvPr
   shapeXml: string; // full normalized shape XML for cloning into slides
   style: PlaceholderStyle; // extracted position + style for preview
+  // Whether THIS template uses SlideCraft's idx-meta convention (idx 10/11/12→category/date/footer,
+  // 15/16→title/subtitle). Stamped per-template at load (usesMetaIdxConvention). A bare third-party
+  // master (no dotted names, no typed sldNum/dt/ftr meta — e.g. CX Sample) sets it false so its
+  // body-typed idx-10..16 placeholders read as REAL content, not meta. Undefined ⇒ true (canonical).
+  metaIdxConvention?: boolean;
 }
 
 export interface DecoRect {
@@ -492,6 +497,12 @@ export async function loadTemplate(
 
     layouts.push({ index: i, name, placeholders, decorations, staticTexts, background });
   }
+
+  // Decide ONCE whether this master follows SlideCraft's idx-meta convention, and stamp every
+  // placeholder so the (template-context-free) placeholderRole can honor it. A bare third-party
+  // master opts out → its body-typed idx-10..16 placeholders bind as real content (CX Sample fix).
+  const metaIdxConvention = usesMetaIdxConvention(layouts);
+  for (const l of layouts) for (const p of l.placeholders) p.metaIdxConvention = metaIdxConvention;
 
   const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);

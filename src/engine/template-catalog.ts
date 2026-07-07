@@ -91,6 +91,30 @@ export function layoutRole(name: string): LayoutRole {
   return FAMILY_TO_ROLE[family] ?? "other";
 }
 
+/**
+ * Does this master follow SlideCraft's idx-META convention (idx 10/11/12→category/date/footer,
+ * 15/16→title/subtitle for body-typed placeholders)? True for our OWN masters:
+ *  (a) canonical dotted "Family.Detail" names, OR
+ *  (b) template-writer output — it always emits explicit sldNum/dt/ftr meta placeholders.
+ * A bare third-party PowerPoint master (e.g. CX Sample: plain names AND no typed sldNum/dt/ftr) has
+ * NEITHER, so it opts out and its body-typed idx-10..16 placeholders read as real CONTENT — the fix
+ * that makes such a master's content slides bind + preview follow. Stamped onto each PlaceholderInfo
+ * at load so the context-free placeholderRole can honor it. Empty/no-layout ⇒ true (safe default).
+ */
+export function usesMetaIdxConvention(layouts: ReadonlyArray<{ name: string; placeholders: PlaceholderInfo[] }>): boolean {
+  if (layouts.length === 0) return true;
+  const half = layouts.length / 2;
+  const dotted = layouts.filter((l) => layoutRole(l.name) !== "other").length;
+  if (dotted >= half) return true;
+  const typedMeta = layouts.filter((l) =>
+    l.placeholders.some((p) => {
+      const t = p.type.toLowerCase();
+      return t === "sldnum" || t === "dt" || t === "ftr";
+    }),
+  ).length;
+  return typedMeta >= half;
+}
+
 // Real-world templates name layouts in plain language ("Title and Content",
 // "Two Columns", "Section Header") — NOT the canonical "Family.Detail" convention.
 // Recognize those keywords so the harness classifies ANY template, not just ours.
@@ -225,16 +249,20 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   if (t === "pic") return "picture";
   if (t === "chart") return "chart";
   if (t === "tbl") return "table";
-  // idx CONVENTION — for a generic/typeless "body" placeholder at a known canonical idx (the SlideIR
-  // meta convention: canonical's category/date/footer/title/subtitle meta are typeless body at these
-  // idxs). Reached only when no authoritative type decided above; keep BEFORE the plain-body rule so
-  // a body-typed idx-10/15/16 meta placeholder still classifies as category/title/subtitle.
-  if (idx === "50") return "slideNumber";
-  if (idx === "11") return "date";
-  if (idx === "12") return "footer";
-  if (idx === "10") return "category";
-  if (idx === "15") return "title";
-  if (idx === "16") return "subtitle";
+  if (idx === "50") return "slideNumber"; // universal slide-number convention (never a content body)
+  // idx-META CONVENTION — SlideCraft's OWN encoding (canonical: category/date/footer/title/subtitle
+  // meta are body-typed at these idxs; template-writer output matches). ONLY applied when the loaded
+  // master opts in (usesMetaIdxConvention → stamped on each ph). A bare third-party master (CX Sample:
+  // no dotted names, no typed sldNum/dt/ftr) opts OUT, so its body#10/11/12/13/16 read as REAL content
+  // below, not meta — which is what makes its content slides bind + preview follow. Undefined ⇒ true,
+  // so synthetic/test placeholders and canonical masters are byte-identical.
+  if (ph.metaIdxConvention ?? true) {
+    if (idx === "11") return "date";
+    if (idx === "12") return "footer";
+    if (idx === "10") return "category";
+    if (idx === "15") return "title";
+    if (idx === "16") return "subtitle";
+  }
   if (t === "body") return "body"; // a REAL body type
   if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
   // ── RECOVERY (only a typeless ph with a non-conventional idx falls through to here) ──
