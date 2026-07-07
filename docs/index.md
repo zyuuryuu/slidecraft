@@ -25,13 +25,13 @@ features:
     details: フローチャート・シーケンス・ガント・KPI ほか 12 種を編集可能な PPTX 図形として出力。class/state/ER/mindmap は Mermaid 経由で。
   - icon: 🎨
     title: テンプレート流し込み
-    details: 会社の .pptx を取り込んで色・フォント・レイアウトを適用。壊れたテンプレの修復取込や、配色から新規作成も。
+    details: 会社の .pptx を取り込むと、色・フォント・レイアウトをそのまま適用。テンプレートの見た目を崩さずにスライドにできます。
   - icon: 🤖
     title: 内蔵オフライン AI
     details: llamafile を同梱。クラウドに送らず手元で生成・編集を補助。外部プロバイダ（Anthropic/OpenAI/OpenRouter/Ollama）も選べます。
   - icon: 🖥
-    title: WYSIWYG プレビュー
-    details: テンプレートの色・装飾を反映した見たままプレビュー。二段階編集（内容とデザイン）で、崩さず調整。
+    title: 出力と同じ見た目でプレビュー
+    details: プレビューは書き出す .pptx / HTML と同じ見た目——「プレビューと本番が違う」がありません。内容とデザインを分けて、崩さず調整できます。
   - icon: 🔌
     title: エージェント連携（MCP）
     details: slidecraft serve で上流 AI（Claude 等）が Tools 経由で編集。GUI がライブ反映する協働ホストにも対応。
@@ -44,7 +44,7 @@ features:
 配置・装飾はテンプレートとエンジンにまかせる分業で、**フォントやレイアウトを崩さずに**整ったスライドを作れます。
 
 - **書く** — Markdown（[執筆ガイド](/guide/markdown-authoring)・[図](/guide/diagrams)）
-- **見る** — テンプレートの色・フォントを反映した WYSIWYG プレビュー（[二段階編集](/guide/editing-and-export)）
+- **見る** — テンプレートの色・フォントを反映した、出力と同じ見た目のプレビュー（[二段階編集](/guide/editing-and-export)）
 - **出す** — 編集可能な図形で構成された `.pptx`、または遷移つきスタンダロン HTML
 
 まずは [インストール](/guide/installation) → [スターターガイド](/guide/getting-started) へ。
