@@ -23,7 +23,6 @@ import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
 import { useDeckIO } from "./useDeckIO";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
-import { SAMPLE_MD } from "../sample-deck";
 
 export type { MarkdownSubMode } from "./useDocumentStore";
 
@@ -66,7 +65,7 @@ export function useDeckController() {
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
-  } = useDocumentStore({ mdText: SAMPLE_MD, templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "サンプル" });
+  } = useDocumentStore({ mdText: "", templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: "無題" });
 
   // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
   // a broken figure kept as-is). Kept SEPARATE from parseError: the slide is valid and MUST still
@@ -152,12 +151,9 @@ export function useDeckController() {
     return () => window.removeEventListener("keydown", onKey);
   }, [subMode, undoDeck, redoDeck]);
 
-  // Initial parse (no debounce) + template load
+  // Load the default template for preview. The app starts EMPTY (no default sample deck) — the user
+  // writes Markdown or imports a project; the preview shows its "type Markdown…" placeholder until then.
   useState(() => {
-    try {
-      resetDeck(parseMd(SAMPLE_MD));
-    } catch { /* ignore */ }
-    // Load template for preview
     fetch("/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")
       .then((r) => r.arrayBuffer())
       .then((buf) => loadTemplate(buf))
