@@ -9,8 +9,8 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
-import { masterToTemplateSpec } from "../src/engine/master-remake";
-import { writeTemplate } from "../src/engine/template-writer";
+import { masterToTemplateSpec, extractLogo } from "../src/engine/master-remake";
+import { writeTemplate, MIDNIGHT_PALETTE } from "../src/engine/template-writer";
 import { buildCatalog, assessTemplateHealth } from "../src/engine/template-catalog";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
@@ -32,6 +32,39 @@ describe("Re-make round-trip on a bundled master (CI-covered)", () => {
     expect(contrast(spec.palette.bodyText, spec.palette.canvas)).toBeGreaterThan(0.3);
     const remade = await loadTemplate(await writeTemplate(spec));
     expect(assessTemplateHealth(buildCatalog(remade)).status).not.toBe("rejected");
+  });
+});
+
+// A minimal valid 1×1 PNG — lets the logo path be CI-covered without the CX fixture.
+const TINY_PNG = Uint8Array.from(
+  atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC"),
+  (c) => c.charCodeAt(0),
+);
+
+describe("logo injection + extraction (CI-covered, synthetic png)", () => {
+  it("writeTemplate embeds the logo on dark layouts, and loadTemplate surfaces it as a data-URI image", async () => {
+    const bytes = await writeTemplate({
+      name: "T",
+      fonts: { major: "Arial", minor: "Arial" },
+      palette: MIDNIGHT_PALETTE,
+      logo: { bytes: TINY_PNG, ext: "png", aspect: 3 },
+    });
+    const remade = await loadTemplate(bytes);
+    const withLogo = remade.layouts.filter((l) => l.images.length > 0);
+    expect(withLogo.length).toBeGreaterThan(0); // dark-family layouts (cover/section/closing) get it
+    expect(withLogo[0].images[0].src).toMatch(/^data:image\/png;base64,/); // preview-paintable, self-contained
+  });
+});
+
+describe.skipIf(!HAS_CX)("logo inheritance from a real master", () => {
+  it("extractLogo lifts the source's raster logo", async () => {
+    const logo = await extractLogo(await loadTemplate(readFileSync(CX)));
+    expect(logo?.ext).toBe("png");
+    expect(logo!.bytes.length).toBeGreaterThan(100);
+  });
+  it("faithful CX import now surfaces its layout logos to the preview (was dropped before)", async () => {
+    const cx = await loadTemplate(readFileSync(CX));
+    expect(cx.layouts.some((l) => l.images.length > 0)).toBe(true);
   });
 });
 

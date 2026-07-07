@@ -17,7 +17,7 @@
  */
 import { isDark, luminance } from "./ooxml-resolve";
 import type { TemplateData } from "./template-loader";
-import { MIDNIGHT_PALETTE, type TemplateSpec } from "./template-writer";
+import { MIDNIGHT_PALETTE, type TemplateSpec, type LogoSpec } from "./template-writer";
 import type { PaletteKey } from "./template-layout-library";
 
 /** Normalize a hex to 6 upper-case digits without '#', or undefined. */
@@ -37,6 +37,23 @@ function readable(color: string | undefined, bg: string): string {
   const c = norm(color);
   if (c && Math.abs(luminance(c) - luminance(bg)) > 0.22) return c;
   return ink(bg);
+}
+
+/** Chroma 0..1 (max−min of RGB channels); 0 = a perfect gray. */
+function chroma(hex: string): number {
+  const n = parseInt(hex, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+}
+
+/** The most desaturated (gray) theme accent — a template's own neutral for weak/meta text. Real
+ *  corporate palettes carry a gray accent (CX = accent4 #9E9EA2); prefer it over a generic default. */
+function grayAccent(th: Record<string, string>): string | undefined {
+  const grays = ["accent4", "accent1", "accent2", "accent3", "accent5", "accent6"]
+    .map((k) => norm(th[k]))
+    .filter((c): c is string => !!c && chroma(c) < 0.15)
+    .sort((a, b) => chroma(a) - chroma(b));
+  return grays[0];
 }
 
 /**
@@ -70,13 +87,16 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
   const accent = norm(th.accent1) ?? MIDNIGHT_PALETTE.accent;
   const accent2 = norm(th.accent2) ?? norm(th.accent1) ?? MIDNIGHT_PALETTE.accent2;
 
+  // Body text = the theme's designated text color (tx1) — CX's real body ink is #282828, not the
+  // master's declared navy. Fall back to the master body style, then a contrast-safe ink.
+  const bodyText = readable(norm(th.tx1) ?? tpl.masterBodyStyle.fontColor, canvas);
   const palette: Record<PaletteKey, string> = {
     background,
     canvas,
     titleText: ink(background), // title sits on the dark header bar / dark layout
-    bodyText: readable(tpl.masterBodyStyle.fontColor, canvas), // body on the light canvas
+    bodyText,
     subtle: isDark(background) ? "CBD5E1" : "475569", // subtitle/meta on the dark background
-    muted: "94A3B8", // weak text (sources, page numbers) — neutral gray reads on both
+    muted: grayAccent(th) ?? "94A3B8", // weak text (sources, page numbers) — the theme's own gray
     accent,
     accent2,
     emphasis: readable(background, canvas), // big-number emphasis on the canvas (brand dark on light)
@@ -89,4 +109,45 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
     fonts: { major, minor },
     palette,
   };
+}
+
+const RASTER_EXT: Record<string, LogoSpec["ext"]> = { png: "png", jpg: "jpeg", jpeg: "jpeg", gif: "gif" };
+
+/**
+ * Extract the source master's LOGO — the raster image referenced by the most `<p:pic>` shapes across
+ * its layouts (a logo recurs on cover/section/closing; a one-off illustration doesn't). Reads the
+ * bytes from the source zip so writeTemplate can re-embed it. Async (zip I/O). Returns undefined when
+ * there's no usable raster logo (e.g. only SVG/EMF, or none). v1: raster only.
+ */
+export async function extractLogo(tpl: TemplateData): Promise<LogoSpec | undefined> {
+  const zip = tpl.zip;
+  const hits = new Map<string, { count: number; aspect: number }>(); // media target → usage
+  for (const layout of tpl.layouts) {
+    const relsFile = zip.file(`ppt/slideLayouts/_rels/slideLayout${layout.index}.xml.rels`);
+    const xmlFile = zip.file(`ppt/slideLayouts/slideLayout${layout.index}.xml`);
+    if (!relsFile || !xmlFile) continue;
+    const rels = await relsFile.async("string");
+    const xml = await xmlFile.async("string");
+    const relMap = new Map<string, string>();
+    for (const m of rels.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)) {
+      if (/media\//.test(m[2])) relMap.set(m[1], m[2]);
+    }
+    for (const pm of xml.matchAll(/<p:pic>[\s\S]*?<\/p:pic>/g)) {
+      const pic = pm[0];
+      const rId = pic.match(/r:embed="([^"]+)"/)?.[1];
+      const target = rId ? relMap.get(rId) : undefined;
+      if (!target || !RASTER_EXT[target.split(".").pop()?.toLowerCase() ?? ""]) continue;
+      const ext = pic.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+      const aspect = ext && +ext[2] > 0 ? +ext[1] / +ext[2] : 3;
+      const cur = hits.get(target);
+      hits.set(target, { count: (cur?.count ?? 0) + 1, aspect: cur?.aspect ?? aspect });
+    }
+  }
+  if (hits.size === 0) return undefined;
+  const [target, meta] = [...hits.entries()].sort((a, b) => b[1].count - a[1].count)[0];
+  const file = zip.file(target.replace(/^\.\.\//, "ppt/"));
+  if (!file) return undefined;
+  const bytes = await file.async("uint8array");
+  const ext = RASTER_EXT[target.split(".").pop()!.toLowerCase()];
+  return { bytes, ext, aspect: meta.aspect };
 }

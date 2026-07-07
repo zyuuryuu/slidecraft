@@ -11,7 +11,7 @@
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
-import { masterToTemplateSpec } from "../engine/master-remake";
+import { masterToTemplateSpec, extractLogo } from "../engine/master-remake";
 import { writeTemplate } from "../engine/template-writer";
 
 export interface TemplateSetters {
@@ -99,7 +99,8 @@ export async function applyTemplateBytesAsRemake(
     const source = await loadTemplate(buf);
     const cleanName = name.replace(/\.pptx$/i, "");
     const spec = masterToTemplateSpec(source, { name: `${cleanName}（Re-make）` });
-    const remadeBytes = await writeTemplate(spec);
+    const logo = await extractLogo(source); // lift the source's logo onto the minted layouts
+    const remadeBytes = await writeTemplate(logo ? { ...spec, logo } : spec);
     const remade = await loadTemplate(remadeBytes);
     const health = assessTemplateHealth(buildCatalog(remade));
     if (health.status === "rejected") {

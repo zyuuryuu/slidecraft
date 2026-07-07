@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
-import type { TemplateData, LayoutInfo, DecoRect, StaticText } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/placeholder-binding";
@@ -108,6 +108,7 @@ interface SlideCardProps {
   layout: LayoutInfo | undefined;
   masterBgColor: string; // hex without #
   masterDecorations?: DecoRect[]; // the master's own shapes — painted under the layout's
+  masterImages?: ImageDeco[]; // the master's own logos/graphics — painted under the layout's
   masterStaticTexts?: StaticText[]; // the master's own static text labels
   scale: number;
   isActive?: boolean;
@@ -124,7 +125,7 @@ interface SlideCardProps {
   exportMode?: boolean;
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -262,6 +263,26 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
             backgroundColor: `#${d.color}`,
             ...(d.radius ? { borderRadius: d.radius * scale } : {}),
             ...(d.border ? { border: `${Math.max(1, 0.014 * scale)}px solid #${d.border}` } : {}),
+          }}
+        />
+      ))}
+
+      {/* Logos / graphics (<p:pic>): master's first, then the layout's — data-URI images painted above
+          the decorative bars (so a corner logo sits on top), below the content placeholders. */}
+      {[...(masterImages ?? []), ...(layout?.images ?? [])].map((im, i) => (
+        <img
+          key={`img-${i}`}
+          src={im.src}
+          alt=""
+          draggable={false}
+          style={{
+            position: "absolute",
+            left: `${(im.x / SLIDE_W) * 100}%`,
+            top: `${(im.y / SLIDE_H) * 100}%`,
+            width: `${(im.w / SLIDE_W) * 100}%`,
+            height: `${(im.h / SLIDE_H) * 100}%`,
+            objectFit: "contain",
+            pointerEvents: "none",
           }}
         />
       ))}
@@ -569,6 +590,7 @@ export default function SlidePreview({
         layout={layout}
         masterBgColor={template?.masterBgColor ?? "FFFFFF"}
         masterDecorations={template?.masterDecorations}
+        masterImages={template?.masterImages}
         masterStaticTexts={template?.masterStaticTexts}
         scale={scale}
         isActive={active}

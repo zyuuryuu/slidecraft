@@ -15,11 +15,39 @@ import {
   type PaletteKey,
 } from "./template-layout-library";
 
+/** A logo image lifted from a source master (Re-make). Injected onto the dark-family layouts
+ *  (cover/section/closing) — where corporate templates show their logo — as a native <p:pic>. */
+export interface LogoSpec {
+  bytes: Uint8Array;
+  ext: "png" | "jpeg" | "gif"; // raster only (svg/emf need a fallback part — skipped in v1)
+  aspect: number; // w/h, to preserve when placing
+}
+
 export interface TemplateSpec {
   name: string;
   fonts: { major: string; minor: string }; // major=見出し / minor=本文
   palette: Record<PaletteKey, string>; // hex（# なし）
   layouts?: LayoutDef[]; // 省略時は組み込み 30 レイアウト
+  logo?: LogoSpec; // Re-make: 元マスターのロゴを dark 系レイアウトへ載せる
+}
+
+// 生成物での ext → MIME（[Content_Types] の Default 用）
+const IMG_MIME: Record<string, string> = { png: "image/png", jpeg: "image/jpeg", gif: "image/gif" };
+// ロゴ配置（inch）: 表紙/章扉の左上、CX の実配置に倣う。幅上限＋アスペクト維持で高さを決める。
+const LOGO_MAX_W = 2.3;
+const LOGO_X = 0.5;
+const LOGO_Y = 0.45;
+/** dark 系レイアウトにロゴを載せるか（light 系はヘッダーバーと干渉するため v1 では載せない）。 */
+const layoutHasLogo = (def: LayoutDef, spec: TemplateSpec): boolean => !!spec.logo && def.family === "dark";
+
+function logoPicXml(spec: TemplateSpec, shapeId: number): string {
+  const w = Math.min(LOGO_MAX_W, 4);
+  const h = w / (spec.logo!.aspect > 0 ? spec.logo!.aspect : 3);
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${shapeId}" name="Logo"/>` +
+    `<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
+    `<p:blipFill><a:blip r:embed="rIdLogo"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+    `<p:spPr><a:xfrm><a:off x="${EMU(LOGO_X)}" y="${EMU(LOGO_Y)}"/><a:ext cx="${EMU(w)}" cy="${EMU(h)}"/></a:xfrm>` +
+    `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 }
 
 /** 既定パレット＝Midnight Executive（canonical の焼き込み色）。スペックはこれを spread して部分差し替えできる。 */
@@ -178,7 +206,8 @@ function layoutXml(def: LayoutDef, spec: TemplateSpec): string {
   let shapeId = 2;
   const shapes =
     decos.map((d) => decoShapeXml(d, spec, shapeId++)).join("") +
-    def.placeholders.map((ph) => phShapeXml(ph, spec, shapeId++)).join("");
+    def.placeholders.map((ph) => phShapeXml(ph, spec, shapeId++)).join("") +
+    (layoutHasLogo(def, spec) ? logoPicXml(spec, shapeId++) : ""); // logo on top (last shape)
   return `${XML_DECL}<p:sldLayout ${NS_A} ${NS_P} ${NS_R} preserve="1">` +
     `<p:cSld name="${escXml(def.name)}">${bgXml(bg)}<p:spTree>${emptySpTreeHeader}${shapes}</p:spTree></p:cSld>` +
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
@@ -210,13 +239,15 @@ const VIEW_PROPS_XML = `${XML_DECL}<p:viewPr ${NS_A} ${NS_P}/>`;
 const TABLE_STYLES_XML =
   `${XML_DECL}<a:tblStyleLst ${NS_A} def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`;
 
-function contentTypesXml(layoutCount: number): string {
+function contentTypesXml(layoutCount: number, logoExt?: string): string {
   const layoutOverrides = Array.from({ length: layoutCount }, (_v, i) =>
     `<Override PartName="/ppt/slideLayouts/slideLayout${i + 1}.xml"` +
     ` ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>`).join("");
+  const imgDefault = logoExt ? `<Default Extension="${logoExt}" ContentType="${IMG_MIME[logoExt]}"/>` : "";
   return `${XML_DECL}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
     `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
     `<Default Extension="xml" ContentType="application/xml"/>` +
+    imgDefault +
     `<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>` +
     `<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>` +
     layoutOverrides +
@@ -248,7 +279,7 @@ export async function writeTemplate(spec: TemplateSpec): Promise<Uint8Array> {
   if (layouts.length === 0) throw new Error("TemplateSpec.layouts must not be empty");
   const zip = new JSZip();
 
-  zip.file("[Content_Types].xml", contentTypesXml(layouts.length));
+  zip.file("[Content_Types].xml", contentTypesXml(layouts.length, spec.logo?.ext));
   zip.file("_rels/.rels", relationships([
     rel("rId1", "officeDocument", "ppt/presentation.xml"),
     relRaw("rId2", "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", "docProps/core.xml"),
@@ -273,10 +304,13 @@ export async function writeTemplate(spec: TemplateSpec): Promise<Uint8Array> {
     ...layouts.map((_d, i) => rel(`rId${i + 1}`, "slideLayout", `../slideLayouts/slideLayout${i + 1}.xml`)),
     rel(`rId${layouts.length + 1}`, "theme", "../theme/theme1.xml"),
   ]));
+  if (spec.logo) zip.file(`ppt/media/logo.${spec.logo.ext}`, spec.logo.bytes);
   layouts.forEach((def, i) => {
     zip.file(`ppt/slideLayouts/slideLayout${i + 1}.xml`, layoutXml(def, spec));
-    zip.file(`ppt/slideLayouts/_rels/slideLayout${i + 1}.xml.rels`,
-      relationships([rel("rId1", "slideMaster", "../slideMasters/slideMaster1.xml")]));
+    const rels = [rel("rId1", "slideMaster", "../slideMasters/slideMaster1.xml")];
+    // rIdLogo (a non-numeric id, so it never collides with the master rId sequence) → the media part.
+    if (layoutHasLogo(def, spec)) rels.push(rel("rIdLogo", "image", `../media/logo.${spec.logo!.ext}`));
+    zip.file(`ppt/slideLayouts/_rels/slideLayout${i + 1}.xml.rels`, relationships(rels));
   });
 
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });

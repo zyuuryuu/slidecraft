@@ -58,11 +58,22 @@ export interface StaticText {
   style: PlaceholderStyle;
 }
 
+/** A picture (logo/graphic) placed on a layout/master, as a data-URI + rect (inches) so the preview
+ *  can paint it. Lets a template's logo show in the WYSIWYG preview (it was dropped before). */
+export interface ImageDeco {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  src: string; // data:<mime>;base64,… (self-contained; no external fetch)
+}
+
 export interface LayoutInfo {
   index: number; // 1-based (slideLayout1.xml)
   name: string; // layout name from cSld
   placeholders: PlaceholderInfo[];
   decorations: DecoRect[]; // decorative shapes (backgrounds, bars, panels)
+  images: ImageDeco[]; // <p:pic> logos/graphics on the layout (data URIs)
   staticTexts: StaticText[]; // non-placeholder text boxes (design labels)
   background?: string; // resolved layout <p:bg> fill (hex, no #); undefined = inherit master bg
 }
@@ -88,6 +99,7 @@ export interface TemplateData {
   masterDecorations: DecoRect[]; // the master's OWN non-placeholder shapes (logos/bars) — a base layer
                                  // shown UNDER every layout (the preview never read these before)
   masterStaticTexts: StaticText[]; // the master's own static text labels (base layer)
+  masterImages: ImageDeco[]; // the master's own <p:pic> logos/graphics (base layer, data URIs)
   themeColors: Record<string, string>; // scheme token → hex (bg1/bg2/tx1/tx2/accent1-6…), clrMap-resolved
 }
 
@@ -382,6 +394,43 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
   return decos;
 }
 
+const IMG_MIME: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", bmp: "image/bmp",
+};
+
+/** Extract `<p:pic>` images (logos/graphics) from a layout/master part as data-URI ImageDecos, so the
+ *  preview can paint them (they were dropped before → a template's logo never showed). Resolves each
+ *  pic's r:embed through the part's .rels to the ppt/media/ bytes. `relDir` is the part's dir (e.g.
+ *  "ppt/slideLayouts") so a "../media/x" target resolves. Async (reads media bytes). Safe: emits a
+ *  self-contained data: URI (no external fetch); raster loads inertly, and svg in an <img> can't run
+ *  script. */
+async function extractImages(xml: string, relsXml: string, relDir: string, zip: JSZip): Promise<ImageDeco[]> {
+  const relMap = new Map<string, string>();
+  for (const m of relsXml.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)) {
+    if (/image/i.test(m[0]) || /media\//.test(m[2])) relMap.set(m[1], m[2]);
+  }
+  const out: ImageDeco[] = [];
+  for (const pic of normalizeNs(xml).match(/<p:pic>[\s\S]*?<\/p:pic>/g) || []) {
+    const rId = pic.match(/r:embed="([^"]+)"/)?.[1];
+    const target = rId ? relMap.get(rId) : undefined;
+    if (!target) continue;
+    const off = pic.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
+    const ext = pic.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+    if (!off || !ext) continue;
+    // Resolve the (relative) target against the part's directory into a zip path.
+    const path = new URL(target, `file:///${relDir}/`).pathname.replace(/^\/+/, "");
+    const file = zip.file(path);
+    const mime = IMG_MIME[path.split(".").pop()?.toLowerCase() ?? ""];
+    if (!file || !mime) continue;
+    const b64 = await file.async("base64");
+    out.push({
+      x: emuToInch(off[1]), y: emuToInch(off[2]), w: emuToInch(ext[1]), h: emuToInch(ext[2]),
+      src: `data:${mime};base64,${b64}`,
+    });
+  }
+  return out;
+}
+
 /** Non-placeholder shapes that carry TEXT (design labels like a cover's "日付 / 部署 / 作成者").
  *  Their box + font resolve through the SAME extractStyle as placeholders (so inherited geometry/
  *  font/color work), and the text is the concatenated runs. */
@@ -495,8 +544,10 @@ export async function loadTemplate(
     const decorations = extractDecorations(xml, themeColors);
     const staticTexts = extractStaticTexts(xml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
     const background = extractBackground(xml, themeColors);
+    const relsXml = (await zip.file(`ppt/slideLayouts/_rels/slideLayout${i}.xml.rels`)?.async("string")) ?? "";
+    const images = await extractImages(xml, relsXml, "ppt/slideLayouts", zip);
 
-    layouts.push({ index: i, name, placeholders, decorations, staticTexts, background });
+    layouts.push({ index: i, name, placeholders, decorations, images, staticTexts, background });
   }
 
   // Decide ONCE whether this master follows SlideCraft's idx-meta convention, and stamp every
@@ -520,10 +571,12 @@ export async function loadTemplate(
   // layouts, run on the master. Shown as a base layer under every layout (previously never read).
   const masterDecorations = extractDecorations(masterXml, themeColors);
   const masterStaticTexts = extractStaticTexts(masterXml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
+  const masterRelsXml = (await zip.file("ppt/slideMasters/_rels/slideMaster1.xml.rels")?.async("string")) ?? "";
+  const masterImages = await extractImages(masterXml, masterRelsXml, "ppt/slideMasters", zip);
 
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
-    masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts,
+    masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts, masterImages,
     themeColors,
   };
 }

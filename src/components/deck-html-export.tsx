@@ -65,6 +65,7 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
         layout={layout}
         masterBgColor={template.masterBgColor}
         masterDecorations={template.masterDecorations}
+        masterImages={template.masterImages}
         masterStaticTexts={template.masterStaticTexts}
         scale={SCALE}
         exportMode
