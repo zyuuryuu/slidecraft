@@ -47,6 +47,8 @@
 
 ## HTML・描画
 
+- **プレビュー/HTML の背景画像・グラデ・図形グラデ描画（A1/A2/A3）** — レイアウト/マスターの `<p:bg>` 画像塗り(blipFill)・グラデ塗り(gradFill) を全面描画、`<p:pic>` の非web主 blip（EMF/WMF/wdp）を `svgBlip`(SVG) へフォールバック、装飾図形の `gradFill` を CSS グラデで描画。純粋 `ooxml-fill.ts` に集約（プレビュー＋HTML 共有・PPTX/golden 非影響）。実 HTML レンダで確認 （他AIレポート＋敵対検証・2026-07-07）
+
 - **図テキストを SVG `<text>` に統一** — svg-writer の text() を `<foreignObject>`+XHTML から native `<text>`/`<tspan>`（dy-stacked・ASCENT=0.875 baseline）＋決定論 wrap＋font-size shrink に移行、preview/HTML/print/canvas が一つの SVG を共有、PPTX golden 不変 （ADR-0013・PR #62・2026-07-04）
 - **HTML 出力：印刷を 1 枚 1 ページに修正** — 全スライドが 1 ページに潰れる致命バグを修正 （PR #63・2026-07-04）
 - **HTML 出力：表現力アップ** — リッチなスライド遷移＋オーバービューグリッド＋遷移選択 UI （PR #61・2026-07-04）

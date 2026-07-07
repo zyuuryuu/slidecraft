@@ -64,6 +64,8 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
         totalSlides={prepared.slides.length}
         layout={layout}
         masterBgColor={template.masterBgColor}
+        masterBackgroundImage={template.masterBackgroundImage}
+        masterBackgroundGradient={template.masterBackgroundGradient}
         masterDecorations={template.masterDecorations}
         masterImages={template.masterImages}
         masterStaticTexts={template.masterStaticTexts}

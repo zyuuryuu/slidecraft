@@ -11,6 +11,7 @@ import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
 import { pickLayout, usesMetaIdxConvention, type LayoutCatalog, type LayoutRole } from "./template-catalog";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
+import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 
 // ── Types ──
 
@@ -51,6 +52,7 @@ export interface DecoRect {
   prst?: string; // prstGeom preset (ellipse / triangle / rightArrow / chevron …). undefined ⇒ rect.
   path?: string; // custGeom → an SVG path drawn in a viewBox stretched to w×h (preserveAspectRatio=none)
   pathViewBox?: string; // "0 0 W H" for `path` (the custGeom path space)
+  gradient?: string; // CSS linear-gradient for a <a:gradFill> shape (rect divs use it; SVG shapes fall back to `color`)
 }
 
 /** Static (non-placeholder) text on a layout/master — design labels like a cover's "日付 / 部署 /
@@ -78,7 +80,9 @@ export interface LayoutInfo {
   decorations: DecoRect[]; // decorative shapes (backgrounds, bars, panels)
   images: ImageDeco[]; // <p:pic> logos/graphics on the layout (data URIs)
   staticTexts: StaticText[]; // non-placeholder text boxes (design labels)
-  background?: string; // resolved layout <p:bg> fill (hex, no #); undefined = inherit master bg
+  background?: string; // resolved layout <p:bg> SOLID fill (hex, no #); undefined = inherit master bg
+  backgroundImage?: string; // layout <p:bg> PICTURE fill as a data: URI (full-bleed brand background)
+  backgroundGradient?: string; // layout <p:bg> GRADIENT fill as a CSS linear-gradient
 }
 
 export interface MasterStyle {
@@ -99,6 +103,8 @@ export interface TemplateData {
   masterTitleStyle: MasterStyle;
   masterBodyStyle: MasterStyle;
   masterBgColor: string; // hex without #, from theme bg1/lt1
+  masterBackgroundImage?: string; // the master's OWN <p:bg> picture fill as a data: URI (base layer)
+  masterBackgroundGradient?: string; // the master's OWN <p:bg> gradient fill as a CSS linear-gradient
   masterDecorations: DecoRect[]; // the master's OWN non-placeholder shapes (logos/bars) — a base layer
                                  // shown UNDER every layout (the preview never read these before)
   masterStaticTexts: StaticText[]; // the master's own static text labels (base layer)
@@ -382,7 +388,10 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
 
     const fill = shapeFillColor(spPr, theme);
     const border = shapeLineColor(spPr, theme);
-    if (!fill && !border) continue; // a noFill text box with no outline is not decoration
+    // A gradient-filled panel/bar has no solidFill → scope to the fill region (before <a:ln>) so a
+    // gradient LINE isn't mistaken for the fill, and keep the shape instead of dropping it (A3).
+    const grad = fill ? undefined : gradFillCss(spPr.split(/<a:ln\b/)[0], theme);
+    if (!fill && !border && !grad) continue; // a noFill text box with no outline is not decoration
 
     const w = emuToInch(extMatch[1]);
     const h = emuToInch(extMatch[2]);
@@ -393,11 +402,12 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
       y: emuToInch(offMatch[2]),
       w,
       h,
-      color: fill ?? "FFFFFF", // border-only card → white fill so its outline still frames content
+      color: fill ?? grad?.first ?? "FFFFFF", // gradient → first stop (SVG shapes); border-only → white
       radius: cornerRadius(spPr, w, h),
       border,
       ...(prst && prst !== "rect" && prst !== "roundRect" ? { prst } : {}),
       ...(cust ? { path: cust.path, pathViewBox: cust.viewBox } : {}),
+      ...(grad ? { gradient: grad.css } : {}),
     });
   }
 
@@ -423,39 +433,23 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
   return decos;
 }
 
-const IMG_MIME: Record<string, string> = {
-  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", bmp: "image/bmp",
-};
-
 /** Extract `<p:pic>` images (logos/graphics) from a layout/master part as data-URI ImageDecos, so the
  *  preview can paint them (they were dropped before → a template's logo never showed). Resolves each
- *  pic's r:embed through the part's .rels to the ppt/media/ bytes. `relDir` is the part's dir (e.g.
- *  "ppt/slideLayouts") so a "../media/x" target resolves. Async (reads media bytes). Safe: emits a
- *  self-contained data: URI (no external fetch); raster loads inertly, and svg in an <img> can't run
- *  script. */
+ *  pic's blip through the part's .rels to the ppt/media/ bytes via the shared `resolveBlipFillSrc`,
+ *  which prefers the primary blip but falls back to the `svgBlip` SVG when the primary is a non-web
+ *  format (EMF/WMF/wdp) a browser can't paint (A2). `relDir` is the part's dir (e.g. "ppt/slideLayouts")
+ *  so a "../media/x" target resolves. Async (reads media bytes). Safe: emits a self-contained data:
+ *  URI (no external fetch); raster loads inertly, and svg in an <img> can't run script. */
 async function extractImages(xml: string, relsXml: string, relDir: string, zip: JSZip): Promise<ImageDeco[]> {
-  const relMap = new Map<string, string>();
-  for (const m of relsXml.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/g)) {
-    if (/image/i.test(m[0]) || /media\//.test(m[2])) relMap.set(m[1], m[2]);
-  }
+  const relMap = buildRelMap(relsXml);
   const out: ImageDeco[] = [];
   for (const pic of normalizeNs(xml).match(/<p:pic>[\s\S]*?<\/p:pic>/g) || []) {
-    const rId = pic.match(/r:embed="([^"]+)"/)?.[1];
-    const target = rId ? relMap.get(rId) : undefined;
-    if (!target) continue;
     const off = pic.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
     const ext = pic.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
     if (!off || !ext) continue;
-    // Resolve the (relative) target against the part's directory into a zip path.
-    const path = new URL(target, `file:///${relDir}/`).pathname.replace(/^\/+/, "");
-    const file = zip.file(path);
-    const mime = IMG_MIME[path.split(".").pop()?.toLowerCase() ?? ""];
-    if (!file || !mime) continue;
-    const b64 = await file.async("base64");
-    out.push({
-      x: emuToInch(off[1]), y: emuToInch(off[2]), w: emuToInch(ext[1]), h: emuToInch(ext[2]),
-      src: `data:${mime};base64,${b64}`,
-    });
+    const src = await resolveBlipFillSrc(pic, relMap, relDir, zip);
+    if (!src) continue;
+    out.push({ x: emuToInch(off[1]), y: emuToInch(off[2]), w: emuToInch(ext[1]), h: emuToInch(ext[2]), src });
   }
   return out;
 }
@@ -574,9 +568,14 @@ export async function loadTemplate(
     const staticTexts = extractStaticTexts(xml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
     const background = extractBackground(xml, themeColors);
     const relsXml = (await zip.file(`ppt/slideLayouts/_rels/slideLayout${i}.xml.rels`)?.async("string")) ?? "";
+    const relMap = buildRelMap(relsXml);
     const images = await extractImages(xml, relsXml, "ppt/slideLayouts", zip);
+    // A full-bleed brand background can be a PICTURE or GRADIENT fill in <p:bg>, not just a solid color
+    // (A1). Both are preview/HTML-only (the exported PPTX inherits <p:bg> natively from the layout).
+    const backgroundImage = await backgroundImageSrc(xml, relMap, "ppt/slideLayouts", zip);
+    const backgroundGradient = backgroundImage ? undefined : backgroundGradientCss(xml, themeColors);
 
-    layouts.push({ index: i, name, placeholders, decorations, images, staticTexts, background });
+    layouts.push({ index: i, name, placeholders, decorations, images, staticTexts, background, backgroundImage, backgroundGradient });
   }
 
   // Decide ONCE whether this master follows SlideCraft's idx-meta convention, and stamp every
@@ -601,12 +600,17 @@ export async function loadTemplate(
   const masterDecorations = extractDecorations(masterXml, themeColors);
   const masterStaticTexts = extractStaticTexts(masterXml, masterTitleStyle, masterBodyStyle, themeColors, masterGeom);
   const masterRelsXml = (await zip.file("ppt/slideMasters/_rels/slideMaster1.xml.rels")?.async("string")) ?? "";
+  const masterRelMap = buildRelMap(masterRelsXml);
   const masterImages = await extractImages(masterXml, masterRelsXml, "ppt/slideMasters", zip);
+  // The master's OWN <p:bg> picture/gradient — shown as the base background under any layout that
+  // doesn't declare its own (A1). Preview/HTML-only, same as masterBgColor.
+  const masterBackgroundImage = await backgroundImageSrc(masterXml, masterRelMap, "ppt/slideMasters", zip);
+  const masterBackgroundGradient = masterBackgroundImage ? undefined : backgroundGradientCss(masterXml, themeColors);
 
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
     masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts, masterImages,
-    themeColors,
+    masterBackgroundImage, masterBackgroundGradient, themeColors,
   };
 }
 

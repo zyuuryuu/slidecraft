@@ -39,7 +39,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | --- | --- | --- |
 | 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。※ 高インパクト分は初回リリース M11 で先行 | M |
 | @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
-| プレビュー描画の残（背景画像/グラデ・非web画像・グループ・arcTo） | すべて**プレビュー/HTML 限定**（PPTX はレイアウト/マスターをネイティブ継承するので出力は正しい＝WYSIWYG 乖離であってファイル破損ではない）。**任意ユーザマスタで顕在化**（同梱19テンプレは該当ほぼ0）。preset 図形・custGeom パスは SVG 描画済（c1d5423）。残：**(A1) 背景 `<p:bg>` の blipFill(画像)/gradFill** が抽出されず master 単色にフォールバック＝全面ブランド背景が消える（`extractBackground` が solid/schemeClr のみ）／**(A2) 非web形式のプライマリ blip（EMF/WMF/wdp/tiff/webp）が無言脱落**＝ロゴが消える（`IMG_MIME` 外→continue・`svgBlip` フォールバック無し。※通常 SVG は PNG プライマリで描けるので"SVG全滅"ではない）／**(A3) 図形 `gradFill`** は枠なし脱落・枠あり白化／**グループ `<p:grpSp>`**（chOff/chExt→off/ext 座標変換要・velis に 28 個）／**custGeom arcTo** 変換 skip。触点: `template-loader.ts`（extractBackground/extractImages/extractDecorations）・`SlidePreview.tsx renderDeco`。※他AI描画レポート＋敵対検証(2026-07-07)で A1/A2/A3 確認 | S〜M |
+| プレビュー描画の残（グループ / arcTo） | プレビュー/HTML 限定（PPTX はネイティブ継承で出力は正しい）。背景画像/グラデ(A1)・非web画像→svgBlip(A2)・図形 gradFill(A3) は**出荷済**（→[shipped](shipped.md)・`ooxml-fill.ts`）。残：**グループ図形 `<p:grpSp>`**（子図形の座標変換 chOff/chExt→off/ext が要り現状は矩形化 or 脱落・velis に 28 個）／**custGeom の arcTo セグメント**（変換 skip 中）。触点: `template-loader.ts extractDecorations`（grpSp は再帰抽出＋座標変換）・`SlidePreview.tsx renderDeco` | S |
 
 ### 📄 テンプレ / マスター
 

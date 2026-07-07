@@ -133,6 +133,8 @@ export default function SlideList({
                 totalSlides={deck.slides.length}
                 layout={layout}
                 masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+                masterBackgroundImage={template?.masterBackgroundImage}
+                masterBackgroundGradient={template?.masterBackgroundGradient}
                 masterDecorations={template?.masterDecorations}
                 masterStaticTexts={template?.masterStaticTexts}
                 scale={THUMB_SCALE}

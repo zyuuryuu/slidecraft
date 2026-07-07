@@ -107,6 +107,8 @@ interface SlideCardProps {
   totalSlides: number;
   layout: LayoutInfo | undefined;
   masterBgColor: string; // hex without #
+  masterBackgroundImage?: string; // the master's own <p:bg> picture fill (data: URI) — full-bleed base
+  masterBackgroundGradient?: string; // the master's own <p:bg> gradient fill (CSS linear-gradient)
   masterDecorations?: DecoRect[]; // the master's own shapes — painted under the layout's
   masterImages?: ImageDeco[]; // the master's own logos/graphics — painted under the layout's
   masterStaticTexts?: StaticText[]; // the master's own static text labels
@@ -177,7 +179,8 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
       key={key}
       style={{
         ...pos,
-        backgroundColor: fill,
+        // A gradient panel/bar paints its CSS gradient; a plain shape its solid fill (A3).
+        ...(d.gradient ? { backgroundImage: d.gradient } : { backgroundColor: fill }),
         ...(borderRadius ? { borderRadius } : {}),
         ...(d.border ? { border: `${strokeWidth}px solid #${d.border}` } : {}),
       }}
@@ -185,7 +188,7 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   );
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -286,9 +289,13 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
     );
   };
 
-  // Background = the LAYOUT's own <p:bg> fill if it has one (e.g. a full-bleed cover panel),
-  // else the master bg color. Decorative shapes are painted on top.
+  // Background = the LAYOUT's own <p:bg> fill if it declares one (a full-bleed cover panel — solid
+  // color, brand IMAGE, or GRADIENT), else the master's. A <p:bg> is exactly one fill, so a layout
+  // that declares ANY background overrides the master's entirely (native slide→layout inheritance).
   const bgColor = `#${layout?.background ?? masterBgColor}`;
+  const layoutHasBg = !!(layout && (layout.background || layout.backgroundImage || layout.backgroundGradient));
+  const bgImage = layoutHasBg ? layout!.backgroundImage : masterBackgroundImage;
+  const bgGradient = layoutHasBg ? layout!.backgroundGradient : masterBackgroundGradient;
 
   return (
     <div
@@ -309,6 +316,16 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
         flexShrink: 0,
       }}
     >
+      {/* Full-bleed background FILL: a brand cover can be a picture or gradient <p:bg>, not just a solid
+          color (A1). Painted behind every decoration/logo/placeholder, above the solid bgColor base. */}
+      {bgImage && (
+        <img src={bgImage} alt="" draggable={false}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+      )}
+      {!bgImage && bgGradient && (
+        <div style={{ position: "absolute", inset: 0, backgroundImage: bgGradient, pointerEvents: "none" }} />
+      )}
+
       {/* Decorative shapes: the MASTER's own shapes first (a base layer under every layout), then the
           layout's. Rect/round-rect/ellipse render as divs; preset polygons (arrows/triangles/…) and
           custom geometry (custGeom) render as SVG so a template's real shapes aren't collapsed to boxes. */}
@@ -636,6 +653,8 @@ export default function SlidePreview({
         totalSlides={deck!.slides.length}
         layout={layout}
         masterBgColor={template?.masterBgColor ?? "FFFFFF"}
+        masterBackgroundImage={template?.masterBackgroundImage}
+        masterBackgroundGradient={template?.masterBackgroundGradient}
         masterDecorations={template?.masterDecorations}
         masterImages={template?.masterImages}
         masterStaticTexts={template?.masterStaticTexts}
