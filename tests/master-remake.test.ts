@@ -56,6 +56,25 @@ describe("logo injection + extraction (CI-covered, synthetic png)", () => {
   });
 });
 
+describe("flatContent — absorb a flat source design (CI-covered)", () => {
+  const lightLayoutXml = async (flatContent: boolean) => {
+    const zip = await JSZip.loadAsync(
+      await writeTemplate({ name: "T", fonts: { major: "Arial", minor: "Arial" }, palette: MIDNIGHT_PALETTE, flatContent }),
+    );
+    for (const f of Object.keys(zip.files).filter((n) => /slideLayout\d+\.xml$/.test(n))) {
+      const x = (await zip.file(f)!.async("string")) as string;
+      if (/name="Content\.1Body\.Single"/.test(x)) return x;
+    }
+    return "";
+  };
+  it("flatContent removes the header-bar deco on light layouts; default keeps it", async () => {
+    // The header bar is the light content layout's only decorative shape (name="Deco…"). Flat drops
+    // it → clean white content slide (title recolored to a dark ink so it still reads on canvas).
+    expect(await lightLayoutXml(true)).not.toMatch(/name="Deco/);
+    expect(await lightLayoutXml(false)).toMatch(/name="Deco/);
+  });
+});
+
 describe.skipIf(!HAS_CX)("logo inheritance from a real master", () => {
   it("extractLogo lifts the source's raster logo", async () => {
     const logo = await extractLogo(await loadTemplate(readFileSync(CX)));
@@ -84,6 +103,10 @@ describe.skipIf(!HAS_CX)("masterToTemplateSpec — extract theme from a real mas
     const spec = masterToTemplateSpec(cx);
     expect(spec.palette.canvas).toBe("FFFFFF"); // CX's real master bg (inverted theme handled)
     expect(luminance(spec.palette.background)).toBeLessThan(0.5); // a dark brand color for dark layouts
+  });
+
+  it("detects CX's FLAT content design (dark title on a light canvas)", () => {
+    expect(masterToTemplateSpec(cx).flatContent).toBe(true);
   });
 
   it("maps colors CONTRAST-SAFELY (no invisible text by construction)", () => {

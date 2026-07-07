@@ -29,6 +29,9 @@ export interface TemplateSpec {
   palette: Record<PaletteKey, string>; // hex（# なし）
   layouts?: LayoutDef[]; // 省略時は組み込み 30 レイアウト
   logo?: LogoSpec; // Re-make: 元マスターのロゴを dark 系レイアウトへ載せる
+  // Re-make: ソースが「フラット設計」（本文スライドは白地＋暗い見出し・ヘッダーバー無し。CX 等）なら true。
+  // light 系レイアウトのヘッダーバーを外し、バー前提の明色（titleText/subtle）を暗色へ寄せる。
+  flatContent?: boolean;
 }
 
 // 生成物での ext → MIME（[Content_Types] の Default 用）
@@ -197,16 +200,20 @@ function decoShapeXml(
 }
 
 function layoutXml(def: LayoutDef, spec: TemplateSpec): string {
-  // family が装飾を決める: dark=背景塗りのみ / light=canvas 塗り＋ヘッダーバー（白タイトルの可読性）
+  // family が装飾を決める: dark=背景塗りのみ / light=canvas 塗り＋ヘッダーバー（白タイトルの可読性）。
+  // flatContent（ソースがフラット設計）なら light のヘッダーバーを外し、バー前提の明色を暗色へ寄せる。
+  const flat = !!spec.flatContent && def.family === "light";
   const bg = def.family === "dark" ? spec.palette.background : spec.palette.canvas;
   const decos = [
-    ...(def.family === "light" ? [{ x: 0, y: 0, w: SLIDE_W, h: HEADER_BAR_H, color: "background" as PaletteKey }] : []),
+    ...(def.family === "light" && !flat ? [{ x: 0, y: 0, w: SLIDE_W, h: HEADER_BAR_H, color: "background" as PaletteKey }] : []),
     ...(def.decos ?? []),
   ];
+  // バー上で白/薄色だった見出し・サブ見出しを、白 canvas でも読める暗色へ（title→emphasis, subtitle→muted）。
+  const remap = (c: PaletteKey): PaletteKey => (flat ? (c === "titleText" ? "emphasis" : c === "subtle" ? "muted" : c) : c);
   let shapeId = 2;
   const shapes =
     decos.map((d) => decoShapeXml(d, spec, shapeId++)).join("") +
-    def.placeholders.map((ph) => phShapeXml(ph, spec, shapeId++)).join("") +
+    def.placeholders.map((ph) => phShapeXml(flat ? { ...ph, color: remap(ph.color) } : ph, spec, shapeId++)).join("") +
     (layoutHasLogo(def, spec) ? logoPicXml(spec, shapeId++) : ""); // logo on top (last shape)
   return `${XML_DECL}<p:sldLayout ${NS_A} ${NS_P} ${NS_R} preserve="1">` +
     `<p:cSld name="${escXml(def.name)}">${bgXml(bg)}<p:spTree>${emptySpTreeHeader}${shapes}</p:spTree></p:cSld>` +

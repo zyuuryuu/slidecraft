@@ -104,10 +104,17 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
 
   const major = tpl.masterTitleStyle.fontName || tpl.masterBodyStyle.fontName || "Arial";
   const minor = tpl.masterBodyStyle.fontName || major;
+  // "Flat" design: the source titles content in a DARK ink on a LIGHT canvas (no dark header bar —
+  // CX's clean white content slides). Then our light layouts drop the header bar to match. When the
+  // source titles in a light color (a bar/dark-header design), keep the bar. Keyed on the master's
+  // title color vs the canvas so it's robust to the specific hue.
+  const titleC = norm(tpl.masterTitleStyle.fontColor);
+  const flatContent = !!titleC && isDark(titleC) && !isDark(canvas);
   return {
     name: opts.name ?? "会社テンプレート (Re-make)",
     fonts: { major, minor },
     palette,
+    ...(flatContent ? { flatContent: true } : {}),
   };
 }
 
