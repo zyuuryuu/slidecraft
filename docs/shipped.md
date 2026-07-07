@@ -50,6 +50,8 @@
 
 - **プレビュー/HTML の背景画像・グラデ・図形グラデ描画（A1/A2/A3）** — レイアウト/マスターの `<p:bg>` 画像塗り(blipFill)・グラデ塗り(gradFill) を全面描画、`<p:pic>` の非web主 blip（EMF/WMF/wdp）を `svgBlip`(SVG) へフォールバック、装飾図形の `gradFill` を CSS グラデで描画。純粋 `ooxml-fill.ts` に集約（プレビュー＋HTML 共有・PPTX/golden 非影響）。実 HTML レンダで確認 （他AIレポート＋敵対検証・2026-07-07）
 - **プレビュー/HTML のグループ図形・custGeom 弧の描画** — `<p:grpSp>` の子図形を chOff/chExt→off/ext の座標変換（＋ネスト合成）で正しい位置に描画（従来は child-space 座標で誤配置・velis の 26 グループ）、custGeom の `arcTo` セグメントを SVG 楕円弧に変換。純粋 `ooxml-geom.ts`（プレビュー/HTML 限定・PPTX 非影響）。velis 実レンダ＋純粋/実フィクスチャテストで確認 （2026-07-07）
+- **図のエッジラベル コントラスト適応＋埋め込み図の自前タイトル抑止** — 図のエッジ/関係ラベルをスライド背景に対しコントラスト適応（低コントラスト ~2.4:1 を解消）、埋め込み図はスライド題枠に一任し自前タイトルを描かない（`omitTitle`・重複/上下逆転を解消）。共有 painter 経由でプレビュー SVG も PPTX も同一挙動（実レンダ敵対監査 M11 の高インパクト分） （PR #83／82569eb・59ef092・2026-07-07）
+- **締めスライドの可読性（reconcile：非バグ確定）** — 「閉じスライドが白地に薄色文字で不可視」の起票を実データで再検証し **canonical `Midnight_Executive` の Closing レイアウト（L29/L30）は full-bleed の濃紺 BG 図形（`1E2761`・13.33×7.5in）＋アクセントバーを持ち、明色テキストが可読**と確認。レンダラも `extractDecorations`→`spToDeco`（layout/master 両方・サイズ制限なし）で同じ塗りを描画＝WYSIWYG で白地に白文字は発生しない。旧起票の「装飾0」は `<p:bg>` のみ見た誤断 （2026-07-07）
 
 - **図テキストを SVG `<text>` に統一** — svg-writer の text() を `<foreignObject>`+XHTML から native `<text>`/`<tspan>`（dy-stacked・ASCENT=0.875 baseline）＋決定論 wrap＋font-size shrink に移行、preview/HTML/print/canvas が一つの SVG を共有、PPTX golden 不変 （ADR-0013・PR #62・2026-07-04）
 - **HTML 出力：印刷を 1 枚 1 ページに修正** — 全スライドが 1 ページに潰れる致命バグを修正 （PR #63・2026-07-04）
@@ -96,10 +98,12 @@
 
 ## UX・配布
 
-- **UI 日英切替（i18n・react-i18next）** — JA\|EN トグル（テーマトグル隣・localStorage 永続・既定 ja）で UI 全体が日⇄英に切替。25 コンポーネント・320 キー（29 名前空間）を `t()` 化し `ja/en.json` に集約。型安全キー（`i18next.d.ts` で ja.json に対して `t()` を型検査）・補間 {{var}}・動的キーは enum 配列 `as const` で narrow。全展開はワークフロー並列（1エージェント=1コンポーネント）＋決定論マージ。実 HTML/アプリ実レンダで全画面の切替を目視確認。残＝.ts 状態文言（→ROADMAP） （2026-07-07）
+- **UI 日英切替（i18n・react-i18next）— 全 UI ＋ .ts 状態文言まで** — JA\|EN トグル（テーマトグル隣・localStorage 永続・既定 ja）で UI 全体が日⇄英に切替。.tsx 25 コンポーネントに加え、フック/モジュール由来の状態・通知文言（`ai-generation-types.ts` の接続ステータス・`useCollab.ts`「未接続」・`useDeckController` notice・AI タスクラベル・修復プラン説明）まで `i18n.t()` 化し、**39 名前空間 379 キー**を `ja/en.json` に集約。`MODE_LABEL` を object→`modeLabel(mode)` 関数化して EN 時の混在を解消。型安全キー（`i18next.d.ts` で ja.json に対し `t()` を型検査）・補間 {{var}}・ハイフンキー（`aiMode.diagram-edit`）を EN/JA 両方で runtime 検証。全展開はワークフロー並列＋決定論マージ（辞書は競合回避で親がマージ） （2026-07-07）
+- **英語ドキュメント（VitePress 二言語サイト＋README＋第三者通知）** — docs サイトを VitePress ネイティブ i18n 化（root=日本語／`/en`=English・ナビ右上の言語スイッチャ自動表示）。公開13ページを `docs/en/` にミラーし、サイト内絶対リンクは `/en` 接頭辞へ書換。`README.en.md`（GitHub 慣習・`<kbd>` ボタン風言語切替）＋`THIRD-PARTY-NOTICES.en.md`（ライセンス名・数値は verbatim、説明文のみ英訳）。並列翻訳（1ファイル=1エージェント・別ファイル出力で競合なし）。`npm run docs:build` 成功（`ignoreDeadLinks` 未設定＝全 `/en` リンク検証）、本番 Pages に配信済 （2026-07-07）
 - **デフォルトのサンプル Markdown 廃止＝空起動** — 起動時に読み込んでいたサンプルデッキ（`sample-deck.ts`）を削除し、アプリは空状態で開始（既存のプレースホルダで graceful）。あわせて**空デッキで「＋ スライド追加」が no-op だった不具合を修正**（純粋 `addBlankSlide` が deck=null なら1スライドを mint）。vite preview＋Playwright で実操作確認 （2026-07-07）
 
 - **`.scft` アプリ関連付け（ダブルクリックで開く）＋拡張子短縮** — プロジェクト拡張子を `.slidecraft`→`.scft` に短縮し、OS 関連付けで**ダブルクリック/「プログラムから開く」**が起動＝新タブで開く。Win/Linux ウォーム起動は `single-instance` で単一ウィンドウ、macOS は open イベント、Win/Linux コールドは argv。fs スコープ動的付与でダイアログ選択と同じ信頼境界 （ADR-0024・2026-07-07）
+- **`.scft` バンドルへ schema version を埋め込み（前方互換の土台）** — プロジェクト（`.scft`）の `meta.json` に `version`（`PROJECT_VERSION`）を書き込み・zod 検証・開封時に読み出す。前方互換の土台を敷設（version を使った互換ゲート/マイグレーションは残＝ROADMAP） （`project-io.ts`・2026-07-07）
 - **AI が Live MCP で作った Deck を GUI 背景タブに出す（モード b）** — 協働中に上流 AI が `new_project` すると背景タブとして出現（表示は切替えない）。マルチドキュメント基盤（`openDoc` activate:false）＋ミラー先の per-tab 切替 （2026-07-07）
 - **改行を LF 固定（.gitattributes）** — Windows CRLF churn を .gitattributes で根治 （PR #69・2026-07-05）
 - **配布 — パッケージ版で collab を動かす** — node externalBin 同梱＋host.cjs resource でパッケージ版 collab を稼働 （PR #37・2026-06-30）

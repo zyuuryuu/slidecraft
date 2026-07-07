@@ -8,14 +8,28 @@ and versioning follows [Semantic Versioning](https://semver.org/) (**the 0.x lin
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-07-07
+
+Highlights: a Japanese/English UI toggle (i18n) and English documentation, `.scft` file association, and higher-fidelity preview rendering.
+
 ### Added
 
+- **Japanese/English UI toggle (i18n)** — Switch the whole UI between Japanese and English from the toggle in the top-right (your choice is remembered).
+- **English documentation** — This documentation site now has an English edition (switch languages from the top-right nav).
 - **Associate `.scft` files with the app (open on double-click)** — Project files (`.scft`) now launch and open in SlideCraft via **double-click / "Open with"**. If the app is already running, it opens as a **new tab** without disturbing what you currently have open.
 - **Surface AI-authored decks from Live MCP in a GUI background tab** — When an upstream AI creates a new deck during collaboration, it appears as a background tab in the GUI (the active view does not switch).
+- **Four built-in templates** — Added "配布資料 公文書高密度 / ビジュアルデッキ マガジン / 技術報告 スタンダード水色" alongside the existing Midnight Executive. See [Templates](/en/guide/templates).
+- **Higher-fidelity preview/HTML rendering** — Renders template background images and gradients, group shapes, and shapes (ellipse / arrow / custom geometry).
+- **Starts empty** — Removed the default sample Markdown so you can start from a blank state.
 
 ### Changed
 
 - **Shortened the project file extension from `.slidecraft` to `.scft`** — A shorter, easier-to-handle 4-character extension.
+
+### Fixed
+
+- Fixed **"+ Add slide" doing nothing on an empty deck**.
+- Fixed **AI-authored decks always being named "Untitled" on the collaboration host** (now named from the first heading).
 
 ## [0.2.0] — 2026-07-07
 

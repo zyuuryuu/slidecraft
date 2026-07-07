@@ -2,7 +2,7 @@
 
 **前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
 
-**現在地（2026-07-07）**：**v0.2.0 出荷済**（第三者マスター対応＋MCP CLI 同梱・[shipped.md](shipped.md)）。以降 main（**未リリース**）に積み増し：**`.scft` 関連付け＋拡張子短縮**／**AI 協働 Deck の背景タブ化**／**プレビュー描画の忠実化**（背景画像・グラデ・非web画像→svgBlip・図形グラデ・グループ図形・custGeom 弧）／**公式ビルトインテンプレ4本化＋テンプレ資産の衛生整理**（テスト用/知財を `public/`→`tests/fixtures/` 退避）／**デフォルトサンプル Markdown 廃止＝空起動**（＋空デッキで「＋」が効く修正）／他AIレポートのトリアージ＋実バグ修正（B4 タブ名）。**いま：UI i18n（日英切替）に着手。** 未リリース分の切り出し（次バージョン）と Windows 署名は保留。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
+**現在地（2026-07-07）**：**v0.2.1 リリース**（タグ `v0.2.1`・installer ドラフト生成 → 実機レビュー後に publish／[CHANGELOG](../CHANGELOG.md)・[shipped.md](shipped.md)）。v0.2.0（第三者マスター対応＋MCP CLI 同梱）に続き、**UI 日英切替（i18n・全 UI ＋ .ts 状態文言まで）＋英語ドキュメント（VitePress 二言語サイト）**、**`.scft` 関連付け＋拡張子短縮**、**AI 協働 Deck の背景タブ化**、**プレビュー描画の忠実化**（背景画像・グラデ・非web画像→svgBlip・図形グラデ・グループ図形・custGeom 弧）、**公式ビルトインテンプレ4本化＋テンプレ資産の衛生整理**、**空起動**（＋空デッキ「＋」修正）、他AIレポートのトリアージ＋実バグ修正（B4 タブ名）を同梱。Windows 署名は保留。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 >
@@ -20,7 +20,6 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | **Windows コード署名（Authenticode）** | **実ユーザがインストール時にブロックされた**（SmartScreen「WindowsによってPCが保護されました」＝不明な発行元）。回避は「詳細情報→実行」だが離脱要因。※Let's Encrypt は **TLS 証明書専用でコード署名不可**（EKU/本人確認が別物）。選択肢: **(0・推奨) SignPath Foundation＝OSS 向け無料 OV Authenticode**（本プロジェクトは Apache-2.0＋公開リポで適格見込み。鍵は先方 HSM 管理・CI パイプラインに署名ステップを組込む。要申請・審査／OV なので SmartScreen 評価は DL 実績で蓄積するが「不明な発行元」ブロックは解消）／(1) Azure Trusted Signing ≈$10/月・要 登録3年以上の組織 or 本人確認／(2) OV 証明書 ≈$200-400/年／(3) EV 証明書 ≈$300-700/年・HSM＋組織・警告最速で消える／(4) 当面は**回避手順を install ガイドに明記**のみ。※updater の minisign 署名（↓）とは別物。→ ADR 化 | 💬 DISCUSS（推奨=SignPath 申請） |
 | Intel Mac (.dmg) | v0.1.0 は runner 都合で arm64 のみ。x64 dmg 生成後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（runner） |
 | 通知バナー（軽量自動更新） | 方針は [ADR-0021](adr/0021-auto-update-strategy.md) で決定済。GitHub Releases API ポーリングで「新版あり」通知（CSP egress＋版数取得＋実ポーリング検証を要す） | ✅ READY |
-| 不可視の締めスライド（旧 M11 BUG1） | **原因特定済（2026-07-07）**：canonical の Closing レイアウト（L29/30）は**明色テキストのみ**（title=FFFFFF・本文=CADCFC）＋**自前 `<p:bg>` 無し・装飾 0**で、**白いマスター**（master bg=`bgRef→bg1→(clrMap)→lt1=FFFFFF`）を継承 → 白地に白/薄色文字で不可視。＝Closing は暗背景前提で設計されているのに暗 `<p:bg>` が未宣言のテンプレ authoring 欠落。**修正方針が要決定**：(a) canonical .pptx 再生成で Closing に暗 `<p:bg>` を付与（＝PPTX 出力に波及・golden 検証要）／(b) プレビュー限定のコントラストガード（＝WYSIWYG 崩れ＋「色を自動反転しない」原則に反する）。どちらも代償あり | 💬 DISCUSS（修正方針） |
 | アプリ内 Help/? 導線 | opener プラグイン未配線 → ドキュメントサイトへ誘導 | 🔗 DEPENDS |
 
 ---
@@ -38,7 +37,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
-| 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。※ 高インパクト分は初回リリース M11 で先行 | M |
+| 図品質の磨き込み（残＝ノード衝突/折返し） | 実レンダ敵対監査（全30枚）で検出した既存問題のうち、**エッジラベル低コントラスト（82569eb／PR #83）と図タイトル重複 `omitTitle`（59ef092）は出荷済**（→[shipped](shipped.md)）。**閉じスライドは非バグと判明**（canonical Closing は full-bleed 濃紺 BG 図形を持ち可読・監査で reconcile 済→shipped）。残＝**ノード衝突＋ラベル折返し**（`layout-engine` は固定 node_width＋全体スケールのみ・最頻/効き目大・未対処）。共有 painter に触る＝PPTX にも波及（golden 検証必須）。触点: `diagram-painter`・`layout-engine` | M |
 | @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
 
 ### 📄 テンプレ / マスター
@@ -52,7 +51,6 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
-| UI 日英表記切り替え（i18n）の残 | 本体は**出荷済**（react-i18next・JA\|EN トグル・25 コンポーネント/320 キー・[shipped](shipped.md)）。残：**.ts 由来の状態/通知文言**（`ai-generation-types.ts` の接続ステータス「接続OK/接続を確認中…」等・`useCollab.ts`「未接続」・フック/エンジンのユーザ向け notice）を t() 化。.tsx と違いフック/モジュール文脈なので individual に対応。触点: `ai-generation-types.ts`・`useCollab.ts`・`useDeckController` notice 系 | S |
 | 完全な署名付き自動アップデート | 初回は軽量通知（M12）で代替。出荷後：`tauri signer` 署名鍵ペア＋`plugins.updater`＋4-OS の `latest.json` 集約＋draft/publish フロー再設計。鍵は回転不可の不可逆判断（ADR 化） | M |
 
 ### 🔒 セキュリティ
@@ -65,9 +63,9 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 
 ## 保留中の依存・運用
 
-- **js-yaml v5 更新** — dependabot **PR #13（OPEN）**：`js-yaml` 4.3.0 → 5.2.0。破壊的変更の確認待ち。
-- **npm audit の残（dev 専用・容認）** — アプリ側の `esbuild` は 0.28.1（安全）へ更新済。残る3件は**すべて `vitepress`（docs 生成）チェーン**（`vitepress@1.6.4 → vite@5.4.21 → esbuild@0.21.5`・`fixAvailable:false`＝上流に修正版なし）。**devDependency で出荷アプリ・アプリ dev サーバには非含有**（docs は静的 HTML 出力・esbuild は出力に入らない）。esbuild advisory は serve モード対象で vitepress はバンドラ利用＝実際上到達困難。解消は vitepress 2.x（未 stable）待ち or override（vite@5→8 は破壊的で不可）。容認。
-- **`.scft` 形式バージョニング（前方互換保険）** — deck/project バンドルに schema version を埋め込む。後付けは困難だが初回リリースのスコープ外（着手時に検討）。
+- **js-yaml v5 更新** — dependabot **PR #13（OPEN・未 merge）**：`js-yaml` 4.3.0 → 5.2.1（メジャー）。破壊的変更の確認待ち。
+- **依存の脆弱性アラート（2026-07-07・いずれもリリース非ブロッカー・容認）** — dependabot 6件。**dev scope 4件**＝`vite`（high: `server.fs.deny` bypass on Windows／medium×2）＋`esbuild`（medium・dev サーバ）で、**すべて `vitepress`/ビルドツール鎖の devDependency**（出荷アプリ・docs 静的出力には非含有／vite dev サーバは開発時のみ）。**runtime 2件**＝`rand`（low）・`glib`（medium）で **Tauri 経由の深い Rust 推移依存**（Tauri/Cargo 更新待ち）。dependabot **PR #86**（minor-patch 群・22件）は CI 失敗中で未 merge。解消はビルドツール鎖の更新 or Tauri bump 待ち。
+- **`.scft` 形式バージョニングの活用（前方互換保険）** — バンドルへの schema version 埋め込み**自体は実装済**（`project-io.ts` の `meta.json.version`=`PROJECT_VERSION`・zod 検証・→[shipped](shipped.md)）。残＝**開封時に version を使った互換ゲート/マイグレーションが未実装**（現状 `openProject` は不一致でも黙って既定へフォールバック＝保険が効いていない）。着手時に「新しい version は拒否 or 移行」を追加。触点: `project-io.ts openProject`。
 - **会社 `.potx` / CX の保管** — 会社系 `.potx`（7本）＋`CX_sample_MSGothic.pptx` は `tests/fixtures/templates/` に置き **gitignore**（知財・ローカル限定・skipIf テストのみ参照）。棚卸＋公式昇格＋public 退避は完了（→[shipped](shipped.md)）。
 - **column 内 table の認識（要注意・小改修ではない）** — separator レイアウトの各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`findTableInLines` 未適用）。**調査済（2026-07-07）**：`TableBlock` は既に `placeholderIdx` を持ち列スコープ可・パーサ側は数行追加で拾えるが、**シリアライザが `slide.table` を意図的に single-body 扱い**（`md-serializer.ts:195` `singleBodyFigure`＝パーサの table 再吸収を防ぐ設計）なので、素直に列 table を作ると round-trip で single-body に化ける。正しく直すにはシリアライザの separator 分岐で列位置に table を emit（diagram/mermaid の :215-222 と同様）＋`singleBodyFigure` ガードの見直しが要る。触点: `md-slide-parser.ts` 列 else 分岐＋`md-serializer.ts` separator 分岐。
 - **混在スライドの本文＋表の同時保持（B1・他AI報告・敵対検証 2026-07-07）** — リード段落（非箇条書き）＋key-value 箇条書きの混在スライドで `convert_bullets_to_table` を掛けると、後段 `parseMd`（`md-slide-parser.ts` の table-vs-text 二択）がリード段落を**無言 drop**（never-silent 方針と不整合・undo 復旧可）。真因はツールでなく**共有パーサ**（同 drop は Markdown インポート等パーサ全経路で起こりうる）。診断が混在スライドで convert を推奨するのが引き金（`deck-diagnostics.ts:86` が bullet だけ数える）。根本策＝パーサが text+table 共存保持（共有経路・**golden 検証必須**）／安全策＝混在時は convert 非推奨 or ツールが警告返し。↑「column 内 table の認識」と同触点。
