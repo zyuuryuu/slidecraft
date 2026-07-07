@@ -5,6 +5,8 @@
 **現在地（2026-07-07）**：**v0.1.0 出荷済**（初回パブリックリリース — 工程化 M0–M13 完了・[shipped.md](shipped.md)）。以降 v0.1.x で**第三者マスター対応**（Re-make／素マスターの本文束縛／プレビュー画像描画）＋**MCP CLI 同梱**（ビルド不要のエージェント駆動）を積み増し。**いま：次バージョンのリリース準備。** 残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
+>
+> **検証で棄却（他AIレポート・敵対検証 2026-07-07／再調査不要）**：(B2) `get_deck_issues` 長い箇条書き過検知＝**非バグ**（検知は `deck-diagnostics.ts` の `SENTENCE_BULLET=28`、報告の `charsPerBullet:59` は検知経路に入らない別 budget＝`slide-fix.ts` の AI 指示値）／(B3) 空本文スライド未検出＝**意図的な仕様**（title-only は正当な内容・追加は区切り/表紙/空カラムの誤検知リスクで要決定の機能追加）／(A4) 大規模テンプレのロール推定ズレ＝広域主張（56枚規模・表/図/チャートが丸められる・文字数過大）は**偽**（tbl/chart/pic は idx 分岐より先に尊重）。実在は [ADR-0023](adr/0023-third-party-master-idx-convention.md) 既知エッジ（規約 opt-in マスタの body@idx15/16 誤分類）のみで、**素朴な typed-title ゲート修正は同梱テンプレ（00_表紙の会議名=body@15）を退行**させるため不可。
 
 ---
 
@@ -38,7 +40,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | --- | --- | --- |
 | 図/テンプレ品質の磨き込み | 実レンダ敵対監査（全30枚・Playwright→エージェント目視）で検出。**共有エンジン由来でプレビュー/PPTX にも出る既存問題**：図のエッジ/関係ラベルが**低コントラスト＋ノード衝突＋折返し**（最頻・効き目大／`diagram-painter` 系）・**閉じスライドが白地に薄色文字で不可視**（Closing レイアウトの背景抽出）・レーダー等の**図タイトルがヘッダと重複**（`omitTitle` 未効き疑い）。共有 painter/テンプレ抽出に触る＝PPTX にも波及（golden 検証必須）。※ 高インパクト分は初回リリース M11 で先行 | M |
 | @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
-| プレビュー図形描画の残（グループ / arcTo / グラデ） | preset 図形（楕円・矢印・三角ほか）・custGeom パスは SVG 描画済（c1d5423）。残：**グループ図形（`<p:grpSp>`）** は子図形の座標変換（chOff/chExt→off/ext）が要り現状は矩形化 or 脱落（velis に 28 個）／custGeom の **arcTo セグメント**は変換 skip 中／**グラデ塗り（`gradFill`）** はフラット単色化。触点: `template-loader.ts extractDecorations`（grpSp は再帰抽出＋座標変換）・`SlidePreview.tsx renderDeco`。プレビュー限定（PPTX はネイティブなので不変） | S〜M |
+| プレビュー描画の残（背景画像/グラデ・非web画像・グループ・arcTo） | すべて**プレビュー/HTML 限定**（PPTX はレイアウト/マスターをネイティブ継承するので出力は正しい＝WYSIWYG 乖離であってファイル破損ではない）。**任意ユーザマスタで顕在化**（同梱19テンプレは該当ほぼ0）。preset 図形・custGeom パスは SVG 描画済（c1d5423）。残：**(A1) 背景 `<p:bg>` の blipFill(画像)/gradFill** が抽出されず master 単色にフォールバック＝全面ブランド背景が消える（`extractBackground` が solid/schemeClr のみ）／**(A2) 非web形式のプライマリ blip（EMF/WMF/wdp/tiff/webp）が無言脱落**＝ロゴが消える（`IMG_MIME` 外→continue・`svgBlip` フォールバック無し。※通常 SVG は PNG プライマリで描けるので"SVG全滅"ではない）／**(A3) 図形 `gradFill`** は枠なし脱落・枠あり白化／**グループ `<p:grpSp>`**（chOff/chExt→off/ext 座標変換要・velis に 28 個）／**custGeom arcTo** 変換 skip。触点: `template-loader.ts`（extractBackground/extractImages/extractDecorations）・`SlidePreview.tsx renderDeco`。※他AI描画レポート＋敵対検証(2026-07-07)で A1/A2/A3 確認 | S〜M |
 
 ### 📄 テンプレ / マスター
 
@@ -69,5 +71,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 - **`.scft` 形式バージョニング（前方互換保険）** — deck/project バンドルに schema version を埋め込む。後付けは困難だが初回リリースのスコープ外（着手時に検討）。
 - **未追跡テンプレ資産** — `public/templates/slide/` に会社系 `.potx`（未追跡6）＋`CX_sample_MSGothic.pptx`（gitignore 済のローカル fixture）が残置。↑「テンプレ資産の棚卸」で束ねる/整理を決める（scratch の一時テストは都度削除済）。
 - **column 内 table の認識（小改修）** — separator レイアウト（col/card/kpi/step）の各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`extractFencedBlock` のみ・`findTableInLines` 未適用）。列内テーブルを native table として拾う（[ADR-0020](adr/0020-image-embedding.md) 敵対レビューで確認・画像とは独立）。触点: `md-slide-parser.ts` separator 分岐。
+- **混在スライドの本文＋表の同時保持（B1・他AI報告・敵対検証 2026-07-07）** — リード段落（非箇条書き）＋key-value 箇条書きの混在スライドで `convert_bullets_to_table` を掛けると、後段 `parseMd`（`md-slide-parser.ts` の table-vs-text 二択）がリード段落を**無言 drop**（never-silent 方針と不整合・undo 復旧可）。真因はツールでなく**共有パーサ**（同 drop は Markdown インポート等パーサ全経路で起こりうる）。診断が混在スライドで convert を推奨するのが引き金（`deck-diagnostics.ts:86` が bullet だけ数える）。根本策＝パーサが text+table 共存保持（共有経路・**golden 検証必須**）／安全策＝混在時は convert 非推奨 or ツールが警告返し。↑「column 内 table の認識」と同触点。
+- **new_project のタブ名導出（B4・他AI報告・小）** — host モードの `new_project` は tab title を常に「Untitled」化（`session.ts` が templateName を "" にリセット→`registry.create(..., "Untitled")`）。先頭スライド見出しから導出する純粋ヘルパ（`md-serializer` の getPlaceholderText 再利用）を `server.ts openInHost` に配線。※ bytes 持込では templateName 空は正しい挙動・`use_template`/`open_project` は既にタブ名あり・GUI の `.scft` open 側（`projectTitleFromFileName`）は別系統で対応済。golden 非影響。敵対検証 2026-07-07。
 - **最背面画像のプレビュー直接ドラッグ（小）** — 最背面レイヤーはハンドルが content の下に隠れるため現状フォーム編集のみ。編集 chrome（枠線＋角ハンドル）だけを前面 overlay 化してドラッグ/リサイズを再有効化（[ADR-0020](adr/0020-image-embedding.md)）。
 - **ステップ/グループセル内の Markdown 整形（要調査）** — separator レイアウト（`<!-- step -->` 等）の各セル内で `## 見出し` が生の `##` のまま表示され、箇条書きの記号（`-`）も落ちて見える（プレビュー実レンダで確認・図形描画の検証中に発見）。セル本文を素テキスト化しているためと推測。**仕様か不具合か切り分けが要る**。触点: `md-slide-parser.ts` の separator 分岐＋group セルのレンダリング。
