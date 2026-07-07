@@ -125,6 +125,66 @@ interface SlideCardProps {
   exportMode?: boolean;
 }
 
+// PowerPoint preset shapes → SVG polygon points (in a 0–100 box, stretched to the shape's rect).
+// Covers the presets bundled templates actually use (arrows / triangles / chevrons / polygons).
+const DECO_POLYGONS: Record<string, string> = {
+  triangle: "50,0 100,100 0,100",
+  rtTriangle: "0,0 0,100 100,100",
+  diamond: "50,0 100,50 50,100 0,50",
+  pentagon: "50,0 100,38 82,100 18,100 0,38",
+  hexagon: "25,0 75,0 100,50 75,100 25,100 0,50",
+  rightArrow: "0,30 60,30 60,10 100,50 60,90 60,70 0,70",
+  leftArrow: "100,30 40,30 40,10 0,50 40,90 40,70 100,70",
+  upArrow: "30,100 30,40 10,40 50,0 90,40 70,40 70,100",
+  downArrow: "30,0 70,0 70,60 90,60 50,100 10,60 30,60",
+  chevron: "0,0 75,0 100,50 75,100 0,100 25,50",
+  homePlate: "0,0 70,0 100,50 70,100 0,100",
+  parallelogram: "25,0 100,0 75,100 0,100",
+  trapezoid: "25,0 75,0 100,100 0,100",
+};
+
+/** Render one decorative shape. custGeom → SVG path; preset polygon → SVG polygon; ellipse → a true
+ *  ellipse (border-radius 50%); rect/round-rect (and unknown presets) → a div. Shared by preview +
+ *  HTML export (SlideCard is SSR'd), so the two never diverge. */
+function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
+  const pos: React.CSSProperties = {
+    position: "absolute",
+    left: `${(d.x / SLIDE_W) * 100}%`,
+    top: `${(d.y / SLIDE_H) * 100}%`,
+    width: `${(d.w / SLIDE_W) * 100}%`,
+    height: `${(d.h / SLIDE_H) * 100}%`,
+  };
+  const fill = `#${d.color}`;
+  const stroke = d.border ? `#${d.border}` : "none";
+  const strokeWidth = d.border ? Math.max(1, 0.014 * scale) : 0;
+  if (d.path && d.pathViewBox) {
+    return (
+      <svg key={key} style={pos} viewBox={d.pathViewBox} preserveAspectRatio="none">
+        <path d={d.path} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      </svg>
+    );
+  }
+  if (d.prst && DECO_POLYGONS[d.prst]) {
+    return (
+      <svg key={key} style={pos} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points={DECO_POLYGONS[d.prst]} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      </svg>
+    );
+  }
+  const borderRadius = d.prst === "ellipse" ? "50%" : d.radius ? d.radius * scale : undefined;
+  return (
+    <div
+      key={key}
+      style={{
+        ...pos,
+        backgroundColor: fill,
+        ...(borderRadius ? { borderRadius } : {}),
+        ...(d.border ? { border: `${strokeWidth}px solid #${d.border}` } : {}),
+      }}
+    />
+  );
+}
+
 function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
@@ -250,22 +310,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterDecorations
       }}
     >
       {/* Decorative shapes: the MASTER's own shapes first (a base layer under every layout), then the
-          layout's — fill + optional rounded corners + outline. */}
-      {[...(masterDecorations ?? []).map((d) => ["m", d] as const), ...(layout?.decorations ?? []).map((d) => ["l", d] as const)].map(([src, d], i) => (
-        <div
-          key={`deco-${src}-${i}`}
-          style={{
-            position: "absolute",
-            left: `${(d.x / SLIDE_W) * 100}%`,
-            top: `${(d.y / SLIDE_H) * 100}%`,
-            width: `${(d.w / SLIDE_W) * 100}%`,
-            height: `${(d.h / SLIDE_H) * 100}%`,
-            backgroundColor: `#${d.color}`,
-            ...(d.radius ? { borderRadius: d.radius * scale } : {}),
-            ...(d.border ? { border: `${Math.max(1, 0.014 * scale)}px solid #${d.border}` } : {}),
-          }}
-        />
-      ))}
+          layout's. Rect/round-rect/ellipse render as divs; preset polygons (arrows/triangles/…) and
+          custom geometry (custGeom) render as SVG so a template's real shapes aren't collapsed to boxes. */}
+      {[...(masterDecorations ?? []), ...(layout?.decorations ?? [])].map((d, i) => renderDeco(d, `deco-${i}`, scale))}
 
       {/* Logos / graphics (<p:pic>): master's first, then the layout's — data-URI images painted above
           the decorative bars (so a corner logo sits on top), below the content placeholders. */}

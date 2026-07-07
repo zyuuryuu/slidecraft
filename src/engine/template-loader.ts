@@ -48,6 +48,9 @@ export interface DecoRect {
   color: string; // fill hex without #
   radius?: number; // corner radius in inches (roundRect / ellipse) — for a faithful preview
   border?: string; // outline color hex without # (a bordered/white card would otherwise vanish)
+  prst?: string; // prstGeom preset (ellipse / triangle / rightArrow / chevron …). undefined ⇒ rect.
+  path?: string; // custGeom → an SVG path drawn in a viewBox stretched to w×h (preserveAspectRatio=none)
+  pathViewBox?: string; // "0 0 W H" for `path` (the custGeom path space)
 }
 
 /** Static (non-placeholder) text on a layout/master — design labels like a cover's "日付 / 部署 /
@@ -338,9 +341,31 @@ function shapeLineColor(spPr: string, theme: Record<string, string>): string | u
 /** Corner radius (inches) for the preview: ellipse → half the min side; roundRect → ~12% of it. */
 function cornerRadius(spPr: string, w: number, h: number): number | undefined {
   const prst = spPr.match(/<a:prstGeom prst="(\w+)"/)?.[1];
-  if (prst === "ellipse") return Math.min(w, h) / 2;
   if (prst === "roundRect") return Math.min(w, h) * 0.12;
-  return undefined;
+  return undefined; // ellipse now renders as a true ellipse (prst-driven), not a px radius
+}
+
+/** Convert a shape's <a:custGeom> pathLst into an SVG path (+ its path-space viewBox), so a
+ *  brand's freeform decoration renders faithfully instead of collapsing to a rectangle. Handles
+ *  moveTo / lnTo / cubic|quadBezTo / close; arcTo segments are skipped (rare in design shapes). */
+function parseCustGeom(spPr: string): { path: string; viewBox: string } | undefined {
+  const pathEl = spPr.match(/<a:custGeom>[\s\S]*?<a:path\b([^>]*)>([\s\S]*?)<\/a:path>/);
+  if (!pathEl) return undefined;
+  const w = pathEl[1].match(/\bw="(\d+)"/)?.[1];
+  const h = pathEl[1].match(/\bh="(\d+)"/)?.[1];
+  if (!w || !h || w === "0" || h === "0") return undefined;
+  const pts = (s: string) => [...s.matchAll(/<a:pt x="(-?\d+)" y="(-?\d+)"\s*\/>/g)].map((m) => `${m[1]} ${m[2]}`);
+  let d = "";
+  for (const cmd of pathEl[2].match(/<a:(moveTo|lnTo|cubicBezTo|quadBezTo|arcTo|close)\b[^>]*(?:\/>|>[\s\S]*?<\/a:\1>)/g) || []) {
+    const type = cmd.match(/<a:(\w+)/)?.[1];
+    const p = pts(cmd);
+    if (type === "moveTo" && p[0]) d += `M${p[0]} `;
+    else if (type === "lnTo" && p[0]) d += `L${p[0]} `;
+    else if (type === "cubicBezTo" && p.length >= 3) d += `C${p[0]} ${p[1]} ${p[2]} `;
+    else if (type === "quadBezTo" && p.length >= 2) d += `Q${p[0]} ${p[1]} `;
+    else if (type === "close") d += "Z ";
+  }
+  return d.trim() ? { path: d.trim(), viewBox: `0 0 ${w} ${h}` } : undefined;
 }
 
 function extractDecorations(layoutXml: string, theme: Record<string, string>): DecoRect[] {
@@ -361,6 +386,8 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
 
     const w = emuToInch(extMatch[1]);
     const h = emuToInch(extMatch[2]);
+    const prst = spPr.match(/<a:prstGeom prst="(\w+)"/)?.[1];
+    const cust = !prst || prst === "custGeom" ? parseCustGeom(spPr) : undefined;
     decos.push({
       x: emuToInch(offMatch[1]),
       y: emuToInch(offMatch[2]),
@@ -369,6 +396,8 @@ function extractDecorations(layoutXml: string, theme: Record<string, string>): D
       color: fill ?? "FFFFFF", // border-only card → white fill so its outline still frames content
       radius: cornerRadius(spPr, w, h),
       border,
+      ...(prst && prst !== "rect" && prst !== "roundRect" ? { prst } : {}),
+      ...(cust ? { path: cust.path, pathViewBox: cust.viewBox } : {}),
     });
   }
 
