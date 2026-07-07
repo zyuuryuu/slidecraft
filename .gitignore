@@ -47,3 +47,6 @@ src-tauri/*.cdx.json
 # VitePress build output
 docs/.vitepress/dist
 docs/.vitepress/cache
+
+# Local-only company template fixture (IP-stripped shell; not committed)
+public/templates/slide/CX_sample_MSGothic.pptx

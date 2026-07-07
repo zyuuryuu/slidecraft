@@ -10,7 +10,7 @@
  * NO typed meta) opts out, so its body-typed idx-10..16 placeholders read as real content.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
@@ -22,9 +22,13 @@ const DIR = resolve(__dirname, "../public/templates/slide");
 const CX = resolve(DIR, "CX_sample_MSGothic.pptx");
 const CANON = resolve(DIR, "Midnight_Executive_30_TemplateOnly.pptx");
 const REPORT = resolve(DIR, "報告書テンプレート.potx");
+// CX Sample + the report .potx are LOCAL-ONLY, IP-stripped company templates (gitignored). Skip the
+// tests that need them when they're absent (CI) — they still run for anyone who has the fixture.
+const HAS_CX = existsSync(CX);
+const HAS_REPORT = existsSync(REPORT);
 
 describe("usesMetaIdxConvention — only OUR masters opt in", () => {
-  it("bare third-party master (CX: plain names, no typed sldNum/dt/ftr) opts OUT", async () => {
+  it.skipIf(!HAS_CX)("bare third-party master (CX: plain names, no typed sldNum/dt/ftr) opts OUT", async () => {
     const tpl = await loadTemplate(readFileSync(CX));
     expect(usesMetaIdxConvention(tpl.layouts)).toBe(false);
   });
@@ -32,13 +36,13 @@ describe("usesMetaIdxConvention — only OUR masters opt in", () => {
     const tpl = await loadTemplate(readFileSync(CANON));
     expect(usesMetaIdxConvention(tpl.layouts)).toBe(true);
   });
-  it("template-writer output (typed sldNum/dt/ftr meta) opts IN", async () => {
+  it.skipIf(!HAS_REPORT)("template-writer output (typed sldNum/dt/ftr meta) opts IN", async () => {
     const tpl = await loadTemplate(readFileSync(REPORT));
     expect(usesMetaIdxConvention(tpl.layouts)).toBe(true);
   });
 });
 
-describe("CX Sample master — preview/HTML background (inverted theme)", () => {
+describe.skipIf(!HAS_CX)("CX Sample master — preview/HTML background (inverted theme)", () => {
   it("masterBgColor comes from the real <p:bg> (bg2→lt2=white), NOT themeColors.bg1 (lt1=navy)", async () => {
     // CX inverts the theme: clrMap bg1→lt1=#0D274D(dark), bg2→lt2=#FFFFFF(white); the master's actual
     // <p:bg> is schemeClr bg2 = white. Deriving the preview bg from themeColors.bg1 painted every
@@ -50,7 +54,7 @@ describe("CX Sample master — preview/HTML background (inverted theme)", () => 
   });
 });
 
-describe("CX Sample master flows through the harness", () => {
+describe.skipIf(!HAS_CX)("CX Sample master flows through the harness", () => {
   let tpl: TemplateData;
   let cat: LayoutCatalog;
   beforeAll(async () => {

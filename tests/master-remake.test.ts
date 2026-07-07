@@ -5,7 +5,7 @@
  * fills content — dissolving the third-party idx/contrast quirks from ADR-0023 by construction.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
@@ -17,9 +17,25 @@ import { parseMd } from "../src/engine/md-parser";
 import { luminance } from "../src/engine/ooxml-resolve";
 
 const CX = resolve(__dirname, "../public/templates/slide/CX_sample_MSGothic.pptx");
+// CX Sample is a LOCAL-ONLY, IP-stripped company template (gitignored) — skip when absent (CI).
+const HAS_CX = existsSync(CX);
+const CANON = resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx");
 const contrast = (a: string, b: string) => Math.abs(luminance(a) - luminance(b));
 
-describe("masterToTemplateSpec — extract theme from a real master", () => {
+// CI-covered path using a TRACKED master (canonical), so Re-make is verified without the CX fixture.
+describe("Re-make round-trip on a bundled master (CI-covered)", () => {
+  it("extracts fonts + a contrast-safe palette and mints a healthy template", async () => {
+    const src = await loadTemplate(readFileSync(CANON));
+    const spec = masterToTemplateSpec(src, { name: "Canon Re-make" });
+    expect(spec.fonts.major).toBeTruthy();
+    expect(contrast(spec.palette.titleText, spec.palette.background)).toBeGreaterThan(0.3);
+    expect(contrast(spec.palette.bodyText, spec.palette.canvas)).toBeGreaterThan(0.3);
+    const remade = await loadTemplate(await writeTemplate(spec));
+    expect(assessTemplateHealth(buildCatalog(remade)).status).not.toBe("rejected");
+  });
+});
+
+describe.skipIf(!HAS_CX)("masterToTemplateSpec — extract theme from a real master", () => {
   let cx: TemplateData;
   beforeAll(async () => {
     cx = await loadTemplate(readFileSync(CX));
@@ -46,7 +62,7 @@ describe("masterToTemplateSpec — extract theme from a real master", () => {
   });
 });
 
-describe("Re-make round-trip — the minted template is healthy + fills content", () => {
+describe.skipIf(!HAS_CX)("Re-make round-trip — the minted template is healthy + fills content", () => {
   let remade: TemplateData;
   beforeAll(async () => {
     const cx = await loadTemplate(readFileSync(CX));
