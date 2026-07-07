@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
-import { insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo, blankSlide } from "../src/engine/deck-structure";
+import { insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo, blankSlide, addBlankSlide } from "../src/engine/deck-structure";
 
 const s = (title: string, extra: Partial<SlideIR> = {}): SlideIR => ({
   layout: "auto",
@@ -26,6 +26,21 @@ describe("insertSlideAt", () => {
   it("inserts before, and clamps an out-of-range index into the deck", () => {
     expect(insertSlideAt(deck("A", "B"), 0, s("X"), "before").at).toBe(0);
     expect(insertSlideAt(deck("A"), 9, s("X"), "after").at).toBe(1); // clamped to end
+  });
+});
+
+describe("addBlankSlide (＋ works on an EMPTY app)", () => {
+  it("mints a one-slide deck when the deck is null (blank start — no Markdown yet)", () => {
+    const { deck: out, at } = addBlankSlide(null, 0);
+    expect(at).toBe(0);
+    expect(out.slides.length).toBe(1); // a real deck now exists → preview renders it, editor edits it
+    expect(out.slides[0]).toEqual(blankSlide());
+  });
+  it("adds after the active slide on a non-empty deck (unchanged behavior)", () => {
+    const d = deck("A", "B");
+    const { deck: out, at } = addBlankSlide(d, 0);
+    expect(at).toBe(1);
+    expect(titles(out)).toEqual(["A", undefined, "B"]);
   });
 });
 

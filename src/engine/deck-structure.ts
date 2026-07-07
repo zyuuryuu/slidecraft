@@ -31,6 +31,14 @@ export function insertSlideAt(deck: DeckIR, index: number, slide: SlideIR, posit
   return { deck: { ...deck, slides }, at };
 }
 
+/** Add a blank slide after `activeSlide`. When `deck` is null — the app started EMPTY (no default
+ *  sample), so there is no deck yet — this MINTS a one-slide deck, so the "＋ add slide" button works
+ *  before any Markdown is written (previously it no-oped on a null deck). */
+export function addBlankSlide(deck: DeckIR | null, activeSlide: number): { deck: DeckIR; at: number } {
+  if (!deck) return { deck: { slides: [blankSlide()] }, at: 0 };
+  return insertSlideAt(deck, activeSlide, blankSlide(), "after");
+}
+
 /** Delete the slide at `index`. Returns null (rejected) when it is the LAST slide (a deck needs ≥1) or
  *  the index is out of range — the caller surfaces that as a never-silent notice. */
 export function deleteSlideAt(deck: DeckIR, index: number): DeckIR | null {

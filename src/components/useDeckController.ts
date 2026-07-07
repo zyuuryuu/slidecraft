@@ -12,7 +12,7 @@ import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
-import { blankSlide, insertSlideAt, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
+import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
@@ -334,8 +334,8 @@ export function useDeckController() {
   // ── Slide STRUCTURE (add / delete / duplicate) — undo-able, via the shared deck-structure ops so the
   // GUI and MCP never diverge. Gated while collab-locked (observe-only: the host owns structure there). ──
   const handleAddSlide = useCallback(() => {
-    if (editLockedRef.current || !deck) return;
-    const { deck: next, at } = insertSlideAt(deck, activeSlide, blankSlide(), "after");
+    if (editLockedRef.current) return; // works even on an EMPTY deck (mints the first slide)
+    const { deck: next, at } = addBlankSlide(deck, activeSlide);
     setDeck(next, "commit");
     setActiveSlide(at);
     setSelected(new Set([at]));
