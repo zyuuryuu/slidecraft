@@ -3,7 +3,9 @@
   "bundle": {
     "externalBin": ["binaries/node", "binaries/llamafile"],
     "resources": {
-      "../dist/mcp/host.cjs": "host.cjs"
+      "../dist/mcp/host.cjs": "host.cjs",
+      "../dist/mcp/cli.cjs": "cli.cjs",
+      "../scripts/slidecraft-mcp": "slidecraft-mcp"
     },
     "macOS": {
       "signingIdentity": "-",

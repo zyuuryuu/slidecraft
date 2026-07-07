@@ -7,7 +7,13 @@
 
 ## [Unreleased]
 
-（次リリースの変更をここに追記）
+### Added
+
+- **MCP サーバをアプリに同梱**（ADR-0022）— 配布インストーラに自己完結した MCP サーバ（`cli.cjs`）と Node ランタイムを同梱。上流 AI（Claude Code / Cursor / Claude Desktop）から **ソースのビルドもシステム Node も不要**で SlideCraft を駆動できる。macOS は Homebrew cask が `slidecraft-mcp` を PATH に登録（`claude mcp add slidecraft -- slidecraft-mcp`）。Windows/Linux は同梱 node ＋ `cli.cjs` を直接登録（正確なパスはインストール先を要確認・現状未検証）。
+
+### Fixed
+
+- `update-cask.mjs` が arm64-only（sha256 1 行）のテンプレートで失敗する潜在バグを是正（1〜2 行を許容）。
 
 ## [0.1.0] - 2026-07-07
 

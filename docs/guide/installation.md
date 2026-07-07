@@ -90,6 +90,10 @@ brew install --cask slidecraft
 macOS 15（Sequoia）以降では、従来の「右クリック →『開く』」だけでは通らなくなっており、上記の **システム設定 →「このまま開く」** が確実な方法です。これは未ノータライズアプリ全般の挙動で、根本解決は Developer-ID 署名＋ノータライズ（$99・下記「将来」）です。
 :::
 
+::: tip AI エージェントから使う（ビルド不要）
+Homebrew でインストールすると、上流 AI（Claude Code / Cursor / Claude Desktop）から SlideCraft を駆動する MCP サーバも**同梱・PATH 登録**されます（v0.1.1 以降）。ソースの clone もシステム Node も不要で、`claude mcp add slidecraft -- slidecraft-mcp` で登録できます。詳細は [MCP ガイド](/guide/mcp) を参照してください。
+:::
+
 ::: warning macOS で直接 .dmg を開く場合の初回注意
 Homebrew を使わず `.dmg` を直接ダウンロードすると quarantine 属性が残るため、Gatekeeper が
 「"SlideCraft" は壊れているため開けません」または「開発元を確認できません」と表示して**そのままではブロック**します。

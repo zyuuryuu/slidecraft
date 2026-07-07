@@ -1,0 +1,32 @@
+#!/bin/sh
+# slidecraft-mcp — launch the bundled SlideCraft MCP server with the bundled Node runtime.
+#
+# Ships INSIDE SlideCraft.app (Contents/Resources/slidecraft-mcp) and is placed on PATH by the
+# Homebrew cask's `binary` stanza. It needs NO system Node: it execs the Node runtime and the
+# self-contained MCP server (cli.cjs) that ship inside the app. Register it in an upstream agent:
+#
+#   claude mcp add slidecraft -- slidecraft-mcp
+#   # or, in a mcp.json:  {"command": "slidecraft-mcp"}
+#
+# The MCP server talks stdio JSON-RPC (--no-fs: .slidecraft/.pptx bytes flow as base64), so the
+# trust boundary is just the agent that spawned it — no network, no filesystem writes.
+
+# Resolve this script's REAL path. Homebrew installs it as a symlink in <prefix>/bin, so $0 is the
+# symlink; follow the chain (POSIX, no `readlink -f` which BSD/macOS historically lacks) to the
+# actual file inside the .app before computing sibling paths.
+target="$0"
+while [ -h "$target" ]; do
+  dir="$(cd "$(dirname "$target")" && pwd)"
+  link="$(readlink "$target")"
+  case "$link" in
+    /*) target="$link" ;;
+    *) target="$dir/$link" ;;
+  esac
+done
+here="$(cd "$(dirname "$target")" && pwd)" # .../SlideCraft.app/Contents/Resources
+
+node="$here/../MacOS/node" # the bundled Node externalBin sits in Contents/MacOS (sibling of Resources)
+cli="$here/cli.cjs"        # the self-contained MCP server bundled next to this script
+
+[ -x "$node" ] || node="node" # fall back to a PATH node if the bundle layout ever differs
+exec "$node" "$cli" "$@"

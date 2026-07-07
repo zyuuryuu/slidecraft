@@ -45,22 +45,46 @@ async function sha256(arch, localPath) {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-const armSha = await sha256("aarch64", armLocal);
-const intelSha = await sha256("x64", intelLocal);
-
 let cask = readFileSync(caskPath, "utf8");
-cask = cask.replace(/version "[^"]*"/, `version "${version}"`);
 
-// Rewrite the sha256 inside each on_arch block (order in the file: on_arm, then on_intel).
-let seen = 0;
-cask = cask.replace(/sha256 "[0-9a-f]{64}"( # [^\n]*)?/g, () => {
-  const sha = seen++ === 0 ? armSha : intelSha;
-  return `sha256 "${sha}"`;
-});
-if (seen !== 2) {
-  console.error(`update-cask: expected 2 sha256 lines in the cask, patched ${seen}. Check the template.`);
+// Fail-closed guard: the `slidecraft-mcp` binary stanza only works on .dmgs that BUNDLE the wrapper,
+// which first ships in v0.1.1 (ADR-0022). Refuse to emit a cask that pairs that stanza with an older
+// version — otherwise `brew install` would fail on the missing binary target. Blocks the footgun of
+// re-cutting the cask for v0.1.0 while the source template already carries the stanza.
+const MIN_LAUNCHER_VERSION = [0, 1, 1];
+const hasLauncherStanza = /binary\s+["'][^"']*slidecraft-mcp["']/.test(cask);
+const semver = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10));
+// negative if a < b, 0 if equal, positive if a > b (missing components treated as 0)
+const cmpVersion = (a, b) => {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+};
+if (hasLauncherStanza && (semver.some(Number.isNaN) || cmpVersion(semver, MIN_LAUNCHER_VERSION) < 0)) {
+  console.error(
+    `update-cask: refusing to emit a cask with the slidecraft-mcp launcher for version "${version}". ` +
+      `That launcher first ships in v${MIN_LAUNCHER_VERSION.join(".")} (ADR-0022); an older .dmg lacks it and brew install would fail.`,
+  );
   process.exit(1);
 }
+
+cask = cask.replace(/version "[^"]*"/, `version "${version}"`);
+
+// The cask may be arm64-only (1 sha256) or arm+intel (2, order: on_arm then on_intel). Match the
+// current template so we don't download an Intel .dmg that isn't built.
+const shaCount = (cask.match(/sha256 "[0-9a-f]{64}"/g) ?? []).length;
+if (shaCount < 1 || shaCount > 2) {
+  console.error(`update-cask: expected 1 (arm64-only) or 2 (arm+intel) sha256 lines, found ${shaCount}. Check the template.`);
+  process.exit(1);
+}
+const armSha = await sha256("aarch64", armLocal);
+const intelSha = shaCount === 2 ? await sha256("x64", intelLocal) : null;
+
+// Rewrite each sha256 in file order (arm first, intel second if present).
+let seen = 0;
+cask = cask.replace(/sha256 "[0-9a-f]{64}"( # [^\n]*)?/g, () => `sha256 "${seen++ === 0 ? armSha : intelSha}"`);
 
 writeFileSync(caskPath, cask);
 console.log(`Updated ${caskPath}`);

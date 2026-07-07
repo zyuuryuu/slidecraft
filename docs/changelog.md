@@ -6,6 +6,12 @@ SlideCraft の主要な変更点です。形式は [Keep a Changelog](https://ke
 - 完全な変更履歴：[CHANGELOG.md](https://github.com/zyuuryuu/slidecraft/blob/main/CHANGELOG.md)
 - 出荷済み機能の網羅ログ：[shipped.md](https://github.com/zyuuryuu/slidecraft/blob/main/docs/shipped.md)
 
+## [Unreleased]
+
+### 追加
+
+- **MCP サーバをアプリに同梱** — 配布インストーラに自己完結した MCP サーバと Node ランタイムを同梱。上流 AI（Claude Code / Cursor / Claude Desktop）から**ソースのビルドもシステム Node も不要**で SlideCraft を駆動できるように。macOS は Homebrew が `slidecraft-mcp` を PATH に登録（`claude mcp add slidecraft -- slidecraft-mcp`）。詳細は [MCP ガイド](/guide/mcp)。
+
 ## [0.1.0] — 2026-07-07
 
 初回パブリックリリース（早期版）。

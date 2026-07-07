@@ -11,35 +11,55 @@
 
 ---
 
-## ビルドと起動
+## 使い方は 2 通り
+
+MCP サーバはアプリに**同梱**されているので、通常はビルド不要です。開発者はソースから起動もできます。
+
+### A. パッケージ版から使う（ビルド不要・推奨）
+
+配布インストーラ（brew / .msi / .AppImage）には、**自己完結した MCP サーバ（`cli.cjs`）と Node ランタイムが同梱**されています。システムに Node が無くても、ソースを clone しなくても動きます（v0.1.1 以降）。
+
+**macOS（Homebrew）** — cask が `slidecraft-mcp` を PATH に置くので、そのまま登録できます：
 
 ```bash
-npm install
-npm run build:mcp        # → dist/mcp/cli.js を生成（esbuild, Node ESM）
-node dist/mcp/cli.js      # stdio で MCP サーバとして待機（通常はエージェントが spawn する）
+brew install --cask zyuuryuu/slidecraft/slidecraft   # 済みなら不要
+claude mcp add slidecraft -- slidecraft-mcp
 ```
 
-`--root` を渡すと現状はエラー終了する（scoped fs は次バージョン）。v1 は `--no-fs` のみ。
-
----
-
-## エージェントへの接続（例：Claude Desktop）
-
-`claude_desktop_config.json` の `mcpServers` に登録する（パスは絶対パス）：
+**macOS** はランチャを使わず**直接**登録することもできます（同梱 node ＋ 同梱 cli.cjs を指す。パスは検証済み）：
 
 ```json
 {
   "mcpServers": {
     "slidecraft": {
-      "command": "node",
-      "args": ["/absolute/path/to/slidecraft/dist/mcp/cli.js"]
+      "command": "/Applications/SlideCraft.app/Contents/MacOS/node",
+      "args": ["/Applications/SlideCraft.app/Contents/Resources/cli.cjs"]
     }
   }
 }
 ```
 
-Claude Code なら `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`
-相当の登録でよい。登録後、エージェントから下記ツールが見える。
+**Windows / Linux** — 同梱 node と `cli.cjs` はインストール先（アプリ本体と同じフォルダ、および `resources/` サブフォルダ）に入っています。ただし**正確なパスはインストーラ・バージョンで変わり、現状デバイス未検証**です（アプリのバイナリ名は `diagram-pipeline-desktop` で、Linux の `.deb`/`.rpm` はこの名前のディレクトリ配下に入る可能性が高い）。次のいずれかを推奨します:
+
+- インストール先を実際に確認し、`cli.cjs`（`resources/` 配下）と `node`（アプリ本体と同階層）の絶対パスを見つけて登録する。
+- 分からなければ**ソースからの起動（B）**を使う（確実）。
+- AppImage は展開先が起動ごとに変わるため、直接パス指定は不向き → **B** を使う。
+
+> Windows/Linux 向けの PATH ランチャ（macOS の `slidecraft-mcp` 相当）は follow-up 予定です。
+
+### B. ソースから起動（開発版）
+
+```bash
+npm install
+npm run build:mcp        # → dist/mcp/cli.js を生成（esbuild, Node ESM。node_modules は外部化＝リポジトリ内で実行）
+node dist/mcp/cli.js      # stdio で MCP サーバとして待機（通常はエージェントが spawn する）
+```
+
+登録は `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js` 相当。
+
+> **`build:mcp`（B）** は node_modules を外部化した開発用（リポジトリ内でのみ動く）。**アプリ同梱（A）** は `build:mcp:bundled` で全依存を内包した `cli.cjs`。用途が違うので混同しないこと。
+
+`--root` を渡すと現状はエラー終了する（scoped fs は次バージョン）。v1 は `--no-fs` のみ。登録後、エージェントから下記ツールが見える。
 
 ---
 

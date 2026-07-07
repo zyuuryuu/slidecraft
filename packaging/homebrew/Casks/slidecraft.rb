@@ -32,6 +32,22 @@ cask "slidecraft" do
 
   app "SlideCraft.app"
 
+  # Put the bundled MCP server launcher on PATH so an upstream agent (Claude Code / Cursor / Claude
+  # Desktop) can drive SlideCraft with NO source build and NO system Node — `slidecraft-mcp` execs the
+  # Node runtime + the self-contained MCP server (cli.cjs) that ship inside the .app. Register with:
+  #   claude mcp add slidecraft -- slidecraft-mcp
+  # NOTE: the wrapper exists only in v0.1.1+ .dmgs. Do NOT ship this stanza in a cask that still points
+  # at the v0.1.0 .dmg (which lacks it) — `brew install` fails on the missing binary target.
+  binary "#{appdir}/SlideCraft.app/Contents/Resources/slidecraft-mcp"
+
+  # Belt-and-suspenders: guarantee the launcher is executable regardless of how resources were packed.
+  # `system_command` is the supported cask-DSL way to run a helper from a postflight block; `chmod +x`
+  # is idempotent and harmless if the executable bit is already set.
+  postflight do
+    system_command "/bin/chmod",
+                   args: ["+x", "#{appdir}/SlideCraft.app/Contents/Resources/slidecraft-mcp"]
+  end
+
   # Remove user data + the auto-downloaded offline-AI model (~2.4 GB) on `brew uninstall --zap`.
   zap trash: [
     "~/Library/Application Support/com.slidecraft.desktop",

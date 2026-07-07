@@ -16,6 +16,7 @@
     "tauri:wsl": "bash scripts/tauri-dev-wsl.sh",
     "typecheck:mcp": "tsc -p tsconfig.mcp.json",
     "build:mcp": "esbuild src/mcp/cli.ts --bundle --platform=node --format=esm --outfile=dist/mcp/cli.js --packages=external --banner:js='#!/usr/bin/env node'",
+    "build:mcp:bundled": "esbuild src/mcp/cli.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist/mcp/cli.cjs",
     "build:host": "esbuild src/mcp/host-main.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist/mcp/host.cjs",
     "stage-node": "node scripts/stage-node.mjs",
     "stage-llamafile": "node scripts/stage-llamafile.mjs",
