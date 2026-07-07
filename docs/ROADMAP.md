@@ -66,6 +66,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 ## 保留中の依存・運用
 
 - **js-yaml v5 更新** — dependabot **PR #13（OPEN）**：`js-yaml` 4.3.0 → 5.2.0。破壊的変更の確認待ち。
+- **npm audit の残（dev 専用・容認）** — アプリ側の `esbuild` は 0.28.1（安全）へ更新済。残る3件は**すべて `vitepress`（docs 生成）チェーン**（`vitepress@1.6.4 → vite@5.4.21 → esbuild@0.21.5`・`fixAvailable:false`＝上流に修正版なし）。**devDependency で出荷アプリ・アプリ dev サーバには非含有**（docs は静的 HTML 出力・esbuild は出力に入らない）。esbuild advisory は serve モード対象で vitepress はバンドラ利用＝実際上到達困難。解消は vitepress 2.x（未 stable）待ち or override（vite@5→8 は破壊的で不可）。容認。
 - **`.scft` 形式バージョニング（前方互換保険）** — deck/project バンドルに schema version を埋め込む。後付けは困難だが初回リリースのスコープ外（着手時に検討）。
 - **会社 `.potx` / CX の保管** — 会社系 `.potx`（7本）＋`CX_sample_MSGothic.pptx` は `tests/fixtures/templates/` に置き **gitignore**（知財・ローカル限定・skipIf テストのみ参照）。棚卸＋公式昇格＋public 退避は完了（→[shipped](shipped.md)）。
 - **column 内 table の認識（要注意・小改修ではない）** — separator レイアウトの各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`findTableInLines` 未適用）。**調査済（2026-07-07）**：`TableBlock` は既に `placeholderIdx` を持ち列スコープ可・パーサ側は数行追加で拾えるが、**シリアライザが `slide.table` を意図的に single-body 扱い**（`md-serializer.ts:195` `singleBodyFigure`＝パーサの table 再吸収を防ぐ設計）なので、素直に列 table を作ると round-trip で single-body に化ける。正しく直すにはシリアライザの separator 分岐で列位置に table を emit（diagram/mermaid の :215-222 と同様）＋`singleBodyFigure` ガードの見直しが要る。触点: `md-slide-parser.ts` 列 else 分岐＋`md-serializer.ts` separator 分岐。
