@@ -108,7 +108,7 @@ public/templates/    # スライドマスター (.pptx)
 
 ## ドキュメント
 
-- [ユーザーガイド](docs/user-guide.md) — 使い方（Markdown 記法・図・テンプレート・AI・出力）
+- 📖 **[ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)** — 使い方（インストール・スターター・Markdown・図・テンプレート・AI・MCP・FAQ）｜ソースは [docs/guide/](docs/guide/)・単一ファイル版は [docs/user-guide.md](docs/user-guide.md)
 - [アーキテクチャ決定記録 (ADR)](docs/adr/) — 決定済み＆実装済みの設計判断
 - [ロードマップ](docs/ROADMAP.md) — 前方向きの計画
 - [実装済みログ](docs/shipped.md) — 出荷済み機能の履歴
