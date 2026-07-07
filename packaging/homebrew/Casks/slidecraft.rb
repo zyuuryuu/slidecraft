@@ -38,6 +38,15 @@ cask "slidecraft" do
   #   claude mcp add slidecraft -- slidecraft-mcp
   # NOTE: the wrapper exists only in v0.2.0+ .dmgs. Do NOT ship this stanza in a cask that still points
   # at the v0.1.0 .dmg (which lacks it) — `brew install` fails on the missing binary target.
+  #
+  # `brew upgrade` order removes the old .app (leaving this symlink pointing at the replaced bundle)
+  # and then tries to relink — Homebrew refuses with "already a Binary at …" and reverts the whole
+  # upgrade. Clear any prior slidecraft-mcp symlink in preflight so the relink always succeeds.
+  # (rm_f is a no-op when it's absent, e.g. a first install.)
+  preflight do
+    FileUtils.rm_f "#{HOMEBREW_PREFIX}/bin/slidecraft-mcp"
+  end
+
   binary "#{appdir}/SlideCraft.app/Contents/Resources/slidecraft-mcp"
 
   # Belt-and-suspenders: guarantee the launcher is executable regardless of how resources were packed.
