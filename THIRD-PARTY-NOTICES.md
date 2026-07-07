@@ -13,7 +13,7 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 
 | ライセンス | 数 |
 | --- | --- |
-| MIT | 208 |
+| MIT | 209 |
 | ISC | 39 |
 | BSD-3-Clause | 8 |
 | Apache-2.0 | 7 |
@@ -22,13 +22,12 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 | Python-2.0 | 1 |
 | BSD-2-Clause | 1 |
 | MPL-2.0 OR Apache-2.0（Apache-2.0 を選択） | 1 |
-| ライセンス未判定（要リリース前確認） | 1 |
 
 主な直接依存：`react` / `react-dom`（MIT）・`@modelcontextprotocol/sdk`（MIT）・`@anthropic-ai/sdk`・`openai`（Apache-2.0）・`mermaid`（MIT）・`pptxgenjs`（MIT）・`jszip`（MIT or GPLv3 → MIT を選択）・`js-yaml`（MIT）・`zod`（MIT）・`@codemirror/*`（MIT）・`tailwindcss`（MIT）・`@tauri-apps/*`（MIT/Apache-2.0）。
 
 - 完全な依存リスト（バージョン・ライセンス付き）は **`npm run sbom`**（CycloneDX SBOM＝`sbom-npm.cdx.json`）で生成できる。
 - Apache-2.0 の npm コンポーネント（7件）に付属する NOTICE は、その配布物内の NOTICE として本ファイルが代替再現する。
-- 「ライセンス未判定 1件」はリリース前に SBOM で特定し本表を更新する。
+- 旧「ライセンス未判定 1件」は **`khroma@2.1.0`**（`mermaid` の推移的依存）と特定・解決済み。`package.json` に `license` フィールドが無い（作者の記載漏れ）ため自動 SPDX 判定が付かなかったが、同梱の `license` ファイルは MIT 全文（Copyright © Fabio Spampinato, Andrew Maney）で readme も "MIT" と明記 ⇒ **MIT** に計上（上表 MIT に含む）。
 
 ## 2. Rust クレート（Tauri バックエンド）
 
