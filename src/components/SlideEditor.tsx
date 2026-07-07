@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
@@ -95,6 +96,7 @@ function textToParagraphs(text: string): Paragraph[] {
 }
 
 export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout, suggestions, onChange }: SlideEditorProps) {
+  const { t } = useTranslation();
   // Layout is meta/structural (which master layout), changed rarely — collapse it by default so the
   // content fields lead; the header still shows the active layout, expand to change it.
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -236,7 +238,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   };
 
   // What the collapsed Layout header shows: the ACTIVE layout (Auto resolves to a concrete name).
-  const layoutLabel = slide.layout === "auto" ? (resolvedLayout ? `自動 → ${resolvedLayout}` : "自動") : slide.layout;
+  const layoutLabel = slide.layout === "auto" ? (resolvedLayout ? t("slideEditor.autoResolvedTo", { layout: resolvedLayout }) : t("slideEditor.auto")) : slide.layout;
 
   return (
     <div className="h-full overflow-auto p-3 flex flex-col gap-3">
@@ -263,7 +265,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
               onChange={(e) => updateLayout(e.target.value)}
               className="w-full px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg"
             >
-              <option value="auto">{resolvedLayout ? `自動 → ${resolvedLayout}` : "自動"}</option>
+              <option value="auto">{resolvedLayout ? t("slideEditor.autoResolvedTo", { layout: resolvedLayout }) : t("slideEditor.auto")}</option>
               {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
@@ -273,7 +275,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 toggle. Picking a candidate PINS it; ⟳Auto re-adapts (keeps slide.layout === "auto"). */}
             {suggestions && suggestions.length > 1 && (
               <div className="mt-1.5 flex flex-wrap gap-1 items-center">
-                <span className="text-[10px] text-faint">候補:</span>
+                <span className="text-[10px] text-faint">{t("slideEditor.candidates")}</span>
                 {suggestions.map((name, i) => {
                   const active = slide.layout === name;
                   return (
@@ -281,7 +283,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                       key={name}
                       type="button"
                       onClick={() => updateLayout(name)}
-                      title={i === 0 ? "Auto の第一候補（最良評価）" : "次点の候補レイアウト"}
+                      title={i === 0 ? t("slideEditor.topCandidateTitle") : t("slideEditor.nextCandidateTitle")}
                       className={`px-1.5 py-0.5 rounded text-[10px] border ${
                         active ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"
                       }`}
@@ -293,7 +295,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 <button
                   type="button"
                   onClick={() => updateLayout("auto")}
-                  title="自動選択に戻す（常に最良評価を選ぶ）"
+                  title={t("slideEditor.resetToAutoTitle")}
                   className={`px-1.5 py-0.5 rounded text-[10px] border ${
                     slide.layout === "auto" ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"
                   }`}
@@ -311,7 +313,9 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       {fields.map(({ phIdx, contentIdx }) => {
         const isGroup = !!groupPlan && /^[1-9]$/.test(phIdx);
         const over = isGroup && Number(phIdx) > groupPlan!.columns;
-        const label = isGroup ? `グループ ${phIdx}${over ? " ⚠超過（出力されません）" : ""}` : getLabel(phIdx, layout);
+        const label = isGroup
+          ? `${t("slideEditor.group", { n: phIdx })}${over ? ` ${t("slideEditor.groupOverflow")}` : ""}`
+          : getLabel(phIdx, layout);
         const currentText = paragraphsToText(
           slide.placeholders.find((p) => p.idx === contentIdx)?.paragraphs || [],
         );
@@ -330,7 +334,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
               onChange={(e) => updatePlaceholder(contentIdx, e.target.value)}
               rows={isGroup ? 4 : phIdx === "1" || phIdx === "2" ? 6 : 2}
               className="w-full mt-0.5 px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg font-mono resize-y"
-              placeholder={isGroup ? "### 見出し\n本文…" : label}
+              placeholder={isGroup ? t("slideEditor.groupPlaceholder") : label}
             />
           </div>
         );
@@ -353,18 +357,18 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           <div className="flex items-center gap-2">
             <img src={slide.image.src} alt={slide.image.alt} className="w-16 h-12 object-contain bg-field rounded shrink-0" />
             <div className="flex-1 min-w-0 text-xs">
-              <div className="text-fg2">🖼 画像{slide.image.alt ? ` — ${slide.image.alt}` : ""}</div>
+              <div className="text-fg2">{t("slideEditor.image")}{slide.image.alt ? ` — ${slide.image.alt}` : ""}</div>
               {/* WHERE it sits: a backmost layer (最背面, behind the content) or WHICH placeholder it fills. */}
-              <div className="truncate text-faint" title="貼り付け/ドロップで差し替え">
+              <div className="truncate text-faint" title={t("slideEditor.replaceByPasteDrop")}>
                 {slide.image.behind
-                  ? "▤ 最背面レイヤー（既存の後ろ）"
-                  : imagePh ? `→ ${getLabel(imagePh.idx, layout)}（idx ${imagePh.idx}）` : "貼り付け/ドロップで差し替え"}
+                  ? t("slideEditor.backmostLayer")
+                  : imagePh ? t("slideEditor.boundToPlaceholder", { label: getLabel(imagePh.idx, layout), idx: imagePh.idx }) : t("slideEditor.replaceByPasteDrop")}
               </div>
             </div>
             <button
               type="button"
               onClick={() => { const next = { ...slide }; delete next.image; onChange(next); }}
-              title="画像を削除"
+              title={t("slideEditor.deleteImage")}
               className="w-6 h-6 flex items-center justify-center rounded bg-field border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-xs shrink-0"
             >
               🗑
@@ -374,7 +378,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           {/* Size SLIDER — the primary size control (numeric is fiddly); scales in place, aspect-locked. */}
           {imgBox && (
             <div className="flex items-center gap-2 text-[10px] text-faint">
-              <span className="shrink-0">サイズ</span>
+              <span className="shrink-0">{t("slideEditor.size")}</span>
               <input
                 type="range"
                 min={0.5}
@@ -382,7 +386,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                 step={0.05}
                 value={Number(imgBox.w.toFixed(2))}
                 onChange={(e) => updateImageSize(e.target.valueAsNumber)}
-                title="ドラッグで拡大・縮小（中心を保ったまま）"
+                title={t("slideEditor.sizeSliderTitle")}
                 className="flex-1 accent-accent"
               />
               <span className="shrink-0 w-12 text-right tabular-nums">{Math.round((imgBox.w / SLIDE_IN.w) * 100)}%</span>
@@ -393,7 +397,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           {imgBox && (
             <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-faint">
               {(["x", "y", "w", "h"] as const).map((k) => (
-                <label key={k} className="flex items-center gap-0.5" title={k === "w" ? "幅" : k === "h" ? "高さ" : k === "x" ? "左位置" : "上位置"}>
+                <label key={k} className="flex items-center gap-0.5" title={k === "w" ? t("slideEditor.width") : k === "h" ? t("slideEditor.height") : k === "x" ? t("slideEditor.left") : t("slideEditor.top")}>
                   <span className="uppercase">{k}</span>
                   <input
                     type="number"
@@ -409,31 +413,31 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
               <button
                 type="button"
                 onClick={toggleImageBehind}
-                title={slide.image.behind ? "本文枠に配置し直す（前面）" : "最背面レイヤーにする（既存を壊さず後ろに敷く）"}
+                title={slide.image.behind ? t("slideEditor.replaceIntoBodyTitle") : t("slideEditor.makeBackmostTitle")}
                 className={`px-1.5 py-0.5 rounded border ${slide.image.behind ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"}`}
               >
-                {slide.image.behind ? "▤ 最背面" : "▤ 本文枠"}
+                {slide.image.behind ? t("slideEditor.backmost") : t("slideEditor.bodyFrame")}
               </button>
               <button
                 type="button"
                 onClick={toggleImageFit}
-                title="contain=全体を余白付きで / cover=枠いっぱいに切り抜き"
+                title={t("slideEditor.fitTitle")}
                 className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
               >
                 {slide.image.fit === "cover" ? "◱ cover" : "▭ contain"}
               </button>
-              <label className="flex items-center gap-0.5 cursor-pointer" title="リサイズ時に縦横比を保つ">
+              <label className="flex items-center gap-0.5 cursor-pointer" title={t("slideEditor.aspectLockTitle")}>
                 <input type="checkbox" checked={aspectLock} onChange={(e) => setAspectLock(e.target.checked)} />
-                比固定
+                {t("slideEditor.aspectLock")}
               </label>
               {slide.image.rect && (
                 <button
                   type="button"
                   onClick={resetImageRect}
-                  title="既定サイズ・位置に戻す（手動調整を解除）"
+                  title={t("slideEditor.resetRectTitle")}
                   className="px-1.5 py-0.5 rounded border border-edge bg-field text-fg2 hover:border-accent/60"
                 >
-                  {slide.image.behind ? "⟲ 既定に戻す" : "⟲ 枠にリセット"}
+                  {slide.image.behind ? t("slideEditor.resetToDefault") : t("slideEditor.resetToFrame")}
                 </button>
               )}
             </div>

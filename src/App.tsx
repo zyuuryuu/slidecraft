@@ -74,11 +74,11 @@ export default function App() {
     // rejected でも修復可能なら確認のうえ「整形して取り込む」（テーマ2 スライス1）。適用に成功した
     // bytes（修復されていればそちら）だけをレジストリに登録する — 使えないマスターを選択肢に残さない。
     const r = await applyMasterBytesWithRepair(picked.bytes, picked.name, (plan) =>
-      confirmDialog(describeRepairPlan(plan), "テンプレートの自動修復"));
+      confirmDialog(describeRepairPlan(plan), t("app.repairTemplateTitle")));
     if (!r.ok) return;
     const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
     setMasterId(entry.id);
-  }, [registerMaster, applyMasterBytesWithRepair]);
+  }, [registerMaster, applyMasterBytesWithRepair, t]);
   // Re-make（第2の口）: .pptx を取り込むが、フォント・配色・背景だけ受け継いで SlideCraft 自前の
   // レイアウトで作り直す。生成された canonical テンプレの bytes をレジストリに登録する。
   const handleRemakeMaster = useCallback(async () => {
@@ -86,9 +86,9 @@ export default function App() {
     if (!picked) return;
     const r = await applyMasterBytesAsRemake(picked.bytes, picked.name);
     if (!r.ok || !r.remadeBytes) return;
-    const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + "（Re-make）", r.remadeBytes);
+    const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
     setMasterId(entry.id);
-  }, [registerMaster, applyMasterBytesAsRemake]);
+  }, [registerMaster, applyMasterBytesAsRemake, t]);
   // 新規テンプレ作成（テーマ2 S4）: スペック → template-writer で生成 → 通常のゲート経由で適用＋登録。
   const [showTemplateCreator, setShowTemplateCreator] = useState(false);
   const handleCreateTemplate = useCallback(async (spec: TemplateSpec) => {
@@ -114,14 +114,16 @@ export default function App() {
   const { submitAndWait: aiSubmitAndWait } = ai;
   const handleProposeTemplateSpec = useCallback(
     async (description: string): Promise<TemplateSpec> =>
-      JSON.parse(await aiSubmitAndWait(description, "template-spec", "テンプレ提案")) as TemplateSpec,
-    [aiSubmitAndWait],
+      JSON.parse(await aiSubmitAndWait(description, "template-spec", t("app.taskTemplateProposal"))) as TemplateSpec,
+    [aiSubmitAndWait, t],
   );
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
     aiFix: async (req, meta) => {
-      const label = `スライド${meta.slideIndex + 1}を編集${meta.attempt > 1 ? `（再試行${meta.attempt - 1}）` : ""}${meta.candidate ? `・候補${meta.candidate + 1}` : ""}`;
+      const label = t("app.taskEditSlide", { n: meta.slideIndex + 1 })
+        + (meta.attempt > 1 ? t("app.taskRetrySuffix", { attempt: meta.attempt - 1 }) : "")
+        + (meta.candidate ? t("app.taskCandidateSuffix", { candidate: meta.candidate + 1 }) : "");
       try {
         // The refine/condense residue uses the Markdown-ONLY sub-prompt (no JSON-ops branch)
         // so a small in-app model can't mis-pick the design-ops format; a freeform batch edit
@@ -197,11 +199,11 @@ export default function App() {
   }, [editLocked, collabBridge, editLockedRef, collabRef]);
   const handleCollabUndo = async () => {
     const r = await collab.serverUndo();
-    if (!r.ok) notify("戻せる操作がありません");
+    if (!r.ok) notify(t("app.nothingToUndo"));
   };
   const handleCollabRedo = async () => {
     const r = await collab.serverRedo();
-    if (!r.ok) notify("やり直せる操作がありません");
+    if (!r.ok) notify(t("app.nothingToRedo"));
   };
   useEffect(() => {
     if (!toast) return;
@@ -221,14 +223,14 @@ export default function App() {
         if (!blob) continue;
         e.preventDefault();
         const reader = new FileReader();
-        reader.onload = async () => { if (typeof reader.result === "string") { handleInsertImage(reader.result, "", await measureImageAspect(reader.result)); notify("画像を貼り付けました"); } };
+        reader.onload = async () => { if (typeof reader.result === "string") { handleInsertImage(reader.result, "", await measureImageAspect(reader.result)); notify(t("app.imagePasted")); } };
         reader.readAsDataURL(blob);
         return;
       }
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [handleInsertImage, notify]);
+  }, [handleInsertImage, notify, t]);
 
   // OS file association (ADR-0024): a .scft opened via double-click / "open with" is handed to us by
   // the Rust side (argv on Win/Linux, the Apple open event on macOS) and queued. Drain it on mount
@@ -273,8 +275,8 @@ export default function App() {
               let bin = ""; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
               const url = `data:${mime};base64,${btoa(bin)}`;
               handleInsertImage(url, "", await measureImageAspect(url));
-              notify("画像を挿入しました");
-            } catch { notify("画像の読み込みに失敗しました"); }
+              notify(t("app.imageInserted"));
+            } catch { notify(t("app.imageLoadFailed")); }
             break; // one image per drop
           }
         });
@@ -290,7 +292,7 @@ export default function App() {
         if (!f.type.startsWith("image/")) continue;
         e.preventDefault();
         const reader = new FileReader();
-        reader.onload = async () => { if (typeof reader.result === "string") { handleInsertImage(reader.result, "", await measureImageAspect(reader.result)); notify("画像を挿入しました"); } };
+        reader.onload = async () => { if (typeof reader.result === "string") { handleInsertImage(reader.result, "", await measureImageAspect(reader.result)); notify(t("app.imageInserted")); } };
         reader.readAsDataURL(f);
         break;
       }
@@ -298,7 +300,7 @@ export default function App() {
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("drop", onDrop);
     return () => { window.removeEventListener("dragover", onDragOver); window.removeEventListener("drop", onDrop); };
-  }, [handleInsertImage, notify]);
+  }, [handleInsertImage, notify, t]);
 
   // AI-fix handoff (ReviewBar "✨直す"): select the slide + open AI Assist with a fix
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
@@ -349,7 +351,7 @@ export default function App() {
           <button
             onClick={handleEnterImport}
             disabled={editLocked}
-            title={editLocked ? "協働接続中は編集ロック中" : "原稿（テキスト）からスライドを作る・取り込む"}
+            title={editLocked ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}
             className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge"
           >
             📝 Draft
@@ -425,7 +427,7 @@ export default function App() {
                       onClick={() => setSlideEditView("form")}
                       className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "form" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-fg"}`}
                     >
-                      フォーム
+                      {t("app.viewForm")}
                     </button>
                     <button
                       onClick={() => setSlideEditView("markdown")}

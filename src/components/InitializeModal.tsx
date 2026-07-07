@@ -8,6 +8,7 @@
  * ONLY here — after commit the deck is the source of truth ([[primary-surface-deck]]).
  */
 
+import { useTranslation } from "react-i18next";
 import Editor from "./Editor";
 import ReviewBar from "./ReviewBar";
 import SlidePreview from "./SlidePreview";
@@ -52,6 +53,7 @@ export default function InitializeModal({
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
   onFixDeterministic, onCursorLine, gotoLine,
 }: InitializeModalProps) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
   return (
     <div
@@ -63,7 +65,7 @@ export default function InitializeModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Draft — 原稿からスライドを作る"
+        aria-label={t("initModal.dialogLabel")}
         className="bg-void border border-accent/40 rounded-lg shadow-2xl flex flex-col w-full max-w-6xl"
         style={{ height: "86vh" }}
       >
@@ -72,11 +74,11 @@ export default function InitializeModal({
           <span className="text-sm text-accent-soft font-medium mr-1">📝 Draft</span>
           <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} onRemake={onRemakeMaster} />
           <span className="w-px h-4 bg-edge mx-1" />
-          <button onClick={onOpenFile} className={action} title=".md / .yaml を取り込む">📄 Markdown を取込む</button>
-          <button onClick={onGenerateAI} className={action} title="AI でデッキを生成">✨ AIで生成</button>
-          <button onClick={onStructure} className={action} title="生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）">🧹 原稿を整形</button>
+          <button onClick={onOpenFile} className={action} title={t("initModal.importMarkdownTitle")}>{t("initModal.importMarkdown")}</button>
+          <button onClick={onGenerateAI} className={action} title={t("initModal.generateAiTitle")}>{t("initModal.generateAi")}</button>
+          <button onClick={onStructure} className={action} title={t("initModal.tidyDraftTitle")}>{t("initModal.tidyDraft")}</button>
           <div className="flex-1" />
-          <button onClick={onCancel} title="キャンセル" className="text-muted hover:text-fg text-lg leading-none">×</button>
+          <button onClick={onCancel} title={t("initModal.close")} className="text-muted hover:text-fg text-lg leading-none">×</button>
         </div>
 
         {/* Structure review of the resulting split (awareness + per-chip →表). The
@@ -95,7 +97,7 @@ export default function InitializeModal({
             <>
               <div className="px-3 py-1 bg-panel text-xs border-b border-edge">
                 <span className="text-muted">Markdown Editor</span>
-                <span className="text-dim"> ・ ここに直接貼り付け／入力してもOK</span>
+                <span className="text-dim"> {t("initModal.editorHint")}</span>
               </div>
               <div className="flex-1 min-h-0">
                 <Editor value={mdText} onChange={onMdChange} language="markdown" onCursorLine={onCursorLine} gotoLine={gotoLine} />
@@ -104,7 +106,7 @@ export default function InitializeModal({
           }
           right={
             <>
-              <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">Slide Preview（分割結果）</div>
+              <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge">{t("initModal.previewHeader")}</div>
               <div className="flex-1 min-h-0 bg-canvas">
                 <SlidePreview deck={deck} template={templateData} error={parseError} activeSlide={activeSlide} onSlideClick={onSlideClick} />
               </div>
@@ -116,17 +118,17 @@ export default function InitializeModal({
         <div className="flex items-center gap-2 px-4 py-2 border-t border-edge shrink-0">
           {!deck && (
             <span className="text-[11px] text-amber-300 truncate">
-              {parseError ? `Markdown を解析できません: ${parseError}` : "内容が空です — 貼り付けるか取り込んでください"}
+              {parseError ? t("initModal.parseError", { parseError }) : t("initModal.emptyContent")}
             </span>
           )}
           <div className="flex-1" />
-          <button onClick={onCancel} className="px-3 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">キャンセル</button>
+          <button onClick={onCancel} className="px-3 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">{t("initModal.cancel")}</button>
           <button
             onClick={onConfirm}
             disabled={!deck}
             className="px-4 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
           >
-            ✓ スライドにする
+            {t("initModal.commit")}
           </button>
         </div>
       </div>

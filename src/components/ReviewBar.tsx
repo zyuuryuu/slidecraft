@@ -12,14 +12,16 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 
 /** A human-readable, editable fix instruction derived from the issue's levers. */
-function fixPromptForIssue(d: DeckIssue): string {
-  if (d.levers.includes("title")) return "このスライドに、内容を表す簡潔なタイトルを付けてください。";
-  if (d.levers.includes("split")) return "情報が多すぎて1スライドに収まりません。要点に絞り、各箇条書きを短いキーフレーズ（目安28字以内）にしてください。情報は省かないでください。";
-  if (d.levers.includes("condense")) return "各箇条書きを短いキーフレーズ（目安28字以内）に要約してください。文章ではなく要点に。情報は省かないでください。";
-  return "このスライドを、レイアウトに収まるよう簡潔に整えてください。";
+function fixPromptForIssue(d: DeckIssue, t: TFunction): string {
+  if (d.levers.includes("title")) return t("reviewBar.promptTitle");
+  if (d.levers.includes("split")) return t("reviewBar.promptSplit");
+  if (d.levers.includes("condense")) return t("reviewBar.promptCondense");
+  return t("reviewBar.promptTidy");
 }
 
 interface ReviewBarProps {
@@ -32,6 +34,7 @@ interface ReviewBarProps {
 }
 
 export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDeterministic, onAiFix }: ReviewBarProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   if (warnIssues.length === 0 && tipIssues.length === 0) return null;
 
@@ -42,7 +45,7 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
       <div key={key} className="flex items-center gap-2 px-3 py-1.5 border-t border-canvas hover:bg-canvas">
         <button
           onClick={() => { onJump(d.slideIndex); setOpen(false); }}
-          title={`推奨: ${d.levers.join(" / ")}`}
+          title={t("reviewBar.recommend", { levers: d.levers.join(" / ") })}
           className="flex items-baseline gap-1.5 flex-1 min-w-0 text-left"
         >
           <span className={`shrink-0 ${warn ? "text-amber-300" : "text-faint"}`}>S{d.slideIndex + 1}</span>
@@ -51,19 +54,19 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
         {canTable && (
           <button
             onClick={() => onFixDeterministic(d)}
-            title="表に変換（決定論・元に戻せます）"
+            title={t("reviewBar.toTableTitle")}
             className="shrink-0 px-2 py-0.5 rounded border border-surface text-cyan hover:bg-edge"
           >
-            →表
+            {t("reviewBar.toTable")}
           </button>
         )}
         {needsAi && (
           <button
-            onClick={() => { onAiFix(d.slideIndex, fixPromptForIssue(d)); setOpen(false); }}
-            title="AI Assist を開いて直す（指示プリセット・確認/編集してから生成）"
+            onClick={() => { onAiFix(d.slideIndex, fixPromptForIssue(d, t)); setOpen(false); }}
+            title={t("reviewBar.aiFixTitle")}
             className="shrink-0 px-2 py-0.5 rounded border border-surface text-brand-soft hover:bg-edge"
           >
-            ✨直す
+            {t("reviewBar.aiFix")}
           </button>
         )}
       </div>
@@ -74,11 +77,11 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
     <div className="relative shrink-0 bg-canvas border-b border-edge text-[11px]">
       {/* Thin always-visible summary */}
       <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2.5 w-full px-3 py-1.5 hover:bg-canvas">
-        {warnIssues.length > 0 && <span className="text-amber-400 font-medium">⚠ 課題 {warnIssues.length}</span>}
-        {tipIssues.length > 0 && <span className="text-muted">💡 提案 {tipIssues.length}</span>}
+        {warnIssues.length > 0 && <span className="text-amber-400 font-medium">{t("reviewBar.warnCount", { n: warnIssues.length })}</span>}
+        {tipIssues.length > 0 && <span className="text-muted">{t("reviewBar.tipCount", { n: tipIssues.length })}</span>}
         <span className="text-dim">{open ? "▴" : "▾"}</span>
         <div className="flex-1" />
-        <span className="text-dim text-[10px]">{open ? "閉じる" : "詳細を見る"}</span>
+        <span className="text-dim text-[10px]">{open ? t("reviewBar.collapse") : t("reviewBar.showDetails")}</span>
       </button>
 
       {/* Dropdown list (on demand) */}

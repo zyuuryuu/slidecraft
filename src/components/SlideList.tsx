@@ -124,7 +124,7 @@ export default function SlideList({
             <div
               data-slide-idx={i}
               className={`flex flex-col items-center transition-[transform,opacity] duration-150 ${canDrag ? "cursor-grab" : ""} ${dragIdx === i ? "opacity-40 scale-95" : ""}`}
-              title={canDrag ? "ドラッグで並べ替え" : undefined}
+              title={canDrag ? t("slideList.dragToReorder") : undefined}
               onPointerDown={canDrag ? (e) => startDrag(e, i) : undefined}
               onClickCapture={(e) => { if (justDragged.current) { justDragged.current = false; e.stopPropagation(); } }} // swallow the post-drag click
             >
@@ -151,7 +151,7 @@ export default function SlideList({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDuplicate(i); }}
-                      title="このスライドを複製"
+                      title={t("slideList.duplicateSlide")}
                       className="w-5 h-5 flex items-center justify-center rounded bg-surface/90 border border-edge text-fg2 hover:bg-accent hover:text-on-accent text-[11px] leading-none"
                     >
                       ⧉
@@ -161,7 +161,7 @@ export default function SlideList({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDelete(i); }}
-                      title="このスライドを削除"
+                      title={t("slideList.deleteSlide")}
                       className="w-5 h-5 flex items-center justify-center rounded bg-surface/90 border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-[11px] leading-none"
                     >
                       🗑

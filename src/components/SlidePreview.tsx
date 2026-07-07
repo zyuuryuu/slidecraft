@@ -677,7 +677,7 @@ export default function SlidePreview({
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-start gap-2 max-w-[92%] rounded-md border border-amber-500/50 bg-amber-950/80 px-3 py-1.5 text-[11px] text-amber-200 shadow-lg shadow-black/40">
           <span className="whitespace-pre-wrap">{notice}</span>
           {onNoticeDismiss && (
-            <button onClick={onNoticeDismiss} className="shrink-0 text-amber-400 hover:text-amber-200 leading-none" title="閉じる">×</button>
+            <button onClick={onNoticeDismiss} className="shrink-0 text-amber-400 hover:text-amber-200 leading-none" title={t("slidePreview.dismiss")}>×</button>
           )}
         </div>
       )}
@@ -710,9 +710,9 @@ export default function SlidePreview({
 
       {hasSlides && (
         <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-void/90 border border-edge rounded text-[11px] text-fg2 select-none shadow">
-          <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} title="縮小" className="px-1.5 py-0.5 hover:bg-edge rounded-l">−</button>
-          <button onClick={() => setZoom(1)} title="フィットに戻す" className="px-1.5 py-0.5 hover:bg-edge tabular-nums text-center" style={{ minWidth: 40 }}>{Math.round(zoom * 100)}%</button>
-          <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} title="拡大" className="px-1.5 py-0.5 hover:bg-edge rounded-r">＋</button>
+          <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} title={t("slidePreview.zoomOut")} className="px-1.5 py-0.5 hover:bg-edge rounded-l">−</button>
+          <button onClick={() => setZoom(1)} title={t("slidePreview.resetZoom")} className="px-1.5 py-0.5 hover:bg-edge tabular-nums text-center" style={{ minWidth: 40 }}>{Math.round(zoom * 100)}%</button>
+          <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} title={t("slidePreview.zoomIn")} className="px-1.5 py-0.5 hover:bg-edge rounded-r">＋</button>
         </div>
       )}
     </div>

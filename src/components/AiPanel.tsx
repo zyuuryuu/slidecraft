@@ -7,6 +7,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration } from "./useAiGeneration";
 import DiffView from "./DiffView";
@@ -57,6 +58,7 @@ export default function AiPanel({
   collabTab,
   collabConnected,
 }: AiPanelProps) {
+  const { t } = useTranslation();
   const [userRequest, setUserRequest] = useState("");
   // Collapse the instruction box (keep scope + a truncated echo) so the 変更プレビュー below gets the room.
   const [promptCollapsed, setPromptCollapsed] = useState(false);
@@ -254,7 +256,7 @@ export default function AiPanel({
       <div
         onMouseDown={onResizeDown}
         onDoubleClick={() => setPanelH(340)}
-        title="ドラッグで高さ変更（ダブルクリックでリセット）"
+        title={t("aiPanel.resizeHint")}
         className="h-1.5 shrink-0 cursor-row-resize bg-edge hover:bg-accent transition-colors"
       />
       {/* Header — hub tabs (アシスト / 協働); gear (config) shows only on the assist tab */}
@@ -263,14 +265,14 @@ export default function AiPanel({
           onClick={() => setHubTab("assist")}
           className={`px-2 py-0.5 rounded text-sm ${hubTab === "assist" ? "bg-edge text-accent-soft font-medium" : "text-muted hover:text-fg"}`}
         >
-          ✨ アシスト
+          ✨ {t("aiPanel.assistTab")}
         </button>
         {collabTab && (
           <button
             onClick={() => setHubTab("collab")}
             className={`px-2 py-0.5 rounded text-sm inline-flex items-center gap-1 ${hubTab === "collab" ? "bg-edge text-fg font-medium" : "text-muted hover:text-fg"}`}
           >
-            🔗 協働{collabConnected && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
+            🔗 {t("aiPanel.collabTab")}{collabConnected && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           </button>
         )}
         <div className="flex-1" />
@@ -279,7 +281,10 @@ export default function AiPanel({
           // (or DL%/error) at a glance and opens the settings popover; everything else lives there.
           <button
             onClick={() => setShowSettings((v) => !v)}
-            title={`${ai.connection.label}${ai.connection.hint ? " — " + ai.connection.hint : ""}（クリックで AI 設定）`}
+            title={t("aiPanel.settingsPillTitle", {
+              label: ai.connection.label,
+              hint: ai.connection.hint ? " — " + ai.connection.hint : "",
+            })}
             className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
           >
             <span className={`${toneColor} leading-none`}>●</span>
@@ -287,7 +292,7 @@ export default function AiPanel({
             <span className="text-muted leading-none">⚙</span>
           </button>
         )}
-        <button onClick={onClose} className="text-muted hover:text-fg text-lg leading-none" title="閉じる">
+        <button onClick={onClose} className="text-muted hover:text-fg text-lg leading-none" title={t("aiPanel.close")}>
           ×
         </button>
       </div>
@@ -295,8 +300,8 @@ export default function AiPanel({
       {/* Plain-language description of the active tab — so it's obvious what each does (non-IT friendly) */}
       <div className="px-3 py-1.5 text-[11px] text-muted border-b border-edge bg-canvas leading-relaxed shrink-0">
         {hubTab === "assist"
-          ? "🖊️ AI にお願いして、このアプリの中でスライドを作る・直します。"
-          : "🤝 あなたが使っている別の AI（例：Claude Code）をこの画面につなぎ、同じ資料を一緒に編集します。（上級者向け）"}
+          ? t("aiPanel.assistDescription")
+          : t("aiPanel.collabDescription")}
       </div>
 
       {hubTab === "collab" ? collabTab : (
@@ -317,15 +322,15 @@ export default function AiPanel({
           onClick={() => setTab("gen")}
           className={`px-2 py-0.5 rounded text-[11px] ${tab === "gen" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-on-accent"}`}
         >
-          生成・編集
+          {t("aiPanel.genEditTab")}
         </button>
         <button
           onClick={() => setTab("tasks")}
           className={`px-2 py-0.5 rounded text-[11px] ${tab === "tasks" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-on-accent"}`}
         >
-          タスク{ai.tasks.length > 0 ? ` ${ai.tasks.length}` : ""}
+          {t("aiPanel.tasksTab")}{ai.tasks.length > 0 ? ` ${ai.tasks.length}` : ""}
         </button>
-        {runningCount > 0 && <span className="text-[10px] text-accent-soft animate-pulse ml-1">● {runningCount} 実行中</span>}
+        {runningCount > 0 && <span className="text-[10px] text-accent-soft animate-pulse ml-1">● {t("aiPanel.runningCount", { count: runningCount })}</span>}
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col">
@@ -343,25 +348,25 @@ export default function AiPanel({
           <button
             type="button"
             onClick={() => setPromptCollapsed((v) => !v)}
-            title={promptCollapsed ? "指示欄を開く" : "指示欄をたたむ（プレビューを広く）"}
+            title={promptCollapsed ? t("aiPanel.expandPrompt") : t("aiPanel.collapsePrompt")}
             aria-expanded={!promptCollapsed}
             className="w-4 h-4 flex items-center justify-center leading-none text-muted hover:text-fg shrink-0"
           >
             {promptCollapsed ? "▸" : "▾"}
           </button>
-          <span>編集対象:</span>
+          <span>{t("aiPanel.editTargetLabel")}</span>
           {batch ? (
-            <span className="px-2 py-0.5 rounded bg-accent/20 text-accent-soft">選択 {selectedCount} 枚を一括編集</span>
+            <span className="px-2 py-0.5 rounded bg-accent/20 text-accent-soft">{t("aiPanel.batchScope", { count: selectedCount })}</span>
           ) : canSlide ? (
-            <span className="px-2 py-0.5 rounded bg-field text-accent-soft">スライド {activeSlideNum}</span>
+            <span className="px-2 py-0.5 rounded bg-field text-accent-soft">{t("aiPanel.slideScope", { num: activeSlideNum })}</span>
           ) : (
-            <span className="text-faint">スライドを選択してください</span>
+            <span className="text-faint">{t("aiPanel.selectSlidePrompt")}</span>
           )}
-          {batch && !promptCollapsed && <span className="text-faint">— 1つの指示を各スライドに適用 → 確認して採用</span>}
+          {batch && !promptCollapsed && <span className="text-faint">{t("aiPanel.batchHint")}</span>}
           {/* Collapsed: echo the current instruction (truncated) so folding doesn't hide what you asked. */}
           {promptCollapsed && (
             <span className="flex-1 min-w-0 truncate text-faint">
-              {userRequest.trim() ? `— ${userRequest.trim()}` : "— 指示欄はたたまれています（▸ で開く）"}
+              {userRequest.trim() ? `— ${userRequest.trim()}` : t("aiPanel.promptCollapsedEcho")}
             </span>
           )}
         </div>
@@ -373,8 +378,8 @@ export default function AiPanel({
             onChange={(e) => setUserRequest(e.target.value)}
             placeholder={
               slideScope
-                ? "このスライドへの指示（例: 箇条書きを3つに / もっと簡潔に / 図を追加 / DBノードを足す / 英語にする）"
-                : "作りたいデッキを指示（例: SaaS の営業提案を5枚で。課題→解決→価格→導入事例→次のステップ）"
+                ? t("aiPanel.slidePromptPlaceholder")
+                : t("aiPanel.deckPromptPlaceholder")
             }
             className="flex-1 h-[4.5rem] min-h-[2.75rem] max-h-56 px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg resize-y"
             onKeyDown={(e) => {
@@ -383,7 +388,7 @@ export default function AiPanel({
           />
           {busy ? (
             <button onClick={ai.cancel} className="self-start px-4 py-2 text-sm bg-edge hover:bg-accent/40 text-fg rounded shrink-0">
-              停止
+              {t("aiPanel.stop")}
             </button>
           ) : (
             <button
@@ -391,7 +396,7 @@ export default function AiPanel({
               disabled={!ready}
               className="self-start px-4 py-2 text-sm bg-accent hover:bg-accent-hi disabled:bg-accent/30 disabled:text-on-accent/40 text-on-accent font-medium rounded shrink-0"
             >
-              {batchRunning ? "一括編集中…" : batch ? `${selectedCount}枚を編集` : bestOfN > 1 ? `生成 ×${bestOfN}` : "生成"}
+              {batchRunning ? t("aiPanel.batchRunning") : batch ? t("aiPanel.editSlidesButton", { count: selectedCount }) : bestOfN > 1 ? t("aiPanel.generateBest", { count: bestOfN }) : t("aiPanel.generate")}
             </button>
           )}
         </div>
@@ -417,14 +422,14 @@ export default function AiPanel({
           Transparent (not silent) even though it fires automatically. */}
       {retrying && ai.generating && (
         <div className="mx-3 mb-2 px-2 py-1.5 bg-accent/15 border border-accent/40 rounded text-xs text-accent-soft">
-          🔁 図の部分編集（ops）として受け取れなかったため、opsで自動的に再生成しています…
+          🔁 {t("aiPanel.autoRetryNotice")}
         </div>
       )}
 
       {/* Best-of-N (Option B): fanning out N candidates; the adoption gate picks the best when they land. */}
       {ai.bestOfRunning && (
         <div className="mx-3 mb-2 px-2 py-1.5 bg-accent/15 border border-accent/40 rounded text-xs text-accent-soft">
-          🎲 {bestOfN} 候補を生成中…（採用ゲートで最良を提示します）
+          🎲 {t("aiPanel.bestOfRunningNotice", { count: bestOfN })}
         </div>
       )}
 
@@ -434,14 +439,14 @@ export default function AiPanel({
         <div className="flex-1 flex flex-col min-h-0 border-t border-edge">
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-muted">
-              {ai.generating ? "生成中…" : adopted ? "適用済み（プレビュー）" : slideScope && currentSlideMd ? "変更プレビュー（採用前に確認）" : "プレビュー（Markdown）"}
+              {ai.generating ? t("aiPanel.generating") : adopted ? t("aiPanel.appliedPreview") : slideScope && currentSlideMd ? t("aiPanel.changePreview") : t("aiPanel.markdownPreview")}
             </span>
             {/* Best-of-N candidate picker: cycle candidates, ✓ = clean (no warnings), ⚠k = k advisories.
                 The best is preselected; ★ marks it. */}
             {cands.length > 1 && !adopted && (
               <div className="flex items-center gap-1 text-[11px] text-muted">
-                <button onClick={() => setSelIdx((i) => (i - 1 + cands.length) % cands.length)} title="前の候補" className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">◀</button>
-                <span className="tabular-nums">候補 {selectedIdx + 1}/{cands.length}</span>
+                <button onClick={() => setSelIdx((i) => (i - 1 + cands.length) % cands.length)} title={t("aiPanel.prevCandidate")} className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">◀</button>
+                <span className="tabular-nums">{t("aiPanel.candidateCounter", { current: selectedIdx + 1, total: cands.length })}</span>
                 <span className={(scored[selectedIdx]?.score ?? 1) === 0 ? "text-green-400" : "text-amber-300"}>
                   {/* — = no content preview (design-intent); ⟳ = full-Markdown drift (score≥100, worse
                       than any warning count); ✓ = clean; ⚠k = k advisories. */}
@@ -450,16 +455,16 @@ export default function AiPanel({
                     : scored[selectedIdx].score === 0 ? "✓"
                     : `⚠${scored[selectedIdx].preview.warnings.length}`}
                 </span>
-                <button onClick={() => setSelIdx((i) => (i + 1) % cands.length)} title="次の候補" className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">▶</button>
+                <button onClick={() => setSelIdx((i) => (i + 1) % cands.length)} title={t("aiPanel.nextCandidate")} className="px-1.5 py-0.5 bg-field hover:bg-edge rounded leading-none">▶</button>
               </div>
             )}
             <div className="flex items-center gap-1">
               {adopted ? (
                 // Adopted: the edit is committed; the review is a frozen record until you close it.
                 <>
-                  <span className="text-xs text-green-300">✓ 適用しました</span>
+                  <span className="text-xs text-green-300">✓ {t("aiPanel.applied")}</span>
                   <button onClick={closePreview} className="px-2.5 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">
-                    閉じる
+                    {t("aiPanel.closeAction")}
                   </button>
                 </>
               ) : (
@@ -470,7 +475,7 @@ export default function AiPanel({
                       disabled={busy}
                       className="px-2.5 py-1 text-xs bg-field hover:bg-edge disabled:opacity-40 text-fg2 rounded"
                     >
-                      却下
+                      {t("aiPanel.reject")}
                     </button>
                   )}
                   <button
@@ -478,7 +483,7 @@ export default function AiPanel({
                     disabled={busy || !currentResult.trim()}
                     className="px-3 py-1 text-xs bg-cyan hover:bg-cyan-hi disabled:opacity-40 text-on-accent font-medium rounded"
                   >
-                    {slideScope ? "採用 → このスライド" : "適用 → 編集へ"}
+                    {slideScope ? t("aiPanel.adoptToSlide") : t("aiPanel.applyToEdit")}
                   </button>
                 </>
               )}

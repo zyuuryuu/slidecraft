@@ -4,6 +4,7 @@
  * can connect. The deck mirrors the host's truth live while connected.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { CollabStatus } from "../ipc/collab-projection";
 
 interface CollabPanelProps {
@@ -22,6 +23,7 @@ interface CollabPanelProps {
 }
 
 function CopyButton({ value }: { value: string }) {
+  const { t } = useTranslation();
   const [done, setDone] = useState(false);
   return (
     <button
@@ -36,7 +38,7 @@ function CopyButton({ value }: { value: string }) {
       }}
       className="px-2 py-1 text-[11px] rounded bg-edge hover:bg-accent/50 text-fg shrink-0"
     >
-      {done ? "コピー済" : "コピー"}
+      {done ? t("collabPanel.copied") : t("collabPanel.copy")}
     </button>
   );
 }
@@ -61,12 +63,13 @@ function Field({ label, value, mono = true }: { label: string; value: string; mo
 export default function CollabPanel({
   embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop,
 }: CollabPanelProps) {
+  const { t } = useTranslation();
   const connected = status === "connected";
   const snippet =
     url && token ? `claude mcp add --transport http slidecraft ${url} --header "Authorization: Bearer ${token}"` : "";
 
   const dot = connected ? "bg-emerald-400" : status === "connecting" ? "bg-amber-400 animate-pulse" : status === "error" ? "bg-rose-500" : "bg-field";
-  const statusLabel = connected ? "接続中" : status === "connecting" ? "接続中…" : status === "error" ? "エラー" : "未接続";
+  const statusLabel = connected ? t("collabPanel.statusConnected") : status === "connecting" ? t("collabPanel.statusConnecting") : status === "error" ? t("collabPanel.statusError") : t("collabPanel.statusDisconnected");
 
   return (
     <div className={embedded ? "flex-1 min-h-0 overflow-auto text-sm" : "fixed bottom-2 right-2 z-50 w-[420px] max-w-[calc(100vw-1rem)] bg-canvas border border-edge rounded-lg shadow-2xl text-sm"}>
@@ -74,9 +77,9 @@ export default function CollabPanel({
         <div className="flex items-center justify-between px-3 py-2 border-b border-edge">
           <div className="flex items-center gap-2">
             <span role="img" aria-label={statusLabel} className={`w-2 h-2 rounded-full ${dot}`} />
-            <span className="text-fg font-medium">🔗 協働（AI ライブ編集）</span>
+            <span className="text-fg font-medium">🔗 {t("collabPanel.headerTitle")}</span>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-fg px-1" title="閉じる">
+          <button onClick={onClose} className="text-muted hover:text-fg px-1" title={t("collabPanel.close")}>
             ✕
           </button>
         </div>
@@ -85,14 +88,12 @@ export default function CollabPanel({
       <div className="p-3 space-y-3">
         {!available ? (
           <p className="text-muted text-xs leading-relaxed">
-            協働機能はデスクトップアプリ（<span className="font-mono">npm run tauri dev</span> / ビルド版）でのみ動作します。
-            ローカルの MCP サイドカーを起動して、上流 AI と webview を同じデッキへ接続します。
+            {t("collabPanel.unavailableBefore")}<span className="font-mono">npm run tauri dev</span>{t("collabPanel.unavailableAfter")}
           </p>
         ) : (
           <>
             <p className="text-muted text-xs leading-relaxed">
-              開始すると、ローカルに MCP ホスト（サイドカー）を起動します。下の URL とトークンを上流 AI に渡すと、
-              AI の編集が <span className="text-emerald-300">この画面にライブ反映</span> されます。
+              {t("collabPanel.introBefore")}<span className="text-emerald-300">{t("collabPanel.introHighlight")}</span>{t("collabPanel.introAfter")}
             </p>
 
             {error && (
@@ -107,26 +108,26 @@ export default function CollabPanel({
                 disabled={status === "connecting"}
                 className="w-full py-2 rounded bg-accent hover:bg-accent-hi disabled:opacity-50 text-on-accent font-medium"
               >
-                {status === "connecting" ? "接続中…" : "協働を開始"}
+                {status === "connecting" ? t("collabPanel.statusConnecting") : t("collabPanel.startButton")}
               </button>
             ) : (
               <>
                 <div className="flex items-center justify-between text-[11px] text-muted">
                   <span>
-                    接続中・ホストの deck をライブ表示中
+                    {t("collabPanel.liveViewing")}
                   </span>
-                  <span>ドキュメント: {docCount}</span>
+                  <span>{t("collabPanel.documentCount", { docCount })}</span>
                 </div>
                 <p className="text-[10px] text-emerald-300/80 leading-relaxed">
-                  ✍️ 協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレ・タブ切替は接続中ロック）。
+                  ✍️ {t("collabPanel.coEditNotice")}
                 </p>
 
-                {url && <Field label="MCP エンドポイント" value={url} />}
-                {token && <Field label="トークン（per-launch）" value={token} />}
+                {url && <Field label={t("collabPanel.endpointLabel")} value={url} />}
+                {token && <Field label={t("collabPanel.tokenLabel")} value={token} />}
 
                 {snippet && (
                   <div>
-                    <div className="text-[10px] text-faint mb-0.5">Claude Code に追加（コピペ）</div>
+                    <div className="text-[10px] text-faint mb-0.5">{t("collabPanel.addToClaudeCode")}</div>
                     <div className="flex items-start gap-1.5">
                       <textarea
                         readOnly
@@ -146,7 +147,7 @@ export default function CollabPanel({
 
                 <div className="flex items-center justify-end pt-1">
                   <button onClick={onStop} className="px-4 py-1.5 rounded bg-edge hover:bg-surface text-fg text-xs">
-                    停止
+                    {t("collabPanel.stopButton")}
                   </button>
                 </div>
               </>

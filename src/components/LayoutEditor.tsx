@@ -7,19 +7,13 @@
  * custom layout is pinned to a showcase slide). Placeholder `idx` is auto-assigned by position, so
  * the user never hand-manages it. Output feeds spec.layouts (appended to the chosen built-ins).
  */
+import { useTranslation } from "react-i18next";
 import { PALETTE_KEYS, type PaletteKey, type LayoutDef, type LayoutPhDef } from "../engine/template-layout-library";
 
-const PH_TYPES: { v: string; l: string }[] = [
-  { v: "ctrTitle", l: "タイトル" },
-  { v: "body", l: "本文" },
-  { v: "subTitle", l: "サブタイトル" },
-  { v: "sldNum", l: "ページ番号" },
-];
-const ALIGNS: { v: string; l: string }[] = [
-  { v: "l", l: "左" },
-  { v: "ctr", l: "中央" },
-  { v: "r", l: "右" },
-];
+// Stable placeholder-type enum values (kept module-level); the UI labels are translated at render time.
+const PH_TYPE_VALUES = ["ctrTitle", "body", "subTitle", "sldNum"] as const; // `as const` → t() key narrows to the valid union
+// Stable alignment enum values; UI labels are translated at render time.
+const ALIGN_VALUES = ["l", "ctr", "r"] as const;
 const GEO: ("x" | "y" | "w" | "h")[] = ["x", "y", "w", "h"];
 
 const cls = "px-1.5 py-0.5 rounded bg-canvas border border-edge text-fg outline-none focus:border-accent";
@@ -40,6 +34,11 @@ function newLayout(n: number): LayoutDef {
 }
 
 export default function LayoutEditor({ layouts, onChange }: { layouts: LayoutDef[]; onChange: (l: LayoutDef[]) => void }) {
+  const { t } = useTranslation();
+  // Enum value → translated label, built inside the component so the hook order is respected.
+  const phTypes: { v: string; l: string }[] = PH_TYPE_VALUES.map((v) => ({ v, l: t(`layoutEditor.phType.${v}`) }));
+  const aligns: { v: string; l: string }[] = ALIGN_VALUES.map((v) => ({ v, l: t(`layoutEditor.align.${v}`) }));
+
   const update = (i: number, patch: Partial<LayoutDef>) => onChange(layouts.map((l, k) => (k === i ? { ...l, ...patch } : l)));
   const updatePh = (i: number, j: number, patch: Partial<LayoutPhDef>) =>
     update(i, { placeholders: layouts[i].placeholders.map((p, k) => (k === j ? { ...p, ...patch } : p)) });
@@ -52,18 +51,18 @@ export default function LayoutEditor({ layouts, onChange }: { layouts: LayoutDef
       {layouts.map((lay, i) => (
         <div key={i} className="border border-edge rounded p-2 flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <input value={lay.name} onChange={(e) => update(i, { name: e.target.value })} className={`${cls} flex-1`} placeholder="レイアウト名" />
+            <input value={lay.name} onChange={(e) => update(i, { name: e.target.value })} className={`${cls} flex-1`} placeholder={t("layoutEditor.layoutNamePlaceholder")} />
             <select value={lay.family} onChange={(e) => update(i, { family: e.target.value as "dark" | "light" })} className={cls}>
-              <option value="light">明るい背景</option>
-              <option value="dark">暗い背景</option>
+              <option value="light">{t("layoutEditor.familyLight")}</option>
+              <option value="dark">{t("layoutEditor.familyDark")}</option>
             </select>
-            <button onClick={() => onChange(layouts.filter((_, k) => k !== i))} className="text-muted hover:text-red-400" title="このレイアウトを削除">✕</button>
+            <button onClick={() => onChange(layouts.filter((_, k) => k !== i))} className="text-muted hover:text-red-400" title={t("layoutEditor.deleteLayout")}>✕</button>
           </div>
           <div className="flex flex-col gap-1">
             {lay.placeholders.map((ph, j) => (
               <div key={j} className="flex flex-wrap items-center gap-1 text-[11px]">
                 <select value={ph.type} onChange={(e) => updatePh(i, j, { type: e.target.value })} className={cls}>
-                  {PH_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                  {phTypes.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
                 </select>
                 {GEO.map((f) => (
                   <label key={f} className="flex items-center gap-0.5">
@@ -77,30 +76,30 @@ export default function LayoutEditor({ layouts, onChange }: { layouts: LayoutDef
                   <input type="number" step={1} value={ph.fontSize} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) updatePh(i, j, { fontSize: n }); }} className={numCls} />
                 </label>
                 <select value={ph.font} onChange={(e) => updatePh(i, j, { font: e.target.value as "major" | "minor" })} className={cls}>
-                  <option value="major">見出し</option>
-                  <option value="minor">本文</option>
+                  <option value="major">{t("layoutEditor.fontMajor")}</option>
+                  <option value="minor">{t("layoutEditor.fontMinor")}</option>
                 </select>
                 <select value={ph.color} onChange={(e) => updatePh(i, j, { color: e.target.value as PaletteKey })} className={cls}>
                   {PALETTE_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>
                 <select value={ph.align} onChange={(e) => updatePh(i, j, { align: e.target.value })} className={cls}>
-                  {ALIGNS.map((a) => <option key={a.v} value={a.v}>{a.l}</option>)}
+                  {aligns.map((a) => <option key={a.v} value={a.v}>{a.l}</option>)}
                 </select>
                 <label className="flex items-center gap-0.5">
                   <input type="checkbox" checked={ph.bold} onChange={(e) => updatePh(i, j, { bold: e.target.checked })} />
-                  <span className="text-faint">太字</span>
+                  <span className="text-faint">{t("layoutEditor.bold")}</span>
                 </label>
-                <button onClick={() => removePh(i, j)} className="text-muted hover:text-red-400" title="枠を削除">－</button>
+                <button onClick={() => removePh(i, j)} className="text-muted hover:text-red-400" title={t("layoutEditor.deletePlaceholder")}>－</button>
               </div>
             ))}
             <button onClick={() => update(i, { placeholders: [...lay.placeholders, newPlaceholder(lay.placeholders.length)] })} className="self-start text-accent-soft hover:text-fg">
-              ＋ 枠を追加
+              {t("layoutEditor.addPlaceholder")}
             </button>
           </div>
         </div>
       ))}
       <button onClick={() => onChange([...layouts, newLayout(layouts.length + 1)])} className="self-start text-accent-soft hover:text-fg">
-        ＋ カスタムレイアウトを追加
+        {t("layoutEditor.addCustomLayout")}
       </button>
     </div>
   );

@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as yaml from "js-yaml";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 
@@ -26,6 +27,7 @@ export default function EdgeStyleControls({
   diagramYaml: string;
   onChange: (yaml: string) => void;
 }) {
+  const { t } = useTranslation();
   const [sel, setSel] = useState(0);
 
   let edges: RawEdge[];
@@ -64,7 +66,7 @@ export default function EdgeStyleControls({
   return (
     <div className="mt-2 border-t border-edge pt-2 flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-faint uppercase tracking-wider">矢印スタイル</span>
+        <span className="text-[10px] text-faint uppercase tracking-wider">{t("edgeStyle.arrowStyle")}</span>
         <select
           value={idx}
           onChange={(e) => setSel(Number(e.target.value))}
@@ -80,7 +82,7 @@ export default function EdgeStyleControls({
 
       <div className="flex items-center gap-3 flex-wrap text-[11px] text-fg2">
         <label className="flex items-center gap-1">
-          <span className={lbl}>太さ</span>
+          <span className={lbl}>{t("edgeStyle.width")}</span>
           <input
             type="number"
             min={1}
@@ -98,11 +100,11 @@ export default function EdgeStyleControls({
             checked={!!style.dash}
             onChange={(e) => patch({ dash: e.target.checked })}
           />
-          <span>点線</span>
+          <span>{t("edgeStyle.dashed")}</span>
         </label>
 
         <label className="flex items-center gap-1">
-          <span className={lbl}>色</span>
+          <span className={lbl}>{t("edgeStyle.color")}</span>
           <input
             type="color"
             value={style.color ?? "#94A3B8"}
@@ -113,7 +115,7 @@ export default function EdgeStyleControls({
       </div>
 
       <label className="flex items-center gap-2 text-[11px] text-fg2">
-        <span className={lbl}>始点位置</span>
+        <span className={lbl}>{t("edgeStyle.startPosition")}</span>
         <input
           type="range"
           min={-0.45}
@@ -126,7 +128,7 @@ export default function EdgeStyleControls({
         <button
           onClick={() => patch({ srcPort: 0 })}
           className="text-[10px] text-muted hover:text-fg px-1"
-          title="始点位置をリセット"
+          title={t("edgeStyle.resetStartPosition")}
         >
           ⟲
         </button>

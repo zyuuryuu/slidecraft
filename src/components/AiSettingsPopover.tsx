@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { PROVIDERS } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
 import type { AiGeneration } from "./useAiGeneration";
@@ -13,6 +14,7 @@ const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
  * logic (useAiGeneration) is unchanged: this is a pure re-home of the same controls.
  */
 export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
+  const { t } = useTranslation();
   const toneColor =
     ai.connection.tone === "ok" ? "text-green-400"
     : ai.connection.tone === "err" ? "text-red-400"
@@ -20,7 +22,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
     : "text-amber-400";
   return (
     <div className="flex flex-col gap-2.5 p-3">
-      <div className="text-[11px] font-medium text-fg2">AI 設定</div>
+      <div className="text-[11px] font-medium text-fg2">{t("aiSettings.title")}</div>
 
       <div className="flex items-center gap-2 text-[11px] flex-wrap">
         <span className={toneColor}>●</span>
@@ -29,7 +31,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
       </div>
 
       <div className="flex items-center gap-2 text-[11px] flex-wrap">
-        <span className="shrink-0 text-muted">プロバイダ</span>
+        <span className="shrink-0 text-muted">{t("aiSettings.provider")}</span>
         <select
           value={ai.provider}
           onChange={(e) => ai.setProvider(e.target.value as typeof ai.provider)}
@@ -43,9 +45,9 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           <button
             onClick={ai.switchToOllama}
             className="px-2 py-0.5 rounded bg-field text-accent-soft hover:bg-edge border border-edge"
-            title="ローカルの Ollama に切り替え"
+            title={t("aiSettings.switchToOllamaTitle")}
           >
-            🦙 Ollama → 使う
+            {t("aiSettings.switchToOllama")}
           </button>
         )}
         {runningInTauri() &&
@@ -57,22 +59,25 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
             <button
               onClick={ai.switchToBuiltin}
               className="px-2 py-0.5 rounded bg-field text-accent-soft hover:bg-edge border border-edge"
-              title="オフラインの組み込みモデルを起動（初回はモデルを自動ダウンロード）"
+              title={t("aiSettings.startBuiltinTitle")}
             >
               {ai.weightsPresent === false
-                ? `⬇ ${ai.builtinModel?.display ?? "オフラインAI"}（初回DL ${ai.builtinModel ? (ai.builtinModel.sizeMb / 1024).toFixed(1) : "?"}GB）`
+                ? t("aiSettings.downloadBuiltin", {
+                    model: ai.builtinModel?.display ?? t("aiSettings.offlineAiName"),
+                    gb: ai.builtinModel ? (ai.builtinModel.sizeMb / 1024).toFixed(1) : "?",
+                  })
                 : ai.provider === "builtin"
-                  ? "💻 オフラインAIを起動"
-                  : "💻 オフラインAIを使う"}
+                  ? t("aiSettings.startBuiltin")
+                  : t("aiSettings.useBuiltin")}
             </button>
           )}
         {runningInTauri() && ai.builtinStatus.kind === "running" && (
           <button
             onClick={ai.stopBuiltin}
             className="px-2 py-0.5 rounded bg-field text-fg2 hover:bg-edge border border-edge"
-            title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
+            title={t("aiSettings.stopBuiltinTitle")}
           >
-            ⏹ 停止
+            {t("aiSettings.stopBuiltin")}
           </button>
         )}
       </div>
@@ -81,8 +86,8 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
 
       {/* Best-of-N: generate N candidates for a single-slide edit and let the adoption gate pick the
           best. Capped at MAX_BEST_OF_N so a mistaken huge value can't spawn a runaway fan-out. */}
-      <label className="flex items-center gap-2 text-xs text-muted" title="1回の生成で候補を複数出し、採用ゲートで最良を提示（単一スライド編集）。1で無効。大きいほど品質↑・遅い/メモリ↑。">
-        <span className="text-fg2">候補数 (Best-of-N)</span>
+      <label className="flex items-center gap-2 text-xs text-muted" title={t("aiSettings.bestOfNTitle")}>
+        <span className="text-fg2">{t("aiSettings.bestOfNLabel")}</span>
         <input
           type="number"
           min={1}
@@ -91,7 +96,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           onChange={(e) => ai.setBestOfN(Number(e.target.value))}
           className={`${field} w-14`}
         />
-        <span className="text-faint">1〜{MAX_BEST_OF_N}</span>
+        <span className="text-faint">{t("aiSettings.bestOfNRange", { max: MAX_BEST_OF_N })}</span>
       </label>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -107,7 +112,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           // The builtin model is capability-selected + auto-adopted, not user-typed — show it
           // read-only (the real tier model, not a stale saved name) until it's actually running.
           <span className={`${field} w-44 text-muted flex items-center`}>
-            {ai.builtinModel?.display ?? "組み込みモデル"}
+            {ai.builtinModel?.display ?? t("aiSettings.builtinModel")}
           </span>
         ) : ai.models.length > 0 ? (
           <select
@@ -116,7 +121,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
             onChange={(e) => ai.setField("model", e.target.value)}
           >
             {ai.cfg.model && !ai.models.includes(ai.cfg.model) && (
-              <option value={ai.cfg.model}>{ai.cfg.model}（未インストール）</option>
+              <option value={ai.cfg.model}>{t("aiSettings.modelNotInstalled", { model: ai.cfg.model })}</option>
             )}
             {ai.models.map((m) => (
               <option key={m} value={m}>{m}</option>
@@ -133,7 +138,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         <button
           onClick={ai.refreshModels}
           type="button"
-          title="インストール済みモデルを取得"
+          title={t("aiSettings.refreshModels")}
           className={`${field} hover:bg-edge`}
         >
           ↻
@@ -144,7 +149,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
             <input
               className={`${field} w-56`}
               type="password"
-              placeholder={ai.preset.keyRequired ? "API key" : "API key (任意)"}
+              placeholder={ai.preset.keyRequired ? "API key" : t("aiSettings.apiKeyOptional")}
               value={ai.cfg.apiKey}
               onChange={(e) => ai.setField("apiKey", e.target.value)}
             />
@@ -154,7 +159,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
                 checked={ai.rememberKey}
                 onChange={(e) => ai.setRememberKey(e.target.checked)}
               />
-              キーを記憶
+              {t("aiSettings.rememberKey")}
             </label>
           </>
         )}

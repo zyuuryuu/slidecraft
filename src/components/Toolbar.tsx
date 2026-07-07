@@ -1,13 +1,15 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Transition } from "../engine/html-shell";
 
-/** HTML export transition choices offered in the File menu submenu (slide = default). */
-const HTML_TRANSITIONS: Array<{ v: Transition; label: string }> = [
-  { v: "slide", label: "スライド" },
-  { v: "fade", label: "フェード" },
-  { v: "zoom", label: "ズーム" },
-  { v: "push", label: "プッシュ" },
-];
+/** HTML export transition choices offered in the File menu submenu (slide = default).
+ *  `labelKey` is a toolbar-namespace i18n key resolved at render time. */
+const HTML_TRANSITIONS = [
+  { v: "slide", labelKey: "toolbar.transitionSlide" },
+  { v: "fade", labelKey: "toolbar.transitionFade" },
+  { v: "zoom", labelKey: "toolbar.transitionZoom" },
+  { v: "push", labelKey: "toolbar.transitionPush" },
+] as const satisfies ReadonlyArray<{ v: Transition; labelKey: string }>; // `as const` → labelKey narrows to a valid t() key
 
 interface ToolbarProps {
   onSave: () => void;
@@ -46,6 +48,7 @@ export default function Toolbar({
   canUndo,
   canRedo,
 }: ToolbarProps) {
+  const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
   const [htmlSub, setHtmlSub] = useState(false); // HTML export → transition flyout
   const btn = "px-3 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors";
@@ -59,10 +62,10 @@ export default function Toolbar({
 
       {onUndo && (
         <div className="flex items-center gap-0.5">
-          <button onClick={onUndo} disabled={!canUndo} title="元に戻す (⌘/Ctrl+Z)" className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
+          <button onClick={onUndo} disabled={!canUndo} title={t("toolbar.undo")} className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
             ↶
           </button>
-          <button onClick={onRedo} disabled={!canRedo} title="やり直す (⌘/Ctrl+Shift+Z)" className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
+          <button onClick={onRedo} disabled={!canRedo} title={t("toolbar.redo")} className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
             ↷
           </button>
         </div>
@@ -72,9 +75,9 @@ export default function Toolbar({
         <button
           onClick={onAiAssist}
           title={
-            aiCollabActive ? "協働編集中：別の AI とライブ共有中（クリックで AI ドックを開閉）"
-              : aiRunning > 0 ? `AI タスク ${aiRunning} 件 実行中`
-                : "AI（アシスト・協働・タスク履歴）"
+            aiCollabActive ? t("toolbar.aiCollabTitle")
+              : aiRunning > 0 ? t("toolbar.aiRunningTitle", { n: aiRunning })
+                : t("toolbar.aiTitle")
           }
           className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
             aiCollabActive
@@ -82,7 +85,7 @@ export default function Toolbar({
               : "bg-brand hover:bg-brand text-on-accent"
           }`}
         >
-          {aiCollabActive ? "✨ AI・協働編集中" : "✨ AI"}
+          {aiCollabActive ? t("toolbar.aiCollabLabel") : t("toolbar.aiLabel")}
           {aiCollabActive && <span className="text-emerald-400 leading-none animate-pulse">●</span>}
           {aiRunning > 0 && (
             <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-fg/25 text-[10px] leading-none animate-pulse">
@@ -100,7 +103,7 @@ export default function Toolbar({
           onClick={() => { setExportOpen((v) => !v); setHtmlSub(false); }}
           className="px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi text-on-accent font-medium rounded transition-colors inline-flex items-center gap-1.5"
         >
-          {generating ? "書き出し中…" : "ファイル"}
+          {generating ? t("toolbar.exporting") : t("toolbar.file")}
           <span className="text-[10px] opacity-80">▾</span>
         </button>
         {exportOpen && (
@@ -112,7 +115,7 @@ export default function Toolbar({
                   onClick={() => { setExportOpen(false); onOpenProject(); }}
                   className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
                 >
-                  <span>📂 プロジェクトを開く</span>
+                  <span>📂 {t("toolbar.openProject")}</span>
                   <span className="text-faint text-xs">.scft</span>
                 </button>
               )}
@@ -122,12 +125,12 @@ export default function Toolbar({
                   disabled={!hasSpec}
                   className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                 >
-                  <span>💾 プロジェクトを保存</span>
+                  <span>💾 {t("toolbar.saveProject")}</span>
                   <span className="text-faint text-xs">.scft</span>
                 </button>
               )}
               <div className="my-1 border-t border-edge" />
-              <div className="px-3 pb-0.5 text-[10px] text-faint">書き出す</div>
+              <div className="px-3 pb-0.5 text-[10px] text-faint">{t("toolbar.exportSection")}</div>
               <button
                 onClick={() => { setExportOpen(false); onGenerate(); }}
                 disabled={!hasSpec || generating}
@@ -149,18 +152,18 @@ export default function Toolbar({
                     className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                   >
                     <span>🌐 HTML</span>
-                    <span className="text-faint text-xs">遷移 ▸</span>
+                    <span className="text-faint text-xs">{t("toolbar.transition")} ▸</span>
                   </button>
                   {htmlSub && hasSpec && (
                     <div className="absolute right-full top-0 w-36 bg-canvas border border-edge rounded-lg shadow-2xl py-1">
-                      {HTML_TRANSITIONS.map(({ v, label }) => (
+                      {HTML_TRANSITIONS.map(({ v, labelKey }) => (
                         <button
                           key={v}
                           onClick={() => { setExportOpen(false); setHtmlSub(false); onExportHtml(v); }}
                           className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
                         >
-                          <span>{label}</span>
-                          {v === "slide" && <span className="text-faint text-[10px]">既定</span>}
+                          <span>{t(labelKey)}</span>
+                          {v === "slide" && <span className="text-faint text-[10px]">{t("toolbar.transitionDefault")}</span>}
                         </button>
                       ))}
                     </div>

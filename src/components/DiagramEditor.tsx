@@ -6,6 +6,7 @@
  * class / sequence), and surfaces validation inline.
  */
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import * as yaml from "js-yaml";
 import type { SlideIR } from "../engine/slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource, canSerializeToMermaid } from "../engine/mermaid-to-diagram";
@@ -37,6 +38,7 @@ export default function DiagramEditor({
   onUpdateMermaid: (mermaid: string) => void;
   onChange: (updated: SlideIR) => void;
 }) {
+  const { t } = useTranslation();
   const currentMode: DiagramMode = slide.mermaidBlock ? "mermaid" : "yaml";
   const [mode, setMode] = useState<DiagramMode>(currentMode);
 
@@ -156,13 +158,13 @@ export default function DiagramEditor({
         <select
           value={mode}
           onChange={(e) => switchMode(e.target.value as DiagramMode)}
-          title={mermaidIncompatible ? "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。" : "編集フォーマットを選択"}
+          title={mermaidIncompatible ? t("diagramEditor.mermaidIncompatibleHint") : t("diagramEditor.selectEditFormat")}
           className="px-2 py-0.5 bg-field border border-edge rounded text-[11px] text-fg hover:border-accent/60"
         >
           <option value="yaml">YAML</option>
           <option value="json">JSON</option>
           <option value="mermaid" disabled={mermaidIncompatible && mode !== "mermaid"}>
-            {mermaidIncompatible && mode !== "mermaid" ? "MERMAID（変換不可）" : "MERMAID"}
+            {mermaidIncompatible && mode !== "mermaid" ? t("diagramEditor.mermaidNotConvertible") : "MERMAID"}
           </option>
         </select>
       </div>

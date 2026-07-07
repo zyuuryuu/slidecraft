@@ -4,9 +4,11 @@
  * unchanged lines muted. Makes "what did the AI change/remove?" visible before apply.
  */
 
+import { useTranslation } from "react-i18next";
 import { lineDiff, diffStat } from "../engine/line-diff";
 
 export default function DiffView({ before, after, fill }: { before: string; after: string; fill?: boolean }) {
+  const { t } = useTranslation();
   const rows = lineDiff(before, after);
   const { del, add } = diffStat(rows);
   return (
@@ -15,8 +17,8 @@ export default function DiffView({ before, after, fill }: { before: string; afte
       style={fill ? undefined : { maxHeight: 160 }}
     >
       <div className="px-3 py-0.5 text-faint sticky top-0 bg-void">
-        変更: <span className="text-red-400">−{del}</span> <span className="text-green-400">+{add}</span>
-        {del === 0 && add === 0 && <span className="text-dim"> （変更なし）</span>}
+        {t("diffView.changes")} <span className="text-red-400">−{del}</span> <span className="text-green-400">+{add}</span>
+        {del === 0 && add === 0 && <span className="text-dim"> {t("diffView.noChanges")}</span>}
       </div>
       <div className="px-3 pb-2">
         {rows.map((r, i) => (

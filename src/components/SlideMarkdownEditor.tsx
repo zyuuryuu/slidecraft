@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SlideMarkdownEditorProps {
   md: string;
@@ -15,6 +16,7 @@ interface SlideMarkdownEditorProps {
 }
 
 export default function SlideMarkdownEditor({ md, onChange }: SlideMarkdownEditorProps) {
+  const { t } = useTranslation();
   const [text, setText] = useState(md);
   const [prevMd, setPrevMd] = useState(md);
   const [focused, setFocused] = useState(false);
@@ -41,7 +43,7 @@ export default function SlideMarkdownEditor({ md, onChange }: SlideMarkdownEdito
       onBlur={() => setFocused(false)}
       spellCheck={false}
       className="h-full w-full px-3 py-2 bg-canvas text-sm text-fg2 font-mono resize-none outline-none leading-relaxed"
-      placeholder={"# 見出し\n> サブタイトル\n\n- 箇条書き\n- 箇条書き"}
+      placeholder={t("slideMdEditor.placeholder")}
     />
   );
 }

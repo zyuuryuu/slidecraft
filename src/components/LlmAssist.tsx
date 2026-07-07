@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { generateCombinedPrompt, DIAGRAM_TYPES } from "../engine/llm-prompts";
 import { PROVIDERS, type ProviderId } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
@@ -33,6 +34,7 @@ interface LlmAssistProps {
 }
 
 export default function LlmAssist({ isOpen, onClose, onImportResult, templateHint, catalog, ai }: LlmAssistProps) {
+  const { t } = useTranslation();
   // The dialog only offers whole-deck or diagram generation (not single-slide).
   const [mode, setMode] = useState<"slides" | "diagram">("slides");
   // Diagram type (Stage 1 of the two-stage design): "auto" lets the AI route; a concrete type sends
@@ -84,7 +86,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
       <div className="bg-canvas border border-edge rounded-lg w-[800px] max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
-          <h2 className="text-fg font-semibold">✨ AIで生成 — 原稿からデッキを生成</h2>
+          <h2 className="text-fg font-semibold">{t("llmAssist.title")}</h2>
           <button onClick={onClose} className="text-muted hover:text-fg text-lg">
             ×
           </button>
@@ -116,13 +118,13 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             </div>
             {mode === "diagram" && (
               <div className="flex items-center gap-2 mb-2">
-                <label className="text-xs text-muted shrink-0">図の種類</label>
+                <label className="text-xs text-muted shrink-0">{t("llmAssist.diagramTypeLabel")}</label>
                 <select
                   value={diagramType}
                   onChange={(e) => setDiagramType(e.target.value as DiagramTypeChoice)}
                   className="px-2 py-1 text-xs bg-field border border-edge rounded text-fg"
                 >
-                  <option value="auto">おまかせ（AIが選ぶ）</option>
+                  <option value="auto">{t("llmAssist.diagramTypeAuto")}</option>
                   {Object.entries(DIAGRAM_TYPES).map(([t, info]) => (
                     <option key={t} value={t}>{info.label}</option>
                   ))}
@@ -135,8 +137,8 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               rows={3}
               className={fieldClass}
               placeholder={mode === "slides"
-                ? "例: CRM移行プロジェクトの進捗報告（10枚程度、現状分析・比較・ロードマップを含む）"
-                : "例: 3層Webアプリのネットワーク構成図（LB→Web→App→DB、DMZあり）"
+                ? t("llmAssist.requestPlaceholderSlides")
+                : t("llmAssist.requestPlaceholderDiagram")
               }
             />
           </div>
@@ -181,9 +183,9 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                 <button
                   onClick={ai.switchToOllama}
                   className="px-2 py-0.5 rounded bg-edge text-accent-soft hover:bg-edge2 shrink-0"
-                  title="ローカルの Ollama に切り替え"
+                  title={t("llmAssist.switchToOllamaTitle")}
                 >
-                  🦙 Ollama検出（{ai.ollamaModels.length}）→ 使う
+                  {t("llmAssist.ollamaDetected", { count: ai.ollamaModels.length })}
                 </button>
               )}
               {runningInTauri() &&
@@ -192,18 +194,18 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                   <button
                     onClick={ai.switchToBuiltin}
                     className="px-2 py-0.5 rounded bg-edge text-accent-soft hover:bg-edge2 shrink-0"
-                    title="オフラインの組み込みモデルを使う（初回はモデルを自動ダウンロード）"
+                    title={t("llmAssist.useBuiltinTitle")}
                   >
-                    {ai.weightsPresent === false ? "⬇ オフラインAI（初回DL 2.4GB）" : "💻 オフラインAIを使う"}
+                    {ai.weightsPresent === false ? t("llmAssist.builtinDownload") : t("llmAssist.builtinUse")}
                   </button>
                 )}
               {runningInTauri() && ai.builtinStatus.kind === "running" && (
                 <button
                   onClick={ai.stopBuiltin}
                   className="px-2 py-0.5 rounded bg-edge text-fg2 hover:bg-edge2 shrink-0"
-                  title="組み込みAIを停止してメモリを解放（次の生成で自動起動）"
+                  title={t("llmAssist.stopBuiltinTitle")}
                 >
-                  ⏹ 停止
+                  {t("llmAssist.stopBuiltin")}
                 </button>
               )}
             </div>
@@ -227,7 +229,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
                   className={`${fieldClass} font-mono text-xs flex-1`}
                 >
                   {ai.cfg.model && !ai.models.includes(ai.cfg.model) && (
-                    <option value={ai.cfg.model}>{ai.cfg.model}（未インストール）</option>
+                    <option value={ai.cfg.model}>{t("llmAssist.modelNotInstalled", { model: ai.cfg.model })}</option>
                   )}
                   {ai.models.map((m) => (
                     <option key={m} value={m}>{m}</option>
@@ -246,7 +248,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               <button
                 onClick={ai.refreshModels}
                 type="button"
-                title="インストール済みモデルを取得"
+                title={t("llmAssist.refreshModelsTitle")}
                 className="px-2 py-2 text-xs bg-edge text-fg2 rounded shrink-0"
               >
                 ↻
@@ -255,8 +257,8 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             {!ai.preset.native && ai.models.length === 0 && (
               <span className="text-[10px] text-faint">
                 {ai.modelsError
-                  ? `モデル一覧を取得できません（${ai.modelsError}）。Base URL を確認、↻ で再取得。手入力も可。`
-                  : "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。"}
+                  ? t("llmAssist.modelsFetchError", { error: ai.modelsError })
+                  : t("llmAssist.modelsEmpty")}
               </span>
             )}
 

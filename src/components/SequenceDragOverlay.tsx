@@ -10,6 +10,7 @@
  */
 
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as yaml from "js-yaml";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export default function SequenceDragOverlay({ diagramYaml, editable = false, onChange, region }: Props) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string } | null>(null);
   const movedRef = useRef(false);
@@ -181,7 +183,7 @@ export default function SequenceDragOverlay({ diagramYaml, editable = false, onC
       />
       {editable && pct && (
         <div
-          title="左右にドラッグで参加者を並べ替え"
+          title={t("seqOverlay.reorderHint")}
           style={{
             position: "absolute",
             left: `${pct.left}%`,

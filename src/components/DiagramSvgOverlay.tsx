@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as yaml from "js-yaml";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
@@ -45,6 +46,7 @@ export default function DiagramSvgOverlay(props: OverlayProps) {
 type Override = { x?: number; y?: number; w?: number; h?: number };
 
 function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }: OverlayProps) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const moveRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
   const resizeRef = useRef<{ id: string; x: number; y: number } | null>(null);
@@ -316,7 +318,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
           {/* bottom-right resize handle */}
           <div
             onPointerDown={onResizeDown}
-            title="ドラッグでリサイズ"
+            title={t("diagramOverlay.resizeDragHint")}
             style={{
               position: "absolute",
               left: `${pct.left + pct.width}%`,
@@ -336,7 +338,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => clearOverride(selected!)}
-              title="自動配置に戻す"
+              title={t("diagramOverlay.resetToAutoLayout")}
               style={{
                 position: "absolute",
                 left: `${pct.left + pct.width}%`,
@@ -366,7 +368,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
           <div
             key={`ep-${h.idx}`}
             onPointerDown={(e) => onEdgePortDown(e, h.idx, h.side, h.node)}
-            title="ドラッグで矢印の始点を移動"
+            title={t("diagramOverlay.moveArrowStartHint")}
             style={{
               position: "absolute",
               left: `${((h.x * baseTf.scale + baseTf.offsetX) / DIAGRAM_W) * 100}%`,

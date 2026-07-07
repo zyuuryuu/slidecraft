@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { AiGeneration } from "./useAiGeneration";
 
 /**
@@ -9,19 +10,20 @@ import type { AiGeneration } from "./useAiGeneration";
  * AND ipc/ai.generateWithAI — this checkbox is just the UI).
  */
 export default function LocalOnlyToggle({ ai }: { ai: AiGeneration }) {
+  const { t } = useTranslation();
   return (
     <details open={ai.localModelOnly} className="text-[11px]">
       <summary className="cursor-pointer select-none text-faint hover:text-fg2 flex items-center gap-1.5">
-        <span>⚙ 上級設定</span>
+        <span>⚙ {t("localOnly.advancedSettings")}</span>
         {ai.localBlocked && (
           <span className="px-1.5 py-0.5 rounded bg-danger text-danger-soft text-[10px]">
-            クラウド送信ブロック中
+            {t("localOnly.cloudBlockedBadge")}
           </span>
         )}
       </summary>
       <label
         className="mt-1.5 flex items-center gap-1.5 text-fg2 cursor-pointer select-none"
-        title="クラウドのプロバイダ/エンドポイントへの送信をブロックし、ローカル（Ollama / localhost / LAN）のみ許可します"
+        title={t("localOnly.toggleTitle")}
       >
         <input
           type="checkbox"
@@ -29,7 +31,7 @@ export default function LocalOnlyToggle({ ai }: { ai: AiGeneration }) {
           onChange={(e) => ai.setLocalModelOnly(e.target.checked)}
           className="accent-accent"
         />
-        🔒 ローカルモデル限定
+        🔒 {t("localOnly.localModelOnly")}
       </label>
     </details>
   );

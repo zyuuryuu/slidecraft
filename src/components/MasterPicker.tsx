@@ -5,6 +5,7 @@
  * in the Draft header (select-only — omit onImport). Applying is gated by the caller (collab lock).
  */
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { MasterEntry } from "./useMasterRegistry";
 
 interface MasterPickerProps {
@@ -21,6 +22,7 @@ interface MasterPickerProps {
 }
 
 export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onCreate, disabled }: MasterPickerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -48,11 +50,11 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        title="このデッキで使うスライドマスター"
+        title={t("masterPicker.buttonTitle")}
         className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge inline-flex items-center gap-1.5 max-w-[220px]"
       >
         <span className="shrink-0">🎨</span>
-        <span className="truncate">{active ? active.name : "マスター選択"}</span>
+        <span className="truncate">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
       </button>
 
@@ -69,7 +71,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
                 }`}
               >
                 <span className="w-3 shrink-0 text-center">{isActive ? "✓" : ""}</span>
-                <span className="truncate">{m.name}{m.builtin ? "（内蔵）" : ""}</span>
+                <span className="truncate">{m.name}{m.builtin ? t("masterPicker.builtinSuffix") : ""}</span>
               </button>
             );
           })}
@@ -77,31 +79,31 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
           {onImport && (
             <button
               onClick={() => { onImport(); setOpen(false); }}
-              title=".pptx のレイアウト・プレースホルダをそのまま活かして取り込む"
+              title={t("masterPicker.importTitle")}
               className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
               <span className="w-3 shrink-0 text-center">＋</span>
-              <span>マスターを取り込む（.pptx）</span>
+              <span>{t("masterPicker.importLabel")}</span>
             </button>
           )}
           {onRemake && (
             <button
               onClick={() => { onRemake(); setOpen(false); }}
-              title=".pptx からフォント・配色・背景だけを受け継ぎ、SlideCraft のレイアウトで作り直す"
+              title={t("masterPicker.remakeTitle")}
               className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
               <span className="w-3 shrink-0 text-center">＋</span>
-              <span>テーマだけ取り込む（Re-make）</span>
+              <span>{t("masterPicker.remakeLabel")}</span>
             </button>
           )}
           {onCreate && (
             <button
               onClick={() => { onCreate(); setOpen(false); }}
-              title="配色とフォントを選んで新しいテンプレを生成する"
+              title={t("masterPicker.createTitle")}
               className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
             >
               <span className="w-3 shrink-0 text-center">＋</span>
-              <span>テンプレを作成…</span>
+              <span>{t("masterPicker.createLabel")}</span>
             </button>
           )}
         </div>
