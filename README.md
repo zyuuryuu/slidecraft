@@ -1,120 +1,96 @@
 # SlideCraft
 
-Markdown で書いたスライドを会社テンプレート PPTX に流し込むデスクトップアプリ。
-LLM が Markdown を書き、人間が WYSIWYG プレビューで確認・PPTX を生成するワークフローを想定。
+**Markdown をあなたの会社テンプレートに流し込んで、整った PowerPoint を作るデスクトップアプリ。**
+フォントもレイアウトも崩さず、図も表も**編集可能な PPTX** として出力します。
 
-Tauri v2 + React + TypeScript + JSZip で構築。
+> 📖 使い方は **[ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)** へ —
+> [インストール](https://zyuuryuu.github.io/slidecraft/guide/installation.html)・
+> [スターター](https://zyuuryuu.github.io/slidecraft/guide/getting-started.html)・
+> [Markdown](https://zyuuryuu.github.io/slidecraft/guide/markdown-authoring.html)・
+> [図](https://zyuuryuu.github.io/slidecraft/guide/diagrams.html)・
+> [AI設定](https://zyuuryuu.github.io/slidecraft/guide/ai-setup.html)・
+> [MCP](https://zyuuryuu.github.io/slidecraft/guide/mcp.html)・
+> [FAQ](https://zyuuryuu.github.io/slidecraft/guide/faq.html)
 
-## 機能
+Tauri v2 + React + TypeScript で構築。**Apache-2.0**。
 
-- **Markdown → PPTX** — Markdown を書くだけでテンプレート PPTX のプレースホルダーにテキストを流し込み
-- **WYSIWYG プレビュー** — テンプレートの装飾・色・フォントを反映したスライドプレビュー
-- **30種レイアウト** — タイトル / セクション / コンテンツ / カラム / KPI / チャート / 比較 / プロセス等
-- **テンプレート読み込み・修復取り込み** — 既存の .pptx テンプレートを読み込んでスタイルを適用。
-  タイトル/本文枠が壊れたテンプレも診断→「整形して取り込む」で救済
-- **テンプレート新規作成** — 配色・フォントを選ぶ（または ✨AI に自然言語で提案させる）だけで
-  新しいテンプレ PPTX をゼロから生成・登録。作成/取込したテンプレはデスクトップでは永続保存
-- **ダイアグラムモード** — YAML/JSON でフローチャート・スイムレーンを PPTX 出力 (PptxGenJS)
-- **クロスプラットフォーム** — Windows (.msi) / macOS (.dmg) / Linux (.AppImage, .deb)
-- **AI エージェント連携 (MCP)** — 上流の AI から SlideCraft を駆動する headless な stdio MCP
-  サーバ `slidecraft serve`。接続方法・ツール一覧・使い方は [docs/mcp-server.md](docs/mcp-server.md) を参照
+## なぜ SlideCraft か
 
-## セットアップ
+「Markdown でスライドを書く」ツールは他にもあります。SlideCraft が違うのは、**あなたの会社テンプレートの見た目を一切崩さず、編集可能な本物の PowerPoint を、最小の計算量で作る**ところです。
 
-### 前提条件
+- 🎯 **テンプレに流し込む、崩さない** — 既存 `.pptx` テンプレのプレースホルダに Markdown を流し込む。フォント・配色・レイアウト・マスター装飾はそのまま。
+- ✏️ **画像じゃない、編集できる図形** — 図・表・ダイアグラムは**ネイティブな PPTX シェイプ**として出力。受け取った人が PowerPoint でそのまま手直しできます。
+- 🧠 **配置は決定論エンジンが整える** — レイアウトはテンプレの役割から自動選択（**どんなマスターでも動く**）、本文は容量内に収め、あふれはフォントを縮めず自動分割、配色はコントラスト保証。
+- ⚡ **計算量は必要最小限、品質は保証** — 整形・配置・検証を決定論エンジンが担うので、AI に必要なのは Markdown を書くことだけ。**小さなローカルモデルで足り、トークンも最小**。AI 出力は適用前に採用ゲートで検証（*harness over model*）。
+- 👁 **プレビュー＝出力** — プレビュー・PPTX・HTML が**同じ描画エンジン**を共有。「プレビューと本番が違った」がありません。
+- 📊 **12 種のネイティブ図＋Mermaid** — フローチャート・ガント・KPI・レーダー…を数行の YAML から編集可能な図形で。
+- 🔒 **ローカルファースト＋AI** — デスクトップ＋内蔵オフライン AI（llamafile）。データは手元に。上流 AI に [MCP](https://zyuuryuu.github.io/slidecraft/guide/mcp.html) で駆動させることも。
 
-- Node.js 20+
-- Rust 1.70+ (Tauri ビルド用)
-- Linux の場合: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, `libssl-dev`, `patchelf`
+## インストール
 
-### インストール
+### エンドユーザ（配布版）
 
-```bash
-git clone git@github.com:zyuuryuu/slidecraft.git
-cd slidecraft
-npm install
-```
-
-### 配布版のインストール（エンドユーザ向け）
-
-- **Windows / Linux** — [Releases](https://github.com/zyuuryuu/slidecraft/releases) から `.msi` / `.AppImage` / `.deb` を取得。
-- **macOS** — ad-hoc 署名（ノータライズなし）のため、**Homebrew tap 経由**が最もクリーンです:
+- **macOS（Apple Silicon）** — Homebrew tap 経由が最もクリーンです（`brew` が quarantine を剥がすので、ad-hoc 署名でも初回警告なしで開けます）:
 
   ```bash
   brew install --cask zyuuryuu/slidecraft/slidecraft
   ```
 
-  `brew` はインストール時に quarantine 属性を剥がすため、初回起動の警告なしで開けます。
-  直接 `.dmg` をダウンロードした場合は初回のみ右クリック →「開く」、または
-  `xattr -dr com.apple.quarantine /Applications/SlideCraft.app` が必要です。
-  詳細・tap の公開手順は [packaging/homebrew/README.md](packaging/homebrew/README.md) を参照。
+  直接 `.dmg` を落とした場合は初回のみ Finder で右クリック →「開く」、または `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`。Intel Mac 版は現在未提供です。
+- **Windows / Linux** — [Releases](https://github.com/zyuuryuu/slidecraft/releases) から `.msi` / `.exe`（Windows）・`.AppImage` / `.deb` / `.rpm`（Linux）を取得。
 
-## 開発
+詳しくは [インストールガイド](https://zyuuryuu.github.io/slidecraft/guide/installation.html)。
+
+### 開発（ソースから）
+
+前提: Node.js 20+ ／ Rust 1.70+ ／ Linux は `libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev patchelf`。
 
 ```bash
-npm run dev          # Vite dev server (localhost:5173)
-npm run tauri dev    # Tauri + Vite 同時起動
+git clone git@github.com:zyuuryuu/slidecraft.git
+cd slidecraft && npm install
+npm run tauri dev    # Tauri + Vite を同時起動（npm run dev はブラウザ demo）
 ```
 
-## テスト
+## 開発コマンド
 
 ```bash
-npm test             # ユニットテスト (Vitest, 402 tests)
-npm run test:e2e     # E2E テスト (Playwright, 6 tests)
+npm test             # ユニットテスト (Vitest)
+npm run typecheck:mcp # MCP レイヤの型チェック（app build は src/mcp を除外）
 npm run lint         # ESLint
-```
-
-## ビルド
-
-```bash
+npm run test:e2e     # E2E (Playwright)
 npm run build        # フロントエンドビルド (tsc + vite)
 npm run tauri build  # インストーラ生成
+npm run docs:dev     # ドキュメントサイト (VitePress) をローカルで
 ```
+
+貢献方法・コーディング規約は [開発・貢献ガイド](https://zyuuryuu.github.io/slidecraft/guide/contributing.html) を参照。
 
 ## プロジェクト構成
 
 ```text
 src/
   engine/            # 純粋ロジック (DOM/Tauri API 依存なし)
-    schema.ts        # Zod スキーマ定義
-    theme.ts         # テーマ設定・YAML パーサー
-    layout-engine.ts # ダイアグラムレイアウト計算
     diagram-painter.ts # 共有 painter (プレビュー SVG ＝ PPTX ネイティブ図形)
-    diagram-icons.ts # ノードアイコン (ネイティブグリフ)
     placeholder-filler.ts # Markdown→PPTX テンプレ流し込み
-    theme-extractor.ts # PPTX からテーマ抽出
-  components/        # React UI コンポーネント
-  ipc/               # Tauri IPC ブリッジ
-src-tauri/           # Rust バックエンド
-tests/               # ユニットテスト
-tests/e2e/           # Playwright E2E テスト
-docs/                # 設計ドキュメント
-themes/              # テーマ YAML ファイル
+    template-writer.ts # TemplateSpec → テンプレ PPTX 生成
+    …
+  components/        # React UI ／ ipc/ # Tauri IPC ／ mcp/ # MCP サーバ
+src-tauri/           # Rust バックエンド（sidecar・keychain・モデルDL）
+tests/ · tests/e2e/  # Vitest ／ Playwright
+docs/                # ドキュメントサイト (VitePress)・ADR・設計
 public/templates/    # スライドマスター (.pptx)
 ```
 
 ## 技術スタック
 
-- **デスクトップシェル**: Tauri v2 (Rust)
-- **フロントエンド**: React 19 + TypeScript 5.9
-- **ビルド**: Vite 8
-- **エディタ**: CodeMirror 6
-- **プレビュー**: 共有 painter (ネイティブ図形 SVG)／Mermaid.js (一部フォールバック)
-- **PPTX 生成**: PptxGenJS
-- **スキーマ検証**: Zod
-- **スタイリング**: Tailwind CSS 4
-- **テスト**: Vitest + Playwright
-- **CI**: GitHub Actions
+Tauri v2 (Rust) ／ React 19 + TypeScript 5.9 ／ Vite 8 ／ CodeMirror 6 ／ 共有 painter（ネイティブ図形 SVG）＋一部 Mermaid.js ／ PptxGenJS ／ Zod ／ Tailwind CSS 4 ／ Vitest + Playwright ／ 内蔵 AI = llamafile。
 
 ## ドキュメント
 
-- 📖 **[ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)** — 使い方（インストール・スターター・Markdown・図・テンプレート・AI・MCP・FAQ）｜ソースは [docs/guide/](docs/guide/)・単一ファイル版は [docs/user-guide.md](docs/user-guide.md)
-- [アーキテクチャ決定記録 (ADR)](docs/adr/) — 決定済み＆実装済みの設計判断
-- [ロードマップ](docs/ROADMAP.md) — 前方向きの計画
-- [実装済みログ](docs/shipped.md) — 出荷済み機能の履歴
-- [詳細設計](docs/design/) — 補助設計資料
-- [MCP サーバの使い方](docs/mcp-server.md)
+- 📖 **[ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)** — 使い方（インストール・スターター・Markdown・図・テンプレート・AI・MCP・FAQ）
 - [SKILL.md](SKILL.md) — 上流 AI 向けの利用スキル（MCP 経由でデッキを著作する手順・契約）
+- [MCP サーバ仕様](docs/mcp-server.md) — 全ツール・リソース・エラー契約
+- [アーキテクチャ決定記録 (ADR)](docs/adr/) ／ [ロードマップ](docs/ROADMAP.md) ／ [実装済みログ](docs/shipped.md) ／ [詳細設計](docs/design/)
 - [リリース手順](RELEASING.md) — バージョニング方針とリリース手順
 
 ## ライセンス
