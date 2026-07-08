@@ -54,3 +54,21 @@ tests/fixtures/templates/CX_sample_MSGothic.pptx
 # Company source templates (.potx) — real IP, kept LOCAL only, never committed.
 # Some tests reference them via skipIf(existsSync) so they simply skip in CI.
 tests/fixtures/templates/*.potx
+
+# Signing keys / secrets — NEVER commit. Windows signing uses the SignPath HSM (the key never
+# reaches this repo or CI); a future updater key + any local secrets stay out of git. Belt-and-
+# suspenders: CI also runs gitleaks (see .github/workflows/security.yml). Cf. CODE_SIGNING_POLICY.md.
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.pgp
+*.asc
+*.sec
+minisign.key
+*.minisign
+.env
+.env.local
+.env.*.local

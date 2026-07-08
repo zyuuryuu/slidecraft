@@ -64,6 +64,11 @@ Development builds, forks, and locally built binaries are never signed with the 
   cannot extract or use the key outside SignPath's infrastructure.
 - Signing requests are authorized by the maintainer through SignPath and are further constrained by
   SignPath's per-project policy (origin repository, workflow, and trigger).
+- **Defense in depth against accidental leaks.** No signing key or updater key is committed or handled
+  in CI today. To keep it that way, key/secret file patterns are `.gitignore`d and CI runs
+  [gitleaks](.github/workflows/security.yml) on every push/PR — a **required** gate that blocks the
+  merge if any credential or private key is ever committed. The SignPath API token (added after
+  approval) is stored as a GitHub encrypted secret and used only by the tag-triggered release job.
 
 ## Authorization and roles
 

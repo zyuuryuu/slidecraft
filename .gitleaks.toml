@@ -1,0 +1,17 @@
+# gitleaks configuration — secret scanning for the SlideCraft repo.
+#
+# Uses gitleaks' default rule set (which matches real credential FORMATS: PEM private-key headers,
+# cloud keys, ghp_/github tokens, etc.) and allowlists a small number of obviously-fake TEST FIXTURES
+# that the generic heuristics flag. Keep this list tight — never allowlist by broad path, and never
+# add a real secret here.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Obviously-fake dummy values in tests — not real secrets."
+regexes = [
+  # collab READY-handshake round-trip fixture (tests/host-handshake.test.ts): a dummy bearer token
+  # used only to prove formatReadyLine/parseReadyLine round-trip. Not a credential.
+  '''abc\.DEF-123_xyz''',
+]
