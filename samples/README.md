@@ -3,6 +3,10 @@
 SlideCraft をさまざまな入力で触って検証するためのサンプル。全ファイルは `parseMd` /
 `structureManuscript` / `diagnoseDeck` で検証済み（`samples valid`）。
 
+> **全機能デモ → [`sample-deck.md`](sample-deck.md)**（約30枚・全図表タイプ網羅／v0.2.0 まで
+> 起動時に自動表示していたデッキ）。Draft に丸ごと貼り付けて「スライドにする」と、ネイティブ図・
+> `mermaid`・表・多カラム・各種レイアウトを一度に試せます。
+
 ## 使い方
 
 - **生原稿（`manuscript-*.md`）**：起動後 **📝 Draft** → モーダルで本文を貼り付け（または
