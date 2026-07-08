@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, usesMetaIdxConvention, type LayoutCatalog, type LayoutRole } from "./template-catalog";
+import { pickLayout, usesMetaIdxConvention, recoverLayoutTitle, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
@@ -35,6 +35,10 @@ export interface PlaceholderInfo {
   name: string; // shape name from cNvPr
   shapeXml: string; // full normalized shape XML for cloning into slides
   style: PlaceholderStyle; // extracted position + style for preview
+  // ADR-0025: a role resolved at load by the gated title recovery (recoverLayoutTitle). When set,
+  // placeholderRole returns it verbatim — so a body-typed/mis-authored "Title" placeholder binds the
+  // deck title. Only ever set to "title", and only when the layout had no title role (gate).
+  resolvedRole?: PlaceholderRole;
   // Whether THIS template uses SlideCraft's idx-meta convention (idx 10/11/12→category/date/footer,
   // 15/16→title/subtitle). Stamped per-template at load (usesMetaIdxConvention). A bare third-party
   // master (no dotted names, no typed sldNum/dt/ftr meta — e.g. CX Sample) sets it false so its
@@ -599,6 +603,10 @@ export async function loadTemplate(
   // master opts out → its body-typed idx-10..16 placeholders bind as real content (CX Sample fix).
   const metaIdxConvention = usesMetaIdxConvention(layouts);
   for (const l of layouts) for (const p of l.placeholders) p.metaIdxConvention = metaIdxConvention;
+  // ADR-0025: roles are now final (metaIdxConvention stamped) — run the gated title recovery per
+  // layout so a body-typed/mis-authored "Title" placeholder is resolved to the title role. Gated on
+  // "no title present", so title-typed (healthy) layouts are untouched.
+  for (const l of layouts) recoverLayoutTitle(l.placeholders);
 
   const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);

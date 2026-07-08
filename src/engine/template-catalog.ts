@@ -237,6 +237,9 @@ function nameRole(name: string): PlaceholderRole | null {
  * conventional-idx branch returns exactly as before → healthy masters are byte-identical.
  */
 export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
+  // ADR-0025: a load-time role resolved by the gated title recovery (recoverLayoutTitle) wins over
+  // the context-free ladder, so binding/catalog/fieldMap all see the SAME promoted role (bijection).
+  if (ph.resolvedRole) return ph.resolvedRole;
   const t = ph.type.toLowerCase();
   const idx = ph.idx;
   // Explicit placeholder TYPE is authoritative — it must win over the idx convention (a template
@@ -272,6 +275,39 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   if (n) return n;
   if (ph.style.w > 0 && ph.style.h > 0 && ph.style.w * ph.style.h >= 1.0) return "body"; // T5 area
   return "other";
+}
+
+/**
+ * ADR-0025 — GATED title recovery over ONE layout's placeholders. `title` is a critical layout
+ * attribute, so identify it by every means; but names are noise for binding, so promotion is gated:
+ *
+ *   - fires ONLY when the layout has NO title-role placeholder (can never steal a real title →
+ *     healthy templates are byte-identical, since they carry a title type/idx),
+ *   - only a PROMOTABLE box (base role body/other — never a meta role like date/footer/subtitle),
+ *   - CONSENSUS: the name must say "title" (nameRole excludes subtitle) AND it must sit at idx 0
+ *     (PowerPoint's title slot) OR have title geometry (top band, wide, short).
+ *
+ * Mutates the winner's `resolvedRole` so every role consumer (bind/catalog/fieldMap) agrees.
+ * Idempotent: a second call sees the promoted title via the gate and no-ops. Pure (R2).
+ */
+export function recoverLayoutTitle(placeholders: PlaceholderInfo[]): void {
+  if (placeholders.some((p) => placeholderRole(p) === "title")) return; // gate: a real title exists
+  let best: PlaceholderInfo | null = null;
+  let bestScore = -1;
+  for (const p of placeholders) {
+    const base = placeholderRole(p);
+    if (base !== "body" && base !== "other") continue; // promotable, non-meta only
+    if (nameRole(p.name) !== "title") continue; // name says title (nameRole checks subtitle first)
+    const idx0 = p.idx === "0";
+    const geo = geometryRole(p.style) === "title";
+    if (!idx0 && !geo) continue; // consensus: name AND (idx0 OR title geometry)
+    const score = (idx0 ? 2 : 0) + (geo ? 1 : 0);
+    if (score > bestScore) {
+      best = p;
+      bestScore = score;
+    }
+  }
+  if (best) best.resolvedRole = "title";
 }
 
 /**

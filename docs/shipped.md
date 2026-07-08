@@ -37,6 +37,7 @@
 
 ## テンプレ・マスター
 
+- **Placeholder ロール解決に gate 付き title リカバリ** — `type="body"`／idx0 でも名前が "Title"/"タイトル" の placeholder が title を受け取らずデッキ題が宙に浮く不具合を修正。ロール解決を「Phase 1: 従来の type→idx→body ラダー」＋「Phase 2: **layout に title 不在時のみ**、非meta の box を `name一致 かつ (idx0 or title 形状)` の合議で title に昇格（取込時に `resolvedRole` 確定→bind/catalog/fieldMap が共有）」に整理。gate により健全テンプレは byte-identical（全 1229 テスト・回帰ゼロ）。テストファースト（`placeholder-role-recovery.test.ts` 10 例） （ADR-0025・2026-07-08）
 - **公式ビルトインテンプレ 4本（マルチビルトイン）＋テンプレ資産の棚卸** — Midnight に加え「配布資料 公文書高密度／ビジュアルデッキ マガジン／技術報告 スタンダード水色」を公式テンプレに昇格（見本からサンプルスライドを除去した TemplateOnly を導出＝`scripts/strip-to-template.mjs`、配布資料はユーザ提供のマスター階層版を採用）。`useMasterRegistry` を `BUILTIN_MASTERS` 配列＋URL マップでマルチビルトイン化。あわせて**テスト専用フィクスチャを `public/` から `tests/fixtures/templates/` へ退避**（衛生・63 テストのパス更新）、会社 `.potx`／CX は同所で gitignore、`public/templates/slide/` は公式 `*_TemplateOnly.pptx` 4本＋CREDITS のみに。実 HTML レンダで3テンプレ目視確認 （2026-07-07）
 - **スライドマスター Re-make（テーマ抽出→自前レイアウト決め打ち）** — `masterToTemplateSpec` が入力マスターからフォント＋コントラスト安全 9色 palette を抽出→`writeTemplate` で自前 canonical レイアウトに載せる新しい取り込みモード（純粋 Import と両立）。ロゴ継承（元マスターの `<p:pic>` を dark 系レイアウトへ再埋め込み）・フラット設計の吸収（ソースがバー無しなら light 系のヘッダーバーを外す）・EA/CJK フォントと dark ロゴ変種は残 （ADR-0023・2026-07-07）
 - **第三者マスターの本文束縛＋反転テーマ背景 修正＋プレビュー画像描画** — idx-META 規約を自前マスター（dotted 名 or 型付き sldNum/dt/ftr メタ）限定にし、素の PowerPoint マスターの idx-10+ body を本文として束縛（プレビュー追随＋PPTX 充填）。反転テーマで暗転していたプレビュー背景を実 `<p:bg>` から解決。layout/master の `<p:pic>` ロゴ/図版をプレビュー描画（従来は全テンプレで pic 落ち） （ADR-0023・2026-07-07）
