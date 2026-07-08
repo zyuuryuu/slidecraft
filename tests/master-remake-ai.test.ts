@@ -66,15 +66,26 @@ describe("AI Re-make Phase-0: mapping parse (hallucination guard)", () => {
 });
 
 describe("AI Re-make Phase-0: compose + deterministic fallback (harness over model)", () => {
-  it("composes the selected canonical bases (deduped, renamed)", () => {
+  it("composes by NAME: keeps each distinctly-named source layout, even on the SAME canonical base", () => {
     const layouts = composeRemakeLayouts([
-      { base: "Title.1Title.Single", rename: "表紙" },
-      { base: "Content.1Body.Single" },
-      { base: "Title.1Title.Single", rename: "dup" }, // duplicate base → ignored
+      { base: "SectionNav.1Title.Single", rename: "Segue白" },
+      { base: "SectionNav.1Title.Single", rename: "Segue紺" }, // same base, different name → KEPT
+      { base: "Content.1Body.Single", rename: "本文" },
     ]);
-    expect(layouts.map((l) => l.name)).toEqual(["表紙", "Content.1Body.Single"]);
-    // geometry/placeholders come from the canonical base (not authored by the AI)
-    expect(layouts[0].placeholders).toEqual(BUILTIN_LAYOUTS.find((l) => l.name === "Title.1Title.Single")!.placeholders);
+    expect(layouts.map((l) => l.name)).toEqual(["Segue白", "Segue紺", "本文"]);
+    // both Segue layouts share the canonical SectionNav geometry (AI picks the base; geometry is deterministic)
+    const sectionBase = BUILTIN_LAYOUTS.find((l) => l.name === "SectionNav.1Title.Single")!;
+    expect(layouts[0].placeholders).toEqual(sectionBase.placeholders);
+    expect(layouts[1].placeholders).toEqual(sectionBase.placeholders);
+  });
+
+  it("dedups only a genuine NAME collision (same resulting name)", () => {
+    const layouts = composeRemakeLayouts([
+      { base: "Title.1Title.Single", rename: "同名" },
+      { base: "Content.1Body.Single", rename: "同名" }, // same NAME → dedup (keep first)
+      { base: "Content.1Body.Single" }, // no rename → name = base → distinct → kept
+    ]);
+    expect(layouts.map((l) => l.name)).toEqual(["同名", "Content.1Body.Single"]);
   });
 
   it("aiRemakeSpec: a valid AI response yields theme + AI-selected layouts", async () => {

@@ -133,16 +133,24 @@ export function parseRemakeMapping(raw: string): RemakeMappingParse {
 
 // ── Compose the final spec (theme is deterministic; layouts are the AI-selected canonical bases) ──
 
-/** Build the LayoutDef[] for the mapping: the selected canonical bases, deduped by name, renamed. */
+/**
+ * Build the LayoutDef[] for the mapping: each source layout becomes its OWN layout on the chosen
+ * canonical base, named after the source (rename) — so the source's layout SET is preserved (e.g.
+ * Segue 白/紺/空 → three SectionNav-geometry layouts), not collapsed to one. Geometry/placeholders
+ * always come from the canonical base (the AI only picked the base). Dedup only on a genuine NAME
+ * collision (LayoutDef names must be unique in the template), keeping the first.
+ */
 export function composeRemakeLayouts(mapping: MappedLayout[]): LayoutDef[] {
   const byName = new Map(BUILTIN_LAYOUTS.map((l) => [l.name, l] as const));
-  const seen = new Set<string>();
+  const seenNames = new Set<string>();
   const out: LayoutDef[] = [];
   for (const m of mapping) {
-    if (seen.has(m.base)) continue; // one instance of each canonical base
-    seen.add(m.base);
     const base = byName.get(m.base);
-    if (base) out.push(m.rename ? { ...base, name: m.rename } : base);
+    if (!base) continue;
+    const name = m.rename?.trim() || m.base; // the layout's name = the source name, else the base name
+    if (seenNames.has(name)) continue; // genuine name collision → keep the first
+    seenNames.add(name);
+    out.push({ ...base, name });
   }
   return out;
 }
