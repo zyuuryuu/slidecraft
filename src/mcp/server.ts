@@ -64,7 +64,7 @@ export interface BuildServerOptions {
 }
 
 export function buildServer(session: Session, opts: BuildServerOptions = {}): McpServer {
-  const server = new McpServer({ name: "slidecraft", version: "0.2.1" });
+  const server = new McpServer({ name: "slidecraft", version: "0.2.2" });
   const host = opts.host;
   const index = { index: z.number().int().describe("0-based slide index") };
   // Optional target doc (host mode only; ignored in stdio where there is one Session).

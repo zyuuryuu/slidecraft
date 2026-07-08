@@ -8,6 +8,20 @@ and versioning follows [Semantic Versioning](https://semver.org/) (**the 0.x lin
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-07-08
+
+A patch focused on bug fixes and security hardening.
+
+### Fixed
+
+- **A placeholder named "Title" not receiving the slide title** — on some templates the title box didn't get the title; now it does.
+- **`brew upgrade` failing with "already a Binary" on macOS** is fixed.
+
+### Security
+
+- Resolved dev-tooling dependency vulnerabilities (none shipped in the app).
+- Added secret scanning (gitleaks) to CI to block accidentally committed credentials.
+
 ## [0.2.1] — 2026-07-07
 
 Highlights: a Japanese/English UI toggle (i18n) and English documentation, `.scft` file association, and higher-fidelity preview rendering.

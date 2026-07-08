@@ -7,9 +7,24 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-08
+
+早期版（0.x）。バグ修正・セキュリティ強化・Windows コード署名（SignPath）の申請準備が中心のパッチ。
+
+### Fixed
+
+- **名前が「Title」/「タイトル」の placeholder にタイトルが入らない不具合**（[ADR-0025](docs/adr/0025-placeholder-role-resolution.md)）— `type="body"` や idx 0 のプレースホルダでも、名前が Title 系で（かつそのレイアウトに title 枠が無いとき）タイトルを受け取るように。第三者テンプレでタイトルが宙に浮く問題を解消（健全テンプレは不変・gate 付き）。
+- **macOS の `brew upgrade` が「already a Binary」で失敗する不具合** — 旧 `slidecraft-mcp` シンボリックリンクを preflight で掃除してから貼り直すよう Homebrew cask を修正。
+
 ### Security
 
-- 開発ツール鎖の依存脆弱性を解消（出荷アプリには非含有）: `vitepress` 1.6.4 → 2.0.0-alpha.18 で脆弱な `vite@5.4.21`（high: `server.fs.deny` bypass ほか）/ `esbuild@0.21.5` を排除（`npm audit` = 0）、Rust の `rand` 0.8.5 → 0.8.6。残る `glib`（medium）は gtk-rs/Tauri スタックに固定のため Tauri 更新待ち。
+- **依存脆弱性を解消**（出荷アプリには非含有）: `vitepress` 1.6.4 → 2.0.0-alpha.18 で脆弱な `vite@5.4.21`（high: `server.fs.deny` bypass ほか）/`esbuild@0.21.5` を依存木から排除（`npm audit` = 0）、Rust の `rand` 0.8.5 → 0.8.6。残る `glib`（medium）は gtk-rs/Tauri スタックに固定のため Tauri 更新待ち。
+- **CI に secret-scan（gitleaks）を追加** — 秘密鍵・クレデンシャルが誤って commit された場合に block する多層防御（Windows 署名鍵自体は SignPath の HSM にあり CI には来ない）。
+
+### Docs
+
+- v0.2.0 まで起動時に表示していた全機能デモを [`samples/sample-deck.md`](samples/sample-deck.md) として保全し、スターターガイドから参照。
+- **Windows コード署名（[SignPath Foundation](https://signpath.org/)）の申請準備** — コード署名ポリシー・行動規範（CODE_OF_CONDUCT）・SECURITY・CONTRIBUTING・issue/PR テンプレを整備。
 
 ## [0.2.1] - 2026-07-07
 
