@@ -85,6 +85,34 @@ AI（template-spec 拡張 or 新 remake モード）
 → **推奨は C**（構造マッピング）。layout-selection の `classifyLayout` を「実行時ヒューリスティック」
 から「取り込み時 AI＋人間確認」へ前倒しする発想で、今直している不整合の**予防**になる。
 
+> **決定（2026-07-08・ユーザ）: C を採用。**
+
+### 4.1 C の詳細設計
+
+C の本質は **「AI 支援のレイアウト・サブセット選択＋ロール写像を、元マスターのレイアウト在庫で
+seed する」**。**幾何/スタイルは canonical ライブラリ（決定論）が供給**し、AI は「どれを・どう
+使うか」だけを決める。既存部品を最大流用:
+
+- **入力（決定論・新規 `masterToLayoutInventory`）** — 各 source layout の要約:
+  `{ srcName, family:"dark|light", hasLogo, phs:[{ type, idx, roleGuess(=placeholderRole), box, fontSizeish, span }] }`。
+  loader の既存抽出（placeholders/geometry）＋ `placeholderRole` をそのまま使う。
+- **AI 契約（新 `remake` プロンプト or template-spec 拡張）** — 入力＝上記 inventory ＋
+  **canonical レイアウト語彙**（`BUILTIN_LAYOUTS` の名前・role・region 数）。出力（JSON）＝
+  source レイアウト群を canonical 語彙に写した**選択＋ロール上書き**:
+  ```json
+  { "layouts": [
+      { "base": "Column.2Body.Equal", "rename": "比較", "roles": { "2": "body", "3": "body" } },
+      { "base": "Section.1Divider.Single", "rename": "章扉" }, … ] }
+  ```
+  幾何は base（canonical LayoutDef）から。`roles` は base の枠 idx→role の**曖昧時のみ**上書き。
+- **合成（決定論）** — 選ばれた base 群 ＝ `TemplateSpec.layouts`（既存の**サブセット選択機構**
+  ＝ADR-0014 PR #77 と同じ土台）に theme（`masterToTemplateSpec`）を載せ、`writeTemplate`。
+- **ハーネス** — §3 の①〜⑤（スキーマ／base 名が語彙内か／role 完全性／contrast／往復生成）＋
+  **決定論フォールバック**（AI が空・不正なら固定30）。best-of-N は既存流用。
+
+要は **AI＝分類器（色提案と同難度）**、**幾何・生成・検証＝決定論**。harness-over-model に忠実で、
+「乱雑 source を取り込み時に一度で canonical へ写す」ことで実行時ヒューリスティックの負担を消す。
+
 ## 5. フェーズ
 
 - **Phase-0 スパイク（feasibility）** — 実テンプレ数本で、決定論抽出した LayoutInventory を
