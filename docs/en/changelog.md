@@ -8,6 +8,18 @@ and versioning follows [Semantic Versioning](https://semver.org/) (**the 0.x lin
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-08
+
+A minor release adding an **AI "remake" import** for slide masters.
+
+### Added
+
+- **"✨ Remake with AI" for slide masters** — a new mode where AI **re-maps** each layout of a messy (e.g. third-party) template onto clean, standard layouts on import. If it can't (or AI isn't connected), it **falls back automatically** to the existing deterministic remake, so it's never worse than before. It also shows *why* each mapping was chosen.
+
+### Changed
+
+- **Stronger automatic layout selection** — layouts that fit the slide's content are picked more reliably (e.g. a plain bullet list is no longer needlessly assigned to a multi-column layout).
+
 ## [0.2.2] — 2026-07-08
 
 A patch focused on bug fixes and security hardening.

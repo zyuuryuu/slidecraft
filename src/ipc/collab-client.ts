@@ -47,7 +47,7 @@ export class CollabClient {
       requestInit: { headers: { Authorization: `Bearer ${opts.token}`, "x-slidecraft-role": opts.role ?? "gui" } },
       fetch: opts.fetch,
     });
-    this.client = new Client({ name: "slidecraft-gui", version: "0.2.2" });
+    this.client = new Client({ name: "slidecraft-gui", version: "0.3.0" });
     this.client.fallbackNotificationHandler = async (n) => this.dispatch(n.method, (n.params ?? {}) as Record<string, unknown>);
   }
 

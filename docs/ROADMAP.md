@@ -2,7 +2,7 @@
 
 **前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
 
-**現在地（2026-07-08）**：**v0.2.1 publish 済み**（[CHANGELOG](../CHANGELOG.md)・[shipped.md](shipped.md)／Homebrew cask も更新・`brew upgrade` の "already a Binary" 修正済み）。v0.2.0（第三者マスター対応＋MCP CLI 同梱）に続き、**UI 日英切替（i18n・全 UI ＋ .ts 状態文言）＋英語ドキュメント（VitePress 二言語サイト）**、**`.scft` 関連付け＋拡張子短縮**、**AI 協働 Deck の背景タブ化**、**プレビュー描画の忠実化**、**公式ビルトインテンプレ4本化＋衛生整理**、**空起動**を同梱。**v0.2.1 後の main（未リリース）**: 依存脆弱性 6→2 解消（vitepress 2.x／rand・残は Tauri スタック固定）、**Placeholder ロールの gate 付き title リカバリ（[ADR-0025](adr/0025-placeholder-role-resolution.md)）**、e2e スイートを空起動＋i18n に追随（CI 全 green）、`examples/`→`samples/` 統合、**Windows コード署名＝SignPath Foundation で方針確定・申請下地整備済（審査待ち／下記）**。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
+**現在地（2026-07-08）**：**v0.3.0 リリース手続き中**（版 bump＋タグ push → release.yml が 4-OS インストーラをドラフト生成 → 実機レビュー後 publish → cask 実 sha 更新）。v0.3.0 の目玉は **AI 非決定 Re-make**（第3の取り込み口「AI で作り直す」＝入力マスターのレイアウトを clean な canonical へ写像・写像根拠 reason／best-of-N・決定論フォールバックで never-worse・[ADR-0026](adr/0026-ai-remake.md)）＋**レイアウト選出エンジンの gate 付き強化 Tier1/2**（[ADR-0025](adr/0025-placeholder-role-resolution.md) と同哲学）。出荷履歴の網羅は [CHANGELOG](../CHANGELOG.md)／[shipped.md](shipped.md)、決定は [ADR](adr/)。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 >
@@ -18,7 +18,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | --- | --- | --- |
 | 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | 💬 DISCUSS（要ユーザ） |
 | **Windows コード署名（Authenticode／SignPath Foundation）** | **方針確定＝SignPath Foundation（OSS 向け無料 OV Authenticode）**。実ユーザが SmartScreen「不明な発行元」でブロックされる問題への恒久策。**申請下地は整備済**（2026-07-08・commit 5b58645）: `CODE_SIGNING_POLICY.md`（署名対象/ビルド&署名フロー/鍵=SignPath HSM/役割/配布・申請中 posture）・`CODE_OF_CONDUCT.md`・`SECURITY.md`・`CONTRIBUTING.md`・issue/PR テンプレ・README 日英の署名節を追加、v0.2.1 公開リリースで「無料 DL 可能」も充足。**残**: (1) [signpath.org/apply](https://signpath.org/apply.html) へ申請、(2) 承認後に `release.yml` へ `signpath/github-action-submit-signing-request` を配線（tag 限定・鍵は先方 HSM・CI は API トークンのみ）しポリシーを実装済みへ更新。鍵は先方管理で公開実績により SmartScreen 評価が蓄積（EV より遅いが「不明な発行元」は解消）。棄却した代替: Azure Trusted Signing（要組織/本人確認）・OV/EV 有償証明書。→ 承認後に ADR 化 | 🔗 DEPENDS（SignPath 審査待ち） |
-| Intel Mac (.dmg) | v0.1.0 は runner 都合で arm64 のみ。x64 dmg 生成後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（runner） |
+| Intel Mac (.dmg) | 出荷は arm64 のみ（`depends_on arch: :arm64`・cask 1-sha）。`release.yml` に macos-13（Intel x64）レグは追加済だが x64 `.dmg` が未出荷＝x64 ジョブ未成功/未検証。x64 ビルド成功後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（x64 ジョブ） |
 | 通知バナー（軽量自動更新） | 方針は [ADR-0021](adr/0021-auto-update-strategy.md) で決定済。GitHub Releases API ポーリングで「新版あり」通知（CSP egress＋版数取得＋実ポーリング検証を要す） | ✅ READY |
 | アプリ内 Help/? 導線 | opener プラグイン未配線 → ドキュメントサイトへ誘導 | 🔗 DEPENDS |
 
