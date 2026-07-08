@@ -4,10 +4,12 @@
  * Runs against the Vite dev server (playwright.config webServer).
  */
 import { test, expect } from "@playwright/test";
+import { seedDeck } from "./_seed";
 
 test.describe("SlideCraft", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
+    await seedDeck(page);
   });
 
   test("shell: title + core toolbar buttons", async ({ page }) => {
@@ -18,8 +20,8 @@ test.describe("SlideCraft", () => {
   });
 
   test("lands in Edit (the home): slide list + slide editor", async ({ page }) => {
-    await expect(page.getByText("Slides", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Slide Editor/)).toBeVisible();
+    await expect(page.getByText("スライド", { exact: true })).toBeVisible();
+    await expect(page.getByText(/スライドエディタ/)).toBeVisible();
     await expect(page.locator(".cursor-col-resize")).toHaveCount(2); // Slides|Editor AND Editor|Preview dividers
   });
 
@@ -35,7 +37,7 @@ test.describe("SlideCraft", () => {
     await expect(page.getByText("Markdown Editor")).toBeVisible();
     await page.getByRole("button", { name: /スライドにする/ }).click();
     await expect(page.getByText("Markdown Editor")).toHaveCount(0);
-    await expect(page.getByText("Slides", { exact: true })).toBeVisible();
+    await expect(page.getByText("スライド", { exact: true })).toBeVisible();
   });
 
   test("preview renders slide cards for the sample deck", async ({ page }) => {

@@ -9,6 +9,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "fs";
+import { seedDeck } from "./_seed";
 
 /** Count pages in a Chromium-produced PDF by its page-tree LEAVES (/Type /Page, not /Pages).
  *  Robust for page.pdf()'s uncompressed output; the /Pages tree is BALANCED (intermediate nodes
@@ -26,7 +27,8 @@ function countPdfPages(pdf: Buffer): number {
 test.describe("HTML export: real print output", () => {
   test("exports .html whose print CSS renders one landscape page per slide", async ({ page }) => {
     await page.goto("/");
-    await page.waitForTimeout(2500); // template + sample deck load (mirrors the PPTX e2e)
+    await seedDeck(page); // the app starts empty (v0.2.1) — seed a deck so HTML export is enabled
+    await page.waitForTimeout(1500); // let the template + deck settle before export
 
     // Export via the real File menu — clicking 🌐 HTML exports with the default ('slide') transition.
     await page.getByRole("button", { name: /ファイル/ }).click();
