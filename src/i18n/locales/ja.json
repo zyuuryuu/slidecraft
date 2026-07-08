@@ -256,7 +256,12 @@
     "mappingTitle": "レイアウト写像（元 → 標準・理由）",
     "repairs": "修復",
     "repairsCount": "{{count}} 枠を修復",
-    "font": "フォント {{name}}"
+    "font": "フォント {{name}}",
+    "resultLabel": "取り込み結果",
+    "previewTitle": "レイアウトのプレビュー（ダミー内容）",
+    "moreLayouts": "ほか {{count}} レイアウト",
+    "sampleTitle": "タイトル",
+    "sampleBody": "本文テキストの例"
   },
   "lang": {
     "name": "日本語",

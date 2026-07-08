@@ -91,7 +91,7 @@ export default function InitializeModal({
 
         {/* Intake progress/result for a Re-make triggered from THIS modal (the main-view banner is behind it). */}
         {onIntakeDismiss && (
-          <IntakeSummaryBar busy={intakeBusy ?? null} result={intakeResult ?? null} onDismiss={onIntakeDismiss} />
+          <IntakeSummaryBar busy={intakeBusy ?? null} result={intakeResult ?? null} onDismiss={onIntakeDismiss} template={templateData} />
         )}
 
         {/* Structure review of the resulting split (awareness + per-chip →表). The

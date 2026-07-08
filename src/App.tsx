@@ -444,6 +444,7 @@ export default function App() {
         busy={intakeBusy}
         result={intakeDismissed ? null : intakeResult}
         onDismiss={() => setIntakeDismissed(true)}
+        template={templateData}
       />
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}

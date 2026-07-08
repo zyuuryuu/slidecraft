@@ -10,10 +10,48 @@
  *
  * Pure presentation — all data comes from apply-template's IntakeSummary + the AI result fields.
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { IntakeSummary, IntakeProgress } from "./apply-template";
 import type { MappedLayout } from "../engine/master-remake-ai";
+import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
+import { findLayout, type TemplateData } from "../engine/template-loader";
+import { parseMd } from "../engine/md-parser";
+import type { DeckIR } from "../engine/slide-schema";
+
+// A mini WYSIWYG preview of a re-made layout: the SAME SlideCard the editor uses, rendered tiny with a
+// dummy-filled sample slide — so the user SEES what each mapped layout looks like, not just its name.
+const THUMB_W = 208; // px
+const THUMB_SCALE = THUMB_W / SLIDE_W;
+const THUMB_H = SLIDE_H * THUMB_SCALE;
+const THUMB_CAP = 16; // cap the rendered thumbnails (30-layout templates would be heavy); note the rest
+
+function LayoutThumb({ template, sample, name, caption }: { template: TemplateData; sample: DeckIR; name: string; caption?: string }) {
+  const layout = findLayout(template, name);
+  return (
+    <div className="shrink-0" style={{ width: THUMB_W }}>
+      <div className="rounded overflow-hidden border border-edge bg-canvas" style={{ width: THUMB_W, height: THUMB_H }}>
+        <SlideCard
+          slide={sample.slides[0]}
+          slideIndex={0}
+          totalSlides={1}
+          layout={layout}
+          masterBgColor={template.masterBgColor ?? "FFFFFF"}
+          masterBackgroundImage={template.masterBackgroundImage}
+          masterBackgroundGradient={template.masterBackgroundGradient}
+          masterDecorations={template.masterDecorations}
+          masterImages={template.masterImages}
+          masterStaticTexts={template.masterStaticTexts}
+          scale={THUMB_SCALE}
+          isActive={false}
+          exportMode
+        />
+      </div>
+      <div className="mt-0.5 text-[10px] text-fg2 truncate" title={name}>{name}</div>
+      {caption && <div className="text-[10px] text-dim truncate" title={caption}>{caption}</div>}
+    </div>
+  );
+}
 
 export type IntakeMode = "import" | "remake" | "remake-ai";
 
@@ -84,11 +122,19 @@ function Swatches({ palette }: { palette: string[] }) {
   );
 }
 
-export function Detail({ result }: { result: IntakeResult }) {
+export function Detail({ result, template, sample }: { result: IntakeResult; template?: TemplateData | null; sample?: DeckIR | null }) {
   const { t } = useTranslation();
   const s = result.summary;
+  // AI mapping caption per layout name (source → canonical base · reason) for the thumbnail grid.
+  const captionByName = new Map<string, string>();
+  for (const m of result.mappings ?? []) {
+    captionByName.set(m.rename || m.base, `→ ${m.base}${m.reason ? ` · ${m.reason}` : ""}`);
+  }
+  const layouts = template?.layouts ?? [];
+  const shown = layouts.slice(0, THUMB_CAP);
+  const showThumbs = !!template && !!sample && sample.slides.length > 0 && shown.length > 0;
   return (
-    <div className="px-3 pb-2.5 pt-1 text-xs text-fg2 space-y-2 max-h-[40vh] overflow-y-auto">
+    <div className="px-3 pb-2.5 pt-1 text-xs text-fg2 space-y-2 max-h-[46vh] overflow-y-auto">
       {s.theme && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-muted">{t("intake.theme")}:</span>
@@ -97,22 +143,39 @@ export function Detail({ result }: { result: IntakeResult }) {
           <span className="text-muted">{s.theme.logo ? t("intake.logoYes") : t("intake.logoNo")}</span>
         </div>
       )}
-      {result.mode === "remake-ai" && result.mappings && result.mappings.length > 0 && (
-        <div className="overflow-x-auto">
-          <div className="text-muted mb-1">{t("intake.mappingTitle")}</div>
-          <table className="w-full border-collapse">
-            <tbody>
-              {result.mappings.map((m: MappedLayout, i) => (
-                <tr key={i} className="border-b border-edge/50 last:border-0">
-                  <td className="py-0.5 pr-2 text-fg truncate max-w-[10rem]">{m.rename || m.base}</td>
-                  <td className="py-0.5 px-1 text-muted">→</td>
-                  <td className="py-0.5 pr-2 text-accent-soft whitespace-nowrap">{m.base}</td>
-                  <td className="py-0.5 text-dim">{m.reason || ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Mini WYSIWYG previews: a dummy-filled sample slide on each layout, so the user SEES the result
+          (not just canonical names). For AI Re-make each thumb is captioned with its source→base·reason. */}
+      {showThumbs ? (
+        <div>
+          <div className="text-muted mb-1">{t("intake.previewTitle")}</div>
+          <div className="flex flex-wrap gap-3">
+            {shown.map((l) => (
+              <LayoutThumb key={l.name} template={template!} sample={sample!} name={l.name} caption={captionByName.get(l.name)} />
+            ))}
+          </div>
+          {layouts.length > shown.length && (
+            <div className="text-dim text-[10px] mt-1">{t("intake.moreLayouts", { count: layouts.length - shown.length })}</div>
+          )}
         </div>
+      ) : (
+        // Text fallback (no template available, e.g. SSR/tests): the AI mapping table.
+        result.mode === "remake-ai" && result.mappings && result.mappings.length > 0 && (
+          <div className="overflow-x-auto">
+            <div className="text-muted mb-1">{t("intake.mappingTitle")}</div>
+            <table className="w-full border-collapse">
+              <tbody>
+                {result.mappings.map((m: MappedLayout, i) => (
+                  <tr key={i} className="border-b border-edge/50 last:border-0">
+                    <td className="py-0.5 pr-2 text-fg truncate max-w-[10rem]">{m.rename || m.base}</td>
+                    <td className="py-0.5 px-1 text-muted">→</td>
+                    <td className="py-0.5 pr-2 text-accent-soft whitespace-nowrap">{m.base}</td>
+                    <td className="py-0.5 text-dim">{m.reason || ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
       {result.mode === "import" && (s.repairs ?? 0) > 0 && (
         <div><span className="text-muted">{t("intake.repairs")}:</span> {t("intake.repairsCount", { count: s.repairs })}</div>
@@ -127,14 +190,22 @@ export function Detail({ result }: { result: IntakeResult }) {
 }
 
 export default function IntakeSummaryBar({
-  busy, result, onDismiss,
+  busy, result, onDismiss, template,
 }: {
   busy: IntakeBusy | null;
   result: IntakeResult | null;
   onDismiss: () => void;
+  /** The active (just-intaken) template — used to render mini WYSIWYG previews of its layouts. */
+  template?: TemplateData | null;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // A dummy-filled sample slide (title + a few bullets) reused for every layout thumbnail. Parsed via the
+  // real md-parser so it's a valid DeckIR; SlideCard binds it to each layout's placeholders by role.
+  const sample = useMemo(
+    () => parseMd(`# ${t("intake.sampleTitle")}\n\n- ${t("intake.sampleBody")}\n- ${t("intake.sampleBody")}\n- ${t("intake.sampleBody")}`),
+    [t],
+  );
   if (!busy && !result) return null;
 
   // Only offer 「詳細」 when there's something to expand — a clean faithful Import has no theme, mappings,
@@ -144,7 +215,8 @@ export default function IntakeSummaryBar({
     !!s?.theme ||
     (result.mode === "remake-ai" && !!result.mappings?.length) ||
     (result.mode === "import" && (s?.repairs ?? 0) > 0) ||
-    (s?.findings.length ?? 0) > 0
+    (s?.findings.length ?? 0) > 0 ||
+    (template?.layouts?.length ?? 0) > 0 // mini-previews of the template's layouts
   );
 
   return (
@@ -157,8 +229,10 @@ export default function IntakeSummaryBar({
         ) : result ? (
           <>
             <div className="flex items-center gap-2 px-3 py-2 text-xs">
+              {/* Passive status label — NOT actionable. Only 「詳細」/「×」 are buttons. */}
+              <span className="text-muted">{t("intake.resultLabel")}</span>
               <span>{MODE_ICON[result.mode]}</span>
-              <span className="text-accent-soft font-medium">{t(`intake.mode.${result.mode}`)}</span>
+              <span className="text-fg2">{t(`intake.mode.${result.mode}`)}</span>
               <span
                 className={
                   result.summary.status === "ok" ? "text-emerald-400"
@@ -179,7 +253,7 @@ export default function IntakeSummaryBar({
               )}
               <button onClick={onDismiss} title={t("intake.dismiss")} className="text-muted hover:text-fg text-base leading-none px-1">×</button>
             </div>
-            {open && hasDetail && <Detail result={result} />}
+            {open && hasDetail && <Detail result={result} template={template} sample={sample} />}
           </>
         ) : null}
       </div>

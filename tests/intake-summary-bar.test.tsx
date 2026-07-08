@@ -6,9 +6,15 @@
  *     data plumbed for exactly this (ADR-0026 §9.1). Rendered via react-dom/server (no click needed).
  */
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { renderToStaticMarkup } from "react-dom/server";
 import "../src/i18n"; // init side-effect → useTranslation interpolates (ja default) instead of echoing keys
 import { phaseFraction, Detail, type IntakeResult } from "../src/components/IntakeSummaryBar";
+import { loadTemplate } from "../src/engine/template-loader";
+import { parseMd } from "../src/engine/md-parser";
+
+const CANON = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
 
 describe("phaseFraction: honest, monotonic progress", () => {
   it("never regresses across phases and best-of-N candidates climb within the generating band", () => {
@@ -64,5 +70,22 @@ describe("Detail: the AI mapping 'why' surface", () => {
     const html = renderToStaticMarkup(<Detail result={det} />);
     expect(html).not.toContain("00_表紙");
     expect(html).toContain("Arial"); // theme still shown
+  });
+
+  it("renders mini WYSIWYG layout previews (SlideCards) when a template is provided", async () => {
+    const tpl = await loadTemplate(new Uint8Array(readFileSync(CANON)));
+    const sample = parseMd("# T\n\n- a\n- b");
+    const name0 = tpl.layouts[0].name;
+    const res: IntakeResult = {
+      mode: "remake-ai", name: "x", ts: 0, usedAi: true,
+      summary: { layoutCount: tpl.layouts.length, status: "ok", findings: [], theme: { major: "Arial", minor: "Arial", palette: ["#111"], logo: false } },
+      mappings: [{ base: name0, rename: name0, reason: "cover" }],
+    };
+    const html = renderToStaticMarkup(<Detail result={res} template={tpl} sample={sample} />);
+    // the thumbnail path ran (preview heading present), NOT the text mapping-table fallback
+    expect(html).toContain("プレビュー"); // intake.previewTitle
+    expect(html).toContain(name0); // the layout's name label under its thumbnail
+    expect(html).toContain("cover"); // the AI mapping caption (→ base · reason)
+    expect(html).toContain("208px"); // a LayoutThumb (THUMB_W) with a SlideCard inside actually rendered
   });
 });

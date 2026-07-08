@@ -256,7 +256,12 @@
     "mappingTitle": "Layout mapping (source → canonical · reason)",
     "repairs": "Repairs",
     "repairsCount": "{{count}} frames repaired",
-    "font": "Font {{name}}"
+    "font": "Font {{name}}",
+    "resultLabel": "Intake result",
+    "previewTitle": "Layout previews (dummy content)",
+    "moreLayouts": "+{{count}} more layouts",
+    "sampleTitle": "Title",
+    "sampleBody": "Sample body text"
   },
   "lang": {
     "name": "English",
