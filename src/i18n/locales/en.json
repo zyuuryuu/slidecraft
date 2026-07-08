@@ -11,7 +11,8 @@
     "condense": "Condense text",
     "diagram": "Generate diagram",
     "diagram-edit": "Edit diagram",
-    "template-spec": "Suggest template"
+    "template-spec": "Suggest template",
+    "master-remake": "Master remake"
   },
   "aiPanel": {
     "resizeHint": "Drag to resize (double-click to reset)",
@@ -129,7 +130,8 @@
     "imageLoadFailed": "Failed to load image",
     "draftLockedTitle": "Editing is locked while collaborating",
     "draftButtonTitle": "Create or import slides from a draft (text)",
-    "viewForm": "Form"
+    "viewForm": "Form",
+    "taskRemakeAI": "Master remake (AI)"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",
@@ -284,7 +286,9 @@
     "remakeTitle": "Inherit only fonts, colors, and background from a .pptx and rebuild with SlideCraft's layouts",
     "remakeLabel": "Import theme only (Re-make)",
     "createTitle": "Pick colors and fonts to generate a new template",
-    "createLabel": "Create template…"
+    "createLabel": "Create template…",
+    "remakeAILabel": "Remake with AI (beta)",
+    "remakeAITitle": "AI maps the imported master's layouts onto clean canonical layouts (falls back to the deterministic remake when AI is not connected)"
   },
   "masterReg": {
     "defaultName": "Template",

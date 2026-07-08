@@ -41,7 +41,7 @@ export interface AiProviderConfig {
 export type AiConfigMap = Record<ProviderId, AiProviderConfig>;
 /** The capability-selected default offline model (from Rust model_tier::builtin_model_info). */
 export interface BuiltinModelInfo { tier: "small" | "balanced"; display: string; file: string; sizeMb: number; }
-export type AiMode = "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "template-spec";
+export type AiMode = "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "template-spec" | "master-remake";
 
 export type AiTaskStatus = "running" | "done" | "error" | "cancelled";
 /** One AI request as a tracked task — the unit of the central task store. Every
@@ -148,6 +148,7 @@ export function postProcessAiResult(mode: AiMode, raw: string, catalog?: LayoutC
     if (!r.ok) return { error: r.error };
     return { result: JSON.stringify(r.spec), ...(r.notices.length ? { notice: r.notices.join(" / ") } : {}) };
   }
+  if (mode === "master-remake") return { result: raw }; // AI Re-make: raw mapping JSON — parsed later by aiRemakeSpec (ADR-0026)
   return { result: raw }; // "diagram" → raw passthrough
 }
 

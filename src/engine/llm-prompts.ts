@@ -23,7 +23,7 @@ export type { DiagramType, DiagramTypeInfo } from "./diagram-type-prompts";
  *  fragment for the diagram / diagram-edit modes (Stage 2 of the two-stage design). "condense" is the
  *  harness refine residue: a Markdown-ONLY sub-prompt (no design-ops branch) so a small model stays on format. */
 export function systemPromptForMode(
-  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec",
+  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec" | "master-remake",
   today: string,
   diagramType?: DiagramType,
 ): string {
@@ -35,11 +35,15 @@ export function systemPromptForMode(
         ? slideCondensePrompt()
         : mode === "template-spec"
           ? templateSpecSystemPrompt()
-          : mode === "diagram-route"
-            ? diagramRoutePrompt()
-            : mode === "diagram-edit"
-              ? diagramEditSystemPrompt(diagramType)
-              : diagramSystemPrompt(diagramType);
+          : mode === "master-remake"
+            // AI Re-make (ADR-0026): the full mapping instruction rides as the user message
+            // (remakeSystemPrompt); the system just nudges JSON-only. Defensive parse tolerates prose.
+            ? "You map a slide master's layouts onto a fixed catalog. Follow the user's instructions exactly and output ONLY the requested JSON object."
+            : mode === "diagram-route"
+              ? diagramRoutePrompt()
+              : mode === "diagram-edit"
+                ? diagramEditSystemPrompt(diagramType)
+                : diagramSystemPrompt(diagramType);
 }
 
 // ── Slide deck prompt ──

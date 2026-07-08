@@ -33,6 +33,7 @@ interface InitializeModalProps {
   onSelectMaster: (id: string) => void;
   onImportMaster: () => void;
   onRemakeMaster: () => void;
+  onRemakeMasterAI?: () => void; // ADR-0026: AI Re-make
   deck: DeckIR | null;
   templateData: TemplateData | null;
   parseError: string | null;
@@ -49,7 +50,7 @@ const action = "px-2.5 py-1 rounded bg-surface text-accent-soft hover:bg-edge bo
 
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
-  masters, activeMasterId, onSelectMaster, onImportMaster, onRemakeMaster,
+  masters, activeMasterId, onSelectMaster, onImportMaster, onRemakeMaster, onRemakeMasterAI,
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
   onFixDeterministic, onCursorLine, gotoLine,
 }: InitializeModalProps) {
@@ -72,7 +73,7 @@ export default function InitializeModal({
         {/* Header + input methods (one tidy row) */}
         <div className="flex items-center gap-2 px-4 py-2 border-b border-edge text-xs shrink-0">
           <span className="text-sm text-accent-soft font-medium mr-1">📝 Draft</span>
-          <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} onRemake={onRemakeMaster} />
+          <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} onRemake={onRemakeMaster} onRemakeAI={onRemakeMasterAI} />
           <span className="w-px h-4 bg-edge mx-1" />
           <button onClick={onOpenFile} className={action} title={t("initModal.importMarkdownTitle")}>{t("initModal.importMarkdown")}</button>
           <button onClick={onGenerateAI} className={action} title={t("initModal.generateAiTitle")}>{t("initModal.generateAi")}</button>

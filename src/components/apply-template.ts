@@ -13,6 +13,7 @@ import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
 import { masterToTemplateSpec, extractLogo } from "../engine/master-remake";
+import { masterToLayoutInventory, remakeSystemPrompt, aiRemakeSpec } from "../engine/master-remake-ai";
 import { writeTemplate } from "../engine/template-writer";
 
 export interface TemplateSetters {
@@ -119,6 +120,57 @@ export async function applyTemplateBytesAsRemake(
       i18n.t("applyTemplate.remakeFailed", {
         error: err instanceof Error ? err.message : String(err),
       }),
+    );
+    return { ok: false };
+  }
+}
+
+export interface RemakeAIResult extends RemakeResult {
+  usedAi?: boolean; // true = the AI mapping was used; false = deterministic fallback (built-in 30)
+  note?: string; // human-readable note about which path ran (for the UI to surface)
+}
+
+/**
+ * AI Re-make (the THIRD import path, ADR-0026 / docs/design/ai-remake.md). Like applyTemplateBytesAsRemake,
+ * but the AI picks which CANONICAL layouts mirror the source master (option C, structure mapping) so the
+ * source's layout SET is preserved with CLEAN roles. `callAI` is INJECTED (systemPrompt → raw text | null)
+ * so this stays DOM/Tauri-free + unit-testable; a null / broken / hallucinated response falls back to the
+ * deterministic Re-make (aiRemakeSpec's built-in floor) — never worse than applyTemplateBytesAsRemake.
+ */
+export async function applyTemplateBytesAsRemakeAI(
+  buf: ArrayBuffer | Uint8Array,
+  name: string,
+  setters: TemplateSetters,
+  callAI: (systemPrompt: string) => Promise<string | null>,
+): Promise<RemakeAIResult> {
+  try {
+    const source = await loadTemplate(buf);
+    const cleanName = name.replace(/\.pptx$/i, "");
+    const prompt = remakeSystemPrompt(masterToLayoutInventory(source));
+    let aiRaw: string | null = null;
+    try {
+      aiRaw = await callAI(prompt);
+    } catch {
+      aiRaw = null; // AI failure → deterministic fallback below (never worse)
+    }
+    const logo = await extractLogo(source);
+    const { spec, usedAi, note } = aiRemakeSpec(source, aiRaw, {
+      name: i18n.t("applyTemplate.remakeName", { name: cleanName }),
+      logo,
+    });
+    const remadeBytes = await writeTemplate(spec);
+    const remade = await loadTemplate(remadeBytes);
+    const health = assessTemplateHealth(buildCatalog(remade));
+    if (health.status === "rejected") {
+      setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
+      return { ok: false, health };
+    }
+    setters.setTemplateData(remade);
+    setters.setTemplateName(spec.name);
+    return { ok: true, health, remadeBytes, usedAi, note };
+  } catch (err) {
+    setters.setParseError(
+      i18n.t("applyTemplate.remakeFailed", { error: err instanceof Error ? err.message : String(err) }),
     );
     return { ok: false };
   }

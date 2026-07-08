@@ -45,7 +45,7 @@ export default function App() {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsRemakeAI,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
@@ -117,6 +117,21 @@ export default function App() {
       JSON.parse(await aiSubmitAndWait(description, "template-spec", t("app.taskTemplateProposal"))) as TemplateSpec,
     [aiSubmitAndWait, t],
   );
+  // AI Re-make（第3の口・ADR-0026）: AI が入力マスターの各レイアウトを clean な canonical へ写像。
+  // callAI は AI 接続時のみ実行（未接続・失敗は null → aiRemakeSpec が決定論 Re-make にフォールバック）。
+  const aiReady = ai.connection.ok;
+  const handleRemakeMasterAI = useCallback(async () => {
+    const picked = await pickBinaryFile(["pptx"], "PowerPoint");
+    if (!picked) return;
+    const callAI = async (systemPrompt: string): Promise<string | null> => {
+      if (!aiReady) return null;
+      try { return await aiSubmitAndWait(systemPrompt, "master-remake", t("app.taskRemakeAI")); } catch { return null; }
+    };
+    const r = await applyMasterBytesAsRemakeAI(picked.bytes, picked.name, callAI);
+    if (!r.ok || !r.remadeBytes) return;
+    const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
+    setMasterId(entry.id);
+  }, [registerMaster, applyMasterBytesAsRemakeAI, aiSubmitAndWait, aiReady, t]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -362,6 +377,7 @@ export default function App() {
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
             onRemake={handleRemakeMaster}
+            onRemakeAI={handleRemakeMasterAI}
             onCreate={() => setShowTemplateCreator(true)}
             disabled={editLocked}
           />
@@ -513,6 +529,7 @@ export default function App() {
         onSelectMaster={handleSelectMaster}
         onImportMaster={handleImportMaster}
         onRemakeMaster={handleRemakeMaster}
+        onRemakeMasterAI={handleRemakeMasterAI}
         deck={deck}
         templateData={templateData}
         parseError={parseError}

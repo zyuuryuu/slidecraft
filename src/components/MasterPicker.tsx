@@ -16,12 +16,13 @@ interface MasterPickerProps {
   onImport?: () => void;
   /** Re-make: import a .pptx but keep only its THEME (fonts/colors) and use SlideCraft's own layouts. */
   onRemake?: () => void;
+  onRemakeAI?: () => void; // ADR-0026: AI Re-make (structure mapping); falls back to deterministic when AI isn't ready
   /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
   onCreate?: () => void;
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onCreate, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onRemakeAI, onCreate, disabled }: MasterPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -75,7 +76,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
               </button>
             );
           })}
-          {(onImport || onRemake || onCreate) && <div className="my-1 h-px bg-edge" />}
+          {(onImport || onRemake || onRemakeAI || onCreate) && <div className="my-1 h-px bg-edge" />}
           {onImport && (
             <button
               onClick={() => { onImport(); setOpen(false); }}
@@ -94,6 +95,16 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
             >
               <span className="w-3 shrink-0 text-center">＋</span>
               <span>{t("masterPicker.remakeLabel")}</span>
+            </button>
+          )}
+          {onRemakeAI && (
+            <button
+              onClick={() => { onRemakeAI(); setOpen(false); }}
+              title={t("masterPicker.remakeAITitle")}
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
+            >
+              <span className="w-3 shrink-0 text-center">✨</span>
+              <span>{t("masterPicker.remakeAILabel")}</span>
             </button>
           )}
           {onCreate && (
