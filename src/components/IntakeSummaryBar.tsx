@@ -148,8 +148,10 @@ export default function IntakeSummaryBar({
   );
 
   return (
-    <div className="fixed top-14 right-3 z-[55] w-[min(92vw,30rem)]" role="status">
-      <div className="bg-surface border border-accent/40 rounded-lg shadow-2xl overflow-hidden">
+    // A layout-flow banner directly under the toolbar (NOT a floating overlay) — so it never covers the
+    // pane headers, the master dropdown, or the bottom Assist dock. It pushes the content down while shown.
+    <div className="shrink-0 bg-surface border-b border-accent/40" role="status">
+      <div className="mx-auto w-full max-w-5xl">
         {busy ? (
           <ProgressRow busy={busy} />
         ) : result ? (

@@ -438,6 +438,14 @@ export default function App() {
         </div>
       </div>
 
+      {/* Intake transparency (progress + result) as a flow banner under the toolbar — never overlaps
+          the panes, the master dropdown, or the bottom Assist dock. */}
+      <IntakeSummaryBar
+        busy={intakeBusy}
+        result={intakeDismissed ? null : intakeResult}
+        onDismiss={() => setIntakeDismissed(true)}
+      />
+
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
         {/* Multi-document tabs — only rendered when >1 project is open */}
@@ -584,6 +592,9 @@ export default function App() {
         onRemakeMasterAI={handleRemakeMasterAI}
         onRemoveMaster={handleRemoveMaster}
         aiReady={aiReady}
+        intakeBusy={intakeBusy}
+        intakeResult={intakeDismissed ? null : intakeResult}
+        onIntakeDismiss={() => setIntakeDismissed(true)}
         deck={deck}
         templateData={templateData}
         parseError={parseError}
@@ -632,12 +643,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Intake transparency: live progress during import/remake + a dismissable result summary after. */}
-      <IntakeSummaryBar
-        busy={intakeBusy}
-        result={intakeDismissed ? null : intakeResult}
-        onDismiss={() => setIntakeDismissed(true)}
-      />
     </>
   );
 }

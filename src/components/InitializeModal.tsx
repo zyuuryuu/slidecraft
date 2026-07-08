@@ -14,6 +14,7 @@ import ReviewBar from "./ReviewBar";
 import SlidePreview from "./SlidePreview";
 import ResizableSplit from "./ResizableSplit";
 import MasterPicker from "./MasterPicker";
+import IntakeSummaryBar, { type IntakeBusy, type IntakeResult } from "./IntakeSummaryBar";
 import type { MasterEntry } from "./useMasterRegistry";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
@@ -36,6 +37,9 @@ interface InitializeModalProps {
   onRemakeMasterAI?: () => void; // ADR-0026: AI Re-make
   onRemoveMaster?: (id: string) => void; // delete an imported master
   aiReady?: boolean; // gate the AI Re-make item when no provider is connected
+  intakeBusy?: IntakeBusy | null; // intake progress/result surfaced INSIDE the modal (it covers the main banner)
+  intakeResult?: IntakeResult | null;
+  onIntakeDismiss?: () => void;
   deck: DeckIR | null;
   templateData: TemplateData | null;
   parseError: string | null;
@@ -53,6 +57,7 @@ const action = "px-2.5 py-1 rounded bg-surface text-accent-soft hover:bg-edge bo
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
   masters, activeMasterId, onSelectMaster, onImportMaster, onRemakeMaster, onRemakeMasterAI, onRemoveMaster, aiReady,
+  intakeBusy, intakeResult, onIntakeDismiss,
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
   onFixDeterministic, onCursorLine, gotoLine,
 }: InitializeModalProps) {
@@ -83,6 +88,11 @@ export default function InitializeModal({
           <div className="flex-1" />
           <button onClick={onCancel} title={t("initModal.close")} className="text-muted hover:text-fg text-lg leading-none">×</button>
         </div>
+
+        {/* Intake progress/result for a Re-make triggered from THIS modal (the main-view banner is behind it). */}
+        {onIntakeDismiss && (
+          <IntakeSummaryBar busy={intakeBusy ?? null} result={intakeResult ?? null} onDismiss={onIntakeDismiss} />
+        )}
 
         {/* Structure review of the resulting split (awareness + per-chip →表). The
             full deterministic tidy is the "🧹 原稿を整形" button above. */}
