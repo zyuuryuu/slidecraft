@@ -76,7 +76,10 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
       )}
 
       {open && (
-        <div className="absolute right-0 mt-1 z-50 min-w-[220px] max-w-[320px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
+        // `top-full` anchors the menu to the BOTTOM of the trigger row (opens below it, never over it).
+        // Needed because the root is inline-flex (button + ⓘ side by side): without an explicit top an
+        // absolute child would take its static position at the flex line's TOP and overlap the toolbar.
+        <div className="absolute top-full right-0 mt-1 z-50 min-w-[220px] max-w-[320px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
           <div className="max-h-[45vh] overflow-y-auto">
             {masters.map((m) => {
               const isActive = m.id === activeId;
