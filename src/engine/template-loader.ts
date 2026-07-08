@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, usesMetaIdxConvention, recoverLayoutTitle, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
+import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
@@ -734,6 +734,11 @@ export function autoSelectLayout(
       pickLayout(catalog, role, regions, hasImage) ??
       pickLayout(catalog, "content", regions, hasImage) ??
       pickLayout(catalog, "content", undefined, hasImage) ??
+      // No content role at all — try columns, then rank ANY body-bearing layout by suitability rather
+      // than falling to catalog[0] (the first layout by file order). Gated: canonical/healthy templates
+      // always expose a content role, so these tiers never fire for them → byte-identical.
+      pickLayout(catalog, "columns", regions, hasImage) ??
+      bestBodyBearing(catalog, regions, hasImage) ??
       catalog[0];
     if (picked) return picked.name;
   }

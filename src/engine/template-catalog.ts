@@ -523,6 +523,7 @@ export function pickLayout(
       // NOT avoid picture/degenerate "bodies" — an image is happy in one (the text-body penalty below
       // would wrongly push it back to a text layout).
       if (hasPictureFrame(e)) s -= 100;
+      else if (!usableBody(e)) s += 5; // no picture frame → deterministically prefer a writable body
     } else if ((role === "content" || role === "columns") && !usableBody(e)) {
       // For TEXT roles, avoid picture/degenerate layouts whose "body" holds no text
       // (e.g. an alien template's "Two Pictures" with maxLines=0) — they break split + bind.
@@ -532,4 +533,21 @@ export function pickLayout(
     return s;
   };
   return [...candidates].sort((a, b) => score(a) - score(b))[0];
+}
+
+/**
+ * Last-resort body-bearing pick, ROLE-AGNOSTIC — used by autoSelectLayout when no content/columns
+ * layout exists, to replace a blind positional `catalog[0]` with a SUITABILITY choice. Ranks any
+ * layout that can actually hold the slide's payload (a usable text body, or a picture frame for an
+ * image slide) by: closest body-region fit → most usable bodies → fewest addons → name. Returns
+ * undefined only when nothing in the template can hold a body (the caller then keeps catalog[0]).
+ */
+export function bestBodyBearing(catalog: LayoutCatalog, regions?: number, hasImage?: boolean): CatalogEntry | undefined {
+  const bodyN = (e: CatalogEntry) => e.placeholders.filter((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0).length;
+  const hasPic = (e: CatalogEntry) => e.placeholders.some((p) => p.role === "picture");
+  const cands = catalog.filter((e) => bodyN(e) > 0 || (hasImage && hasPic(e)));
+  if (cands.length === 0) return undefined;
+  const dist = (e: CatalogEntry) => (regions !== undefined ? Math.abs(bodyN(e) - regions) : 0);
+  const addons = (e: CatalogEntry) => e.name.match(/\+/g)?.length ?? 0;
+  return [...cands].sort((a, b) => dist(a) - dist(b) || bodyN(b) - bodyN(a) || addons(a) - addons(b) || a.name.localeCompare(b.name))[0];
 }
