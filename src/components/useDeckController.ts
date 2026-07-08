@@ -17,7 +17,7 @@ import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasCo
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsRemake, applyTemplateBytesAsRemakeAI, type IntakeProgress } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsRemakeAI, type IntakeProgress } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
 import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
@@ -193,9 +193,11 @@ export function useDeckController() {
   );
   // Re-make（第2の取り込み口）: 入力マスターのテーマ（フォント・配色）だけ抽出し SlideCraft 自前の
   // レイアウトで作り直す。第三者マスターの idx/テーマの癖（ADR-0023）を構造的に回避する。
+  // Re-make v2 (ADR-0027): the "テーマだけ取り込む（Re-make）" button now preserves the source's visual
+  // layer (decorations/geometry/backgrounds) and only normalises fonts — so the brand design survives.
   const applyMasterBytesAsRemake = useCallback(
     (buf: ArrayBuffer | Uint8Array, name: string) =>
-      applyTemplateBytesAsRemake(buf, name, { setTemplateData, setTemplateName, setParseError }),
+      applyTemplateBytesAsFaithfulRemake(buf, name, { setTemplateData, setTemplateName, setParseError }),
     [setTemplateData, setTemplateName, setParseError],
   );
 

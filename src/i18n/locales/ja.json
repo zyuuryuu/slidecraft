@@ -230,7 +230,7 @@
   "intake": {
     "mode": {
       "import": "取り込み",
-      "remake": "作り直し（決定論）",
+      "remake": "作り直し（デザイン保持）",
       "remake-ai": "作り直し（AI）"
     },
     "progress": {
@@ -321,8 +321,8 @@
     "builtinSuffix": "（内蔵）",
     "importTitle": ".pptx のレイアウト・プレースホルダをそのまま活かして取り込む",
     "importLabel": "マスターを取り込む（.pptx）",
-    "remakeTitle": ".pptx からフォント・配色・背景だけを受け継ぎ、SlideCraft のレイアウトで作り直す",
-    "remakeLabel": "テーマだけ取り込む（Re-make）",
+    "remakeTitle": "元テンプレの装飾・背景・レイアウトをそのまま保持し、フォントだけ整えて取り込む（ADR-0027）",
+    "remakeLabel": "デザインを保持して取り込む（Re-make）",
     "createTitle": "配色とフォントを選んで新しいテンプレを生成する",
     "createLabel": "テンプレを作成…",
     "remakeAILabel": "AI で作り直す（試験）",

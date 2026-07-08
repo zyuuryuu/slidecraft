@@ -13,6 +13,7 @@ import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
 import { masterToTemplateSpec, extractLogo } from "../engine/master-remake";
+import { faithfulRemake } from "../engine/faithful-remake";
 import { masterToLayoutInventory, remakeSystemPrompt, aiRemakeSpec, pickBestRawMapping, type MappedLayout } from "../engine/master-remake-ai";
 import { writeTemplate } from "../engine/template-writer";
 
@@ -171,6 +172,52 @@ export async function applyTemplateBytesAsRemake(
         error: err instanceof Error ? err.message : String(err),
       }),
     );
+    return { ok: false };
+  }
+}
+
+/**
+ * Faithful Re-make (ADR-0027): keep the source's VISUAL layer (decorations / geometry / backgrounds /
+ * images) byte-intact and normalise only the theme fonts — so the brand design (e.g. the 公文書
+ * master's 85 decorations) SURVIVES, unlike applyTemplateBytesAsRemake which rebuilds on canonical
+ * layouts and drops it. Applied through the same health gate; placeholder roles bind via the loader
+ * (same as faithful Import), which is why geometry preservation is safe.
+ */
+export async function applyTemplateBytesAsFaithfulRemake(
+  buf: ArrayBuffer | Uint8Array,
+  name: string,
+  setters: TemplateSetters,
+): Promise<RemakeResult> {
+  try {
+    const { bytes, fonts } = await faithfulRemake(buf);
+    const remade = await loadTemplate(bytes);
+    const health = assessTemplateHealth(buildCatalog(remade));
+    if (health.status === "rejected") {
+      setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
+      return { ok: false, health };
+    }
+    setters.setTemplateData(remade);
+    setters.setTemplateName(i18n.t("applyTemplate.remakeName", { name: name.replace(/\.pptx$/i, "") }));
+    const hasLogo = remade.masterImages.length > 0 || remade.layouts.some((l) => l.images.length > 0);
+    return {
+      ok: true,
+      health,
+      remadeBytes: bytes,
+      summary: {
+        layoutCount: remade.layouts.length,
+        status: health.status,
+        findings: health.findings.map((f) => f.message),
+        // Show the VISIBLE font (ea over latin) + the source's own brand colors (faithful keeps them).
+        theme: {
+          major: fonts.majorEa || fonts.majorLatin,
+          minor: fonts.minorEa || fonts.minorLatin,
+          palette: Object.values(remade.themeColors).map((h) => (h.startsWith("#") ? h : `#${h}`)),
+          logo: hasLogo,
+        },
+      },
+    };
+  } catch (err) {
+    setters.setParseError(i18n.t("applyTemplate.remakeFailed", { error: err instanceof Error ? err.message : String(err) }));
     return { ok: false };
   }
 }

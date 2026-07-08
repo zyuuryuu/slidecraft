@@ -230,7 +230,7 @@
   "intake": {
     "mode": {
       "import": "Import",
-      "remake": "Remake (deterministic)",
+      "remake": "Remake (design-preserving)",
       "remake-ai": "Remake (AI)"
     },
     "progress": {
@@ -321,8 +321,8 @@
     "builtinSuffix": " (built-in)",
     "importTitle": "Import a .pptx keeping its layouts and placeholders as-is",
     "importLabel": "Import master (.pptx)",
-    "remakeTitle": "Inherit only fonts, colors, and background from a .pptx and rebuild with SlideCraft's layouts",
-    "remakeLabel": "Import theme only (Re-make)",
+    "remakeTitle": "Import keeping the source's decorations, backgrounds and layouts, normalising only the fonts (ADR-0027)",
+    "remakeLabel": "Keep the design (Re-make)",
     "createTitle": "Pick colors and fonts to generate a new template",
     "createLabel": "Create template…",
     "remakeAILabel": "Remake with AI (beta)",
