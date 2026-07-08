@@ -89,12 +89,13 @@ export function remakeSystemPrompt(inventory: SourceLayoutSummary[]): string {
 
 Output ONLY one JSON object — no prose, no code fence:
 
-{ "layouts": [ { "base": "<exact canonical name>", "rename": "<source layout name>" }, ... ] }
+{ "layouts": [ { "base": "<exact canonical name>", "rename": "<source layout name>", "reason": "<why this base, one short line>" }, ... ] }
 
 Rules:
 - "base" MUST be one of the canonical names listed below, copied EXACTLY.
 - Produce one entry per source layout, in the source order. Skip a source layout only if nothing fits.
 - Prefer the same role and body-region count; match dark/light family; a cover→title, a divider→section, a bullets slide→content, a 2-up→columns, a closing/summary→closing/summary.
+- "reason": one short line naming the deciding cue (role, family, body-region count, or a placeholder pattern). Keep it to a dozen words.
 
 ## Canonical layouts (choose "base" from these)
 
@@ -107,7 +108,7 @@ ${inv}`;
 
 // ── Defensive parse + vocabulary validation (harness) ──
 
-export interface MappedLayout { base: string; rename?: string }
+export interface MappedLayout { base: string; rename?: string; reason?: string }
 export type RemakeMappingParse =
   | { ok: true; layouts: MappedLayout[]; dropped: number }
   | { ok: false; error: string };
@@ -125,10 +126,35 @@ export function parseRemakeMapping(raw: string): RemakeMappingParse {
     const base = (e as { base?: unknown })?.base;
     if (typeof base !== "string" || !VOCAB_NAMES.has(base)) { dropped++; continue; }
     const rename = (e as { rename?: unknown })?.rename;
-    layouts.push({ base, rename: typeof rename === "string" && rename.trim() ? rename.trim() : undefined });
+    const reason = (e as { reason?: unknown })?.reason;
+    layouts.push({
+      base,
+      rename: typeof rename === "string" && rename.trim() ? rename.trim() : undefined,
+      reason: typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 200) : undefined,
+    });
   }
   if (layouts.length === 0) return { ok: false, error: `all ${dropped} entries invalid (base not in vocabulary)` };
   return { ok: true, layouts, dropped };
+}
+
+/**
+ * best-of-N: given several raw model responses (e.g. N sampled generations), pick the single BEST
+ * one — the parse that maps the MOST source layouts, tie-broken by FEWEST hallucinated drops. Returns
+ * the winning raw string (so the caller re-parses via the normal path), or null when none parse. A
+ * local small model varies run-to-run; this cheaply lifts the floor without any scoring heuristic
+ * beyond "covered more, hallucinated less". Deterministic (no clock/rng) — stable under resume.
+ */
+export function pickBestRawMapping(raws: (string | null | undefined)[]): string | null {
+  let best: { raw: string; layouts: number; dropped: number } | null = null;
+  for (const raw of raws) {
+    if (!raw) continue;
+    const p = parseRemakeMapping(raw);
+    if (!p.ok) continue;
+    if (!best || p.layouts.length > best.layouts || (p.layouts.length === best.layouts && p.dropped < best.dropped)) {
+      best = { raw, layouts: p.layouts.length, dropped: p.dropped };
+    }
+  }
+  return best?.raw ?? null;
 }
 
 // ── Compose the final spec (theme is deterministic; layouts are the AI-selected canonical bases) ──
@@ -161,11 +187,19 @@ export function composeRemakeLayouts(mapping: MappedLayout[]): LayoutDef[] {
  * Re-make (theme only → built-in 30) — never worse than today. `logo` is threaded in by the caller
  * (async zip read) like the deterministic path does.
  */
+export interface AiRemakeResult {
+  spec: TemplateSpec;
+  usedAi: boolean;
+  note: string;
+  /** The AI's per-source-layout decisions (base + reason), for surfacing "why" to the user. */
+  mappings?: MappedLayout[];
+}
+
 export function aiRemakeSpec(
   tpl: TemplateData,
   aiRaw: string | null | undefined,
   opts: { name?: string; logo?: LogoSpec } = {},
-): { spec: TemplateSpec; usedAi: boolean; note: string } {
+): AiRemakeResult {
   const theme = masterToTemplateSpec(tpl, { name: opts.name });
   const base: TemplateSpec = { ...theme, ...(opts.logo ? { logo: opts.logo } : {}) };
   if (!aiRaw) return { spec: base, usedAi: false, note: "no AI response — deterministic Re-make (built-in 30)" };
@@ -173,5 +207,10 @@ export function aiRemakeSpec(
   if (!m.ok) return { spec: base, usedAi: false, note: `AI response unusable (${m.error}) — deterministic fallback` };
   const layouts = composeRemakeLayouts(m.layouts);
   if (layouts.length === 0) return { spec: base, usedAi: false, note: "no canonical layouts composed — deterministic fallback" };
-  return { spec: { ...base, layouts }, usedAi: true, note: `AI Re-make: ${layouts.length} layouts mapped (${m.dropped} dropped)` };
+  return {
+    spec: { ...base, layouts },
+    usedAi: true,
+    note: `AI Re-make: ${layouts.length} layouts mapped (${m.dropped} dropped)`,
+    mappings: m.layouts,
+  };
 }

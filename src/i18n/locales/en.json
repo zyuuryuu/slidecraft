@@ -131,7 +131,9 @@
     "draftLockedTitle": "Editing is locked while collaborating",
     "draftButtonTitle": "Create or import slides from a draft (text)",
     "viewForm": "Form",
-    "taskRemakeAI": "Master remake (AI)"
+    "taskRemakeAI": "Master remake (AI)",
+    "remakeAIDone": "AI remade {{count}} layouts",
+    "remakeAIFallback": "AI not used — remade with standard layouts"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",

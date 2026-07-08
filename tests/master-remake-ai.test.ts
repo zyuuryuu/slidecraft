@@ -10,7 +10,7 @@ import { loadTemplate } from "../src/engine/template-loader";
 import { BUILTIN_LAYOUTS } from "../src/engine/template-layout-library";
 import {
   remakeVocabulary, masterToLayoutInventory, remakeSystemPrompt,
-  parseRemakeMapping, composeRemakeLayouts, aiRemakeSpec,
+  parseRemakeMapping, composeRemakeLayouts, aiRemakeSpec, pickBestRawMapping,
 } from "../src/engine/master-remake-ai";
 
 const load = (p: string) => loadTemplate(new Uint8Array(readFileSync(p)));
@@ -106,5 +106,67 @@ describe("AI Re-make Phase-0: compose + deterministic fallback (harness over mod
       expect(spec.layouts).toBeUndefined(); // falls back to the built-in 30
       expect(spec.fonts).toBeTruthy();
     }
+  });
+});
+
+describe("AI Re-make Phase-2: rationale (explainability) + best-of-N", () => {
+  it("parseRemakeMapping captures a per-entry `reason` (trimmed, capped)", () => {
+    const raw = JSON.stringify({ layouts: [
+      { base: "Title.1Title.Single", rename: "表紙", reason: "  cover: single centred title  " },
+      { base: "Content.1Body.Single", rename: "本文" }, // no reason → undefined, still valid
+      { base: "Column.2Body.Equal", rename: "比較", reason: 42 }, // non-string → ignored
+    ] });
+    const r = parseRemakeMapping(raw);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.layouts[0].reason).toBe("cover: single centred title");
+      expect(r.layouts[1].reason).toBeUndefined();
+      expect(r.layouts[2].reason).toBeUndefined();
+    }
+  });
+
+  it("aiRemakeSpec surfaces the AI decisions (base + reason) via `mappings` for a valid response", async () => {
+    const tpl = await load(MIDNIGHT);
+    const raw = JSON.stringify({ layouts: [{ base: "Title.1Title.Single", rename: "表紙", reason: "cover" }] });
+    const { usedAi, mappings } = aiRemakeSpec(tpl, raw, { name: "T" });
+    expect(usedAi).toBe(true);
+    expect(mappings).toEqual([{ base: "Title.1Title.Single", rename: "表紙", reason: "cover" }]);
+  });
+
+  it("aiRemakeSpec omits `mappings` on the deterministic fallback", async () => {
+    const tpl = await load(MIDNIGHT);
+    const { usedAi, mappings } = aiRemakeSpec(tpl, "garbage");
+    expect(usedAi).toBe(false);
+    expect(mappings).toBeUndefined();
+  });
+
+  it("pickBestRawMapping picks the response covering the MOST source layouts", () => {
+    const thin = JSON.stringify({ layouts: [{ base: "Title.1Title.Single" }] });
+    const rich = JSON.stringify({ layouts: [
+      { base: "Title.1Title.Single" }, { base: "Content.1Body.Single" }, { base: "Column.2Body.Equal" },
+    ] });
+    expect(pickBestRawMapping([thin, rich])).toBe(rich);
+    expect(pickBestRawMapping([rich, thin])).toBe(rich);
+  });
+
+  it("pickBestRawMapping tie-breaks on FEWEST hallucinated drops", () => {
+    const clean = JSON.stringify({ layouts: [{ base: "Title.1Title.Single" }, { base: "Content.1Body.Single" }] });
+    const dirty = JSON.stringify({ layouts: [
+      { base: "Title.1Title.Single" }, { base: "Content.1Body.Single" }, { base: "Made.Up" }, { base: "Also.Fake" },
+    ] }); // same 2 usable, but 2 dropped
+    expect(pickBestRawMapping([dirty, clean])).toBe(clean);
+  });
+
+  it("pickBestRawMapping skips null/garbage and returns null when none parse", () => {
+    const good = JSON.stringify({ layouts: [{ base: "Content.1Body.Single" }] });
+    expect(pickBestRawMapping([null, "not json", undefined, good])).toBe(good);
+    expect(pickBestRawMapping([null, "nope", JSON.stringify({ layouts: [{ base: "Fake.1" }] })])).toBeNull();
+    expect(pickBestRawMapping([])).toBeNull();
+  });
+
+  it("remakeSystemPrompt asks for a reason field", async () => {
+    const tpl = await load(MIDNIGHT);
+    const prompt = remakeSystemPrompt(masterToLayoutInventory(tpl));
+    expect(prompt).toContain('"reason"');
   });
 });

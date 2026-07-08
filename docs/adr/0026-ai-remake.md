@@ -39,8 +39,14 @@
   不満なら AI）。
 - 限界: canonical に無い真に固有な構造は写せない（案 B の将来 Phase）。多くのマスターは canonical に
   近く決定論で足りる可能性 — AI が効くのは固有度の高いマスター。
+- **Phase-2（実装済）**: (1) 写像の**根拠 `reason`**（プロンプト＋parse＋`mappings` 返却＋トースト要約）で
+  説明可能性を付与。(2) **best-of-N**（`pickBestRawMapping`・既定 `n=2`）でローカル小モデルの run 間
+  ばらつきを緩和。実測（CX_sample・K=3・5 モデル）: valid-JSON 全 5 モデル 3/3、phi4/granite8b は
+  ばらつき小、phi3.5/mistral で best-of-N が効く（[設計 §9](../design/ai-remake.md)）。
 
 ## References
 
-- 実装: `src/engine/master-remake-ai.ts`（Phase-0 スカフォールディング・test-first `master-remake-ai.test.ts`）
-- 設計・Phase-0 実測: [docs/design/ai-remake.md](../design/ai-remake.md)
+- 実装: `src/engine/master-remake-ai.ts`（inventory/prompt/parse＝reason・ハルシ drop/compose＝name 単位/
+  `pickBestRawMapping`＝best-of-N/fallback・test-first `master-remake-ai.test.ts`）／
+  `src/components/apply-template.ts`（`applyTemplateBytesAsRemakeAI`・callAI 注入・best-of-N）
+- 設計・Phase-0/2 実測: [docs/design/ai-remake.md](../design/ai-remake.md)

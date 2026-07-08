@@ -13,7 +13,7 @@ import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
 import { masterToTemplateSpec, extractLogo } from "../engine/master-remake";
-import { masterToLayoutInventory, remakeSystemPrompt, aiRemakeSpec } from "../engine/master-remake-ai";
+import { masterToLayoutInventory, remakeSystemPrompt, aiRemakeSpec, pickBestRawMapping, type MappedLayout } from "../engine/master-remake-ai";
 import { writeTemplate } from "../engine/template-writer";
 
 export interface TemplateSetters {
@@ -128,6 +128,7 @@ export async function applyTemplateBytesAsRemake(
 export interface RemakeAIResult extends RemakeResult {
   usedAi?: boolean; // true = the AI mapping was used; false = deterministic fallback (built-in 30)
   note?: string; // human-readable note about which path ran (for the UI to surface)
+  mappings?: MappedLayout[]; // per-source-layout AI decisions (base + reason) for "why" surfacing
 }
 
 /**
@@ -142,19 +143,30 @@ export async function applyTemplateBytesAsRemakeAI(
   name: string,
   setters: TemplateSetters,
   callAI: (systemPrompt: string) => Promise<string | null>,
+  opts: { n?: number } = {},
 ): Promise<RemakeAIResult> {
   try {
     const source = await loadTemplate(buf);
     const cleanName = name.replace(/\.pptx$/i, "");
     const prompt = remakeSystemPrompt(masterToLayoutInventory(source));
+    // best-of-N: a local small model varies run-to-run; sample n times and keep the mapping that
+    // covers the most source layouts (fewest hallucinated). n=1 = single call (unchanged). Sequential
+    // because the injected callAI serialises one request at a time; per-call failures degrade to null.
+    const n = Math.max(1, Math.min(5, Math.round(opts.n ?? 1)));
     let aiRaw: string | null = null;
     try {
-      aiRaw = await callAI(prompt);
+      if (n === 1) {
+        aiRaw = await callAI(prompt);
+      } else {
+        const raws: (string | null)[] = [];
+        for (let i = 0; i < n; i++) raws.push(await callAI(prompt).catch(() => null));
+        aiRaw = pickBestRawMapping(raws);
+      }
     } catch {
       aiRaw = null; // AI failure → deterministic fallback below (never worse)
     }
     const logo = await extractLogo(source);
-    const { spec, usedAi, note } = aiRemakeSpec(source, aiRaw, {
+    const { spec, usedAi, note, mappings } = aiRemakeSpec(source, aiRaw, {
       name: i18n.t("applyTemplate.remakeName", { name: cleanName }),
       logo,
     });
@@ -167,7 +179,7 @@ export async function applyTemplateBytesAsRemakeAI(
     }
     setters.setTemplateData(remade);
     setters.setTemplateName(spec.name);
-    return { ok: true, health, remadeBytes, usedAi, note };
+    return { ok: true, health, remadeBytes, usedAi, note, mappings };
   } catch (err) {
     setters.setParseError(
       i18n.t("applyTemplate.remakeFailed", { error: err instanceof Error ? err.message : String(err) }),

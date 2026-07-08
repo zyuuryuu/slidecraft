@@ -40,6 +40,11 @@ function measureImageAspect(dataUrl: string): Promise<number | undefined> {
   });
 }
 
+// AI Re-make best-of-N: how many times to sample the model and keep the widest-coverage mapping.
+// A local small model varies run-to-run; 2 lifts the coverage floor at a modest one-time import cost
+// (see docs/design/ai-remake.md — model-variance measurement). Cloud/no-AI paths collapse this to 1.
+const REMAKE_BEST_OF_N = 2;
+
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
@@ -117,6 +122,10 @@ export default function App() {
       JSON.parse(await aiSubmitAndWait(description, "template-spec", t("app.taskTemplateProposal"))) as TemplateSpec,
     [aiSubmitAndWait, t],
   );
+  // Transient toast (2.8s). Declared here (before handlers that call it) so the AI Re-make handler and
+  // the collab bridge below can both depend on `notify` without a temporal-dead-zone reference.
+  const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
+  const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
   // AI Re-make（第3の口・ADR-0026）: AI が入力マスターの各レイアウトを clean な canonical へ写像。
   // callAI は AI 接続時のみ実行（未接続・失敗は null → aiRemakeSpec が決定論 Re-make にフォールバック）。
   const aiReady = ai.connection.ok;
@@ -127,11 +136,16 @@ export default function App() {
       if (!aiReady) return null;
       try { return await aiSubmitAndWait(systemPrompt, "master-remake", t("app.taskRemakeAI")); } catch { return null; }
     };
-    const r = await applyMasterBytesAsRemakeAI(picked.bytes, picked.name, callAI);
+    // best-of-N: sample the local model REMAKE_BEST_OF_N times and keep the widest-coverage mapping
+    // (a small local model varies run-to-run). n=1 when AI isn't connected (the single call returns null).
+    const r = await applyMasterBytesAsRemakeAI(picked.bytes, picked.name, callAI, {
+      n: aiReady ? REMAKE_BEST_OF_N : 1,
+    });
     if (!r.ok || !r.remadeBytes) return;
     const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
     setMasterId(entry.id);
-  }, [registerMaster, applyMasterBytesAsRemakeAI, aiSubmitAndWait, aiReady, t]);
+    notify(r.usedAi ? t("app.remakeAIDone", { count: r.mappings?.length ?? 0 }) : t("app.remakeAIFallback"));
+  }, [registerMaster, applyMasterBytesAsRemakeAI, aiSubmitAndWait, aiReady, notify, t]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -195,10 +209,8 @@ export default function App() {
     collab.setActiveHostDoc(target?.hostDocId ?? null);
   }, [switchDoc, docs, collab]);
 
-  // P2.5 collaboration bridge + transient toast: while connected, per-slide edits and Undo/Redo are
-  // routed to the host (single truth); stale/empty results surface a never-silent toast.
-  const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
-  const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
+  // P2.5 collaboration bridge: while connected, per-slide edits and Undo/Redo are routed to the host
+  // (single truth); stale/empty results surface a never-silent toast (via `notify`, declared above).
   const collabBridge = useMemo(
     () =>
       editLocked

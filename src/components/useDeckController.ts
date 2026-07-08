@@ -203,8 +203,12 @@ export function useDeckController() {
   // レイアウトへ写像（構造マッピング）。callAI は App が provider から注入。壊れ/未接続なら
   // aiRemakeSpec が決定論 Re-make にフォールバックする（never worse）。
   const applyMasterBytesAsRemakeAI = useCallback(
-    (buf: ArrayBuffer | Uint8Array, name: string, callAI: (systemPrompt: string) => Promise<string | null>) =>
-      applyTemplateBytesAsRemakeAI(buf, name, { setTemplateData, setTemplateName, setParseError }, callAI),
+    (
+      buf: ArrayBuffer | Uint8Array,
+      name: string,
+      callAI: (systemPrompt: string) => Promise<string | null>,
+      opts?: { n?: number },
+    ) => applyTemplateBytesAsRemakeAI(buf, name, { setTemplateData, setTemplateName, setParseError }, callAI, opts),
     [setTemplateData, setTemplateName, setParseError],
   );
 

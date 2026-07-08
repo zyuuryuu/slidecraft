@@ -131,7 +131,9 @@
     "draftLockedTitle": "協働接続中は編集ロック中",
     "draftButtonTitle": "原稿（テキスト）からスライドを作る・取り込む",
     "viewForm": "フォーム",
-    "taskRemakeAI": "マスター再構成（AI）"
+    "taskRemakeAI": "マスター再構成（AI）",
+    "remakeAIDone": "AI が {{count}} レイアウトを再構成しました",
+    "remakeAIFallback": "AI 未使用 — 標準レイアウトで再構成しました"
   },
   "applyTemplate": {
     "templateUnusable": "このテンプレートは使用できません: {{reason}}",

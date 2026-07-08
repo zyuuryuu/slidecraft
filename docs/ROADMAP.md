@@ -47,7 +47,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | --- | --- | --- |
 | 内蔵 30 レイアウトのオミット | Midnight Executive 30 種は**開発用** — 主要テーマ（＋一部バックログ）完了後にビルトイン同梱をやめ、canonical .pptx は入力サンプルとしてリポジトリ内に残置。触点: `useMasterRegistry` の `BUILTIN_URL`＋起動 fetch（→ 残置サンプル参照 or `writeTemplate` で起動時生成）・`BUILTIN_LAYOUTS` の既定セット差し替え・`LAYOUT_NAMES` フォールバックの整理・テスト fixture パス・`scripts/rebuild-template.ts` 引退。ランタイムはロールベースで 30 種非依存（alien テストでゲート済み）のため作業はこの触点に閉じる | S〜M |
 | スライドマスター Re-make の残（本体は [shipped](shipped.md)） | Re-make 本体（テーマ抽出→自前レイアウト・ロゴ継承・フラット設計吸収・純粋 Import 両立）は出荷済（[ADR-0023](adr/0023-third-party-master-idx-convention.md)）。残る磨き込み：**(A) EA/CJK フォント分類**（`<a:ea>` 抽出＝latin 名流用の解消）・**(B) dark ロゴ変種の per-background 選択**（現状は最頻1枚）。関連 [[third_party_master_idx_fix]] | S |
-| **AI 非決定 Re-make の続き（Phase-2）** | Phase-0（feasibility=GO・小モデル実証）＋Phase-1 MVP（構造マッピング・第3口 UI 配線・end-to-end 実証）は**出荷済**（[ADR-0026](adr/0026-ai-remake.md)・[設計](design/ai-remake.md)・→[shipped](shipped.md)）。残：**(A) 案 B の部分導入** — canonical に無い source 固有構造を AI が幾何ごと合成／**(B) best-of-N・採用ゲート配線**（現状は単発 `submitAndWait`）／**(C) より弱い/多様なモデルでのばらつき計測＋写像の根拠提示（説明可能性）**／EA/CJK フォント連携（Re-make 残 A）。触点: `master-remake-ai.ts`・`apply-template.ts`・`useAiGeneration`。 | M |
+| **AI 非決定 Re-make の続き（Phase-3）** | Phase-0（feasibility=GO）＋Phase-1 MVP（構造マッピング・第3口 UI）＋Phase-2（**根拠 `reason`／best-of-N／5 モデル×K=3 ばらつき実測**）は**出荷済**（[ADR-0026](adr/0026-ai-remake.md)・[設計 §9](design/ai-remake.md)・→[shipped](shipped.md)）。残：**(A) 案 B の部分導入** — canonical に無い source 固有構造を AI が幾何ごと合成／**(B) per-layout「なぜ」パネル** — `mappings`（reason 付き・配線済）の可視化 UI（現状はトースト要約のみ）／**(C) weaker-model 緩和**（プロンプト few-shot 化 等）／EA/CJK フォント連携（Re-make 残 A）。触点: `master-remake-ai.ts`・`apply-template.ts`・`MasterPicker`。 | M |
 
 ### 🖥 UX / オンボーディング / 配布
 
