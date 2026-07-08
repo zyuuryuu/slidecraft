@@ -227,6 +227,36 @@
     "cancel": "Cancel",
     "commit": "✓ Make slides"
   },
+  "intake": {
+    "mode": {
+      "import": "Import",
+      "remake": "Remake (deterministic)",
+      "remake-ai": "Remake (AI)"
+    },
+    "progress": {
+      "loading": "Loading…",
+      "generating": "Remaking with AI… candidate {{step}}/{{total}}",
+      "composing": "Composing…",
+      "validating": "Validating…"
+    },
+    "status": {
+      "ok": "Healthy",
+      "degraded": "Some limits",
+      "rejected": "Unusable"
+    },
+    "layoutCount": "{{count}} layouts",
+    "aiUsed": "AI mapping",
+    "aiFallback": "Deterministic fallback",
+    "details": "Details",
+    "dismiss": "Dismiss",
+    "theme": "Theme",
+    "fonts": "Head {{major}} / Body {{minor}}",
+    "logoYes": "Logo inherited",
+    "logoNo": "No logo",
+    "mappingTitle": "Layout mapping (source → canonical · reason)",
+    "repairs": "Repairs",
+    "repairsCount": "{{count}} frames repaired"
+  },
   "lang": {
     "name": "English",
     "switchTo": "日本語",
@@ -290,7 +320,8 @@
     "createTitle": "Pick colors and fonts to generate a new template",
     "createLabel": "Create template…",
     "remakeAILabel": "Remake with AI (beta)",
-    "remakeAITitle": "AI maps the imported master's layouts onto clean canonical layouts (falls back to the deterministic remake when AI is not connected)"
+    "remakeAITitle": "AI maps the imported master's layouts onto clean canonical layouts (falls back to the deterministic remake when AI is not connected)",
+    "showInfoTitle": "Show the latest intake result"
   },
   "masterReg": {
     "defaultName": "Template",

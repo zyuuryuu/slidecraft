@@ -25,6 +25,7 @@ import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
 import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { describeRepairPlan } from "./components/apply-template";
+import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
@@ -65,6 +66,13 @@ export default function App() {
   // sample + any imported this session). Selecting/importing applies it to the active doc (gated).
   const { masters, importMaster: registerMaster, getBytes: getMasterBytes } = useMasterRegistry();
   const [masterId, setMasterId] = useState(BUILTIN_MASTER.id);
+  // Intake transparency: `busy` drives the live progress bar during an import/remake; `result` is the
+  // last completed intake. The summary bar is dismissable (`dismissed`) yet the result persists so the
+  // MasterPicker ⓘ can re-show it. A new intake un-dismisses.
+  const [intakeBusy, setIntakeBusy] = useState<IntakeBusy | null>(null);
+  const [intakeResult, setIntakeResult] = useState<IntakeResult | null>(null);
+  const [intakeDismissed, setIntakeDismissed] = useState(false);
+  const showIntake = useCallback((r: IntakeResult) => { setIntakeResult(r); setIntakeDismissed(false); }, []);
   const handleSelectMaster = useCallback(async (id: string) => {
     const entry = masters.find((m) => m.id === id);
     if (!entry) return;
@@ -74,26 +82,40 @@ export default function App() {
     if (r.ok) setMasterId(id);
   }, [masters, getMasterBytes, applyMasterBytes]);
   const handleImportMaster = useCallback(async () => {
+    if (intakeBusy) return; // one intake at a time
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
-    // rejected でも修復可能なら確認のうえ「整形して取り込む」（テーマ2 スライス1）。適用に成功した
-    // bytes（修復されていればそちら）だけをレジストリに登録する — 使えないマスターを選択肢に残さない。
-    const r = await applyMasterBytesWithRepair(picked.bytes, picked.name, (plan) =>
-      confirmDialog(describeRepairPlan(plan), t("app.repairTemplateTitle")));
-    if (!r.ok) return;
-    const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
-    setMasterId(entry.id);
-  }, [registerMaster, applyMasterBytesWithRepair, t]);
+    setIntakeBusy({ mode: "import", phase: { phase: "loading" } });
+    try {
+      // rejected でも修復可能なら確認のうえ「整形して取り込む」（テーマ2 スライス1）。適用に成功した
+      // bytes（修復されていればそちら）だけをレジストリに登録する — 使えないマスターを選択肢に残さない。
+      const r = await applyMasterBytesWithRepair(picked.bytes, picked.name, (plan) =>
+        confirmDialog(describeRepairPlan(plan), t("app.repairTemplateTitle")));
+      if (!r.ok) return;
+      const entry = registerMaster(picked.name, r.repairedBytes ?? picked.bytes);
+      setMasterId(entry.id);
+      if (r.summary) showIntake({ mode: "import", name: picked.name.replace(/\.pptx$/i, ""), summary: r.summary, ts: Date.now() });
+    } finally {
+      setIntakeBusy(null);
+    }
+  }, [intakeBusy, registerMaster, applyMasterBytesWithRepair, showIntake, t]);
   // Re-make（第2の口）: .pptx を取り込むが、フォント・配色・背景だけ受け継いで SlideCraft 自前の
   // レイアウトで作り直す。生成された canonical テンプレの bytes をレジストリに登録する。
   const handleRemakeMaster = useCallback(async () => {
+    if (intakeBusy) return;
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
-    const r = await applyMasterBytesAsRemake(picked.bytes, picked.name);
-    if (!r.ok || !r.remadeBytes) return;
-    const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
-    setMasterId(entry.id);
-  }, [registerMaster, applyMasterBytesAsRemake, t]);
+    setIntakeBusy({ mode: "remake", phase: { phase: "composing" } });
+    try {
+      const r = await applyMasterBytesAsRemake(picked.bytes, picked.name);
+      if (!r.ok || !r.remadeBytes) return;
+      const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
+      setMasterId(entry.id);
+      if (r.summary) showIntake({ mode: "remake", name: picked.name.replace(/\.pptx$/i, ""), summary: r.summary, ts: Date.now() });
+    } finally {
+      setIntakeBusy(null);
+    }
+  }, [intakeBusy, registerMaster, applyMasterBytesAsRemake, showIntake, t]);
   // 新規テンプレ作成（テーマ2 S4）: スペック → template-writer で生成 → 通常のゲート経由で適用＋登録。
   const [showTemplateCreator, setShowTemplateCreator] = useState(false);
   const handleCreateTemplate = useCallback(async (spec: TemplateSpec) => {
@@ -130,6 +152,7 @@ export default function App() {
   // callAI は AI 接続時のみ実行（未接続・失敗は null → aiRemakeSpec が決定論 Re-make にフォールバック）。
   const aiReady = ai.connection.ok;
   const handleRemakeMasterAI = useCallback(async () => {
+    if (intakeBusy) return;
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
     if (!picked) return;
     const callAI = async (systemPrompt: string): Promise<string | null> => {
@@ -138,14 +161,22 @@ export default function App() {
     };
     // best-of-N: sample the local model REMAKE_BEST_OF_N times and keep the widest-coverage mapping
     // (a small local model varies run-to-run). n=1 when AI isn't connected (the single call returns null).
-    const r = await applyMasterBytesAsRemakeAI(picked.bytes, picked.name, callAI, {
-      n: aiReady ? REMAKE_BEST_OF_N : 1,
-    });
-    if (!r.ok || !r.remadeBytes) return;
-    const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
-    setMasterId(entry.id);
-    notify(r.usedAi ? t("app.remakeAIDone", { count: r.mappings?.length ?? 0 }) : t("app.remakeAIFallback"));
-  }, [registerMaster, applyMasterBytesAsRemakeAI, aiSubmitAndWait, aiReady, notify, t]);
+    setIntakeBusy({ mode: "remake-ai", phase: { phase: "loading" } });
+    try {
+      const r = await applyMasterBytesAsRemakeAI(picked.bytes, picked.name, callAI, {
+        n: aiReady ? REMAKE_BEST_OF_N : 1,
+        onProgress: (phase) => setIntakeBusy({ mode: "remake-ai", phase }),
+      });
+      if (!r.ok || !r.remadeBytes) return;
+      const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
+      setMasterId(entry.id);
+      // The intake bar (below) now shows the outcome persistently + the mapping detail, replacing the
+      // transient done-toast; usedAi/mappings/note ride along for the "why" panel.
+      if (r.summary) showIntake({ mode: "remake-ai", name: picked.name.replace(/\.pptx$/i, ""), summary: r.summary, usedAi: r.usedAi, note: r.note, mappings: r.mappings, ts: Date.now() });
+    } finally {
+      setIntakeBusy(null);
+    }
+  }, [intakeBusy, registerMaster, applyMasterBytesAsRemakeAI, aiSubmitAndWait, aiReady, showIntake, t]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -391,6 +422,7 @@ export default function App() {
             onRemake={handleRemakeMaster}
             onRemakeAI={handleRemakeMasterAI}
             onCreate={() => setShowTemplateCreator(true)}
+            onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
             disabled={editLocked}
           />
           <LanguageToggle />
@@ -589,6 +621,13 @@ export default function App() {
           {toast.message}
         </div>
       )}
+
+      {/* Intake transparency: live progress during import/remake + a dismissable result summary after. */}
+      <IntakeSummaryBar
+        busy={intakeBusy}
+        result={intakeDismissed ? null : intakeResult}
+        onDismiss={() => setIntakeDismissed(true)}
+      />
     </>
   );
 }

@@ -19,10 +19,12 @@ interface MasterPickerProps {
   onRemakeAI?: () => void; // ADR-0026: AI Re-make (structure mapping); falls back to deterministic when AI isn't ready
   /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
   onCreate?: () => void;
+  /** Re-show the last intake result summary (the transparency bar). Omit → no ⓘ (nothing imported yet). */
+  onShowInfo?: () => void;
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onRemakeAI, onCreate, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onRemakeAI, onCreate, onShowInfo, disabled }: MasterPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +49,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
   const active = masters.find((m) => m.id === activeId);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative inline-flex items-center gap-1" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
@@ -58,6 +60,15 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
         <span className="truncate">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
       </button>
+      {onShowInfo && (
+        <button
+          onClick={onShowInfo}
+          title={t("masterPicker.showInfoTitle")}
+          className="shrink-0 w-6 h-6 rounded-full text-muted hover:text-accent-soft hover:bg-edge inline-flex items-center justify-center text-xs"
+        >
+          ⓘ
+        </button>
+      )}
 
       {open && (
         <div className="absolute right-0 mt-1 z-50 min-w-[220px] max-w-[320px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">

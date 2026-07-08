@@ -227,6 +227,36 @@
     "cancel": "キャンセル",
     "commit": "✓ スライドにする"
   },
+  "intake": {
+    "mode": {
+      "import": "取り込み",
+      "remake": "作り直し（決定論）",
+      "remake-ai": "作り直し（AI）"
+    },
+    "progress": {
+      "loading": "読み込み中…",
+      "generating": "AI で作り直し中… 候補 {{step}}/{{total}}",
+      "composing": "組み立て中…",
+      "validating": "検証中…"
+    },
+    "status": {
+      "ok": "健全",
+      "degraded": "一部制約",
+      "rejected": "使用不可"
+    },
+    "layoutCount": "{{count}} レイアウト",
+    "aiUsed": "AI 写像",
+    "aiFallback": "決定論フォールバック",
+    "details": "詳細",
+    "dismiss": "閉じる",
+    "theme": "テーマ",
+    "fonts": "見出し {{major}} / 本文 {{minor}}",
+    "logoYes": "ロゴ継承あり",
+    "logoNo": "ロゴなし",
+    "mappingTitle": "レイアウト写像（元 → 標準・理由）",
+    "repairs": "修復",
+    "repairsCount": "{{count}} 枠を修復"
+  },
   "lang": {
     "name": "日本語",
     "switchTo": "English",
@@ -290,7 +320,8 @@
     "createTitle": "配色とフォントを選んで新しいテンプレを生成する",
     "createLabel": "テンプレを作成…",
     "remakeAILabel": "AI で作り直す（試験）",
-    "remakeAITitle": "AI が入力マスターのレイアウトを整った標準レイアウトへ写像して作り直す（未接続時は決定論版にフォールバック）"
+    "remakeAITitle": "AI が入力マスターのレイアウトを整った標準レイアウトへ写像して作り直す（未接続時は決定論版にフォールバック）",
+    "showInfoTitle": "直近の取り込み結果を表示"
   },
   "masterReg": {
     "defaultName": "テンプレート",

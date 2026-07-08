@@ -22,11 +22,40 @@ export interface TemplateSetters {
   setParseError: (e: string | null) => void;
 }
 
+/**
+ * "What happened" summary of an intake, for the transparency bar (docs/design/ai-remake.md §9.2 →
+ * generalised to all three intake modes). Built by each apply function from data it already computes.
+ */
+export interface IntakeSummary {
+  layoutCount: number; // resulting layouts in the active template
+  status: TemplateHealth["status"]; // ok | degraded | rejected
+  findings: string[]; // health finding messages (warnings the user should see)
+  theme?: { major: string; minor: string; palette: string[]; logo: boolean }; // Re-make modes (hex WITH #)
+  repairs?: number; // faithful-Import repair path: how many placeholder frames were repaired
+}
+
+/** Progress ticks emitted DURING a (possibly slow) intake so the UI can show a live indicator. */
+export type IntakeProgress =
+  | { phase: "loading" }
+  | { phase: "generating"; step: number; total: number } // AI best-of-N candidate i/n
+  | { phase: "composing" }
+  | { phase: "validating" };
+
+function themeSummary(spec: { fonts: { major: string; minor: string }; palette: Record<string, string> }, logo: boolean) {
+  return {
+    major: spec.fonts.major,
+    minor: spec.fonts.minor,
+    palette: Object.values(spec.palette).map((h) => (h.startsWith("#") ? h : `#${h}`)),
+    logo,
+  };
+}
+
 export interface ApplyTemplateResult {
   ok: boolean;
   health?: TemplateHealth; // present whenever the bytes parsed (even if rejected), for the caller to surface
   repair?: RepairPlan; // rejected 時の修復プラン（repairable でも同意が得られなかった場合も返す）
   repairedBytes?: Uint8Array; // 修復を適用したときの登録用 bytes（レジストリにはこちらを保存する）
+  summary?: IntakeSummary; // "what happened" for the transparency bar (present when ok)
 }
 
 /**
@@ -59,16 +88,27 @@ export async function applyTemplateBytesWithRepair(
     if (health.status !== "rejected") {
       setters.setTemplateData(tpl);
       setters.setTemplateName(name.replace(/\.pptx$/i, ""));
-      return { ok: true, health };
+      return {
+        ok: true,
+        health,
+        summary: { layoutCount: tpl.layouts.length, status: health.status, findings: health.findings.map((f) => f.message), repairs: 0 },
+      };
     }
 
     const plan = planRepairs(tpl);
     if (plan.repairable && (await confirmRepair(plan))) {
       const r = await repairTemplate(buf);
       if (r.healthAfter.status !== "rejected") {
-        setters.setTemplateData(await loadTemplate(r.bytes));
+        const repaired = await loadTemplate(r.bytes);
+        setters.setTemplateData(repaired);
         setters.setTemplateName(name.replace(/\.pptx$/i, ""));
-        return { ok: true, health: r.healthAfter, repair: plan, repairedBytes: r.bytes };
+        return {
+          ok: true,
+          health: r.healthAfter,
+          repair: plan,
+          repairedBytes: r.bytes,
+          summary: { layoutCount: repaired.layouts.length, status: r.healthAfter.status, findings: r.healthAfter.findings.map((f) => f.message), repairs: plan.ops.length },
+        };
       }
     }
 
@@ -114,7 +154,12 @@ export async function applyTemplateBytesAsRemake(
     }
     setters.setTemplateData(remade);
     setters.setTemplateName(spec.name);
-    return { ok: true, health, remadeBytes };
+    return {
+      ok: true,
+      health,
+      remadeBytes,
+      summary: { layoutCount: remade.layouts.length, status: health.status, findings: health.findings.map((f) => f.message), theme: themeSummary(spec, !!logo) },
+    };
   } catch (err) {
     setters.setParseError(
       i18n.t("applyTemplate.remakeFailed", {
@@ -143,9 +188,11 @@ export async function applyTemplateBytesAsRemakeAI(
   name: string,
   setters: TemplateSetters,
   callAI: (systemPrompt: string) => Promise<string | null>,
-  opts: { n?: number } = {},
+  opts: { n?: number; onProgress?: (p: IntakeProgress) => void } = {},
 ): Promise<RemakeAIResult> {
+  const tick = opts.onProgress ?? (() => {});
   try {
+    tick({ phase: "loading" });
     const source = await loadTemplate(buf);
     const cleanName = name.replace(/\.pptx$/i, "");
     const prompt = remakeSystemPrompt(masterToLayoutInventory(source));
@@ -155,16 +202,16 @@ export async function applyTemplateBytesAsRemakeAI(
     const n = Math.max(1, Math.min(5, Math.round(opts.n ?? 1)));
     let aiRaw: string | null = null;
     try {
-      if (n === 1) {
-        aiRaw = await callAI(prompt);
-      } else {
-        const raws: (string | null)[] = [];
-        for (let i = 0; i < n; i++) raws.push(await callAI(prompt).catch(() => null));
-        aiRaw = pickBestRawMapping(raws);
+      const raws: (string | null)[] = [];
+      for (let i = 0; i < n; i++) {
+        tick({ phase: "generating", step: i + 1, total: n });
+        raws.push(await callAI(prompt).catch(() => null));
       }
+      aiRaw = n === 1 ? raws[0] : pickBestRawMapping(raws);
     } catch {
       aiRaw = null; // AI failure → deterministic fallback below (never worse)
     }
+    tick({ phase: "composing" });
     const logo = await extractLogo(source);
     const { spec, usedAi, note, mappings } = aiRemakeSpec(source, aiRaw, {
       name: i18n.t("applyTemplate.remakeName", { name: cleanName }),
@@ -172,6 +219,7 @@ export async function applyTemplateBytesAsRemakeAI(
     });
     const remadeBytes = await writeTemplate(spec);
     const remade = await loadTemplate(remadeBytes);
+    tick({ phase: "validating" });
     const health = assessTemplateHealth(buildCatalog(remade));
     if (health.status === "rejected") {
       setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
@@ -179,7 +227,10 @@ export async function applyTemplateBytesAsRemakeAI(
     }
     setters.setTemplateData(remade);
     setters.setTemplateName(spec.name);
-    return { ok: true, health, remadeBytes, usedAi, note, mappings };
+    return {
+      ok: true, health, remadeBytes, usedAi, note, mappings,
+      summary: { layoutCount: remade.layouts.length, status: health.status, findings: health.findings.map((f) => f.message), theme: themeSummary(spec, !!logo) },
+    };
   } catch (err) {
     setters.setParseError(
       i18n.t("applyTemplate.remakeFailed", { error: err instanceof Error ? err.message : String(err) }),

@@ -17,7 +17,7 @@ import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasCo
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsRemake, applyTemplateBytesAsRemakeAI } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsRemake, applyTemplateBytesAsRemakeAI, type IntakeProgress } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
 import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
@@ -207,7 +207,7 @@ export function useDeckController() {
       buf: ArrayBuffer | Uint8Array,
       name: string,
       callAI: (systemPrompt: string) => Promise<string | null>,
-      opts?: { n?: number },
+      opts?: { n?: number; onProgress?: (p: IntakeProgress) => void },
     ) => applyTemplateBytesAsRemakeAI(buf, name, { setTemplateData, setTemplateName, setParseError }, callAI, opts),
     [setTemplateData, setTemplateName, setParseError],
   );

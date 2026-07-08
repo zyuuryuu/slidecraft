@@ -65,4 +65,35 @@ describe("applyTemplateBytesAsRemakeAI", () => {
       expect(r.usedAi).toBe(false);
     }
   });
+
+  it("returns an intake `summary` (layout count, health status, theme) for the transparency bar", async () => {
+    const { setters, applied } = makeSetters();
+    const mapping = JSON.stringify({ layouts: [{ base: "Title.1Title.Single", rename: "表紙" }, { base: "Content.1Body.Single", rename: "本文" }] });
+    const r = await applyTemplateBytesAsRemakeAI(SRC, "会社.pptx", setters, async () => mapping);
+    expect(r.summary).toBeDefined();
+    expect(r.summary!.layoutCount).toBe(applied()!.layouts.length);
+    expect(r.summary!.status).toBe(r.health!.status);
+    expect(r.summary!.theme).toBeDefined();
+    expect(r.summary!.theme!.major).toBeTruthy();
+    expect(Array.isArray(r.summary!.theme!.palette)).toBe(true);
+    expect(r.summary!.theme!.palette[0]).toMatch(/^#/); // hex WITH #
+  });
+
+  it("emits onProgress ticks: loading → generating(step/total) → composing → validating (best-of-N=2)", async () => {
+    const { setters } = makeSetters();
+    const phases: string[] = [];
+    const steps: Array<{ step: number; total: number }> = [];
+    const mapping = JSON.stringify({ layouts: [{ base: "Content.1Body.Single", rename: "本文" }] });
+    await applyTemplateBytesAsRemakeAI(SRC, "x.pptx", setters, async () => mapping, {
+      n: 2,
+      onProgress: (p) => {
+        phases.push(p.phase);
+        if (p.phase === "generating") steps.push({ step: p.step, total: p.total });
+      },
+    });
+    expect(phases[0]).toBe("loading");
+    expect(phases).toContain("composing");
+    expect(phases).toContain("validating");
+    expect(steps).toEqual([{ step: 1, total: 2 }, { step: 2, total: 2 }]); // both best-of-N candidates ticked
+  });
 });

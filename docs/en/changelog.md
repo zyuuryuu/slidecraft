@@ -8,6 +8,10 @@ and versioning follows [Semantic Versioning](https://semver.org/) (**the 0.x lin
 
 ## [Unreleased]
 
+### Added
+
+- **Transparent master intake** — when you import a template, a progress bar shows while it runs and a result summary appears after (how many layouts, whether it's healthy, whether AI was used). Expand "Details" to see which source layout AI mapped to which canonical layout (with the reason), plus the extracted fonts and colors.
+
 ## [0.3.0] — 2026-07-08
 
 A minor release adding an **AI "remake" import** for slide masters.
