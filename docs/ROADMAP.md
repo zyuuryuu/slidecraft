@@ -39,6 +39,7 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | --- | --- | --- |
 | 図品質の磨き込み（残＝ノード衝突/折返し） | 実レンダ敵対監査（全30枚）で検出した既存問題のうち、**エッジラベル低コントラスト（82569eb／PR #83）と図タイトル重複 `omitTitle`（59ef092）は出荷済**（→[shipped](shipped.md)）。**閉じスライドは非バグと判明**（canonical Closing は full-bleed 濃紺 BG 図形を持ち可読・監査で reconcile 済→shipped）。残＝**ノード衝突＋ラベル折返し**（`layout-engine` は固定 node_width＋全体スケールのみ・最頻/効き目大・未対処）。共有 painter に触る＝PPTX にも波及（golden 検証必須）。触点: `diagram-painter`・`layout-engine` | M |
 | @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
+| **プレビュー/HTML の PPTX 追随（SmartArt・複雑図形）** | プレビュー/HTML は共有 SlideCard レンダラで PPTX と WYSIWYG のはずだが、**テンプレ由来の図形描画にまだ追随不足**の疑い（ユーザ体感 2026-07-08）。特に **SmartArt（`<dgm:>`/graphicFrame の diagram パート）は未描画の見込み**、加えて connector・WordArt・複雑 custGeom・グループのネスト等。まず**ギャップの実測**（実テンプレ群を Playwright 実レンダ→PPTX と目視差分＝敵対監査）→ 高インパクト分から共有レンダラ（`ooxml-geom`/`ooxml-fill`/SlideCard）で closing。SmartArt は dgm→図形ツリー展開が要る大物なので別 phase。プレビュー/HTML 限定なら PPTX golden 非影響（ただし共有 painter に触る変更は golden 検証必須）。関連 [[diagram_render_architecture]] | M〜L |
 
 ### 📄 テンプレ / マスター
 
