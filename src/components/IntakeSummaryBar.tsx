@@ -98,7 +98,7 @@ export function Detail({ result }: { result: IntakeResult }) {
         </div>
       )}
       {result.mode === "remake-ai" && result.mappings && result.mappings.length > 0 && (
-        <div>
+        <div className="overflow-x-auto">
           <div className="text-muted mb-1">{t("intake.mappingTitle")}</div>
           <table className="w-full border-collapse">
             <tbody>
@@ -148,7 +148,7 @@ export default function IntakeSummaryBar({
   );
 
   return (
-    <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[55] w-[min(92vw,44rem)]" role="status">
+    <div className="fixed top-14 right-3 z-[55] w-[min(92vw,30rem)]" role="status">
       <div className="bg-surface border border-accent/40 rounded-lg shadow-2xl overflow-hidden">
         {busy ? (
           <ProgressRow busy={busy} />

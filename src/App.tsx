@@ -64,7 +64,7 @@ export default function App() {
 
   // Master registry (Slice 1a): the global set of slide masters the draft can pick from (bundled
   // sample + any imported this session). Selecting/importing applies it to the active doc (gated).
-  const { masters, importMaster: registerMaster, getBytes: getMasterBytes } = useMasterRegistry();
+  const { masters, importMaster: registerMaster, getBytes: getMasterBytes, removeMaster } = useMasterRegistry();
   const [masterId, setMasterId] = useState(BUILTIN_MASTER.id);
   // Intake transparency: `busy` drives the live progress bar during an import/remake; `result` is the
   // last completed intake. The summary bar is dismissable (`dismissed`) yet the result persists so the
@@ -81,6 +81,12 @@ export default function App() {
     const r = await applyMasterBytes(bytes, entry.name);
     if (r.ok) setMasterId(id);
   }, [masters, getMasterBytes, applyMasterBytes]);
+  // Delete an imported master (built-ins are protected in the registry → the ✓ default always survives).
+  // If the deleted one was active, re-select the default built-in so the deck never mirrors a gone master.
+  const handleRemoveMaster = useCallback((id: string) => {
+    removeMaster(id);
+    if (id === masterId) void handleSelectMaster(BUILTIN_MASTER.id);
+  }, [removeMaster, masterId, handleSelectMaster]);
   const handleImportMaster = useCallback(async () => {
     if (intakeBusy) return; // one intake at a time
     const picked = await pickBinaryFile(["pptx"], "PowerPoint");
@@ -422,7 +428,9 @@ export default function App() {
             onRemake={handleRemakeMaster}
             onRemakeAI={handleRemakeMasterAI}
             onCreate={() => setShowTemplateCreator(true)}
-            onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
+            onShowInfo={intakeResult ? () => setIntakeDismissed((d) => !d) : undefined}
+            onRemove={handleRemoveMaster}
+            aiReady={aiReady}
             disabled={editLocked}
           />
           <LanguageToggle />
@@ -574,6 +582,8 @@ export default function App() {
         onImportMaster={handleImportMaster}
         onRemakeMaster={handleRemakeMaster}
         onRemakeMasterAI={handleRemakeMasterAI}
+        onRemoveMaster={handleRemoveMaster}
+        aiReady={aiReady}
         deck={deck}
         templateData={templateData}
         parseError={parseError}

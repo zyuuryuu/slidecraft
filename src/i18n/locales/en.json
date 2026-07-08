@@ -322,7 +322,10 @@
     "createLabel": "Create template…",
     "remakeAILabel": "Remake with AI (beta)",
     "remakeAITitle": "AI maps the imported master's layouts onto clean canonical layouts (falls back to the deterministic remake when AI is not connected)",
-    "showInfoTitle": "Show the latest intake result"
+    "showInfoTitle": "Show the latest intake result",
+    "removeTitle": "Delete this template",
+    "remakeAINotReady": "AI not connected — connect a provider first (Assist → provider settings)",
+    "aiOfflineSuffix": " (AI offline)"
   },
   "masterReg": {
     "defaultName": "Template",

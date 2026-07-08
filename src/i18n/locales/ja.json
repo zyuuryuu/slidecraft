@@ -322,7 +322,10 @@
     "createLabel": "テンプレを作成…",
     "remakeAILabel": "AI で作り直す（試験）",
     "remakeAITitle": "AI が入力マスターのレイアウトを整った標準レイアウトへ写像して作り直す（未接続時は決定論版にフォールバック）",
-    "showInfoTitle": "直近の取り込み結果を表示"
+    "showInfoTitle": "直近の取り込み結果を表示",
+    "removeTitle": "このテンプレを削除",
+    "remakeAINotReady": "AI 未接続 — 先に AI に接続してください（アシスト → プロバイダ設定）",
+    "aiOfflineSuffix": "（AI 未接続）"
   },
   "masterReg": {
     "defaultName": "テンプレート",
