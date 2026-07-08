@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "parse-audit": "tsx scripts/parse-audit.ts",
+    "parse-audit": "npx tsx scripts/parse-audit.ts",
     "tauri": "tauri",
     "tauri:wsl": "bash scripts/tauri-dev-wsl.sh",
     "typecheck:mcp": "tsc -p tsconfig.mcp.json",
