@@ -16,8 +16,29 @@
  * accept image parts); until then a re-made deck uses the extracted colors + fonts on clean layouts.
  */
 import { isDark, luminance } from "./ooxml-resolve";
-import type { TemplateData } from "./template-loader";
+import type { TemplateData, ThemeFonts } from "./template-loader";
 import { MIDNIGHT_PALETTE, type TemplateSpec, type LogoSpec } from "./template-writer";
+
+/**
+ * Resolve an OOXML theme-font reference to a real typeface. A master placeholder often fonts via
+ * `+mj-lt` / `+mn-lt` (major/minor latin) or `+mj-ea` / `+mn-ea` (East-Asian) — a POINTER into the
+ * theme's fontScheme, NOT a usable name. Capturing the raw token would (a) show "+mj-lt" in the intake
+ * summary and (b) write a broken `<a:latin typeface="+mj-lt"/>` into the re-made theme. Resolve it to
+ * the theme's actual font; if the theme lacks it, fall back to any real theme font, then "Arial" — so
+ * we NEVER emit or display a token.
+ */
+export function resolveFontToken(name: string, tf: ThemeFonts | undefined): string {
+  if (!name.startsWith("+")) return name;
+  const byToken: Record<string, string | undefined> = {
+    "+mj-lt": tf?.majorLatin,
+    "+mn-lt": tf?.minorLatin,
+    "+mj-ea": tf?.majorEa ?? tf?.majorLatin,
+    "+mn-ea": tf?.minorEa ?? tf?.minorLatin,
+  };
+  const resolved = byToken[name] ?? tf?.majorLatin ?? tf?.minorLatin ?? "Arial";
+  // Guard against a theme that itself stores a token (rare/malformed) — never return a "+…" name.
+  return resolved.startsWith("+") ? "Arial" : resolved;
+}
 import type { PaletteKey } from "./template-layout-library";
 
 /** Normalize a hex to 6 upper-case digits without '#', or undefined. */
@@ -102,8 +123,8 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
     emphasis: readable(background, canvas), // big-number emphasis on the canvas (brand dark on light)
   };
 
-  const major = tpl.masterTitleStyle.fontName || tpl.masterBodyStyle.fontName || "Arial";
-  const minor = tpl.masterBodyStyle.fontName || major;
+  const major = resolveFontToken(tpl.masterTitleStyle.fontName || tpl.masterBodyStyle.fontName || "Arial", tpl.themeFonts);
+  const minor = resolveFontToken(tpl.masterBodyStyle.fontName || tpl.masterTitleStyle.fontName || "Arial", tpl.themeFonts);
   // "Flat" design: the source titles content in a DARK ink on a LIGHT canvas (no dark header bar —
   // CX's clean white content slides). Then our light layouts drop the header bar to match. When the
   // source titles in a light color (a bar/dark-header design), keep the bar. Keyed on the master's

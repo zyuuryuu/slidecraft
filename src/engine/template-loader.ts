@@ -115,6 +115,27 @@ export interface TemplateData {
   masterStaticTexts: StaticText[]; // the master's own static text labels (base layer)
   masterImages: ImageDeco[]; // the master's own <p:pic> logos/graphics (base layer, data URIs)
   themeColors: Record<string, string>; // scheme token → hex (bg1/bg2/tx1/tx2/accent1-6…), clrMap-resolved
+  themeFonts: ThemeFonts; // theme fontScheme major/minor typefaces — resolves +mj-lt/+mn-lt references
+}
+
+/** The theme's fontScheme typefaces, used to resolve `+mj-lt`/`+mn-lt` master references to real names. */
+export interface ThemeFonts {
+  majorLatin?: string;
+  minorLatin?: string;
+  majorEa?: string; // East-Asian (CJK) — often the visible font for Japanese text
+  minorEa?: string;
+}
+
+/** Read the theme fontScheme so a master placeholder that fonts via `+mj-lt` (a theme reference, not a
+ *  real typeface) can be resolved to the actual font name at Re-make time and in the intake summary. */
+function extractThemeFonts(themeXml: string): ThemeFonts {
+  const block = (tag: string) => themeXml.match(new RegExp(`<a:${tag}>[\\s\\S]*?</a:${tag}>`))?.[0] ?? "";
+  const face = (blk: string, kind: string) => blk.match(new RegExp(`<a:${kind}[^>]*typeface="([^"]*)"`))?.[1] || undefined;
+  const major = block("majorFont"), minor = block("minorFont");
+  return {
+    majorLatin: face(major, "latin"), minorLatin: face(minor, "latin"),
+    majorEa: face(major, "ea"), minorEa: face(minor, "ea"),
+  };
 }
 
 // ── Namespace normalization ──
@@ -555,6 +576,7 @@ export async function loadTemplate(
   // which we resolve to hex so a theme-colored title isn't lost to the white master fallback.
   const themeXml = await readEntryString(zip, "ppt/theme/theme1.xml", ZIP_LIMITS.xmlEntry);
   const themeColors = buildThemeColors(themeXml, masterXml);
+  const themeFonts = extractThemeFonts(themeXml);
   const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];
   const bodyStyleXml = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0];
   const masterTitleStyle = parseMasterStyle(titleStyleXml, {
@@ -634,7 +656,7 @@ export async function loadTemplate(
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
     masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts, masterImages,
-    masterBackgroundImage, masterBackgroundGradient, themeColors,
+    masterBackgroundImage, masterBackgroundGradient, themeColors, themeFonts,
   };
 }
 

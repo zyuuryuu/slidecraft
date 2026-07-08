@@ -255,7 +255,8 @@
     "logoNo": "ロゴなし",
     "mappingTitle": "レイアウト写像（元 → 標準・理由）",
     "repairs": "修復",
-    "repairsCount": "{{count}} 枠を修復"
+    "repairsCount": "{{count}} 枠を修復",
+    "font": "フォント {{name}}"
   },
   "lang": {
     "name": "日本語",

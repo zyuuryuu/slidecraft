@@ -92,7 +92,7 @@ export function Detail({ result }: { result: IntakeResult }) {
       {s.theme && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-muted">{t("intake.theme")}:</span>
-          <span>{t("intake.fonts", { major: s.theme.major, minor: s.theme.minor })}</span>
+          <span>{s.theme.major === s.theme.minor ? t("intake.font", { name: s.theme.major }) : t("intake.fonts", { major: s.theme.major, minor: s.theme.minor })}</span>
           <Swatches palette={s.theme.palette} />
           <span className="text-muted">{s.theme.logo ? t("intake.logoYes") : t("intake.logoNo")}</span>
         </div>

@@ -255,7 +255,8 @@
     "logoNo": "No logo",
     "mappingTitle": "Layout mapping (source → canonical · reason)",
     "repairs": "Repairs",
-    "repairsCount": "{{count}} frames repaired"
+    "repairsCount": "{{count}} frames repaired",
+    "font": "Font {{name}}"
   },
   "lang": {
     "name": "English",

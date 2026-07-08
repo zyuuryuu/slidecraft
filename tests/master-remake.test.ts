@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
-import { masterToTemplateSpec, extractLogo } from "../src/engine/master-remake";
+import { masterToTemplateSpec, extractLogo, resolveFontToken } from "../src/engine/master-remake";
 import { writeTemplate, MIDNIGHT_PALETTE } from "../src/engine/template-writer";
 import { buildCatalog, assessTemplateHealth } from "../src/engine/template-catalog";
 import { generatePptx } from "../src/engine/placeholder-filler";
@@ -32,6 +32,37 @@ describe("Re-make round-trip on a bundled master (CI-covered)", () => {
     expect(contrast(spec.palette.bodyText, spec.palette.canvas)).toBeGreaterThan(0.3);
     const remade = await loadTemplate(await writeTemplate(spec));
     expect(assessTemplateHealth(buildCatalog(remade)).status).not.toBe("rejected");
+  });
+});
+
+describe("theme-font token resolution (+mj-lt is a reference, not a real font)", () => {
+  it("resolveFontToken maps +mj-lt/+mn-lt/+mj-ea to the theme font, passes real names through, never returns a token", () => {
+    const tf = { majorLatin: "Georgia", minorLatin: "Verdana", majorEa: "游明朝", minorEa: "游ゴシック" };
+    expect(resolveFontToken("+mj-lt", tf)).toBe("Georgia");
+    expect(resolveFontToken("+mn-lt", tf)).toBe("Verdana");
+    expect(resolveFontToken("+mj-ea", tf)).toBe("游明朝");
+    expect(resolveFontToken("+mn-ea", tf)).toBe("游ゴシック");
+    expect(resolveFontToken("MS Gothic", tf)).toBe("MS Gothic"); // real name unchanged
+    expect(resolveFontToken("+mj-lt", {})).toBe("Arial"); // theme lacks it → safe default, never a token
+    expect(resolveFontToken("+mj-lt", undefined)).toBe("Arial");
+    expect(resolveFontToken("+mj-ea", { majorLatin: "Georgia" })).toBe("Georgia"); // ea falls back to latin
+  });
+
+  it("the loader extracts theme fontScheme typefaces (bundled masters font via +mj-lt)", async () => {
+    const src = await loadTemplate(readFileSync(CANON));
+    expect(src.themeFonts.majorLatin).toBe("Georgia"); // Midnight theme major latin
+    expect(src.masterTitleStyle.fontName).toMatch(/^\+/); // master itself references the token…
+  });
+
+  it("masterToTemplateSpec resolves the token → a REAL font name (not '+mj-lt') in the re-made theme", async () => {
+    const src = await loadTemplate(readFileSync(CANON));
+    const spec = masterToTemplateSpec(src, { name: "T" });
+    expect(spec.fonts.major).not.toMatch(/^\+/); // …but the re-made spec must carry a real font
+    expect(spec.fonts.major).toBe("Georgia");
+    expect(spec.fonts.minor).not.toMatch(/^\+/);
+    // and the written theme therefore has a real typeface, not a broken "+mj-lt" reference
+    const remade = await loadTemplate(await writeTemplate(spec));
+    expect(remade.themeFonts.majorLatin).not.toMatch(/^\+/);
   });
 });
 
