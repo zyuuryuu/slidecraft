@@ -294,6 +294,10 @@ export class CollabProjection {
       this.failAndStop(msg(e));
       return;
     }
+    // The get_deck await is a window in which the GUI may have switched to a LOCAL tab (mirrorPaused),
+    // re-targeted another doc, or stopped. A pull that started before that must NOT land now and clobber
+    // the local/other tab — re-check here and drop it WITHOUT advancing lastRev (so a resume re-applies).
+    if (this.closed || this.mirrorPaused || (this.targetDocId !== null && this.targetDocId !== target.docId)) return;
     this.lastDocId = target.docId;
     this.lastRev = target.rev;
     this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title, isInitial });
