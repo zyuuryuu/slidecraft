@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, usesMetaIdxConvention, recoverLayoutTitle, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
+import { pickLayout, usesMetaIdxConvention, recoverLayoutTitle, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
@@ -662,11 +662,16 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   const hasBody = idxs.has("1") || visualIdx === "1";
   const hasIdx2 = idxs.has("2") || visualIdx === "2";
   const hasIdx3 = idxs.has("3") || visualIdx === "3";
-  const allText = slide.placeholders
+  // Closing intent lives in the HEADING (idx 15/0), not a stray body mention — so scope to the title
+  // and use the SHARED closing vocabulary (CLOSING_RE) the layout classifier uses. This fixes both the
+  // miss (まとめ/おわりに/ご清聴/Next steps were never routed to a Closing layout) and the false-positive
+  // (a content slide whose body merely says "thank …" was coerced to closing). The slideIndex===last
+  // gate below + pickLayout's closing→content degrade keep healthy decks unchanged.
+  const titleText = slide.placeholders
+    .filter((p) => p.idx === "15" || p.idx === "0")
     .flatMap((p) => p.paragraphs.flatMap((pp) => pp.segments.map((s) => s.text)))
-    .join(" ")
-    .toLowerCase();
-  const isClosing = allText.includes("thank") || allText.includes("感謝") || allText.includes("ありがとう");
+    .join(" ");
+  const isClosing = CLOSING_RE.test(titleText);
 
   // Index-0 slides default to a Title (cover) slide, EXCEPT a real content slide authored first (no
   // separate cover): a title WITH body (idx 15 + idx 1). The parser stores every `# X`/`## Y` in the
@@ -674,7 +679,13 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   // NO body) still coerces to Title here — the distinguisher is hasBody. Without this, a content slide
   // at idx 0 is read through the empty title namespace (idx 0/1) and serializes mangled. See
   // serializer-content-index0.test.ts.
-  if (slideIndex === 0 && !visualIdx && !(hasTitle && hasBody)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  // A first slide coerces to the Title (cover) role — UNLESS it carries a REAL body. "Real body" means
+  // idx 1 as a BODY, not idx 1 as a title-namespace cover's SUBTITLE (which coexists with a ctrTitle at
+  // idx 0). So the carve-out is `hasBody && !hasCtrTitle`: a body-only first slide (bullets, no title —
+  // idx 1, no idx 0/15) falls through to content instead of binding into the cover's subtitle slot,
+  // while a real cover (idx 15/16, or ctrTitle idx 0 + subtitle idx 1) still coerces to title. This
+  // subsumes the old hasTitle&&hasBody carve-out. See serializer-content-index0.test.ts.
+  if (slideIndex === 0 && !visualIdx && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
   if (isClosing && slideIndex === totalSlides - 1) return { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
   if (slide.code) return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
   if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };

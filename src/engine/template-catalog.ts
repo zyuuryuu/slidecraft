@@ -121,12 +121,17 @@ export function usesMetaIdxConvention(layouts: ReadonlyArray<{ name: string; pla
 // English AND Japanese keywords (real templates are often localized). Only title/section/closing get
 // keywords here — content vs columns is decided by STRUCTURE (body count/geometry), so e.g. a
 // 「本文（1カラム）」 vs 「本文（2カラム）」 isn't forced by the word カラム.
+/** Closing-slide vocabulary — the SINGLE source shared by the layout classifier (NAME_KEYWORDS below)
+ *  AND the slide→role classifier (slideRoleRegions' isClosing), so both halves of the pipeline agree
+ *  on what "closing" means. Word-anchored (\b) English + JA tokens. */
+export const CLOSING_RE = /\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑/i;
+
 const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\b(?:two|three|four|2|3|4|multi)\b[\s\S]*\b(?:column|content|panel|box|option)\b|compar|versus|\bvs\b/i, "columns"],
   [/\bcolumn\b/i, "columns"],
   [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b|章扉|セクション|区切り|中扉/i, "section"],
   [/\bcode\b|\blog\b|\bsource\b|コード|ログ|ソース/i, "code"],
-  [/\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑/i, "closing"],
+  [CLOSING_RE, "closing"],
   [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
   [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b|表紙|タイトル|扉絵/i, "title"],
 ];
@@ -187,10 +192,19 @@ export function classifyLayout(
   info: { hasTitle: boolean; hasSubtitle: boolean; bodyCount: number; bodyBoxes?: Box[] },
 ): LayoutRole {
   const byName = layoutRole(name);
-  if (byName !== "other") return byName;
+  if (byName !== "other") return byName; // T1: canonical dotted family — authoritative, byte-identical
+  const struct = structureRole(info.hasTitle, info.hasSubtitle, info.bodyCount, info.bodyBoxes);
   const byKeyword = nameKeywordRole(name);
-  if (byKeyword !== "other") return byKeyword;
-  return structureRole(info.hasTitle, info.hasSubtitle, info.bodyCount, info.bodyBoxes);
+  // GATE 1 (ADR-0025-style, GEOMETRY-BACKED): ≥2 genuine side-by-side PEER bodies are unambiguously
+  // columns, so they override a misleading non-columns name (a 2-col layout named "Section"/"Agenda").
+  // Keyed on peer GEOMETRY (not bare bodyCount), so a stacked / primary+sidebar / no-geometry 2-body
+  // layout is NEVER forced to columns.
+  if (info.bodyBoxes && peerBodyCount(info.bodyBoxes) >= 2 && byKeyword !== "columns") return "columns";
+  // GATE 2: a "columns" NAME with <2 real bodies falls back to structure — a 1-body layout mislabeled
+  // "columns" would otherwise be picked for a 2-column slide and silently drop the 2nd column on bind.
+  if (byKeyword === "columns" && struct !== "columns") return struct;
+  if (byKeyword !== "other") return byKeyword; // T2: keyword
+  return struct; // T3: structure (name-agnostic backbone)
 }
 
 // Slide geometry facts (inches, 16:9 13.333×7.5) — kept LOCAL so this pure role module
