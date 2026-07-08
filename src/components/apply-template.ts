@@ -41,10 +41,15 @@ export type IntakeProgress =
   | { phase: "composing" }
   | { phase: "validating" };
 
-function themeSummary(spec: { fonts: { major: string; minor: string }; palette: Record<string, string> }, logo: boolean) {
+function themeSummary(
+  spec: { fonts: { major: string; minor: string; majorEa?: string; minorEa?: string }; palette: Record<string, string> },
+  logo: boolean,
+) {
+  // Show the VISIBLE typeface: for a Japanese master that's the East-Asian (ea) font (the brand font),
+  // with the Latin pairing as a fallback. So a 游ゴシック deck reads "游ゴシック", not "Century Gothic".
   return {
-    major: spec.fonts.major,
-    minor: spec.fonts.minor,
+    major: spec.fonts.majorEa || spec.fonts.major,
+    minor: spec.fonts.minorEa || spec.fonts.minor,
     palette: Object.values(spec.palette).map((h) => (h.startsWith("#") ? h : `#${h}`)),
     logo,
   };

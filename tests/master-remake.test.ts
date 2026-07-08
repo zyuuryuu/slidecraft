@@ -64,6 +64,27 @@ describe("theme-font token resolution (+mj-lt is a reference, not a real font)",
     const remade = await loadTemplate(await writeTemplate(spec));
     expect(remade.themeFonts.majorLatin).not.toMatch(/^\+/);
   });
+
+  it("preserves the East-Asian (CJK) brand font — a JP master's 游ゴシック survives the Re-make round-trip", async () => {
+    // The Japanese-locale Office default: brand font in the theme <a:ea> slot, an English pairing font in
+    // <a:latin>, and the master placeholders fonting via +mj-lt/+mn-lt. Build that shape off a real load.
+    const base = await loadTemplate(readFileSync(CANON));
+    const jp = {
+      ...base,
+      themeFonts: { majorLatin: "Century Gothic", minorLatin: "Calibri", majorEa: "游ゴシック Light", minorEa: "游ゴシック" },
+      masterTitleStyle: { ...base.masterTitleStyle, fontName: "+mj-lt" },
+      masterBodyStyle: { ...base.masterBodyStyle, fontName: "+mn-lt" },
+    };
+    const spec = masterToTemplateSpec(jp, { name: "JP" });
+    // the spec carries BOTH the Latin pairing AND the EA brand font (not just Latin)
+    expect(spec.fonts.major).toBe("Century Gothic");
+    expect(spec.fonts.majorEa).toBe("游ゴシック Light");
+    expect(spec.fonts.minorEa).toBe("游ゴシック");
+    // and the re-made theme round-trips the EA font — the corporate JP font is NOT lost
+    const remade = await loadTemplate(await writeTemplate(spec));
+    expect(remade.themeFonts.majorEa).toBe("游ゴシック Light");
+    expect(remade.themeFonts.minorEa).toBe("游ゴシック");
+  });
 });
 
 // A minimal valid 1×1 PNG — lets the logo path be CI-covered without the CX fixture.

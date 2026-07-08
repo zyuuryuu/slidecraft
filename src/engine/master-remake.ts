@@ -125,6 +125,10 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
 
   const major = resolveFontToken(tpl.masterTitleStyle.fontName || tpl.masterBodyStyle.fontName || "Arial", tpl.themeFonts);
   const minor = resolveFontToken(tpl.masterBodyStyle.fontName || tpl.masterTitleStyle.fontName || "Arial", tpl.themeFonts);
+  // Carry the East-Asian (CJK) typefaces too — for Japanese masters the brand font lives in the theme's
+  // <a:ea> slot (latin holds only the Western pairing font). Dropping these silently loses 游ゴシック etc.
+  const majorEa = tpl.themeFonts.majorEa;
+  const minorEa = tpl.themeFonts.minorEa ?? tpl.themeFonts.majorEa;
   // "Flat" design: the source titles content in a DARK ink on a LIGHT canvas (no dark header bar —
   // CX's clean white content slides). Then our light layouts drop the header bar to match. When the
   // source titles in a light color (a bar/dark-header design), keep the bar. Keyed on the master's
@@ -133,7 +137,7 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
   const flatContent = !!titleC && isDark(titleC) && !isDark(canvas);
   return {
     name: opts.name ?? "会社テンプレート (Re-make)",
-    fonts: { major, minor },
+    fonts: { major, minor, ...(majorEa ? { majorEa } : {}), ...(minorEa ? { minorEa } : {}) },
     palette,
     ...(flatContent ? { flatContent: true } : {}),
   };

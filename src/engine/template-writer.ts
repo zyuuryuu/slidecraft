@@ -25,7 +25,9 @@ export interface LogoSpec {
 
 export interface TemplateSpec {
   name: string;
-  fonts: { major: string; minor: string }; // major=見出し / minor=本文
+  // major=見出し / minor=本文. `*Ea` = the East-Asian (CJK) typeface for that role — for Japanese
+  // masters the brand font usually lives HERE (theme <a:ea>), so it must round-trip or JP text loses it.
+  fonts: { major: string; minor: string; majorEa?: string; minorEa?: string };
   palette: Record<PaletteKey, string>; // hex（# なし）
   layouts?: LayoutDef[]; // 省略時は組み込み 30 レイアウト
   logo?: LogoSpec; // Re-make: 元マスターのロゴを dark 系レイアウトへ載せる
@@ -103,8 +105,8 @@ function themeXml(spec: TemplateSpec): string {
     `<a:hlink>${solid(c.accent)}</a:hlink><a:folHlink>${solid(c.muted)}</a:folHlink>` +
     `</a:clrScheme>` +
     `<a:fontScheme name="${escXml(spec.name)}">` +
-    `<a:majorFont><a:latin typeface="${escXml(spec.fonts.major)}"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>` +
-    `<a:minorFont><a:latin typeface="${escXml(spec.fonts.minor)}"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>` +
+    `<a:majorFont><a:latin typeface="${escXml(spec.fonts.major)}"/><a:ea typeface="${escXml(spec.fonts.majorEa ?? "")}"/><a:cs typeface=""/></a:majorFont>` +
+    `<a:minorFont><a:latin typeface="${escXml(spec.fonts.minor)}"/><a:ea typeface="${escXml(spec.fonts.minorEa ?? "")}"/><a:cs typeface=""/></a:minorFont>` +
     `</a:fontScheme>` +
     `<a:fmtScheme name="Office">` +
     `<a:fillStyleLst>${fill3}</a:fillStyleLst>` +
