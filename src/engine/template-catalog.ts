@@ -280,7 +280,17 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
     if (idx === "15") return "title";
     if (idx === "16") return "subtitle";
   }
-  if (t === "body") return "body"; // a REAL body type
+  if (t === "body") {
+    // AI-Import P1 (docs/design/ai-import.md §4-A): a body-TYPED placeholder that is geometrically a
+    // footer-band strip (a rule / footer / label — e.g. body@30 at y=6.7 h=0.3 on EVERY layout) is a
+    // design/meta element, NOT content. Reclassify by geometry so it doesn't inflate bodyCount, skew
+    // column detection, or steal binding. GATED to geometryRole's meta band (thin + very bottom) — a
+    // real content body (taller / higher) yields null here and stays "body". Title/subtitle promotion
+    // is left to the gated recoverLayoutTitle, so only the 3 unambiguous META roles trigger.
+    const gm = geometryRole(ph.style);
+    if (gm === "footer" || gm === "date" || gm === "slideNumber") return gm;
+    return "body"; // a REAL body type
+  }
   if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
   // ── RECOVERY (only a typeless ph with a non-conventional idx falls through to here) ──
   const g = geometryRole(ph.style); // T3 geometry (bonus; null when xfrm inherited)

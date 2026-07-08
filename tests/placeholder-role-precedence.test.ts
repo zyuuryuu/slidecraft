@@ -34,3 +34,37 @@ describe("placeholderRole: explicit type wins over idx convention", () => {
     expect(placeholderRole(ph("body", "1"))).toBe("body");
   });
 });
+
+// AI-Import P1 (docs/design/ai-import.md §4-A): a body-TYPED placeholder that sits as a thin strip in
+// the footer band is a design/meta element (rule / footer / label), NOT content — audited templates
+// carried e.g. body@30(0.5,6.7 12.3×0.3) as "body" on EVERY layout, inflating bodyCount + skewing
+// column detection. Reclassify by GEOMETRY, gated to the unambiguous footer band so real content bodies
+// (taller / higher) are never touched.
+describe("placeholderRole: geometry-based meta detection for footer-band body placeholders", () => {
+  const META = new Set(["footer", "date", "slideNumber"]);
+  const phg = (type: string, idx: string, g: { x: number; y: number; w: number; h: number }): PlaceholderInfo => ({
+    idx, type, name: "", shapeXml: "",
+    style: { ...g, fontSize: 12, fontColor: "000000", fontName: "Calibri", bold: false, align: "l", bulletChar: "" },
+  });
+
+  it("a full-width thin strip at the bottom (body@30) is META, not body", () => {
+    expect(META.has(placeholderRole(phg("body", "30", { x: 0.5, y: 6.7, w: 12.3, h: 0.3 })))).toBe(true);
+  });
+
+  it("a footer-band source/note strip (body@14) is META, not body", () => {
+    expect(META.has(placeholderRole(phg("body", "14", { x: 0.6, y: 6.5, w: 12.1, h: 0.6 })))).toBe(true);
+  });
+
+  it("a real CONTENT body (tall, high) stays body", () => {
+    expect(placeholderRole(phg("body", "1", { x: 0.6, y: 1.5, w: 12, h: 4 }))).toBe("body");
+    expect(placeholderRole(phg("body", "2", { x: 8.6, y: 1.2, w: 4.3, h: 5.6 }))).toBe("body"); // a column body
+  });
+
+  it("a short body just ABOVE the footer band (y<6.15) is NOT reclassified (gate is tight)", () => {
+    expect(placeholderRole(phg("body", "1", { x: 1, y: 6.0, w: 2, h: 0.4 }))).toBe("body");
+  });
+
+  it("a body with inherited (zero) geometry is untouched — no geometry to judge", () => {
+    expect(placeholderRole(phg("body", "7", { x: 0, y: 0, w: 0, h: 0 }))).toBe("body");
+  });
+});
