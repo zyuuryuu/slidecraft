@@ -98,7 +98,16 @@ Tauri v2 (Rust) / React 19 + TypeScript 5.9 / Vite 8 / CodeMirror 6 / shared pai
 - [Architecture Decision Records (ADRs)](docs/adr/) / [Roadmap](docs/ROADMAP.md) / [Shipped log](docs/shipped.md) / [Detailed design](docs/design/)
 - [Releasing](RELEASING.md) — versioning policy and release procedure
 
+## Code signing
+
+Windows installers will be Authenticode-signed with the [SignPath Foundation](https://signpath.org/)
+certificate once the project is approved (currently unsigned). See the
+[Code Signing Policy](CODE_SIGNING_POLICY.md) for the build, signing, and key-management approach.
+macOS uses ad-hoc signing + Homebrew; Linux is unsigned.
+
 ## License
 
 **Apache License 2.0** — full text in [LICENSE](LICENSE). For attribution of third-party components, bundled binaries, and
 AI model weights downloaded at runtime, see [NOTICE](NOTICE) / [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Community: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · security reports: [SECURITY.md](SECURITY.md) · contributing: [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,0 +1,41 @@
+name: 🐛 Bug report
+description: Report something that doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! For **security** issues, use [private reporting](https://github.com/zyuuryuu/slidecraft/security/advisories/new) instead — not this form.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: Steps to reproduce → expected → actual.
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input (if relevant)
+      description: A minimal Markdown/YAML deck or the template you used. This helps a lot for rendering/binding bugs.
+      render: markdown
+  - type: dropdown
+    id: os
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Browser (dev build)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SlideCraft version
+      placeholder: e.g. 0.2.1
+    validations:
+      required: true
