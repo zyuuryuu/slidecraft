@@ -44,6 +44,11 @@ export interface PlaceholderInfo {
   // master (no dotted names, no typed sldNum/dt/ftr meta — e.g. CX Sample) sets it false so its
   // body-typed idx-10..16 placeholders read as REAL content, not meta. Undefined ⇒ true (canonical).
   metaIdxConvention?: boolean;
+  // F0b (master-intake.md §2 部品0): the ACTUAL slide size (inches), stamped ONLY when the template is
+  // NOT canonical 16:9 13.333×7.5. geometryRole's role thresholds are ratios of the slide dims, so an
+  // A4/4:3/smaller-16:9 master needs the real size to classify geometry correctly. Undefined ⇒ canonical
+  // (geometryRole uses its 13.333×7.5 defaults) ⇒ 16:9 templates are byte-identical.
+  slideSize?: { w: number; h: number };
 }
 
 export interface DecoRect {
@@ -620,17 +625,27 @@ export async function loadTemplate(
     layouts.push({ index: i, name, placeholders, decorations, images, staticTexts, background, backgroundImage, backgroundGradient });
   }
 
+  const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
+  // F0b (§2 部品0): the real slide size, needed to relativize geometryRole's role thresholds. Stamp it
+  // ONLY when the master is NOT canonical 16:9 13.333×7.5 (within tolerance) — canonical templates keep
+  // slideSize undefined so geometryRole uses its hardcoded defaults ⇒ byte-identical.
+  const sldSz = presentationXml.match(/<p:sldSz[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
+  const slideSize = sldSz ? { w: +sldSz[1] / 914400, h: +sldSz[2] / 914400 } : undefined;
+  const nonCanonical = !!slideSize && (Math.abs(slideSize.w - 13.333) > 0.05 || Math.abs(slideSize.h - 7.5) > 0.05);
+
   // Decide ONCE whether this master follows SlideCraft's idx-meta convention, and stamp every
   // placeholder so the (template-context-free) placeholderRole can honor it. A bare third-party
   // master opts out → its body-typed idx-10..16 placeholders bind as real content (CX Sample fix).
   const metaIdxConvention = usesMetaIdxConvention(layouts);
-  for (const l of layouts) for (const p of l.placeholders) p.metaIdxConvention = metaIdxConvention;
+  for (const l of layouts)
+    for (const p of l.placeholders) {
+      p.metaIdxConvention = metaIdxConvention;
+      if (nonCanonical) p.slideSize = slideSize; // relativize geometryRole for non-16:9 masters
+    }
   // ADR-0025: roles are now final (metaIdxConvention stamped) — run the gated title recovery per
   // layout so a body-typed/mis-authored "Title" placeholder is resolved to the title role. Gated on
   // "no title present", so title-typed (healthy) layouts are untouched.
   for (const l of layouts) recoverLayoutTitle(l.placeholders);
-
-  const presentationXml = await readEntryString(zip, "ppt/presentation.xml", ZIP_LIMITS.xmlEntry);
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);
   const contentTypes = await readEntryString(zip, "[Content_Types].xml", ZIP_LIMITS.xmlEntry);
 

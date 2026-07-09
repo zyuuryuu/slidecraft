@@ -216,14 +216,20 @@ const SLIDE_H_IN = 7.5;
  *  that still carry explicit xfrm (e.g. canonical). Returns null when geometry is absent
  *  (inherited xfrm → w/h 0, the common real-world case) or the box is large/central (left
  *  to the area→body fallback), so it never misfires on a healthy or geometry-less master. */
-function geometryRole(s: { x: number; y: number; w: number; h: number }): PlaceholderRole | null {
+function geometryRole(
+  s: { x: number; y: number; w: number; h: number },
+  sw: number = SLIDE_W_IN,
+  sh: number = SLIDE_H_IN,
+): PlaceholderRole | null {
+  // F0b (§2 部品0): thresholds are RATIOS of the slide dims. sw/sh default to canonical 16:9, so a
+  // 16:9 master (slideSize not stamped) is byte-identical; a non-16:9 master passes its real size.
   if (s.w <= 0 || s.h <= 0) return null; // inherited xfrm — no geometry to judge
-  const lowStrip = s.h <= 0.6 && s.y >= 0.82 * SLIDE_H_IN;
-  if (lowStrip && s.w <= 0.25 * SLIDE_W_IN && s.x >= 0.6 * SLIDE_W_IN) return "slideNumber";
-  if (lowStrip && s.x <= 0.3 * SLIDE_W_IN) return "date";
+  const lowStrip = s.h <= 0.08 * sh && s.y >= 0.82 * sh; // 0.08*7.5=0.6 (byte-identical at 16:9)
+  if (lowStrip && s.w <= 0.25 * sw && s.x >= 0.6 * sw) return "slideNumber";
+  if (lowStrip && s.x <= 0.3 * sw) return "date";
   if (lowStrip) return "footer";
-  if (s.y <= 0.18 * SLIDE_H_IN && s.w >= 0.55 * SLIDE_W_IN && s.h <= 0.22 * SLIDE_H_IN) return "title";
-  if (s.y <= 0.42 * SLIDE_H_IN && s.w >= 0.5 * SLIDE_W_IN && s.h <= 0.18 * SLIDE_H_IN) return "subtitle";
+  if (s.y <= 0.18 * sh && s.w >= 0.55 * sw && s.h <= 0.22 * sh) return "title";
+  if (s.y <= 0.42 * sh && s.w >= 0.5 * sw && s.h <= 0.18 * sh) return "subtitle";
   return null;
 }
 
@@ -287,13 +293,13 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
     // column detection, or steal binding. GATED to geometryRole's meta band (thin + very bottom) — a
     // real content body (taller / higher) yields null here and stays "body". Title/subtitle promotion
     // is left to the gated recoverLayoutTitle, so only the 3 unambiguous META roles trigger.
-    const gm = geometryRole(ph.style);
+    const gm = geometryRole(ph.style, ph.slideSize?.w, ph.slideSize?.h);
     if (gm === "footer" || gm === "date" || gm === "slideNumber") return gm;
     return "body"; // a REAL body type
   }
   if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
   // ── RECOVERY (only a typeless ph with a non-conventional idx falls through to here) ──
-  const g = geometryRole(ph.style); // T3 geometry (bonus; null when xfrm inherited)
+  const g = geometryRole(ph.style, ph.slideSize?.w, ph.slideSize?.h); // T3 geometry (bonus; null when xfrm inherited)
   if (g) return g;
   const n = nameRole(ph.name); // T4 name keyword (last resort)
   if (n) return n;
@@ -323,7 +329,7 @@ export function recoverLayoutTitle(placeholders: PlaceholderInfo[]): void {
     if (base !== "body" && base !== "other") continue; // promotable, non-meta only
     if (nameRole(p.name) !== "title") continue; // name says title (nameRole checks subtitle first)
     const idx0 = p.idx === "0";
-    const geo = geometryRole(p.style) === "title";
+    const geo = geometryRole(p.style, p.slideSize?.w, p.slideSize?.h) === "title";
     if (!idx0 && !geo) continue; // consensus: name AND (idx0 OR title geometry)
     const score = (idx0 ? 2 : 0) + (geo ? 1 : 0);
     if (score > bestScore) {
