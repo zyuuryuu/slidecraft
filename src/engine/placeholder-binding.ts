@@ -123,6 +123,34 @@ export function bindContentByRole(
   return out;
 }
 
+/** One piece of slide content that binding could not place, tagged with the ROLE it wanted. */
+export interface UnboundContent {
+  content: PlaceholderContent;
+  role: PlaceholderRole;
+}
+
+/**
+ * DO-NO-HARM / no-silent-drop (master-intake.md §2 部品2 ・ P1 可視性不変条件): the slide TEXT content
+ * that bindContentByRole does NOT place into any layout placeholder — i.e. content that would be
+ * SILENTLY DROPPED (more bodies than the layout offers, or a title with no title slot, e.g. the
+ * mislabeled-header case inflating/starving roles). The invariant is "every content is bound OR
+ * reported as unbound", so callers surface this (a MUST-tier unbound = a warning) instead of the
+ * content vanishing. Blank (cleared) fields are not drops. Visuals (diagram/table/image) ride a body
+ * region via their own placeholderIdx and aren't in slide.placeholders, so they're out of scope here.
+ * Byte-identical to routing — it only OBSERVES bindContentByRole. Pure (R2).
+ */
+export function unboundContent(
+  slide: SlideIR,
+  layoutPlaceholders: readonly PlaceholderInfo[],
+): UnboundContent[] {
+  const hasCtrTitle = layoutHasCtrTitle(layoutPlaceholders);
+  const bound = bindContentByRole(slide, layoutPlaceholders);
+  const placed = new Set(bound.values());
+  return slide.placeholders
+    .filter((c) => !placed.has(c) && !isBlankParagraphs(c.paragraphs))
+    .map((c) => ({ content: c, role: slideIdxRole(c.idx, hasCtrTitle) }));
+}
+
 /**
  * The canonical content idx that role-binds BACK to layout placeholder `ph` — the INVERSE of
  * bindContentByRole for a single placeholder. The editor writes a field's text at THIS idx so what
