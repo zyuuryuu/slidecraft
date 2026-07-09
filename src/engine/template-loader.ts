@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
+import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, placeholderRole, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
@@ -653,15 +653,24 @@ export async function loadTemplate(
   // "no title present", so title-typed (healthy) layouts are untouched.
   for (const l of layouts) recoverLayoutTitle(l.placeholders);
 
-  // F1 (§2 部品1): stamp each placeholder with the relative-attribute scorer's function, so the
-  // do-no-harm binding gate can hard-exclude "chrome" slots from receiving body/title content.
+  // F1 (§2 部品1/2): run the relative-attribute scorer ONCE per layout and (a) stamp each placeholder's
+  // inferred function (the do-no-harm chrome gate reads it), and (b) recover a MISLABELED TITLE — promote
+  // a high-confidence scorer title PLACEHOLDER to the title role when the layout has none. Gates:
+  // "no title role" (never steal a real title → healthy templates byte-identical), placeholder source
+  // (a baked staticText title has no fillable slot), confidence ≥ 0.7, and a promotable base role
+  // (body/other). Complements the name-based recoverLayoutTitle: it catches a body-typed heading whose
+  // NAME gives no hint (e.g. a 3-column master's idx-10 heading) but whose GEOMETRY clearly is the title.
   for (const l of layouts) {
-    const fnByIdx = new Map(
-      inferFunction(l, slideSize).filter((s) => s.source === "placeholder" && s.idx).map((s) => [s.idx!, s.fn]),
-    );
+    const scored = inferFunction(l, slideSize);
+    const fnByIdx = new Map(scored.filter((s) => s.source === "placeholder" && s.idx).map((s) => [s.idx!, s.fn] as const));
     for (const p of l.placeholders) {
       const f = fnByIdx.get(p.idx);
       if (f) p.inferredFunction = f;
+    }
+    if (!l.placeholders.some((p) => placeholderRole(p) === "title")) {
+      const t = scored.find((s) => s.fn === "title" && s.source === "placeholder" && s.confidence >= 0.7);
+      const ph = t && l.placeholders.find((p) => p.idx === t.idx);
+      if (ph && (placeholderRole(ph) === "body" || placeholderRole(ph) === "other")) ph.resolvedRole = "title";
     }
   }
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);

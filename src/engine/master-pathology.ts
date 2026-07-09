@@ -69,7 +69,6 @@ export function detectPathologies(
 
   for (const l of tpl.layouts) {
     const phRoles = l.placeholders.map((ph: PlaceholderInfo) => ({ ph, role: placeholderRole(ph) }));
-    const hasTitle = phRoles.some((p) => p.role === "title");
     const maxPhFs = Math.max(0, ...l.placeholders.map((p) => p.style.fontSize));
     const hasBody = phRoles.some((p) => p.role === "body");
 
@@ -84,28 +83,35 @@ export function detectPathologies(
       if (ph.type === "" && !/^[1-9]$/.test(ph.idx))
         add("typeless-placeholder", l.name, `idx=${ph.idx} name="${ph.name}"`);
 
-    // ヒューリスティック: title が placeholder でない／body 型
-    //  - title=staticText: 表紙見出しは上部帯でなく垂直中央寄り(y~2.5)もある → 「広幅×大フォント×上半分」で拾う
-    //    （細い accent "03" は幅フィルタで除外される）。
-    //  - title=body: 図/ヒーロー枠（巨大面積）は title たり得ない → 面積で除外（figure-as-body と二重計上しない）。
-    const titleStatic: StaticText | undefined = hasTitle
+    // title の病理（title=生text / title=body 型）。F1-②b の scorer 復元が load 時に body 見出しを
+    // title role へ昇格する（resolvedRole）ため、role だけ見ると病理が消える。よって「genuine title
+    // （実型 ctrtitle/title、または idx-META 慣習の idx15）」と「body 見出し（＝②b 昇格 or 未昇格の
+    // 幾何的見出し）」を区別し、後者を raw 病理として検出する（復元後でも計測が安定）。
+    const isRealTitleType = (p: PlaceholderInfo) => { const t = p.type.toLowerCase(); return t === "title" || t === "ctrtitle"; };
+    const isMetaTitle = (p: PlaceholderInfo) => (p.metaIdxConvention ?? true) && p.idx === "15";
+    const genuine = (p: PlaceholderInfo) => isRealTitleType(p) || isMetaTitle(p);
+    const hasGenuineTitle = phRoles.some((p) => p.role === "title" && genuine(p.ph));
+
+    // title=body: title ROLE だが型/慣習では title でない（②b 昇格された body 見出し）
+    const bodyTitles = phRoles.filter((p) => p.role === "title" && !genuine(p.ph)).map((p) => p.ph);
+    // 未昇格の幾何的見出し（②b の confidence 未満で昇格しなかった場合）も 1 件だけ拾う
+    if (!hasGenuineTitle && bodyTitles.length === 0) {
+      const geo = phRoles.find(
+        (p) => p.role === "body" && isTopWide(p.ph.style) && p.ph.style.fontSize === maxPhFs && maxPhFs > 0 && areaOf(p.ph.style) < 0.3 * SW * SH,
+      );
+      if (geo) bodyTitles.push(geo.ph);
+    }
+    for (const p of bodyTitles) add("title-as-body", l.name, `${p.type || "body"}@${p.idx} fs${p.style.fontSize}`);
+
+    // title=生text: genuine title 枠が無く、上部・広幅・大フォントの staticText が実質の見出し
+    //   （細い accent "03" は幅フィルタで除外）。
+    const titleStatic: StaticText | undefined = hasGenuineTitle
       ? undefined
       : l.staticTexts.find((s) => s.style.w > 0.45 * SW && s.style.fontSize >= 18 && s.style.y < 0.55 * SH);
-    const titleBody = hasTitle
-      ? undefined
-      : phRoles.find(
-          (p) =>
-            p.role === "body" &&
-            isTopWide(p.ph.style) &&
-            p.ph.style.fontSize === maxPhFs &&
-            maxPhFs > 0 &&
-            areaOf(p.ph.style) < 0.3 * SW * SH,
-        );
     if (titleStatic)
       add("title-as-static-text", l.name, `"${titleStatic.text.slice(0, 20)}" fs${titleStatic.style.fontSize} y${titleStatic.style.y.toFixed(1)}`);
-    if (titleBody)
-      add("title-as-body", l.name, `${titleBody.ph.type}@${titleBody.ph.idx} fs${titleBody.ph.style.fontSize} y${titleBody.ph.style.y.toFixed(1)}`);
-    if (!hasTitle && !titleStatic && !titleBody && hasBody)
+
+    if (!hasGenuineTitle && !titleStatic && bodyTitles.length === 0 && hasBody)
       add("no-title-role", l.name, `${l.placeholders.length}ph・title role 皆無`);
 
     // ヒューリスティック: 巨大面積×大フォントの body＝図枠（散文 body は fs<24 なので過検出しにくい）
