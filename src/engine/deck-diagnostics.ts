@@ -15,7 +15,7 @@ import type { LayoutCatalog } from "./template-catalog";
 import { slideIdxRole } from "./template-catalog";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 
-export type Lever = "split" | "condense" | "visualize" | "title";
+export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
 export interface DeckIssue {
   slideIndex: number;
@@ -60,6 +60,13 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog): DeckIssue[]
     const body = rolePlaceholder(slide, "body");
 
     if (!title.trim() && (body || isVisual)) add("warn", "タイトルが無い", ["title"]);
+
+    // 句読点はスライドでは prose に見える（体言止めが読みやすい）。読点「、」が最も可読性を落とすので
+    // 強い警告（warn）、句点「。」は末尾を落とせば済むことが多いので軽い注意（info）。タイトル＋本文を走査。
+    const prose = slide.placeholders.flatMap((ph) => ph.paragraphs).map(textOf).join("\n");
+    if (prose.includes("、")) add("warn", "読点「、」が使われている（中黒「・」や改行で整えると読みやすい）", ["polish"]);
+    if (prose.includes("。")) add("info", "句点「。」が使われている（スライドでは省くのが一般的）", ["polish"]);
+
     if (isVisual || !body) return;
 
     // Overflow: the body needs more than one box, or a single bullet is taller than the box.

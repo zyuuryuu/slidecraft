@@ -356,7 +356,8 @@
     "kindDeterministic": "Deterministic",
     "close": "Close",
     "cancel": "Cancel",
-    "accept": "✓ Accept ({{count}})"
+    "accept": "✓ Accept ({{count}})",
+    "leverPolish": "Punctuation"
   },
   "reviewBar": {
     "warnCount": "⚠ Issues {{n}}",
@@ -371,7 +372,8 @@
     "promptTitle": "Give this slide a concise title that describes its content.",
     "promptSplit": "There is too much information to fit on one slide. Focus on the key points and make each bullet a short key phrase (aim for 28 characters or fewer). Do not omit information.",
     "promptCondense": "Summarize each bullet into a short key phrase (aim for 28 characters or fewer). Key points, not sentences. Do not omit information.",
-    "promptTidy": "Tidy this slide up concisely so it fits within the layout."
+    "promptTidy": "Tidy this slide up concisely so it fits within the layout.",
+    "promptPolish": "Polish punctuation for slides: replace 、 with ・ or line breaks, drop 。 (noun-ending). Keep the meaning."
   },
   "seqOverlay": {
     "reorderHint": "Drag left/right to reorder participants"

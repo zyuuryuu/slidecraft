@@ -2,7 +2,7 @@
 
 **前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
 
-**現在地（2026-07-08）**：**v0.3.0 リリース手続き中**（版 bump＋タグ push → release.yml が 4-OS インストーラをドラフト生成 → 実機レビュー後 publish → cask 実 sha 更新）。v0.3.0 の目玉は **AI 非決定 Re-make**（第3の取り込み口「AI で作り直す」＝入力マスターのレイアウトを clean な canonical へ写像・写像根拠 reason／best-of-N・決定論フォールバックで never-worse・[ADR-0026](adr/0026-ai-remake.md)）＋**レイアウト選出エンジンの gate 付き強化 Tier1/2**（[ADR-0025](adr/0025-placeholder-role-resolution.md) と同哲学）。出荷履歴の網羅は [CHANGELOG](../CHANGELOG.md)／[shipped.md](shipped.md)、決定は [ADR](adr/)。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
+**現在地（2026-07-09）**：**v0.3.0 タグ打ち直し前**（draft のまま未公開）。v0.3.0 の中身は再定義され、目玉は **faithful Re-make**（デザイン保持＋フォント正規化＝「自分のテンプレを保つ」・[ADR-0027](adr/0027-remake-source-visual-preservation.md)・日本語 EA フォント保持含む）＋**取り込みの透明化 UX**（進捗/結果バー・レイアウトのミニプレビュー・削除）＋**取り込み理解精度 P1**（幾何メタ検出・`parse-audit` 計測ツール）。**AI Re-make（option C＝canonical 写像）は撤去**（[ADR-0028](adr/0028-retire-ai-remake-option-c.md)・"間違った AI の使い所"）。取り込みは「忠実 Import／faithful Re-make／決定論 Re-make」に整理。出荷履歴は [CHANGELOG](../CHANGELOG.md)／[shipped.md](shipped.md)、決定は [ADR](adr/)。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
 
 > **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
 >
@@ -60,6 +60,19 @@ v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md
 | 項目 | 内容 | サイズ |
 | --- | --- | --- |
 | F1'（egress hard boundary）｜LOW（保留） | 保留（F2 で前提縮小）：`http:default` の `https://**` を CSP 一致 allowlist（3 AI API＋`huggingface.co`＋`cdn-lfs*.huggingface.co`〔モデルDL の LFS CDN 302 先・含めないと DL 破綻〕＋loopback）に縮小し、承認済み custom host を **Rust 側 egress ゲート**（reqwest・host allowlist 強制）で通す実境界化。streaming fetch の Rust 越し再実装を要し大きめ。触点: `src-tauri/capabilities/default.json`・Rust command・`src/ipc/app-fetch.ts` | M |
+
+### 📝 オーサリング / 編集
+
+| 項目 | 内容 | サイズ |
+| --- | --- | --- |
+| **インデント（ネスト箇条書き）対応** | 現状は**未対応**（パーサが `- 項目` とインデントした子箇条を全て level 0 にフラット化・`Paragraph` に `level` フィールド無し・出力も lvl 0）。「もっとインデントを適切に使わせたい」への対応＝多層：**parser**（先頭空白→level）／**schema `Paragraph.level`**（slide-schema・要ユーザ確認〔R4 相当〕）／**serializer**（`<a:pPr lvl marL>`・placeholder-filler）／**preview**（SlidePreview の marginLeft）／**md-serializer**（往復で空白復元）／**editor**（Tab/Shift-Tab で indent/outdent）。触点広め。 | M |
+
+### 🔌 MCP / 連携
+
+| 項目 | 内容 | サイズ |
+| --- | --- | --- |
+| **MCP エンドポイント2種の統合** | 意図せず2つの MCP サーバ面が並立：**stdio CLI**（`mcp/cli.ts`・headless・ADR-0022 同梱）と **HTTP collab host**（`mcp/host.ts`・`StreamableHTTPServerTransport`・GUI 起動で AI が接続 IN）。tool/resource 登録を**1つの server core（`mcp/server.ts`）に統合し transport だけ2系統**にする（現状の重複/ズレを解消）。まず両者の tool/resource セット差分を棚卸し→共通コア化。触点: `mcp/cli.ts`・`mcp/host.ts`・`mcp/server.ts`・`mcp/resources.ts`。 | M |
+| **MCP: スライドのスクリーンショット取得（AI の自己デザインチェック）** | 上流 AI が「自分の編集で**デザインが崩れていないか**」を視覚で確認できるよう、**特定スライドの現在の描画を画像で返す MCP ツール**（例 `get_slide_image(docId, index)`）。既存の `SlideCard`／HTML export（`deck-html-export`）が WYSIWYG 描画済なので、SSR→ラスタ化（headless 描画 or SVG/PNG 化）で実現。テキスト resource（`get_slide`）と併せて AI が"見て直す"ループを閉じられる。要検討: ラスタ化手段（Tauri webview 経由 or 純 SSR→画像）・画像サイズ/転送。触点: `mcp/server.ts`・`mcp/resources.ts`・`components/deck-html-export`。 | M |
 
 ---
 

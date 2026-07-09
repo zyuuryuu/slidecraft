@@ -28,6 +28,7 @@ export default function RefineProposal({
     condense: t("refineProposal.leverCondense"),
     title: t("refineProposal.leverTitle"),
     split: t("refineProposal.leverSplit"),
+    polish: t("refineProposal.leverPolish"),
     edit: t("refineProposal.leverEdit"),
   };
 

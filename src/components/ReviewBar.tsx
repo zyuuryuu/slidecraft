@@ -21,6 +21,7 @@ function fixPromptForIssue(d: DeckIssue, t: TFunction): string {
   if (d.levers.includes("title")) return t("reviewBar.promptTitle");
   if (d.levers.includes("split")) return t("reviewBar.promptSplit");
   if (d.levers.includes("condense")) return t("reviewBar.promptCondense");
+  if (d.levers.includes("polish")) return t("reviewBar.promptPolish");
   return t("reviewBar.promptTidy");
 }
 
@@ -40,7 +41,7 @@ export default function ReviewBar({ warnIssues, tipIssues, onJump, onFixDetermin
 
   const row = (d: DeckIssue, key: string, warn: boolean) => {
     const canTable = d.levers.includes("visualize") && !d.levers.includes("split");
-    const needsAi = onAiFix && (d.levers.includes("condense") || d.levers.includes("title"));
+    const needsAi = onAiFix && (d.levers.includes("condense") || d.levers.includes("title") || d.levers.includes("polish"));
     return (
       <div key={key} className="flex items-center gap-2 px-3 py-1.5 border-t border-canvas hover:bg-canvas">
         <button

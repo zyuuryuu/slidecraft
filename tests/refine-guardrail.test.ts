@@ -56,7 +56,7 @@ describe("refineDeck — validate-and-retry guardrail", () => {
       calls++;
       return calls === 1
         ? { ok: true as const, markdown: "# 实绩\n\n- 销售额23%增长，14亿2000万日元" } // drifted to 中文 → rejected
-        : { ok: true as const, markdown: "# 実績\n\n- 売上高: 23%増、14億2000万円" }; // clean JA
+        : { ok: true as const, markdown: "# 実績\n\n- 売上高: 23%増 14億2000万円" }; // clean JA (no 読点 — slide-clean)
     };
     const r = await refineDeck(parseMd(NUM_DECK), catalog, { level: 3, maxAiRetries: 2, aiFix });
     expect(calls).toBe(2); // the 中文 candidate was rejected, retried

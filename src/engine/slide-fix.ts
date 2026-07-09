@@ -36,6 +36,8 @@ function composeInstruction(levers: Set<Lever>, budget?: SlideFix["budget"]): st
     parts.push(`各箇条書きは文章でなく短いキーフレーズに（語尾・助詞・冗長表現を削る${budget ? `・各${budget.charsPerBullet}字以内` : ""}）。固有名詞・数値・要点は残す。`);
   if (levers.has("visualize"))
     parts.push("「ラベル: 値」が並ぶ箇所は表（| 項目 | 内容 |）に、手順やフローは ```diagram の flowchart にしてもよい。");
+  if (levers.has("polish"))
+    parts.push("句読点をスライド向けに整える：読点「、」は中黒「・」/改行/削除で、句点「。」は原則削除する（体言止め）。意味は変えない。");
   if (budget) parts.push(`本文は最大${budget.maxBullets}項目に収める。`);
   // Hard guard against the model deleting content (the "丸ごとOmit" the user hit):
   // shorten wording, never drop whole lines/facts.

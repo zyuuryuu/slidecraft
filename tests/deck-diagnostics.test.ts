@@ -50,4 +50,26 @@ describe("diagnoseDeck", () => {
   it("a clean short deck has no issues", () => {
     expect(diagnoseDeck(parseMd("# まとめ\n\n- 速い\n- 安い\n- 簡単")).length).toBe(0);
   });
+
+  it("flags 読点「、」 as a strong warning (polish lever)", () => {
+    const issues = diagnoseDeck(parseMd("# 概要\n\n- 速く、安く、簡単に導入できる"));
+    const dt = issues.find((x) => x.message.includes("読点"));
+    expect(dt).toBeTruthy();
+    expect(dt!.level).toBe("warn");
+    expect(dt!.levers).toContain("polish");
+  });
+
+  it("flags 句点「。」 as a light tip (info, polish lever)", () => {
+    const issues = diagnoseDeck(parseMd("# 概要\n\n- 導入は容易です。"));
+    const ku = issues.find((x) => x.message.includes("句点"));
+    expect(ku).toBeTruthy();
+    expect(ku!.level).toBe("info");
+    expect(ku!.levers).toContain("polish");
+    expect(issues.some((x) => x.message.includes("読点"))).toBe(false); // no 、 here
+  });
+
+  it("also checks the TITLE, and a punctuation-free deck is clean", () => {
+    expect(diagnoseDeck(parseMd("# 速く、確実に\n\n- 要点")).some((x) => x.message.includes("読点"))).toBe(true);
+    expect(diagnoseDeck(parseMd("# まとめ\n\n- 速い\n- 安い")).some((x) => x.message.includes("読点") || x.message.includes("句点"))).toBe(false);
+  });
 });
