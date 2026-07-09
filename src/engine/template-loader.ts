@@ -10,6 +10,7 @@ import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zi
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
 import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
+import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
@@ -49,6 +50,11 @@ export interface PlaceholderInfo {
   // A4/4:3/smaller-16:9 master needs the real size to classify geometry correctly. Undefined ⇒ canonical
   // (geometryRole uses its 13.333×7.5 defaults) ⇒ 16:9 templates are byte-identical.
   slideSize?: { w: number; h: number };
+  // F1 (§2 部品1/2): the relative-attribute scorer's verdict, stamped at load (inferFunction). Used by
+  // the do-no-harm binding gate: a placeholder inferred "chrome" (thin edge strip) never receives
+  // body/title content even if its (mislabeled) role is body — the header-bug fix. Healthy chrome is
+  // already a meta role, so the gate is a no-op on healthy masters (byte-identical).
+  inferredFunction?: ElementFunction;
 }
 
 export interface DecoRect {
@@ -646,6 +652,18 @@ export async function loadTemplate(
   // layout so a body-typed/mis-authored "Title" placeholder is resolved to the title role. Gated on
   // "no title present", so title-typed (healthy) layouts are untouched.
   for (const l of layouts) recoverLayoutTitle(l.placeholders);
+
+  // F1 (§2 部品1): stamp each placeholder with the relative-attribute scorer's function, so the
+  // do-no-harm binding gate can hard-exclude "chrome" slots from receiving body/title content.
+  for (const l of layouts) {
+    const fnByIdx = new Map(
+      inferFunction(l, slideSize).filter((s) => s.source === "placeholder" && s.idx).map((s) => [s.idx!, s.fn]),
+    );
+    for (const p of l.placeholders) {
+      const f = fnByIdx.get(p.idx);
+      if (f) p.inferredFunction = f;
+    }
+  }
   const presentationRels = await readEntryString(zip, "ppt/_rels/presentation.xml.rels", ZIP_LIMITS.xmlEntry);
   const contentTypes = await readEntryString(zip, "[Content_Types].xml", ZIP_LIMITS.xmlEntry);
 
