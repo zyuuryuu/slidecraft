@@ -19,6 +19,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { loadTemplate } from "../src/engine/template-loader";
 import { buildCatalog, placeholderRole } from "../src/engine/template-catalog";
+import { detectGroups } from "../src/engine/group-layout";
 
 const META = new Set(["date", "footer", "slideNumber"]);
 const SLIDE_H = 7.5;
@@ -45,9 +46,14 @@ async function auditTemplate(path: string): Promise<{ flagged: number; total: nu
     }
     const tiny = bodies.filter((x) => (x.s.w ?? 0) > 0 && (x.s.w ?? 0) * (x.s.h ?? 0) < 0.4);
     if (tiny.length) flags.push(`TINY-BODY(${tiny.map((x) => x.idx).join(",")})`);
+    // `grp=` shows which repeated-group KIND detectGroups recognises (card/step/kpi/compare). NOTE: a
+    // `grp=-` is NOT necessarily a problem — a plain multi-column layout (Column.3Body.Equal: 1 slot per
+    // column) also yields `-` and binds fine via the columns role. Distinguishing a genuine vocabulary
+    // MISS (e.g. 縦積みブロック) from a valid design needs BINDING-level verification, not a heuristic flag.
+    const grp = detectGroups(l);
     if (flags.length) flagged++;
     const tag = flags.length ? `\x1b[33m🚩 ${flags.join(" ; ")}\x1b[0m` : "\x1b[32mok\x1b[0m";
-    console.log(`  ${l.name.padEnd(24)} role=${(c?.role ?? "?").padEnd(9)} bc=${String(c?.bodyCount ?? "?").padEnd(2)} ${tag}`);
+    console.log(`  ${l.name.padEnd(24)} role=${(c?.role ?? "?").padEnd(9)} bc=${String(c?.bodyCount ?? "?").padEnd(2)} grp=${(grp?.kind ?? "-").padEnd(7)} ${tag}`);
     console.log(`      ${phs.map((x) => `${x.role}@${x.idx}(${(x.s.x ?? 0).toFixed(1)},${(x.s.y ?? 0).toFixed(1)} ${(x.s.w ?? 0).toFixed(1)}×${(x.s.h ?? 0).toFixed(1)})`).join("  ")}`);
   }
   console.log(`  \x1b[1m→ ${flagged}/${tpl.layouts.length} flagged\x1b[0m`);
