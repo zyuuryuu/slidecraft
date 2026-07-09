@@ -34,9 +34,7 @@ interface InitializeModalProps {
   onSelectMaster: (id: string) => void;
   onImportMaster: () => void;
   onRemakeMaster: () => void;
-  onRemakeMasterAI?: () => void; // ADR-0026: AI Re-make
   onRemoveMaster?: (id: string) => void; // delete an imported master
-  aiReady?: boolean; // gate the AI Re-make item when no provider is connected
   intakeBusy?: IntakeBusy | null; // intake progress/result surfaced INSIDE the modal (it covers the main banner)
   intakeResult?: IntakeResult | null;
   onIntakeDismiss?: () => void;
@@ -56,7 +54,7 @@ const action = "px-2.5 py-1 rounded bg-surface text-accent-soft hover:bg-edge bo
 
 export default function InitializeModal({
   isOpen, onCancel, onConfirm, mdText, onMdChange, onOpenFile, onStructure, onGenerateAI,
-  masters, activeMasterId, onSelectMaster, onImportMaster, onRemakeMaster, onRemakeMasterAI, onRemoveMaster, aiReady,
+  masters, activeMasterId, onSelectMaster, onImportMaster, onRemakeMaster, onRemoveMaster,
   intakeBusy, intakeResult, onIntakeDismiss,
   deck, templateData, parseError, activeSlide, onSlideClick, warnIssues, tipIssues,
   onFixDeterministic, onCursorLine, gotoLine,
@@ -80,7 +78,7 @@ export default function InitializeModal({
         {/* Header + input methods (one tidy row) */}
         <div className="flex items-center gap-2 px-4 py-2 border-b border-edge text-xs shrink-0">
           <span className="text-sm text-accent-soft font-medium mr-1">📝 Draft</span>
-          <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} onRemake={onRemakeMaster} onRemakeAI={onRemakeMasterAI} onRemove={onRemoveMaster} aiReady={aiReady} />
+          <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} onRemake={onRemakeMaster} onRemove={onRemoveMaster} />
           <span className="w-px h-4 bg-edge mx-1" />
           <button onClick={onOpenFile} className={action} title={t("initModal.importMarkdownTitle")}>{t("initModal.importMarkdown")}</button>
           <button onClick={onGenerateAI} className={action} title={t("initModal.generateAiTitle")}>{t("initModal.generateAi")}</button>

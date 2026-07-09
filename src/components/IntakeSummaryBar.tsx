@@ -13,7 +13,6 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { IntakeSummary, IntakeProgress } from "./apply-template";
-import type { MappedLayout } from "../engine/master-remake-ai";
 import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
 import { findLayout, type TemplateData } from "../engine/template-loader";
 import { parseMd } from "../engine/md-parser";
@@ -26,7 +25,7 @@ const THUMB_SCALE = THUMB_W / SLIDE_W;
 const THUMB_H = SLIDE_H * THUMB_SCALE;
 const THUMB_CAP = 16; // cap the rendered thumbnails (30-layout templates would be heavy); note the rest
 
-function LayoutThumb({ template, sample, name, caption }: { template: TemplateData; sample: DeckIR; name: string; caption?: string }) {
+function LayoutThumb({ template, sample, name }: { template: TemplateData; sample: DeckIR; name: string }) {
   const layout = findLayout(template, name);
   return (
     <div className="shrink-0" style={{ width: THUMB_W }}>
@@ -48,20 +47,16 @@ function LayoutThumb({ template, sample, name, caption }: { template: TemplateDa
         />
       </div>
       <div className="mt-0.5 text-[10px] text-fg2 truncate" title={name}>{name}</div>
-      {caption && <div className="text-[10px] text-dim truncate" title={caption}>{caption}</div>}
     </div>
   );
 }
 
-export type IntakeMode = "import" | "remake" | "remake-ai";
+export type IntakeMode = "import" | "remake";
 
 export interface IntakeResult {
   mode: IntakeMode;
   name: string;
   summary: IntakeSummary;
-  usedAi?: boolean;
-  note?: string;
-  mappings?: MappedLayout[];
   ts: number;
 }
 
@@ -70,7 +65,7 @@ export interface IntakeBusy {
   phase: IntakeProgress;
 }
 
-const MODE_ICON: Record<IntakeMode, string> = { import: "📥", remake: "🔁", "remake-ai": "✨" };
+const MODE_ICON: Record<IntakeMode, string> = { import: "📥", remake: "🔁" };
 
 /** Coarse monotonic fraction so the bar reads as real progress. AI best-of-N dominates the wall-clock,
  *  so the generating phase spans the bulk (10→85%); the fast pre/post phases bracket it. */
@@ -125,11 +120,6 @@ function Swatches({ palette }: { palette: string[] }) {
 export function Detail({ result, template, sample }: { result: IntakeResult; template?: TemplateData | null; sample?: DeckIR | null }) {
   const { t } = useTranslation();
   const s = result.summary;
-  // AI mapping caption per layout name (source → canonical base · reason) for the thumbnail grid.
-  const captionByName = new Map<string, string>();
-  for (const m of result.mappings ?? []) {
-    captionByName.set(m.rename || m.base, `→ ${m.base}${m.reason ? ` · ${m.reason}` : ""}`);
-  }
   const layouts = template?.layouts ?? [];
   const shown = layouts.slice(0, THUMB_CAP);
   const showThumbs = !!template && !!sample && sample.slides.length > 0 && shown.length > 0;
@@ -143,39 +133,19 @@ export function Detail({ result, template, sample }: { result: IntakeResult; tem
           <span className="text-muted">{s.theme.logo ? t("intake.logoYes") : t("intake.logoNo")}</span>
         </div>
       )}
-      {/* Mini WYSIWYG previews: a dummy-filled sample slide on each layout, so the user SEES the result
-          (not just canonical names). For AI Re-make each thumb is captioned with its source→base·reason. */}
-      {showThumbs ? (
+      {/* Mini WYSIWYG previews: a dummy-filled sample slide on each layout, so the user SEES the result. */}
+      {showThumbs && (
         <div>
           <div className="text-muted mb-1">{t("intake.previewTitle")}</div>
           <div className="flex flex-wrap gap-3">
             {shown.map((l) => (
-              <LayoutThumb key={l.name} template={template!} sample={sample!} name={l.name} caption={captionByName.get(l.name)} />
+              <LayoutThumb key={l.name} template={template!} sample={sample!} name={l.name} />
             ))}
           </div>
           {layouts.length > shown.length && (
             <div className="text-dim text-[10px] mt-1">{t("intake.moreLayouts", { count: layouts.length - shown.length })}</div>
           )}
         </div>
-      ) : (
-        // Text fallback (no template available, e.g. SSR/tests): the AI mapping table.
-        result.mode === "remake-ai" && result.mappings && result.mappings.length > 0 && (
-          <div className="overflow-x-auto">
-            <div className="text-muted mb-1">{t("intake.mappingTitle")}</div>
-            <table className="w-full border-collapse">
-              <tbody>
-                {result.mappings.map((m: MappedLayout, i) => (
-                  <tr key={i} className="border-b border-edge/50 last:border-0">
-                    <td className="py-0.5 pr-2 text-fg truncate max-w-[10rem]">{m.rename || m.base}</td>
-                    <td className="py-0.5 px-1 text-muted">→</td>
-                    <td className="py-0.5 pr-2 text-accent-soft whitespace-nowrap">{m.base}</td>
-                    <td className="py-0.5 text-dim">{m.reason || ""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
       )}
       {result.mode === "import" && (s.repairs ?? 0) > 0 && (
         <div><span className="text-muted">{t("intake.repairs")}:</span> {t("intake.repairsCount", { count: s.repairs })}</div>
@@ -208,12 +178,11 @@ export default function IntakeSummaryBar({
   );
   if (!busy && !result) return null;
 
-  // Only offer 「詳細」 when there's something to expand — a clean faithful Import has no theme, mappings,
+  // Only offer 「詳細」 when there's something to expand — a clean faithful Import has no theme,
   // repairs, or findings, so its one-line summary is the whole story (no empty expander).
   const s = result?.summary;
   const hasDetail = !!result && (
     !!s?.theme ||
-    (result.mode === "remake-ai" && !!result.mappings?.length) ||
     (result.mode === "import" && (s?.repairs ?? 0) > 0) ||
     (s?.findings.length ?? 0) > 0 ||
     (template?.layouts?.length ?? 0) > 0 // mini-previews of the template's layouts
@@ -242,9 +211,6 @@ export default function IntakeSummaryBar({
                 {result.summary.status === "ok" ? "✓" : result.summary.status === "degraded" ? "△" : "✕"} {t(`intake.status.${result.summary.status}`)}
               </span>
               <span className="text-fg2">{t("intake.layoutCount", { count: result.summary.layoutCount })}</span>
-              {result.mode === "remake-ai" && (
-                <span className="text-muted">{result.usedAi ? t("intake.aiUsed") : t("intake.aiFallback")}</span>
-              )}
               <div className="flex-1" />
               {hasDetail && (
                 <button onClick={() => setOpen((v) => !v)} className="text-accent-soft hover:text-fg px-1">

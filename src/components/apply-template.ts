@@ -14,7 +14,6 @@ import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engi
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
 import { masterToTemplateSpec, extractLogo } from "../engine/master-remake";
 import { faithfulRemake } from "../engine/faithful-remake";
-import { masterToLayoutInventory, remakeSystemPrompt, aiRemakeSpec, pickBestRawMapping, type MappedLayout } from "../engine/master-remake-ai";
 import { writeTemplate } from "../engine/template-writer";
 
 export interface TemplateSetters {
@@ -222,74 +221,6 @@ export async function applyTemplateBytesAsFaithfulRemake(
   }
 }
 
-export interface RemakeAIResult extends RemakeResult {
-  usedAi?: boolean; // true = the AI mapping was used; false = deterministic fallback (built-in 30)
-  note?: string; // human-readable note about which path ran (for the UI to surface)
-  mappings?: MappedLayout[]; // per-source-layout AI decisions (base + reason) for "why" surfacing
-}
-
-/**
- * AI Re-make (the THIRD import path, ADR-0026 / docs/design/ai-remake.md). Like applyTemplateBytesAsRemake,
- * but the AI picks which CANONICAL layouts mirror the source master (option C, structure mapping) so the
- * source's layout SET is preserved with CLEAN roles. `callAI` is INJECTED (systemPrompt → raw text | null)
- * so this stays DOM/Tauri-free + unit-testable; a null / broken / hallucinated response falls back to the
- * deterministic Re-make (aiRemakeSpec's built-in floor) — never worse than applyTemplateBytesAsRemake.
- */
-export async function applyTemplateBytesAsRemakeAI(
-  buf: ArrayBuffer | Uint8Array,
-  name: string,
-  setters: TemplateSetters,
-  callAI: (systemPrompt: string) => Promise<string | null>,
-  opts: { n?: number; onProgress?: (p: IntakeProgress) => void } = {},
-): Promise<RemakeAIResult> {
-  const tick = opts.onProgress ?? (() => {});
-  try {
-    tick({ phase: "loading" });
-    const source = await loadTemplate(buf);
-    const cleanName = name.replace(/\.pptx$/i, "");
-    const prompt = remakeSystemPrompt(masterToLayoutInventory(source));
-    // best-of-N: a local small model varies run-to-run; sample n times and keep the mapping that
-    // covers the most source layouts (fewest hallucinated). n=1 = single call (unchanged). Sequential
-    // because the injected callAI serialises one request at a time; per-call failures degrade to null.
-    const n = Math.max(1, Math.min(5, Math.round(opts.n ?? 1)));
-    let aiRaw: string | null = null;
-    try {
-      const raws: (string | null)[] = [];
-      for (let i = 0; i < n; i++) {
-        tick({ phase: "generating", step: i + 1, total: n });
-        raws.push(await callAI(prompt).catch(() => null));
-      }
-      aiRaw = n === 1 ? raws[0] : pickBestRawMapping(raws);
-    } catch {
-      aiRaw = null; // AI failure → deterministic fallback below (never worse)
-    }
-    tick({ phase: "composing" });
-    const logo = await extractLogo(source);
-    const { spec, usedAi, note, mappings } = aiRemakeSpec(source, aiRaw, {
-      name: i18n.t("applyTemplate.remakeName", { name: cleanName }),
-      logo,
-    });
-    const remadeBytes = await writeTemplate(spec);
-    const remade = await loadTemplate(remadeBytes);
-    tick({ phase: "validating" });
-    const health = assessTemplateHealth(buildCatalog(remade));
-    if (health.status === "rejected") {
-      setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
-      return { ok: false, health };
-    }
-    setters.setTemplateData(remade);
-    setters.setTemplateName(spec.name);
-    return {
-      ok: true, health, remadeBytes, usedAi, note, mappings,
-      summary: { layoutCount: remade.layouts.length, status: health.status, findings: health.findings.map((f) => f.message), theme: themeSummary(spec, !!logo) },
-    };
-  } catch (err) {
-    setters.setParseError(
-      i18n.t("applyTemplate.remakeFailed", { error: err instanceof Error ? err.message : String(err) }),
-    );
-    return { ok: false };
-  }
-}
 
 /** 修復プランを確認ダイアログ向けの短い日本語に要約する（純粋・UI 非依存）。 */
 export function describeRepairPlan(plan: RepairPlan): string {

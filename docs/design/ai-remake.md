@@ -1,6 +1,7 @@
 # 設計: AI による非決定 Re-make（第3の取り込み口）
 
-- Status: Draft（設計中・未実装）
+- Status: **Superseded**（option C は撤去＝[ADR-0028](../adr/0028-retire-ai-remake-option-c.md)。理由と代替は
+  ADR-0028／[ai-import.md](ai-import.md) 参照。本書は歴史的記録として残す）
 - Date: 2026-07-08
 - 関連: [ADR-0023](../adr/0023-third-party-master-idx-convention.md)（決定論 Re-make）／[ADR-0014](../adr/0014-template-authoring.md)（AI が spec 提案）／[ADR-0018](../adr/0018-validation-at-adoption-gate.md)（採用ゲート）／[ADR-0005](../adr/0005-harness-over-model.md)（harness over model）／[ADR-0025](../adr/0025-placeholder-role-resolution.md)＋layout Tier1/2（不整合対処）
 

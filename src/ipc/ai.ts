@@ -105,7 +105,7 @@ export interface AiRequest {
   apiKey: string;
   baseURL: string;
   model: string;
-  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec" | "master-remake";
+  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec";
   userRequest: string;
   /** For the diagram / diagram-edit modes: which of the 12 shapes to emit (Stage 2). Omitted → flowchart. */
   diagramType?: DiagramType;

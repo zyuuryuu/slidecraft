@@ -11,8 +11,7 @@
     "condense": "本文を要約",
     "diagram": "図の生成",
     "diagram-edit": "図の編集",
-    "template-spec": "テンプレ提案",
-    "master-remake": "マスター再構成"
+    "template-spec": "テンプレ提案"
   },
   "aiPanel": {
     "resizeHint": "ドラッグで高さ変更（ダブルクリックでリセット）",
@@ -130,10 +129,7 @@
     "imageLoadFailed": "画像の読み込みに失敗しました",
     "draftLockedTitle": "協働接続中は編集ロック中",
     "draftButtonTitle": "原稿（テキスト）からスライドを作る・取り込む",
-    "viewForm": "フォーム",
-    "taskRemakeAI": "マスター再構成（AI）",
-    "remakeAIDone": "AI が {{count}} レイアウトを再構成しました",
-    "remakeAIFallback": "AI 未使用 — 標準レイアウトで再構成しました"
+    "viewForm": "フォーム"
   },
   "applyTemplate": {
     "templateUnusable": "このテンプレートは使用できません: {{reason}}",
@@ -230,8 +226,7 @@
   "intake": {
     "mode": {
       "import": "取り込み",
-      "remake": "作り直し（デザイン保持）",
-      "remake-ai": "作り直し（AI）"
+      "remake": "作り直し（デザイン保持）"
     },
     "progress": {
       "loading": "読み込み中…",
@@ -245,15 +240,12 @@
       "rejected": "使用不可"
     },
     "layoutCount": "{{count}} レイアウト",
-    "aiUsed": "AI 写像",
-    "aiFallback": "決定論フォールバック",
     "details": "詳細",
     "dismiss": "閉じる",
     "theme": "テーマ",
     "fonts": "見出し {{major}} / 本文 {{minor}}",
     "logoYes": "ロゴ継承あり",
     "logoNo": "ロゴなし",
-    "mappingTitle": "レイアウト写像（元 → 標準・理由）",
     "repairs": "修復",
     "repairsCount": "{{count}} 枠を修復",
     "font": "フォント {{name}}",
@@ -325,12 +317,8 @@
     "remakeLabel": "デザインを保持して取り込む（Re-make）",
     "createTitle": "配色とフォントを選んで新しいテンプレを生成する",
     "createLabel": "テンプレを作成…",
-    "remakeAILabel": "AI で作り直す（試験）",
-    "remakeAITitle": "AI が入力マスターのレイアウトを整った標準レイアウトへ写像して作り直す（未接続時は決定論版にフォールバック）",
     "showInfoTitle": "直近の取り込み結果を表示",
-    "removeTitle": "このテンプレを削除",
-    "remakeAINotReady": "AI 未接続 — 先に AI に接続してください（アシスト → プロバイダ設定）",
-    "aiOfflineSuffix": "（AI 未接続）"
+    "removeTitle": "このテンプレを削除"
   },
   "masterReg": {
     "defaultName": "テンプレート",

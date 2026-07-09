@@ -14,22 +14,19 @@ interface MasterPickerProps {
   onSelect: (id: string) => void;
   /** Import a new master (.pptx) FAITHFULLY — keep its own layouts/placeholders. Omit → SELECT only. */
   onImport?: () => void;
-  /** Re-make: import a .pptx but keep only its THEME (fonts/colors) and use SlideCraft's own layouts. */
+  /** Re-make (ADR-0027): import a .pptx keeping the source's DESIGN (decorations/layouts) and normalising
+   *  only the fonts. Omit → SELECT only. */
   onRemake?: () => void;
-  onRemakeAI?: () => void; // ADR-0026: AI Re-make (structure mapping); falls back to deterministic when AI isn't ready
   /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
   onCreate?: () => void;
   /** Re-show the last intake result summary (the transparency bar). Omit → no ⓘ (nothing imported yet). */
   onShowInfo?: () => void;
   /** Delete an imported master (built-ins are never deletable). Omit → no delete affordance. */
   onRemove?: (id: string) => void;
-  /** Whether an AI provider is connected. When false, the "AI で作り直す" item is disabled (it would
-   *  otherwise silently fall back to the deterministic Re-make, which reads as "did nothing"). Default true. */
-  aiReady?: boolean;
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onRemakeAI, onCreate, onShowInfo, onRemove, aiReady = true, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onCreate, onShowInfo, onRemove, disabled }: MasterPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -107,7 +104,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
               );
             })}
           </div>
-          {(onImport || onRemake || onRemakeAI || onCreate) && <div className="my-1 h-px bg-edge" />}
+          {(onImport || onRemake || onCreate) && <div className="my-1 h-px bg-edge" />}
           {onImport && (
             <button
               onClick={() => { onImport(); setOpen(false); }}
@@ -126,17 +123,6 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
             >
               <span className="w-3 shrink-0 text-center">＋</span>
               <span>{t("masterPicker.remakeLabel")}</span>
-            </button>
-          )}
-          {onRemakeAI && (
-            <button
-              onClick={() => { if (aiReady) { onRemakeAI(); setOpen(false); } }}
-              disabled={!aiReady}
-              title={aiReady ? t("masterPicker.remakeAITitle") : t("masterPicker.remakeAINotReady")}
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            >
-              <span className="w-3 shrink-0 text-center">✨</span>
-              <span>{t("masterPicker.remakeAILabel")}{!aiReady ? t("masterPicker.aiOfflineSuffix") : ""}</span>
             </button>
           )}
           {onCreate && (

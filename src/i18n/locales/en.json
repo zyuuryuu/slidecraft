@@ -11,8 +11,7 @@
     "condense": "Condense text",
     "diagram": "Generate diagram",
     "diagram-edit": "Edit diagram",
-    "template-spec": "Suggest template",
-    "master-remake": "Master remake"
+    "template-spec": "Suggest template"
   },
   "aiPanel": {
     "resizeHint": "Drag to resize (double-click to reset)",
@@ -130,10 +129,7 @@
     "imageLoadFailed": "Failed to load image",
     "draftLockedTitle": "Editing is locked while collaborating",
     "draftButtonTitle": "Create or import slides from a draft (text)",
-    "viewForm": "Form",
-    "taskRemakeAI": "Master remake (AI)",
-    "remakeAIDone": "AI remade {{count}} layouts",
-    "remakeAIFallback": "AI not used — remade with standard layouts"
+    "viewForm": "Form"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",
@@ -230,8 +226,7 @@
   "intake": {
     "mode": {
       "import": "Import",
-      "remake": "Remake (design-preserving)",
-      "remake-ai": "Remake (AI)"
+      "remake": "Remake (design-preserving)"
     },
     "progress": {
       "loading": "Loading…",
@@ -245,15 +240,12 @@
       "rejected": "Unusable"
     },
     "layoutCount": "{{count}} layouts",
-    "aiUsed": "AI mapping",
-    "aiFallback": "Deterministic fallback",
     "details": "Details",
     "dismiss": "Dismiss",
     "theme": "Theme",
     "fonts": "Head {{major}} / Body {{minor}}",
     "logoYes": "Logo inherited",
     "logoNo": "No logo",
-    "mappingTitle": "Layout mapping (source → canonical · reason)",
     "repairs": "Repairs",
     "repairsCount": "{{count}} frames repaired",
     "font": "Font {{name}}",
@@ -325,12 +317,8 @@
     "remakeLabel": "Keep the design (Re-make)",
     "createTitle": "Pick colors and fonts to generate a new template",
     "createLabel": "Create template…",
-    "remakeAILabel": "Remake with AI (beta)",
-    "remakeAITitle": "AI maps the imported master's layouts onto clean canonical layouts (falls back to the deterministic remake when AI is not connected)",
     "showInfoTitle": "Show the latest intake result",
-    "removeTitle": "Delete this template",
-    "remakeAINotReady": "AI not connected — connect a provider first (Assist → provider settings)",
-    "aiOfflineSuffix": " (AI offline)"
+    "removeTitle": "Delete this template"
   },
   "masterReg": {
     "defaultName": "Template",

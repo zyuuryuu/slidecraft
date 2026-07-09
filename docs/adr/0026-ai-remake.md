@@ -1,6 +1,6 @@
 # ADR-0026: AI 非決定 Re-make（第3の取り込み口・構造マッピング）
 
-- Status: Accepted
+- Status: **Superseded by [ADR-0028](0028-retire-ai-remake-option-c.md)**（option C は撤去。理由は ADR-0028 参照）
 - Date: 2026-07-08
 - 詳細設計: [docs/design/ai-remake.md](../design/ai-remake.md)
 - 関連: [ADR-0023](0023-third-party-master-idx-convention.md)（決定論 Re-make）／[ADR-0014](0014-template-authoring.md)（AI が spec 提案）／[ADR-0018](0018-validation-at-adoption-gate.md)（採用ゲート）／[ADR-0005](0005-harness-over-model.md)（harness over model）／[ADR-0025](0025-placeholder-role-resolution.md)＋layout 選出 Tier1/2

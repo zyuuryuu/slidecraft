@@ -17,7 +17,7 @@ import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasCo
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsRemakeAI, type IntakeProgress } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
 import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
@@ -198,19 +198,6 @@ export function useDeckController() {
   const applyMasterBytesAsRemake = useCallback(
     (buf: ArrayBuffer | Uint8Array, name: string) =>
       applyTemplateBytesAsFaithfulRemake(buf, name, { setTemplateData, setTemplateName, setParseError }),
-    [setTemplateData, setTemplateName, setParseError],
-  );
-
-  // AI Re-make（第3の取り込み口・ADR-0026）: AI が入力マスターの各レイアウトを clean な canonical
-  // レイアウトへ写像（構造マッピング）。callAI は App が provider から注入。壊れ/未接続なら
-  // aiRemakeSpec が決定論 Re-make にフォールバックする（never worse）。
-  const applyMasterBytesAsRemakeAI = useCallback(
-    (
-      buf: ArrayBuffer | Uint8Array,
-      name: string,
-      callAI: (systemPrompt: string) => Promise<string | null>,
-      opts?: { n?: number; onProgress?: (p: IntakeProgress) => void },
-    ) => applyTemplateBytesAsRemakeAI(buf, name, { setTemplateData, setTemplateName, setParseError }, callAI, opts),
     [setTemplateData, setTemplateName, setParseError],
   );
 
@@ -673,7 +660,7 @@ export function useDeckController() {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsRemakeAI,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,

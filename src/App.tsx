@@ -41,17 +41,12 @@ function measureImageAspect(dataUrl: string): Promise<number | undefined> {
   });
 }
 
-// AI Re-make best-of-N: how many times to sample the model and keep the widest-coverage mapping.
-// A local small model varies run-to-run; 2 lifts the coverage floor at a modest one-time import cost
-// (see docs/design/ai-remake.md — model-variance measurement). Cloud/no-AI paths collapse this to 1.
-const REMAKE_BEST_OF_N = 2;
-
 export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsRemakeAI,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
@@ -154,35 +149,6 @@ export default function App() {
   // the collab bridge below can both depend on `notify` without a temporal-dead-zone reference.
   const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
   const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
-  // AI Re-make（第3の口・ADR-0026）: AI が入力マスターの各レイアウトを clean な canonical へ写像。
-  // callAI は AI 接続時のみ実行（未接続・失敗は null → aiRemakeSpec が決定論 Re-make にフォールバック）。
-  const aiReady = ai.connection.ok;
-  const handleRemakeMasterAI = useCallback(async () => {
-    if (intakeBusy) return;
-    const picked = await pickBinaryFile(["pptx"], "PowerPoint");
-    if (!picked) return;
-    const callAI = async (systemPrompt: string): Promise<string | null> => {
-      if (!aiReady) return null;
-      try { return await aiSubmitAndWait(systemPrompt, "master-remake", t("app.taskRemakeAI")); } catch { return null; }
-    };
-    // best-of-N: sample the local model REMAKE_BEST_OF_N times and keep the widest-coverage mapping
-    // (a small local model varies run-to-run). n=1 when AI isn't connected (the single call returns null).
-    setIntakeBusy({ mode: "remake-ai", phase: { phase: "loading" } });
-    try {
-      const r = await applyMasterBytesAsRemakeAI(picked.bytes, picked.name, callAI, {
-        n: aiReady ? REMAKE_BEST_OF_N : 1,
-        onProgress: (phase) => setIntakeBusy({ mode: "remake-ai", phase }),
-      });
-      if (!r.ok || !r.remadeBytes) return;
-      const entry = registerMaster(picked.name.replace(/\.pptx$/i, "") + t("app.remakeSuffix"), r.remadeBytes);
-      setMasterId(entry.id);
-      // The intake bar (below) now shows the outcome persistently + the mapping detail, replacing the
-      // transient done-toast; usedAi/mappings/note ride along for the "why" panel.
-      if (r.summary) showIntake({ mode: "remake-ai", name: picked.name.replace(/\.pptx$/i, ""), summary: r.summary, usedAi: r.usedAi, note: r.note, mappings: r.mappings, ts: Date.now() });
-    } finally {
-      setIntakeBusy(null);
-    }
-  }, [intakeBusy, registerMaster, applyMasterBytesAsRemakeAI, aiSubmitAndWait, aiReady, showIntake, t]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, setDeck,
@@ -426,11 +392,9 @@ export default function App() {
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
             onRemake={handleRemakeMaster}
-            onRemakeAI={handleRemakeMasterAI}
             onCreate={() => setShowTemplateCreator(true)}
             onShowInfo={intakeResult ? () => setIntakeDismissed((d) => !d) : undefined}
             onRemove={handleRemoveMaster}
-            aiReady={aiReady}
             disabled={editLocked}
           />
           <LanguageToggle />
@@ -590,9 +554,7 @@ export default function App() {
         onSelectMaster={handleSelectMaster}
         onImportMaster={handleImportMaster}
         onRemakeMaster={handleRemakeMaster}
-        onRemakeMasterAI={handleRemakeMasterAI}
         onRemoveMaster={handleRemoveMaster}
-        aiReady={aiReady}
         intakeBusy={intakeBusy}
         intakeResult={intakeDismissed ? null : intakeResult}
         onIntakeDismiss={() => setIntakeDismissed(true)}
