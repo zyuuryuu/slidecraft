@@ -111,6 +111,27 @@ NEXT: <次にやるべきこと — ファイル名と変更内容を1行で>
 
 ---
 
+## 課題・記録の置き場（Issue 中心）
+
+作業・決定・文脈を置き場で分離する。複数マシン / エージェントで動かすため、**「やること」は
+GitHub Issue に集約**する（唯一の共有作業キュー）。
+
+| 置き場 | 中身 | 補足 |
+| --- | --- | --- |
+| **GitHub Issue** | やること（bug / task / 残作業） | open→closed で追跡・修正コミットは `Fixes #N` で紐づけ・本文に repro / root cause / fix 方針 |
+| **ADR**（`docs/adr/`） | 不可逆な決定と理由 | Issue は閉じるが ADR は永続記録 |
+| **`docs/design/`** | 設計仕様 | work item でなく coherent な spec |
+| **`docs/ROADMAP.md`** | 前方の計画＝高レベルのテーマのみ | 粒度の細かい作業項目は Issue へ |
+| **`docs/shipped.md`** | 出荷ログ（1 機能 1 行） | — |
+| **memory**（`~/.claude/…`） | ユーザ / プロジェクトの非自明な前提（好み・north star） | 私の作業文脈。Issue で代替しない |
+
+- **バグ / 気になる挙動を見つけたら memory や docs に書かず、`gh issue create` で Issue を切る。**
+- commit の `NEXT:` や ROADMAP に残作業プロズを溜めない — Issue 化する。
+- `gh issue view` は projects-classic の deprecation で失敗する。本文取得は
+  `gh api repos/OWNER/REPO/issues/N --jq '.title, .body'` を使う。
+
+---
+
 ## 設計パラメータ
 
 | パラメータ | 値 | 根拠 |
