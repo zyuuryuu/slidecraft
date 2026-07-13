@@ -1,90 +1,48 @@
 # SlideCraft ロードマップ
 
-**前向きの計画のみ**を記す。実装済みの履歴は **[shipped.md](shipped.md)**、決定の記録は [docs/adr/](adr/)、詳細な経緯は git（PR）を参照。
+前向きの**テーマ**のみを記す。個別の作業項目（bug / task / 残作業）は
+**[GitHub Issues](https://github.com/zyuuryuu/slidecraft/issues)** で追跡する（このファイルには溜めない —
+CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [shipped.md](shipped.md)、決定は
+[docs/adr/](adr/)、設計仕様は [docs/design/](design/)。
 
-**現在地（2026-07-09）**：**v0.3.0 タグ打ち直し前**（draft のまま未公開）。v0.3.0 の中身は再定義され、目玉は **faithful Re-make**（デザイン保持＋フォント正規化＝「自分のテンプレを保つ」・[ADR-0027](adr/0027-remake-source-visual-preservation.md)・日本語 EA フォント保持含む）＋**取り込みの透明化 UX**（進捗/結果バー・レイアウトのミニプレビュー・削除）＋**取り込み理解精度 P1**（幾何メタ検出・`parse-audit` 計測ツール）。**AI Re-make（option C＝canonical 写像）は撤去**（[ADR-0028](adr/0028-retire-ai-remake-option-c.md)・"間違った AI の使い所"）。取り込みは「忠実 Import／faithful Re-make／決定論 Re-make」に整理。出荷履歴は [CHANGELOG](../CHANGELOG.md)／[shipped.md](shipped.md)、決定は [ADR](adr/)。残る細部は「リリース後の残タスク」、将来テーマは「バックログ」へ。
-
-> **既知の仕様（非バグ・再調査不要）**：表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
->
-> **検証で棄却（他AIレポート・敵対検証 2026-07-07／再調査不要）**：(B2) `get_deck_issues` 長い箇条書き過検知＝**非バグ**（検知は `deck-diagnostics.ts` の `SENTENCE_BULLET=28`、報告の `charsPerBullet:59` は検知経路に入らない別 budget＝`slide-fix.ts` の AI 指示値）／(B3) 空本文スライド未検出＝**意図的な仕様**（title-only は正当な内容・追加は区切り/表紙/空カラムの誤検知リスクで要決定の機能追加）／(A4) 大規模テンプレのロール推定ズレ＝広域主張（56枚規模・表/図/チャートが丸められる・文字数過大）は**偽**（tbl/chart/pic は idx 分岐より先に尊重）。実在は [ADR-0023](adr/0023-third-party-master-idx-convention.md) 既知エッジ（規約 opt-in マスタの body@idx15/16 誤分類）のみで、**素朴な typed-title ゲート修正は同梱テンプレ（00_表紙の会議名=body@15）を退行**させるため不可。
-
----
-
-## 🔻 リリース後の残タスク（v0.1.x）
-
-v0.1.0 の工程化フェーズ（M0–M13）は完了（[shipped.md](shipped.md)）。残る細部のみ：
-
-| 項目 | 内容 | 状態 |
-| --- | --- | --- |
-| 本アプリアイコン | 仮の青地「S」→ 正式デザイン確定 → `tauri icon` で全形式/サイズ再生成 | 💬 DISCUSS（要ユーザ） |
-| **Windows コード署名（Authenticode／SignPath Foundation）** | **方針確定＝SignPath Foundation（OSS 向け無料 OV Authenticode）**。実ユーザが SmartScreen「不明な発行元」でブロックされる問題への恒久策。**申請下地は整備済**（2026-07-08・commit 5b58645）: `CODE_SIGNING_POLICY.md`（署名対象/ビルド&署名フロー/鍵=SignPath HSM/役割/配布・申請中 posture）・`CODE_OF_CONDUCT.md`・`SECURITY.md`・`CONTRIBUTING.md`・issue/PR テンプレ・README 日英の署名節を追加、v0.2.1 公開リリースで「無料 DL 可能」も充足。**残**: (1) [signpath.org/apply](https://signpath.org/apply.html) へ申請、(2) 承認後に `release.yml` へ `signpath/github-action-submit-signing-request` を配線（tag 限定・鍵は先方 HSM・CI は API トークンのみ）しポリシーを実装済みへ更新。鍵は先方管理で公開実績により SmartScreen 評価が蓄積（EV より遅いが「不明な発行元」は解消）。棄却した代替: Azure Trusted Signing（要組織/本人確認）・OV/EV 有償証明書。→ 承認後に ADR 化 | 🔗 DEPENDS（SignPath 審査待ち） |
-| Intel Mac (.dmg) | 出荷は arm64 のみ（`depends_on arch: :arm64`・cask 1-sha）。`release.yml` に macos-13（Intel x64）レグは追加済だが x64 `.dmg` が未出荷＝x64 ジョブ未成功/未検証。x64 ビルド成功後に cask の on_arm/on_intel 分割を復活＋`update-cask` を 2-sha へ | 🔗 DEPENDS（x64 ジョブ） |
-| 通知バナー（軽量自動更新） | 方針は [ADR-0021](adr/0021-auto-update-strategy.md) で決定済。GitHub Releases API ポーリングで「新版あり」通知（CSP egress＋版数取得＋実ポーリング検証を要す） | ✅ READY |
-| アプリ内 Help/? 導線 | opener プラグイン未配線 → ドキュメントサイトへ誘導 | 🔗 DEPENDS |
+**現在地（2026-07-13）**：**v0.3.0 タグ打ち直し前**（draft のまま未公開）。目玉は **faithful Re-make**
+（デザイン保持＋フォント正規化・[ADR-0027](adr/0027-remake-source-visual-preservation.md)・日本語 EA
+フォント保持）＋**取り込み透明化 UX**（進捗/結果バー・ミニプレビュー・削除）＋**Master-Intake F0/F1
+基盤**（任意マスターの取り込み理解＝病理センサス／sanitize-master 双子／決定論スコアラー／do-no-harm
+ゲート・→[shipped](shipped.md)）。**AI Re-make（option C）は撤去**（[ADR-0028](adr/0028-retire-ai-remake-option-c.md)）。
+取り込みは「忠実 Import／faithful Re-make／決定論 Re-make」に整理。
 
 ---
 
-## バックログ（将来）
+## テーマ（各作業は Issue で追跡）
 
-### 🧠 AI 編集の深化
-
-| 項目 | 内容 | サイズ |
+| テーマ | 中身 | Issues |
 | --- | --- | --- |
-| 部分生成の続き（P2〜P4） | ops 化は **P1＝図コンテンツで実装済**（→shipped）。**テキスト編集はまだ全文再生成＝drift の温床**が残る。残り：**P2 placeholder テキスト ops**（`applyFieldEdit` 即利用）／**P3 chart・table・gantt ops**（series/cards/tasks/cell）／**P4 refine・batch 経路への ops 配線＋delta 成功率テレメトリ**。触点: `diagram-edit-ops.ts`（雛形）・`placeholder-binding.applyFieldEdit`・`ai-apply.ts`（マージ）・`llm-prompts` | M〜L |
-| 生成の encoding 事故を構造で抑止（#12-D） | 弱モデルの `\uXXXX` 違反を**発生させない**根本抑止。案：(D-1) 生成を per-slide 分割し違反の被害半径を1枚に＋壊れた1枚だけ再試行（`extractSlidePlan` 既存）／(D-2) 本文を JSON 文字列から出しエスケープ不要な形式へ。現状は floor（違反破棄＋告知）で担保済。着手時に設計 | M |
-
-### 🖼 HTML / 描画品質
-
-| 項目 | 内容 | サイズ |
-| --- | --- | --- |
-| 図品質の磨き込み（残＝ノード衝突/折返し） | 実レンダ敵対監査（全30枚）で検出した既存問題のうち、**エッジラベル低コントラスト（82569eb／PR #83）と図タイトル重複 `omitTitle`（59ef092）は出荷済**（→[shipped](shipped.md)）。**閉じスライドは非バグと判明**（canonical Closing は full-bleed 濃紺 BG 図形を持ち可読・監査で reconcile 済→shipped）。残＝**ノード衝突＋ラベル折返し**（`layout-engine` は固定 node_width＋全体スケールのみ・最頻/効き目大・未対処）。共有 painter に触る＝PPTX にも波及（golden 検証必須）。触点: `diagram-painter`・`layout-engine` | M |
-| @font-face CJK 埋め込み（設計 S7） | Noto Sans/Serif JP サブセットを data URI 内蔵しクロスマシン完全再現（現状は順序付きフォールバックスタック）。前提＝`<a:ea>` フォント抽出＋明朝/ゴシック分類。サブセット化ツールが新規に必要 | M |
-| **プレビュー/HTML の PPTX 追随（SmartArt・複雑図形）** | プレビュー/HTML は共有 SlideCard レンダラで PPTX と WYSIWYG のはずだが、**テンプレ由来の図形描画にまだ追随不足**の疑い（ユーザ体感 2026-07-08）。特に **SmartArt（`<dgm:>`/graphicFrame の diagram パート）は未描画の見込み**、加えて connector・WordArt・複雑 custGeom・グループのネスト等。まず**ギャップの実測**（実テンプレ群を Playwright 実レンダ→PPTX と目視差分＝敵対監査）→ 高インパクト分から共有レンダラ（`ooxml-geom`/`ooxml-fill`/SlideCard）で closing。SmartArt は dgm→図形ツリー展開が要る大物なので別 phase。プレビュー/HTML 限定なら PPTX golden 非影響（ただし共有 painter に触る変更は golden 検証必須）。関連 [[diagram_render_architecture]] | M〜L |
-
-### 📄 テンプレ / マスター
-
-| 項目 | 内容 | サイズ |
-| --- | --- | --- |
-| 内蔵 30 レイアウトのオミット | Midnight Executive 30 種は**開発用** — 主要テーマ（＋一部バックログ）完了後にビルトイン同梱をやめ、canonical .pptx は入力サンプルとしてリポジトリ内に残置。触点: `useMasterRegistry` の `BUILTIN_URL`＋起動 fetch（→ 残置サンプル参照 or `writeTemplate` で起動時生成）・`BUILTIN_LAYOUTS` の既定セット差し替え・`LAYOUT_NAMES` フォールバックの整理・テスト fixture パス・`scripts/rebuild-template.ts` 引退。ランタイムはロールベースで 30 種非依存（alien テストでゲート済み）のため作業はこの触点に閉じる | S〜M |
-| スライドマスター Re-make の残（本体は [shipped](shipped.md)） | Re-make 本体（テーマ抽出→自前レイアウト・ロゴ継承・フラット設計吸収・純粋 Import 両立）は出荷済（[ADR-0023](adr/0023-third-party-master-idx-convention.md)）。残る磨き込み：**(B) dark ロゴ変種の per-background 選択**（現状は最頻1枚）。※ EA/CJK フォント（`<a:ea>` 抽出＝日本語ブランドフォント保持）は**出荷済**（→[shipped](shipped.md)）。関連 [[third_party_master_idx_fix]] | S |
-| **AI-Import comprehension（乱雑テンプレの"理解"補完）** | AI Re-make（option C＝canonical 写像）は**撤去**（[ADR-0028](adr/0028-retire-ai-remake-option-c.md)・"間違った AI の使い所"）。**正しい使い所＝取り込み時の"理解"を AI で補完**：決定論（`placeholderRole`/`classifyLayout`/`detectGroups`）は固定語彙内を解けるが、語彙外構造・曖昧ロール・意味/装飾境界は落ちる（[設計 ai-import.md](design/ai-import.md) §2）。ハーネス＝distill→高信頼決定論→AI ラストマイル→検証→人間確認（§3）。**着手条件は data 駆動**：`npm run parse-audit` を実テンプレに回し、binding correctness の失敗が実証されたら設計・導入。現在地: 設計＋P1（幾何メタ検出）＋計測ツール済。上位方針＝[master-intake.md](design/master-intake.md)（do-no-harm・ティア・部品分解 F0-F3） | M |
-| **Master-Intake 基盤（幾何の床上げ＋スコアラー＋do-no-harm ゲート）** | 任意マスター対応の方針は [設計 master-intake.md](design/master-intake.md)。**F0**: 幾何の床上げ（xfrm 継承の完全解決＝w/h=0 が `isPeer`/capacity を殺す・`geometryRole` の sldSz 相対化・複数 master・idx-META の per-layout gate〔ADR-0023 既知エッジ・同梱テンプレ退行に注意〕）。**F1**: 決定論スコアラー（placeholders∪staticTexts・相対属性・confidence 出力・ADR-0025 方式の取り込み時 stamp・健全テンプレ byte-identical）＋ binding の no-silent-drop 化（未束縛の報告・MUST ティア空欄の警告・chrome 硬除外）。**並走**: テンプレプロファイル（取り込み時のロール確認 UI＋修正の `master-store` 永続化＝2回目以降は完全決定論・正解ラベルの副産物）。触点: `template-loader.ts`・`template-catalog.ts`・`placeholder-binding.ts`・`placeholder-filler.ts`・`master-store.ts` | L |
-| **取り込み理解の計測基盤（sanitize-master 双子・病理センサス）** | 機密テンプレを外に出さずに精度計測する証拠戦略（[設計 master-intake.md](design/master-intake.md) §3）。**sanitize-master**: 実テンプレ→構造骨格のみの合成 .pptx（双子）＋実物との parse-audit 一致 assert（忠実性の機械的証明・名前はキーワード級仮名化）。**病理センサス**: 実テンプレ群→病理チェックリストのみ出力（`make-dirty-fixture.ts` をミューテーションライブラリに育てる根拠）。**公開乱雑コーパス**: 官公庁/大学/学会テンプレを共有ベースラインに。既存資産: `template-writer`・`make-dirty-fixture.ts`・`parse-audit`・ローカル `.potx` 7本（gitignore） | M |
-
-### 🖥 UX / オンボーディング / 配布
-
-| 項目 | 内容 | サイズ |
-| --- | --- | --- |
-| 完全な署名付き自動アップデート | 初回は軽量通知（M12）で代替。出荷後：`tauri signer` 署名鍵ペア＋`plugins.updater`＋4-OS の `latest.json` 集約＋draft/publish フロー再設計。鍵は回転不可の不可逆判断（ADR 化） | M |
-
-### 🔒 セキュリティ
-
-| 項目 | 内容 | サイズ |
-| --- | --- | --- |
-| F1'（egress hard boundary）｜LOW（保留） | 保留（F2 で前提縮小）：`http:default` の `https://**` を CSP 一致 allowlist（3 AI API＋`huggingface.co`＋`cdn-lfs*.huggingface.co`〔モデルDL の LFS CDN 302 先・含めないと DL 破綻〕＋loopback）に縮小し、承認済み custom host を **Rust 側 egress ゲート**（reqwest・host allowlist 強制）で通す実境界化。streaming fetch の Rust 越し再実装を要し大きめ。触点: `src-tauri/capabilities/default.json`・Rust command・`src/ipc/app-fetch.ts` | M |
-
-### 📝 オーサリング / 編集
-
-| 項目 | 内容 | サイズ |
-| --- | --- | --- |
-| **インデント（ネスト箇条書き）対応** | 現状は**未対応**（パーサが `- 項目` とインデントした子箇条を全て level 0 にフラット化・`Paragraph` に `level` フィールド無し・出力も lvl 0）。「もっとインデントを適切に使わせたい」への対応＝多層：**parser**（先頭空白→level）／**schema `Paragraph.level`**（slide-schema・要ユーザ確認〔R4 相当〕）／**serializer**（`<a:pPr lvl marL>`・placeholder-filler）／**preview**（SlidePreview の marginLeft）／**md-serializer**（往復で空白復元）／**editor**（Tab/Shift-Tab で indent/outdent）。触点広め。 | M |
-
-### 🔌 MCP / 連携
-
-| 項目 | 内容 | サイズ |
-| --- | --- | --- |
-| **MCP エンドポイント2種の統合** | 意図せず2つの MCP サーバ面が並立：**stdio CLI**（`mcp/cli.ts`・headless・ADR-0022 同梱）と **HTTP collab host**（`mcp/host.ts`・`StreamableHTTPServerTransport`・GUI 起動で AI が接続 IN）。tool/resource 登録を**1つの server core（`mcp/server.ts`）に統合し transport だけ2系統**にする（現状の重複/ズレを解消）。まず両者の tool/resource セット差分を棚卸し→共通コア化。触点: `mcp/cli.ts`・`mcp/host.ts`・`mcp/server.ts`・`mcp/resources.ts`。 | M |
-| **MCP: スライドのスクリーンショット取得（AI の自己デザインチェック）** | 上流 AI が「自分の編集で**デザインが崩れていないか**」を視覚で確認できるよう、**特定スライドの現在の描画を画像で返す MCP ツール**（例 `get_slide_image(docId, index)`）。既存の `SlideCard`／HTML export（`deck-html-export`）が WYSIWYG 描画済なので、SSR→ラスタ化（headless 描画 or SVG/PNG 化）で実現。テキスト resource（`get_slide`）と併せて AI が"見て直す"ループを閉じられる。要検討: ラスタ化手段（Tauri webview 経由 or 純 SSR→画像）・画像サイズ/転送。触点: `mcp/server.ts`・`mcp/resources.ts`・`components/deck-html-export`。 | M |
+| **任意マスター取り込み理解** | scorer 復元の拡張（figure/subtitle）・複数 master・AI ラストマイル・geometryRole の header 誤認 | [`master-intake`](https://github.com/zyuuryuu/slidecraft/labels/master-intake) |
+| **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
+| **HTML / 描画品質** | 図のノード衝突/折返し・SmartArt/複雑図形の追随・@font-face CJK 埋め込み | #104 #105 #115 |
+| **MCP / 連携** | エンドポイント2種の統合・スライドスクショ取得 | [`mcp`](https://github.com/zyuuryuu/slidecraft/labels/mcp) |
+| **リリース / 配布** | アプリアイコン・Win 署名・Intel mac・通知/署名付き自動更新 | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release) #114 #120 |
+| **オーサリング / パーサ** | インデント・混在本文＋表・列内 table・セル整形・未閉じ fence | #88 #89 #100 #101 #102 #103 |
+| **テンプレ資産 / 負債** | 内蔵30オミット・Re-make dark ロゴ・.scft version ゲート | [`tech-debt`](https://github.com/zyuuryuu/slidecraft/labels/tech-debt) #118 |
+| **セキュリティ** | egress hard boundary（F1'・Rust ゲート） | #119 |
 
 ---
 
-## 保留中の依存・運用
+## 既知の仕様（非バグ・再調査不要）
 
-- **js-yaml v5 更新** — dependabot **PR #13（OPEN・未 merge）**：`js-yaml` 4.3.0 → 5.2.1（メジャー）。破壊的変更の確認待ち。
-- **依存の脆弱性アラート（2026-07-08・6件中5件解消）** — **npm 4件**（`vite` high `server.fs.deny` bypass ＋ medium×2・`esbuild` medium）は `vitepress` 1.6.4→**2.0.0-alpha.18** で解消（v2 は vite@8 を使い、アプリ既存の vite@8/esbuild@0.28 に dedup＝脆弱な vite@5.4.21/esbuild@0.21.5 が消滅・`npm audit`=0・docs:build/二言語スイッチャ検証済）。**`rand`（low）**は `cargo update` で 0.8.5→0.8.6。**残 1件＝`glib`（medium・0.18.5→0.20.0）**は gtk-rs/Tauri スタックに固定され単独更新不可＝**Tauri の GTK バインディング更新待ち**（Linux GTK の iterator 健全性・実害小）。※vitepress は現状 2.x が alpha（`next` タグ）＝docs ツールのみ・出荷物非影響。stable 化したら追随。dependabot PR #86（minor-patch 群）/#13（js-yaml メジャー）は別途。
-- **`.scft` 形式バージョニングの活用（前方互換保険）** — バンドルへの schema version 埋め込み**自体は実装済**（`project-io.ts` の `meta.json.version`=`PROJECT_VERSION`・zod 検証・→[shipped](shipped.md)）。残＝**開封時に version を使った互換ゲート/マイグレーションが未実装**（現状 `openProject` は不一致でも黙って既定へフォールバック＝保険が効いていない）。着手時に「新しい version は拒否 or 移行」を追加。触点: `project-io.ts openProject`。
-- **会社 `.potx` / CX の保管** — 会社系 `.potx`（7本）＋`CX_sample_MSGothic.pptx` は `tests/fixtures/templates/` に置き **gitignore**（知財・ローカル限定・skipIf テストのみ参照）。棚卸＋公式昇格＋public 退避は完了（→[shipped](shipped.md)）。
-- **column 内 table の認識（要注意・小改修ではない）** — separator レイアウトの各カラムは図（```diagram/mermaid```）は拾うが **GFM テーブルは本文テキスト化**（`findTableInLines` 未適用）。**調査済（2026-07-07）**：`TableBlock` は既に `placeholderIdx` を持ち列スコープ可・パーサ側は数行追加で拾えるが、**シリアライザが `slide.table` を意図的に single-body 扱い**（`md-serializer.ts:195` `singleBodyFigure`＝パーサの table 再吸収を防ぐ設計）なので、素直に列 table を作ると round-trip で single-body に化ける。正しく直すにはシリアライザの separator 分岐で列位置に table を emit（diagram/mermaid の :215-222 と同様）＋`singleBodyFigure` ガードの見直しが要る。触点: `md-slide-parser.ts` 列 else 分岐＋`md-serializer.ts` separator 分岐。
-- **混在スライドの本文＋表の同時保持（B1・他AI報告・敵対検証 2026-07-07）** — リード段落（非箇条書き）＋key-value 箇条書きの混在スライドで `convert_bullets_to_table` を掛けると、後段 `parseMd`（`md-slide-parser.ts` の table-vs-text 二択）がリード段落を**無言 drop**（never-silent 方針と不整合・undo 復旧可）。真因はツールでなく**共有パーサ**（同 drop は Markdown インポート等パーサ全経路で起こりうる）。診断が混在スライドで convert を推奨するのが引き金（`deck-diagnostics.ts:86` が bullet だけ数える）。根本策＝パーサが text+table 共存保持（共有経路・**golden 検証必須**）／安全策＝混在時は convert 非推奨 or ツールが警告返し。↑「column 内 table の認識」と同触点。
-- **最背面画像のプレビュー直接ドラッグ（小）** — 最背面レイヤーはハンドルが content の下に隠れるため現状フォーム編集のみ。編集 chrome（枠線＋角ハンドル）だけを前面 overlay 化してドラッグ/リサイズを再有効化（[ADR-0020](adr/0020-image-embedding.md)）。
-- **ステップ/グループセル内の Markdown 整形（要仕様判断）** — **原因特定済（2026-07-07）**：セルは `linesToParagraphs` を通り、(1) `## 見出し` は**リテラル表示**＝`linesToParagraphs` は `###`（3個）だけを heading 認識し `##`（2個）は素通り（`#`=タイトル/`##`=サブタイトル/`###`=グループ見出し という規約との齟齬）／(2) 箇条書きの `-` は `bullet:true` になるが、`SlidePreview.renderParagraph`（`para.bullet && bulletChar`）が**プレースホルダ style の `bulletChar` が空（buNone）だと記号を描かない**ため、列/セルの本文が「箇条書きなのに・が出ない」状態になる。どちらも**本文本体・round-trip に波及する仕様判断**（`##`→heading 化はシリアライザが `###` 正規化／bulletChar フォールバックはテンプレの buNone 意図と content 意図の衝突）。触点: `md-slide-parser.ts linesToParagraphs`・`SlidePreview.tsx renderParagraph`。
+- 表セル文字・図ノード文字は独立図形のため、スライドマスター body 書式には非追従（継承対象外）。
+- **検証で棄却（2026-07-07）**：`get_deck_issues` 長い箇条書き過検知＝非バグ（検知は `SENTENCE_BULLET=28`、
+  報告の `charsPerBullet:59` は別 budget）／空本文スライド未検出＝意図的仕様（title-only は正当）／
+  大規模テンプレのロール推定ズレ＝偽（tbl/chart/pic は idx 分岐より先に尊重）。実在は
+  [ADR-0023](adr/0023-third-party-master-idx-convention.md) 既知エッジ（規約 opt-in マスタの
+  body@idx15/16 誤分類）のみで、素朴な typed-title ゲート修正は同梱テンプレを退行させるため不可。
+
+---
+
+## 依存・運用（継続追跡）
+
+- **js-yaml v5** — dependabot PR #13（OPEN）：4.3.0 → 5.2.1（メジャー）。破壊的変更の確認待ち。
+- **依存脆弱性** — 残 1 件＝`glib`（medium）は gtk-rs/Tauri スタックに固定＝**Tauri の GTK バインディング
+  更新待ち**（実害小）。npm 系は vitepress 2.x（alpha）で解消済、stable 化したら追随。
+- **会社 `.potx`(7) ＋ CX** — `tests/fixtures/templates/` に **gitignore**（知財・ローカル限定・skipIf のみ参照）。
