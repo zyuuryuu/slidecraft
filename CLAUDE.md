@@ -130,6 +130,23 @@ GitHub Issue に集約**する（唯一の共有作業キュー）。
 - `gh issue view` は projects-classic の deprecation で失敗する。本文取得は
   `gh api repos/OWNER/REPO/issues/N --jq '.title, .body'` を使う。
 
+### Issue の自己完結基準（疎結合セッションが単独で取れるように）
+
+各セッションが数件単位で独立に着手できるよう、Issue は**それ単独で読んで着手できる**こと。起票時も
+着手時（不足を補う）も、次を満たす：
+
+- **repro / root cause / 触点（`file:line`）/ fix 方針** を本文に書く。
+- **現状・着手点** を 1 行：関連コードの現在地と「何が既にあるか」（例:「`inferFunction` は figure も
+  判定済＝`master-scorer.ts`。これを復元に使う」）。fresh セッションが最初に読むファイルを示す。
+- **壊してはいけない不変条件** を明記：健全テンプレ **byte-identical**・共有 painter / PPTX は
+  **golden 必須**・**test-first（R3）**・binding は **no-silent-drop / do-no-harm** 等、該当するもの。
+- **受け入れ基準**：先に書くべきテストを 1 行。
+- **サイズ**：1 セッションを超えるなら**分割**。依存は本文に「blocked by #N」。会話固有の略語（②a 等）は
+  本文で 1 語説明する。
+
+**とりまとめ（triage）**：起票された Issue はこの基準に揃える（不足を補筆・重複を `duplicate` で閉じ・
+分割・`good first issue` 付与・依存順の明記）。閉じられた Issue がマイルストーンなら [shipped.md](docs/shipped.md) に 1 行追記。
+
 ---
 
 ## 設計パラメータ
