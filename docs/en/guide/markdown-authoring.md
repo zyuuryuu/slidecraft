@@ -196,7 +196,7 @@ Usage notes:
 
 Each region can hold a **figure** instead of body text. Writing a ` ```diagram ` or ` ```mermaid ` fence inside a region turns that region into a figure, which sits side by side with the other columns.
 
-```markdown
+````markdown
 # 構成と指標
 
 <!-- col -->
@@ -212,7 +212,7 @@ nodes:
 ### 指標
 - 稼働率 98%
 - 月次成長 +12%
-```
+````
 
 For the figure notation itself, see [Diagrams](/en/guide/diagrams).
 
@@ -228,7 +228,7 @@ A fenced block enclosed in ` ``` ` is handled differently depending on the **fen
 | ` ```mermaid ` | Mermaid notation. Convertible ones become native figures; the rest fall back to a Mermaid image |
 | Others (` ```yaml ` / ` ```python ` / a bare ` ``` ` with no language, etc.) | Displayed as monospace **code / log** |
 
-```markdown
+````markdown
 # 設定例
 
 ```yaml
@@ -236,7 +236,7 @@ server:
   port: 8080
   workers: 4
 ```
-```
+````
 
 Fences not used for figures (`yaml` / `python` / `bash` / `log`, no language specified, and so on) are placed on the slide as-is as a monospace code block. The language name is preserved as a display hint.
 

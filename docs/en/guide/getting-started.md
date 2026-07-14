@@ -50,7 +50,7 @@ Markdown is interpreted as blocks, one per slide. At a minimum, learning the fol
 
 Here's an example you can paste as-is for your very first deck.
 
-```markdown
+````markdown
 # 2026年 事業計画
 > 第2四半期レビュー
 
@@ -79,7 +79,7 @@ xychart:
   series:
     - { kind: bar, name: "2024", values: [10, 14, 13, 18] }
 ```
-```
+````
 
 ::: tip Metadata on the title slide
 On the title slide, lines like `Category:` / `Date:` / `Footer:` are treated as metadata. A `## Heading` or `> Quote` becomes the subtitle.

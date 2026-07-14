@@ -268,6 +268,21 @@ export function parseSlideBlock(
   let codeBlockLang = "";
   let codeBlockLines: string[] = [];
 
+  // Commit the current fence's accumulated lines to diagram/mermaid/code. Shared by the closing-fence
+  // branch AND the EOF flush (#89) so an UNCLOSED fence's content isn't silently dropped.
+  const commitCodeBlock = () => {
+    if (codeBlockLang === "diagram" || codeBlockLang === "mermaid-shapes") {
+      diagram = { yaml: codeBlockLines.join("\n"), placeholderIdx: "1" };
+    } else if (codeBlockLang === "mermaid") {
+      const f = mermaidToFigure(codeBlockLines.join("\n"), "1");
+      if (f.diagram) diagram = f.diagram;
+      else mermaidBlock = f.mermaidBlock;
+    } else if (codeBlockLines.length > 0) {
+      // Any OTHER fence (```yaml / ```python / ```log / ```) is CODE/LOG — a monospace body.
+      code = { content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" };
+    }
+  };
+
   for (let i = cursor; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
@@ -280,21 +295,8 @@ export function parseSlideBlock(
         codeBlockLines = [];
         continue;
       } else {
-        // End of code block
-        if (codeBlockLang === "diagram" || codeBlockLang === "mermaid-shapes") {
-          diagram = {
-            yaml: codeBlockLines.join("\n"),
-            placeholderIdx: "1",
-          };
-        } else if (codeBlockLang === "mermaid") {
-          const f = mermaidToFigure(codeBlockLines.join("\n"), "1");
-          if (f.diagram) diagram = f.diagram;
-          else mermaidBlock = f.mermaidBlock;
-        } else if (codeBlockLines.length > 0) {
-          // Any OTHER fence (```yaml / ```python / ```log / ```) is CODE/LOG — capture it as a
-          // monospace body (previously the content was silently dropped).
-          code = { content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" };
-        }
+        // End of code block — commit it (diagram / mermaid / code).
+        commitCodeBlock();
         inCodeBlock = false;
         codeBlockLang = "";
         codeBlockLines = [];
@@ -351,6 +353,11 @@ export function parseSlideBlock(
     // Everything else → body
     bodyLines.push(line);
   }
+
+  // #89 no-silent-drop: an UNCLOSED diagram/mermaid/code fence (e.g. from the docs nested-fence copy
+  // bug #88, where the inner closing ``` was consumed by the outer markdown fence) leaves inCodeBlock
+  // true here. Commit it as if the fence closed at slide end, rather than dropping the lines silently.
+  if (inCodeBlock) commitCodeBlock();
 
   // Determine the placeholder namespace (title vs content) — the SINGLE shared rule (slide-roles):
   // a Title/Closing layout OR the presence of any meta field promotes the slide to the title namespace.
