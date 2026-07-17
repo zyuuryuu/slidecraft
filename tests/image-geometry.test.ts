@@ -10,7 +10,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { parseMd } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
-import { imageRect, imageAspectRatio, dragImageRect } from "../src/engine/placeholder-binding";
+import { imageRect, imageAspectRatio, dragImageRect } from "../src/engine/visual-placement";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { generatePptx } from "../src/engine/placeholder-filler";
 

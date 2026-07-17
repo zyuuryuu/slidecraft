@@ -12,7 +12,8 @@ import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../en
 import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/placeholder-binding";
+import { bindContentByRole } from "../engine/placeholder-binding";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";

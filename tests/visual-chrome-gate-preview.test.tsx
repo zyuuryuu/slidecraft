@@ -14,7 +14,7 @@ import { resolve } from "path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SlideCard } from "../src/components/SlidePreview";
 import { loadTemplate, findLayout, type TemplateData } from "../src/engine/template-loader";
-import { bodyPlaceholders } from "../src/engine/placeholder-binding";
+import { bodyPlaceholders } from "../src/engine/visual-placement";
 import type { SlideIR } from "../src/engine/slide-schema";
 
 const KOUBUN = resolve(__dirname, "../public/templates/slide/配布資料_公文書高密度_TemplateOnly.pptx");

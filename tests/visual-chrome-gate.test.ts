@@ -20,7 +20,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import type { PlaceholderInfo } from "../src/engine/template-loader";
-import { bodyPlaceholders, nthBody, imagePlaceholder, unboundVisuals } from "../src/engine/placeholder-binding";
+import { bodyPlaceholders, nthBody, imagePlaceholder, unboundVisuals } from "../src/engine/visual-placement";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import type { SlideIR, DeckIR } from "../src/engine/slide-schema";
 

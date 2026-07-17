@@ -10,7 +10,8 @@ import { useTranslation } from "react-i18next";
 import type { SlideIR, Paragraph } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
-import { buildFieldMap, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN, applyFieldEdit } from "../engine/placeholder-binding";
+import { buildFieldMap, applyFieldEdit } from "../engine/placeholder-binding";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN } from "../engine/visual-placement";
 import { groupEditorPlan } from "../engine/group-binding";
 import DiagramEditor from "./DiagramEditor";
 

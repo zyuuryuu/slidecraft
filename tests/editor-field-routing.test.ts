@@ -18,7 +18,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { loadTemplate, type TemplateData, type LayoutInfo } from "../src/engine/template-loader";
-import { bindContentByRole, contentIdxForPlaceholder, buildFieldMap, bodyPlaceholders, nthBody } from "../src/engine/placeholder-binding";
+import { bindContentByRole, contentIdxForPlaceholder, buildFieldMap } from "../src/engine/placeholder-binding";
+import { bodyPlaceholders, nthBody } from "../src/engine/visual-placement";
 import { placeholderRole } from "../src/engine/template-catalog";
 import type { SlideIR } from "../src/engine/slide-schema";
 
