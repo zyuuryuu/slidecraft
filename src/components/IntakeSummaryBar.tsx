@@ -12,7 +12,7 @@
  */
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { IntakeSummary, IntakeProgress } from "./apply-template";
+import { phaseFraction, type IntakeSummary, type IntakeProgress } from "./apply-template";
 import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
 import { findLayout, type TemplateData } from "../engine/template-loader";
 import { parseMd } from "../engine/md-parser";
@@ -66,17 +66,6 @@ export interface IntakeBusy {
 }
 
 const MODE_ICON: Record<IntakeMode, string> = { import: "📥", remake: "🔁" };
-
-/** Coarse monotonic fraction so the bar reads as real progress. AI best-of-N dominates the wall-clock,
- *  so the generating phase spans the bulk (10→85%); the fast pre/post phases bracket it. */
-export function phaseFraction(p: IntakeProgress): number {
-  switch (p.phase) {
-    case "loading": return 0.06;
-    case "generating": return 0.1 + 0.75 * (p.step / Math.max(1, p.total));
-    case "composing": return 0.9;
-    case "validating": return 0.97;
-  }
-}
 
 function ProgressRow({ busy }: { busy: IntakeBusy }) {
   const { t } = useTranslation();

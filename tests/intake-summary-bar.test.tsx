@@ -10,7 +10,8 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { renderToStaticMarkup } from "react-dom/server";
 import "../src/i18n"; // init side-effect → useTranslation interpolates (ja default) instead of echoing keys
-import { phaseFraction, Detail, type IntakeResult } from "../src/components/IntakeSummaryBar";
+import { Detail, type IntakeResult } from "../src/components/IntakeSummaryBar";
+import { phaseFraction } from "../src/components/apply-template";
 import { loadTemplate } from "../src/engine/template-loader";
 import { parseMd } from "../src/engine/md-parser";
 
