@@ -41,6 +41,23 @@ export type IntakeProgress =
   | { phase: "composing" }
   | { phase: "validating" };
 
+/**
+ * Coarse monotonic fraction so the progress bar reads as real progress. AI best-of-N dominates the
+ * wall-clock, so the generating phase spans the bulk (10→85%); the fast pre/post phases bracket it.
+ *
+ * Lives HERE (next to IntakeProgress) rather than in IntakeSummaryBar.tsx: a component module may only
+ * export components, or React Fast Refresh silently stops working for the file
+ * (eslint react-refresh/only-export-components — it had CI lint red).
+ */
+export function phaseFraction(p: IntakeProgress): number {
+  switch (p.phase) {
+    case "loading": return 0.06;
+    case "generating": return 0.1 + 0.75 * (p.step / Math.max(1, p.total));
+    case "composing": return 0.9;
+    case "validating": return 0.97;
+  }
+}
+
 function themeSummary(
   spec: { fonts: { major: string; minor: string; majorEa?: string; minorEa?: string }; palette: Record<string, string> },
   logo: boolean,
