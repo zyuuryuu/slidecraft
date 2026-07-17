@@ -160,7 +160,10 @@ describe("#125 コーパス: ロール変化ゼロ（byte-identical の直接ゲ
         }
       }
     }
-    expect(ctrTitleLayouts).toBeGreaterThan(40); // 実際に表紙を検査している
+    // 走査が空振りしていないことの sanity。floor は CI が保証する側＝**committed corpus** に較正する:
+    // gitignore された IP テンプレ（CX_sample ＋ 会社 .potx 7本）はローカルにしか無いため、
+    // ctrTitle レイアウト数は CI=30 / ローカル=40+ と環境で変わる（40 だとローカル緑・CI 赤になる）。
+    expect(ctrTitleLayouts).toBeGreaterThan(25);
     expect(promoted).toBe(0); // 健全な表紙は subTitle 型を持つ＝発火 0＝既存出力は不変
   });
 
