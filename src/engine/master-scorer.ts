@@ -52,6 +52,20 @@ const firstText = (xml: string): string => xml.match(/<a:t>([^<]*)</)?.[1] ?? ""
 const area = (e: { w: number; h: number }) => Math.max(0, e.w) * Math.max(0, e.h);
 
 /**
+ * chrome 帯＝「極小フォント × 低背 × 上下端に張り付く」装飾/メタの帯（footer/header/date/番号）。
+ *
+ * THE 単一定義。#96 の根本原因は「ロールラダー（template-catalog）と scorer が chrome の定義を
+ * 共有していない」ことだった——ラダーは幅広ヘッダーを title と読み、scorer は同じ帯を chrome と
+ * 読む。判定式を2箇所に複製すると次の編集で必ず再発するので、両者はこの1本を参照する。
+ * 文脈非依存（同一レイアウト内の相対比較を要さない）ので placeholder 単体でも評価できる。
+ * 閾値はスライド高さに相対（非16:9 でも効く）。slideH 既定＝canonical 16:9——ローダーは非 canonical
+ * の時だけ slideSize を stamp するので、呼び側は `ph.slideSize?.h` をそのまま渡せる（R2 純粋）。
+ */
+export function isChromeBand(e: { y: number; h: number; fontSize: number }, slideH: number = CANON.h): boolean {
+  return e.fontSize <= 12 && e.h <= 0.12 * slideH && (e.y <= 0.08 * slideH || e.y + e.h >= 0.92 * slideH);
+}
+
+/**
  * レイアウトの各テキスト要素に機能＋confidence を付ける。読み順（左上→右下）でソートして返す。
  * slideSize は非16:9 マスターの相対化に使う（既定＝canonical 16:9）。
  */
@@ -73,7 +87,7 @@ export function inferFunction(layout: LayoutInfo, slideSize: { w: number; h: num
   const maxFs = Math.max(1, ...els.map((e) => e.fs));
 
   // ── 除外規則（content role から分離）──
-  const isChrome = (e: El) => e.fs <= 12 && e.h <= 0.12 * SH && (e.y <= 0.08 * SH || e.y + e.h >= 0.92 * SH);
+  const isChrome = (e: El) => isChromeBand({ y: e.y, h: e.h, fontSize: e.fs }, SH);
   const isAccent = (e: El) => !isChrome(e) && e.fs >= 0.8 * maxFs && area(e) <= 0.05 * SA;
   // 図枠＝視覚型、または「巨大面積 かつ 大フォント」（通常の1カラム本文は面積大でも fs 小ゆえ除外）
   const isFigure = (e: El) => !isChrome(e) && !isAccent(e) && (e.visual || (area(e) >= 0.3 * SA && e.fs >= 20));

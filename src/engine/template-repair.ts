@@ -10,6 +10,7 @@
 import { loadZipSafe, readCappedString, ZIP_LIMITS } from "./zip-safe";
 import { loadTemplate, type TemplateData, type LayoutInfo, type PlaceholderInfo } from "./template-loader";
 import { buildCatalog, assessTemplateHealth, placeholderRole, type TemplateHealth } from "./template-catalog";
+import { isChromeBand } from "./master-scorer";
 
 // ── Types ──
 
@@ -42,9 +43,14 @@ const TITLE_MIN_FONT_PT = 18;
 
 // ── 診断（提案の決定）──
 
-/** 既存ラダーが救えなかった placeholder（role="other"）だけが修復候補。 */
+/** 既存ラダーが救えなかった placeholder（role="other"）だけが修復候補。
+ *  chrome 帯は除く（#96）: ラダーは装飾帯を意図的に "other" へ落とすので、除外しないと
+ *  bodyCandidate（面積最大）が footer/header 帯に type="body" を付けてしまう——「救済」の名で
+ *  chrome を content 枠に変える最悪の誤注入。do-no-harm は修復提案にも及ぶ。 */
 function unresolved(layout: LayoutInfo): PlaceholderInfo[] {
-  return layout.placeholders.filter((p) => placeholderRole(p) === "other");
+  return layout.placeholders.filter(
+    (p) => placeholderRole(p) === "other" && !isChromeBand(p.style, p.slideSize?.h),
+  );
 }
 
 function titleCandidate(cands: PlaceholderInfo[]): PlaceholderInfo | undefined {

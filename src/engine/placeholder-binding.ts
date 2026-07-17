@@ -117,12 +117,18 @@ export function bindContentByRole(
     if (usedLayoutIdx.has(lph.idx)) continue; // consumed by a direct bind
     const role = placeholderRole(lph);
     // DO-NO-HARM gate (master-intake.md §2 部品2): a placeholder the scorer inferred "chrome" (a thin
-    // edge strip — footer/header/date/番号 band) never receives MUST-tier content (title/body), even
+    // edge strip — footer/header/date/番号 band) never receives MUST-tier content (title/body/other), even
     // when its role is a mislabeled "body" (the header bug). Skip BEFORE consuming a content slot so the
     // content flows to the next REAL body (else stays unbound → surfaced by unboundContent). Healthy
     // chrome is already a meta role (not title/body) → the gate is a no-op → binding is byte-identical.
     // Only Pass 2 (automatic role-binding) is gated; Pass 1's explicit idx-exact user boxes are not.
-    if (lph.inferredFunction === "chrome" && (role === "title" || role === "body")) continue;
+    // "other" is listed because of #96: the ladder now resolves an untyped chrome band to "other", which
+    // would otherwise move it OUT of this gate's protection — a user's custom-box content (資料番号 etc.)
+    // role-binds as "other" whenever Pass-1 idx-exact can't claim it (e.g. after a layout switch) and
+    // would land IN the band. Byte-identical: no corpus placeholder is chrome ∧ role "other" today.
+    // The list must stay ROLE-scoped — a blanket `inferredFunction === "chrome"` skip would strip every
+    // footer/date/slideNumber (341+320+282 corpus placeholders) of its legitimate meta content.
+    if (lph.inferredFunction === "chrome" && (role === "title" || role === "body" || role === "other")) continue;
     roleSeen[role] = (roleSeen[role] ?? 0) + 1;
     const content = contentByRole.get(role)?.[roleSeen[role] - 1];
     if (content) out.set(lph.idx, content);

@@ -13,6 +13,7 @@
 
 import type { LayoutInfo, PlaceholderInfo, TemplateData } from "./template-loader";
 import { detectGroups } from "./group-layout";
+import { isChromeBand } from "./master-scorer";
 
 export type LayoutRole =
   | "title"
@@ -300,6 +301,20 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
   // ── RECOVERY (only a typeless ph with a non-conventional idx falls through to here) ──
   const g = geometryRole(ph.style, ph.slideSize?.w, ph.slideSize?.h); // T3 geometry (bonus; null when xfrm inherited)
+  // A meta STRIP recovers first and is ORDER-CRITICAL: a bottom footer/date/番号 strip IS itself a chrome
+  // band, so letting the chrome guard below run first would strip 127 corpus placeholders (Midnight/velis,
+  // via type-loss) of their meta role → editor fields on slide-number strips + template-repair candidates.
+  if (g === "footer" || g === "date" || g === "slideNumber") return g;
+  // #96: a chrome band (tiny font × edge-hugging) is DECORATION — never a content/heading role. The scorer
+  // already calls this band "chrome"; the ladder used to call a wide one "title" (geometryRole's title
+  // pattern can't tell a title from a running header), so the layout looked like it already HAD a title →
+  // both title recoveries were gated off → the real heading was never restored and the deck title went
+  // unbound. Gating T3-title/subtitle, T4 name AND T5 area TOGETHER is required: a header named
+  // 「資料タイトル」 reproduces the same bug through nameRole, so a geometry-only guard is not enough.
+  // "other" (not "footer") is deliberate — contentIdxForPlaceholder maps footer→idx 12, which would write
+  // the deck's FOOTER text into a TOP header band (a new mis-injection). "other" attracts no canonical
+  // content yet keeps the band hand-editable via Pass-1 idx-exact (the 資料番号=13 precedent).
+  if (isChromeBand(ph.style, ph.slideSize?.h)) return "other";
   if (g) return g;
   const n = nameRole(ph.name); // T4 name keyword (last resort)
   if (n) return n;
@@ -316,6 +331,7 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
  *   - only a PROMOTABLE box (base role body/other — never a meta role like date/footer/subtitle),
  *   - CONSENSUS: the name must say "title" (nameRole excludes subtitle) AND it must sit at idx 0
  *     (PowerPoint's title slot) OR have title geometry (top band, wide, short).
+ *   - never a chrome band (#96) — see below.
  *
  * Mutates the winner's `resolvedRole` so every role consumer (bind/catalog/fieldMap) agrees.
  * Idempotent: a second call sees the promoted title via the gate and no-ops. Pure (R2).
@@ -325,6 +341,12 @@ export function recoverLayoutTitle(placeholders: PlaceholderInfo[]): void {
   let best: PlaceholderInfo | null = null;
   let bestScore = -1;
   for (const p of placeholders) {
+    // #96: a chrome band is never the title. Load-bearing BECAUSE of the recovery-tier fix above: it
+    // resolves a band to "other", which is exactly this loop's promotable set — so a running header named
+    // 「資料タイトル」 at idx 0 would satisfy name ∧ idx0 and be promoted, re-creating #96 (the layout would
+    // look titled → the real heading never restored). isChromeBand is pure and reads no load-time stamp, so
+    // this holds wherever recoverLayoutTitle runs.
+    if (isChromeBand(p.style, p.slideSize?.h)) continue;
     const base = placeholderRole(p);
     if (base !== "body" && base !== "other") continue; // promotable, non-meta only
     if (nameRole(p.name) !== "title") continue; // name says title (nameRole checks subtitle first)

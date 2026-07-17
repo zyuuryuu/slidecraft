@@ -75,6 +75,21 @@ const LAYOUTS: L[] = [
       chromeStrip(10),
   },
   {
+    // 本文（幅広ヘッダー）: #96 の再現レイアウト。上と同型だが hdr 帯が「幅広」（実テンプレの
+    //   running header はスライド幅いっぱいが普通）。w ≥ 0.55*13.333 = 7.33 で geometryRole の
+    //   title パターンに合致するため、かつては帯が role=title を奪い (a) 見出しが復元されない
+    //   (b) title が未束縛・本文が見出し枠へズレる、という二重の障害になっていた。
+    //   ※ 上の「本文（ヘッダー付き）」は w=6 でこの帯域を外しており、バグを踏まない。
+    name: "本文（幅広ヘッダー）",
+    bgc: C.white,
+    shapes:
+      deco(2, { x: 0, y: 0, w: 13.333, h: 0.5 }, C.light) +
+      typedPh(3, "オブジェクト 3", `type="hdr" idx="20"`, { x: 0.5, y: 0.12, w: 12.3, h: 0.26 }, 10, { color: C.steel }) +
+      typedPh(4, "テキスト プレースホルダー", `type="body" idx="1"`, { x: 0.6, y: 0.72, w: 12.1, h: 0.9 }, 24, { bold: true, color: C.navy }) +
+      typedPh(5, "本文", `type="body" idx="2"`, { x: 0.6, y: 1.85, w: 12.1, h: 4.9 }, 14, { color: C.darkText }) +
+      chromeStrip(10),
+  },
+  {
     // 3カラム: body 見出し(idx1) + 3 カラム(idx2/3/4) + 下部 chrome。
     name: "3カラム",
     bgc: C.white,
