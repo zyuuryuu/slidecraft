@@ -363,6 +363,43 @@ export function recoverLayoutTitle(placeholders: PlaceholderInfo[]): void {
 }
 
 /**
+ * #125 — GATED subtitle recovery, the subtitle twin of recoverLayoutTitle (ADR-0025 left it as YAGNI;
+ * a probe of type-stripped covers then measured the hole). On a COVER (ctrTitle), a subtitle box that
+ * is body-typed or typeless reads as role "body", which is worse than a lost title: the deck's
+ * subtitle goes unbound AND the box eats the bullets.
+ *
+ * The root cause is an ASYMMETRY between the two sides of binding, not a missing heuristic: the
+ * content side (slideIdxRole) already says "on a ctrTitle layout, idx 1 IS the subtitle", while the
+ * layout side reads type="body" / idx 1–9 as absolute. This restores the symmetry, so both sides
+ * agree and the pair round-trips (ADR-0011 bijection).
+ *
+ * Gates, mirroring ADR-0025:
+ *   - the layout has a ctrTitle (a cover) AND no subtitle role at all → a REAL subtitle is never
+ *     stolen. Every healthy cover carries a subTitle type, so this fires 0× across the corpus and
+ *     bundled output is unchanged.
+ *   - promotes ONE box: idx "1", PowerPoint's subtitle slot — the same convention slideIdxRole uses.
+ *   - only a promotable base role (body/other) — a meta role (date/footer/…) is inviolable.
+ *   - never a chrome band (#96): a decoration band is not a subtitle.
+ *
+ * Why the idx convention and NOT geometry: on the real corpus, "below the title, short, smaller font"
+ * cannot separate a subtitle from CX Sample's quote-attribution line (ctrTitle quote + body idx=11 at
+ * y=6.04), which ADR-0023 deliberately binds as CONTENT — a geometry rung would silently re-role it.
+ * The idx-1 convention is the signal that carries actual authorial intent here.
+ *
+ * Mutates the winner's `resolvedRole` so every consumer (bind/catalog/fieldMap) agrees. Idempotent:
+ * a second call sees the promoted subtitle via the gate and no-ops. Pure (R2).
+ */
+export function recoverLayoutSubtitle(placeholders: PlaceholderInfo[]): void {
+  if (!placeholders.some((p) => p.type.toLowerCase().includes("ctrtitle"))) return; // gate: covers only
+  if (placeholders.some((p) => placeholderRole(p) === "subtitle")) return; // gate: a real subtitle exists
+  const cand = placeholders.find((p) => p.idx === "1"); // the cover's subtitle slot (≤1 by construction)
+  if (!cand || isChromeBand(cand.style, cand.slideSize?.h)) return;
+  const base = placeholderRole(cand);
+  if (base !== "body" && base !== "other") return; // promotable, non-meta only
+  cand.resolvedRole = "subtitle";
+}
+
+/**
  * Rough fit box: full-width chars per line × lines that fit the box at its font
  * (conservative, full-width assumption). For deciding "too much → split/warn",
  * NOT for shrinking. Half-width (latin) text fits more, so this errs toward early
