@@ -208,7 +208,13 @@ export interface FieldSlot {
   contentIdx: string; // SlideIR content idx the editor reads/writes for this field
 }
 
-const FIELD_MARK = (i: number) => ` ${i}`;
+/** The bijection probe's per-field marker (buildFieldMap). The sentinel is U+0000 - a code point that
+ *  can NEVER appear in real user text, so a probe can't be mistaken for content.
+ *
+ *  Written as the ESCAPE \u0000, never as a raw NUL byte: a literal NUL makes every tool treat this
+ *  file as BINARY - grep silently reports 0 matches unless you pass -a, and a naive full-file rewrite
+ *  drops the byte. The escape has the identical runtime value while keeping the source plain ASCII. */
+const FIELD_MARK = (i: number) => `\u0000${i}`;
 
 /**
  * Build the editor's field map: a VERIFIED BIJECTION between a layout's editable placeholders and
