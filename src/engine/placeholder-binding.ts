@@ -164,6 +164,50 @@ export function unboundContent(
     .map((c) => ({ content: c, role: slideIdxRole(c.idx, hasCtrTitle) }));
 }
 
+/** A visual (figure/table/code/image) kind, as the slide model carries it. */
+export type VisualKind = "diagram" | "mermaid" | "table" | "code" | "image";
+
+/** One visual that has no body region to live in, tagged with the ordinal it asked for. */
+export interface UnboundVisual {
+  kind: VisualKind;
+  placeholderIdx: string;
+}
+
+/**
+ * DO-NO-HARM / no-silent-drop (#124), the VISUAL twin of unboundContent: the slide's visuals that
+ * resolve to NO placeholder region and are therefore not drawn. The invariant is "every visual is
+ * drawn OR reported" — with the chrome gate on bodyPlaceholders, a layout whose only body was a
+ * header band now offers no region, and a silently missing table would just trade mis-injection for
+ * a silent drop. Callers surface this instead.
+ *
+ * It OBSERVES the same resolvers the renderers use (bodyPlaceholders/nthBody/imagePlaceholder), so it
+ * cannot disagree with what export/preview actually draw. Two deliberate non-drops:
+ *   - a SOLO figure (ordinal 1) fills the whole slide by design — it needs no region, so a region-less
+ *     layout is not a drop for it;
+ *   - a BEHIND image is a backmost layer with its own fallback box, not a bound region.
+ * Scope is BINDING: a visual that fails to render for another reason (e.g. a mermaid block with no
+ * rasterized svgCache) is not a binding drop and isn't reported here. Pure (R2).
+ */
+export function unboundVisuals(
+  slide: SlideIR,
+  layoutPlaceholders: readonly PlaceholderInfo[],
+): UnboundVisual[] {
+  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
+  const out: UnboundVisual[] = [];
+  const needsRegion = (kind: VisualKind, placeholderIdx: string) => {
+    if (!nthBody(bodyPhs, placeholderIdx)) out.push({ kind, placeholderIdx });
+  };
+  // A figure at ordinal 1 is SOLO (full-slide) — see buildSlideXml; only ordinal 2+ is region-bound.
+  const regionBound = (placeholderIdx: string) => (parseInt(placeholderIdx) || 1) !== 1;
+  if (slide.diagram && regionBound(slide.diagram.placeholderIdx)) needsRegion("diagram", slide.diagram.placeholderIdx);
+  if (slide.mermaidBlock) needsRegion("mermaid", slide.mermaidBlock.placeholderIdx);
+  if (slide.table) needsRegion("table", slide.table.placeholderIdx);
+  if (slide.code) needsRegion("code", slide.code.placeholderIdx);
+  if (slide.image && !slide.image.behind && !imagePlaceholder(layoutPlaceholders, slide.image.placeholderIdx))
+    out.push({ kind: "image", placeholderIdx: slide.image.placeholderIdx });
+  return out;
+}
+
 /**
  * The canonical content idx that role-binds BACK to layout placeholder `ph` — the INVERSE of
  * bindContentByRole for a single placeholder. The editor writes a field's text at THIS idx so what
@@ -265,9 +309,29 @@ export function buildFieldMap(
   return editable.filter((ph) => chosen.has(ph.idx)).map((ph) => ({ phIdx: ph.idx, contentIdx: chosen.get(ph.idx)! }));
 }
 
-/** The layout's BODY placeholders in stable order — a figure/table rides the Nth of these. */
+/**
+ * The layout's BODY placeholders in stable order — a figure/table rides the Nth of these.
+ *
+ * DO-NO-HARM gate (#124, master-intake.md §2 部品2): a placeholder the scorer inferred "chrome" (a thin
+ * edge strip — a running header / footer band) is DECORATION, never a content region, so it must not
+ * occupy a body ORDINAL. bindContentByRole's Pass 2 already gates the TEXT route this way; the VISUAL
+ * route (nthBody / imagePlaceholder → figure, table, code, image) reached the same mislabeled band
+ * through here, so a body-TYPED chrome band (公文書's 資料名スロット: type="body" 3.1"×0.62" at the top
+ * edge, fs 9) collected figures — worst case 05_比較表, whose ONLY body IS the band, drew the table
+ * inside the header strip. The ladder can't fix it: an explicit type="body" is authoritative there
+ * (#96 only closed the RECOVERY tier), so the gate belongs on the ordinal.
+ *
+ * Reads the SAME signal as the text gate (the load-time `inferredFunction` stamp) so the two routes
+ * can't disagree about what chrome is. Keep it ROLE-scoped: healthy chrome (footer/date/slideNumber)
+ * is already a meta role and never reaches this filter, so healthy masters are unaffected.
+ *
+ * A layout whose bodies are ALL chrome yields [] → nthBody returns undefined → the visual has no home.
+ * That is deliberate ("空欄OK・誤注入NG"): callers must report it (unboundVisuals), never re-home it.
+ */
 export function bodyPlaceholders(layoutPlaceholders: readonly PlaceholderInfo[]): PlaceholderInfo[] {
-  return [...layoutPlaceholders].sort(sortByIdx).filter((p) => placeholderRole(p) === "body");
+  return [...layoutPlaceholders]
+    .sort(sortByIdx)
+    .filter((p) => placeholderRole(p) === "body" && p.inferredFunction !== "chrome");
 }
 
 /** The BODY placeholder a visual targets: placeholderIdx "1"→1st body, "2"→2nd, … (1-based). */

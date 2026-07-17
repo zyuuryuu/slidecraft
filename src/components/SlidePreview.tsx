@@ -384,6 +384,19 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           never full-bleed — it rides its placeholder box). */}
       {slide.image?.behind && renderImageBox(imageRect(slide.image, imagePlaceholder(layoutPhs, slide.image.placeholderIdx))!)}
 
+      {/* SOLO diagram on a layout with NO body region: it is full-slide by design and needs no
+          placeholder, but the loop below can only draw a diagram anchored on one — so without this it
+          would vanish from the preview while the export still paints it (buildSlideXml), breaking
+          WYSIWYG. Reachable once the chrome gate (#124) empties a layout's body ordinals. */}
+      {slide.diagram && !diagBodyIdx && slide.diagram.placeholderIdx === "1" && (
+        <DiagramSvgOverlay
+          key="diagram-solo"
+          diagramYaml={slide.diagram.yaml}
+          editable={!!onDiagramChange}
+          onChange={onDiagramChange}
+        />
+      )}
+
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {
         const s = ph.style;
