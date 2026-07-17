@@ -8,9 +8,13 @@
  * placeholder idxs bind correctly through their shared ROLE. (The old preview keyed content by
  * literal idx, so an alien master rendered blank even though the export bound it fine.)
  *
+ * Scope is the TEXT route. Where a figure/table/image goes is the other half of binding and lives in
+ * visual-placement.ts — the two are separate routes through the same layout, and #124 happened
+ * because a guard was added to only one of them. Only `sortByIdx` is shared (that module imports it).
+ *
  * Pure logic (R2): no DOM / Tauri.
  */
-import type { SlideIR, PlaceholderContent, Paragraph, ImageBlock, ImageRect } from "./slide-schema";
+import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 import { slideIdxRole, placeholderRole, type PlaceholderRole } from "./template-catalog";
 
@@ -164,6 +168,7 @@ export function unboundContent(
     .map((c) => ({ content: c, role: slideIdxRole(c.idx, hasCtrTitle) }));
 }
 
+
 /**
  * The canonical content idx that role-binds BACK to layout placeholder `ph` — the INVERSE of
  * bindContentByRole for a single placeholder. The editor writes a field's text at THIS idx so what
@@ -263,121 +268,4 @@ export function buildFieldMap(
     used.add(pick);
   }
   return editable.filter((ph) => chosen.has(ph.idx)).map((ph) => ({ phIdx: ph.idx, contentIdx: chosen.get(ph.idx)! }));
-}
-
-/** The layout's BODY placeholders in stable order — a figure/table rides the Nth of these. */
-export function bodyPlaceholders(layoutPlaceholders: readonly PlaceholderInfo[]): PlaceholderInfo[] {
-  return [...layoutPlaceholders].sort(sortByIdx).filter((p) => placeholderRole(p) === "body");
-}
-
-/** The BODY placeholder a visual targets: placeholderIdx "1"→1st body, "2"→2nd, … (1-based). */
-export function nthBody(bodyPhs: readonly PlaceholderInfo[], placeholderIdx?: string): PlaceholderInfo | undefined {
-  if (!placeholderIdx) return undefined;
-  return bodyPhs[Math.max(1, parseInt(placeholderIdx) || 1) - 1];
-}
-
-/**
- * The placeholder an EMBEDDED IMAGE targets. Unlike a diagram/table (always a BODY region), an image
- * prefers a real PICTURE frame (type="pic" → role "picture") when the layout offers one — that's what
- * an image-specific placeholder is for — riding the Nth picture by the same 1-based ordinal, and
- * clamping a too-large ordinal to a picture rather than dropping to body. Layouts WITHOUT a picture
- * frame (all bundled canonical/report masters) fall back to nthBody(body) → byte-identical to before.
- * Pure (R2); shared by preview / form / export so the image can't bind to different frames.
- */
-export function imagePlaceholder(
-  layoutPlaceholders: readonly PlaceholderInfo[],
-  placeholderIdx?: string,
-): PlaceholderInfo | undefined {
-  if (!placeholderIdx) return undefined;
-  const pics = [...layoutPlaceholders].sort(sortByIdx).filter((p) => placeholderRole(p) === "picture");
-  if (pics.length) return pics[Math.max(1, parseInt(placeholderIdx) || 1) - 1] ?? pics[0];
-  return nthBody(bodyPlaceholders(layoutPlaceholders), placeholderIdx);
-}
-
-/** 16:9 slide size in inches (12192000×6858000 EMU). */
-export const SLIDE_IN = { w: 12192000 / 914400, h: 6858000 / 914400 };
-
-/**
- * The image's box (inches): the manual `rect` override, else its target placeholder's box. A BEHIND
- * image is a NORMAL-sized figure that merely sits behind the content — it uses the SAME box as a body
- * figure would (its placeholder region), NOT the whole slide. Only when a behind image has no target
- * placeholder (e.g. a cover with no body) does it fall back to a centered ~70% box — never full-bleed.
- * Shared by preview + export so it lands identically in both (WYSIWYG). Pure (R2).
- */
-export function imageRect(image: ImageBlock, ph: PlaceholderInfo | undefined): ImageRect | undefined {
-  if (image.rect) return image.rect;
-  if (ph) return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
-  if (image.behind) return { x: SLIDE_IN.w * 0.15, y: SLIDE_IN.h * 0.15, w: SLIDE_IN.w * 0.7, h: SLIDE_IN.h * 0.7 };
-  return undefined;
-}
-
-/** The aspect ratio (w/h) to preserve when resizing an image: the measured intrinsic aspect, else the
- *  current box's aspect, else 1. ONE source of truth so the preview drag and the form-numeric resize
- *  lock to the SAME ratio (they diverged when each inlined its own fallback). Pure. */
-export function imageAspectRatio(image: ImageBlock, box: ImageRect | undefined): number {
-  return image.aspect && image.aspect > 0 ? image.aspect : box && box.h > 0 ? box.w / box.h : 1;
-}
-
-/** The PPTX picture geometry for an image dropped in `box` (inches): the actual <p:pic> rect plus an
- *  optional crop (srcRect, fractions in 1/1000 %). PowerPoint's blipFill STRETCHES to the pic rect, so
- *  we do the aspect math here — matching the browser's object-fit so preview == export (WYSIWYG):
- *   • aspect unknown or already == box → fill the box (no distortion, no crop);
- *   • cover → fill the box, crop the overflow via srcRect;
- *   • contain → shrink the pic to fit inside the box, centered (letterbox), no crop. Pure. */
-export function fitImageInBox(
-  box: ImageRect,
-  fit: "contain" | "cover" | undefined,
-  aspect: number | undefined,
-): { rect: ImageRect; srcRect?: { l: number; t: number; r: number; b: number } } {
-  if (!aspect || aspect <= 0 || box.w <= 0 || box.h <= 0) return { rect: box };
-  const boxAr = box.w / box.h;
-  if (Math.abs(boxAr - aspect) < 1e-4) return { rect: box }; // aspect-locked: box already matches
-  if (fit === "cover") {
-    if (aspect > boxAr) {
-      const c = Math.round(((1 - boxAr / aspect) / 2) * 100000); // wider → crop left+right
-      return { rect: box, srcRect: { l: c, t: 0, r: c, b: 0 } };
-    }
-    const c = Math.round(((1 - aspect / boxAr) / 2) * 100000); // taller → crop top+bottom
-    return { rect: box, srcRect: { l: 0, t: c, r: 0, b: c } };
-  }
-  // contain (default): letterbox inside the box.
-  if (aspect > boxAr) {
-    const h = box.w / aspect; // width-bound
-    return { rect: { x: box.x, y: box.y + (box.h - h) / 2, w: box.w, h } };
-  }
-  const w = box.h * aspect; // height-bound
-  return { rect: { x: box.x + (box.w - w) / 2, y: box.y, w, h: box.h } };
-}
-
-/** New image rect for a preview drag gesture (案B): "move" translates the box (clamped onto the slide);
- *  a corner handle resizes from the OPPOSITE (fixed) corner, width-driven with the height following the
- *  aspect (so a drag never distorts), clamped to a min size and kept within the slide. dx/dy in inches.
- *  Pure — the pointer→inch conversion + gesture state live in the component. */
-export function dragImageRect(
-  mode: "move" | "nw" | "ne" | "sw" | "se",
-  base: ImageRect,
-  dx: number,
-  dy: number,
-  aspect: number,
-  slideW: number,
-  slideH: number,
-): ImageRect {
-  const MIN = 0.4;
-  const ar = aspect > 0 ? aspect : base.h > 0 ? base.w / base.h : 1;
-  if (mode === "move") {
-    return {
-      x: Math.min(Math.max(0, base.x + dx), Math.max(0, slideW - base.w)),
-      y: Math.min(Math.max(0, base.y + dy), Math.max(0, slideH - base.h)),
-      w: base.w,
-      h: base.h,
-    };
-  }
-  const right = mode === "ne" || mode === "se";
-  const bottom = mode === "sw" || mode === "se";
-  const ax = right ? base.x : base.x + base.w; // fixed anchor = opposite corner
-  const ay = bottom ? base.y : base.y + base.h;
-  const maxW = Math.min(right ? slideW - ax : ax, (bottom ? slideH - ay : ay) * ar);
-  const w = Math.max(MIN, Math.min(right ? base.w + dx : base.w - dx, maxW));
-  const h = w / ar;
-  return { x: right ? ax : ax - w, y: bottom ? ay : ay - h, w, h };
 }

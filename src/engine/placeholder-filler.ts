@@ -13,7 +13,8 @@ import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog } from "./template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./placeholder-binding";
+import { bindContentByRole } from "./placeholder-binding";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./visual-placement";
 import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
@@ -228,13 +229,14 @@ async function buildSlideXml(
   if (!imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
 
   // Add diagram shapes if present
-  if (slide.diagram) {
-    // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is
-    // confined to its placeholder region so it doesn't cover the bullets.
-    const diagPh =
-      (parseInt(slide.diagram.placeholderIdx) || 1) !== 1
-        ? visualBody(slide.diagram.placeholderIdx)
-        : undefined;
+  // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is confined to its placeholder
+  // region so it doesn't cover the bullets. A region-bound figure whose region does NOT resolve is
+  // DROPPED (and reported by unboundVisuals) rather than falling through to the solo/full-slide path:
+  // silently re-homing it would paint the figure OVER the very bullets it was meant to sit beside
+  // (#124 — reachable once the chrome gate removes a header band from the body ordinals).
+  const diagWantsRegion = slide.diagram ? (parseInt(slide.diagram.placeholderIdx) || 1) !== 1 : false;
+  const diagPh = diagWantsRegion ? visualBody(slide.diagram!.placeholderIdx) : undefined;
+  if (slide.diagram && (!diagWantsRegion || diagPh)) {
     const diagramShapes = await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
     // Re-number shape IDs to avoid conflicts
     let reNumbered = diagramShapes;

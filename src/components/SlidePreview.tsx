@@ -12,7 +12,8 @@ import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../en
 import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
-import { bindContentByRole, bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/placeholder-binding";
+import { bindContentByRole } from "../engine/placeholder-binding";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -383,6 +384,19 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           BEFORE the placeholder shapes, so existing title/body/figures stay on top (never the slide bg,
           never full-bleed — it rides its placeholder box). */}
       {slide.image?.behind && renderImageBox(imageRect(slide.image, imagePlaceholder(layoutPhs, slide.image.placeholderIdx))!)}
+
+      {/* SOLO diagram on a layout with NO body region: it is full-slide by design and needs no
+          placeholder, but the loop below can only draw a diagram anchored on one — so without this it
+          would vanish from the preview while the export still paints it (buildSlideXml), breaking
+          WYSIWYG. Reachable once the chrome gate (#124) empties a layout's body ordinals. */}
+      {slide.diagram && !diagBodyIdx && slide.diagram.placeholderIdx === "1" && (
+        <DiagramSvgOverlay
+          key="diagram-solo"
+          diagramYaml={slide.diagram.yaml}
+          editable={!!onDiagramChange}
+          onChange={onDiagramChange}
+        />
+      )}
 
       {/* Placeholders from template with user content */}
       {layout?.placeholders.map((ph) => {

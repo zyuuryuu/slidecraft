@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, placeholderRole, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
+import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, recoverLayoutSubtitle, placeholderRole, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
@@ -651,7 +651,12 @@ export async function loadTemplate(
   // ADR-0025: roles are now final (metaIdxConvention stamped) — run the gated title recovery per
   // layout so a body-typed/mis-authored "Title" placeholder is resolved to the title role. Gated on
   // "no title present", so title-typed (healthy) layouts are untouched.
-  for (const l of layouts) recoverLayoutTitle(l.placeholders);
+  // #125 runs alongside it: on a cover (ctrTitle) with no subtitle role, idx 1 IS the subtitle slot —
+  // restoring the layout side's agreement with slideIdxRole's content-side convention.
+  for (const l of layouts) {
+    recoverLayoutTitle(l.placeholders);
+    recoverLayoutSubtitle(l.placeholders);
+  }
 
   // F1 (§2 部品1/2): run the relative-attribute scorer ONCE per layout and (a) stamp each placeholder's
   // inferred function (the do-no-harm chrome gate reads it), and (b) recover a MISLABELED TITLE — promote

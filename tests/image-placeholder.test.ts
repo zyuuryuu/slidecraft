@@ -13,7 +13,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, autoSelectLayout, type TemplateData, type LayoutInfo } from "../src/engine/template-loader";
 import { placeholderRole, buildCatalog } from "../src/engine/template-catalog";
-import { imagePlaceholder, bodyPlaceholders, nthBody } from "../src/engine/placeholder-binding";
+import { imagePlaceholder, bodyPlaceholders, nthBody } from "../src/engine/visual-placement";
 import { parseMd } from "../src/engine/md-parser";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
