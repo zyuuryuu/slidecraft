@@ -86,6 +86,12 @@ NEXT: <次にやるべきこと — ファイル名と変更内容を1行で>
 - エラー発生時はまず原因を調査してから修正に着手する
 - テストファイルの変更（アサーション変更含む）はユーザ確認が必要
 - コード変更のみであれば確認不要で進めてよい
+- **ローカル緑 ≠ CI 緑**。`npm test` に加え **`npm run lint`** と `npm run build` まで通す
+  （CI の `test` ジョブは vitest → 型 → lint を順に走らせるので、前段が落ちると lint が隠れる）。
+  **push したら CI の結果を必ず見る**（docs-only は `paths-ignore` で CI が走らない＝緑に見える罠）
+- **コーパス走査テストは committed corpus に較正するか `it.skipIf` で守る**。
+  会社 `.potx`／CX 等は gitignore でローカルにしか無く、CI では走査対象が減る。
+  件数の floor をローカル基準で書くと**ローカル緑・CI 赤**になる（実例: #125 の `ctrTitleLayouts`）
 
 ---
 
