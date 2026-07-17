@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# pre-push — run CI's FAST gate locally so a broken push never reaches a shared branch.
+#
+# WHY: main went red for days (2026-07-08 → 07-17) because a push carried a lint error and nobody
+# looked at CI afterward — that blocked EVERY PR (dependabot included). A CLAUDE.md line ("push したら
+# CI を見る") is a soft promise that depends on remembering; this hook is the harness enforcing it, so
+# it can't be forgotten. It runs the same fast checks as CI's `test` job (type + lint + unit tests) —
+# NOT the slow ones (e2e, Rust/Tauri build) which stay CI-only.
+#
+# Mirrors CI's `paths-ignore` (**/*.md, docs/**, LICENSE, NOTICE): a docs-only push skips the gate,
+# exactly as CI does. Escape hatch: `git push --no-verify` (use sparingly — it's how main broke).
+#
+# Installed via package.json "prepare" (git config core.hooksPath .githooks) on every `npm install`,
+# so every machine/session gets it automatically.
+
+set -e
+
+ZERO='0000000000000000000000000000000000000000'
+need_gate=0
+changed=''
+
+# stdin: <local_ref> <local_sha> <remote_ref> <remote_sha> per ref being pushed.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue          # branch deletion — nothing to test
+  if [ "$remote_sha" = "$ZERO" ]; then            # new branch on the remote
+    base=$(git merge-base origin/main "$local_sha" 2>/dev/null || echo '')
+    if [ -z "$base" ]; then need_gate=1; break; fi # can't scope → gate to be safe
+    range="$base..$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  changed="$changed
+$(git diff --name-only "$range" 2>/dev/null || { need_gate=1; break; })"
+done
+
+# Decide: gate unless EVERY changed file is docs-ignored (same globs as CI paths-ignore).
+if [ "$need_gate" = "0" ]; then
+  non_docs=$(printf '%s\n' "$changed" | grep -vE '(\.md$|^docs/|^LICENSE$|^NOTICE$)' | grep -v '^$' || true)
+  if [ -z "$non_docs" ]; then
+    echo "pre-push: docs-only の push → CI と同じく gate をスキップ"
+    exit 0
+  fi
+fi
+
+echo "pre-push: CI の fast gate をローカルで実行（type + lint + unit tests）… bypass は git push --no-verify"
+npm run build          # tsc -b + vite — the type gate (green npm test can hide a broken tsc)
+npm run typecheck:mcp  # MCP tsconfig type gate (CI runs this separately)
+npm run lint           # the check that was red on main for 9 days
+npm test               # vitest
+echo "pre-push: gate 緑 — push を許可"
