@@ -61,6 +61,27 @@
 - **回帰基準**: 健全テンプレ（canonical／報告書／マガジン／velis 等の既存系統）は
   **byte-identical**。スコアラーは既存ラダーが低信頼な時のみ発火する形にゲートする。
 
+> **⚠ 計測: 精度は verdict ごとに違う — 一様に信頼しない**（2026-07-17・25 テンプレ / 403 レイアウト /
+> 2715 placeholder。全数値は #98 のコメント）。プロトタイプの「5/5」は **title＋chrome の verdict** の話であり、
+> `ElementFunction` 全体に一般化してはいけない。
+>
+> - **chrome ＝ 高精度・実運用中**：部品2 の do-no-harm ゲートが依存し、#96 でロール解決（RECOVERY tier の
+>   guard）にも配線済。`isChromeBand()` が唯一の定義（`master-scorer.ts`）。
+> - **figure ＝ precision 35%**（20/57）。述語 `visual型 || (面積≥0.3·SA && fs≥20)` は、マスター既定の
+>   本文フォントが 20–32pt であるため**ふつうの本文枠**を選ぶ（velis `Title and Content|17` fs26・
+>   報告書 `08_目次|1` fs20・CX `Title_with bullet text|10` fs28）。加えて **構造的ブロッカー**：
+>   `bodyPlaceholders`/`nthBody` は `role==="body"` で絞るので、図枠を別ロールにすると**図がその枠から
+>   追い出される**（ADR-0025 型の取込時 stamp は取れない）。唯一の非合成な図枠（配布資料 `04_図＋説明|1`）は
+>   健全な出荷テンプレで**今日すでに散文を受けている** ⇒「図枠に散文を入れない」と「byte-identical」は同時に成立しない。
+> - **subtitle ＝ precision 29%・confidence が定数 0.5**（分散ゼロ ⇒ **どんな閾値でもゲート不能**。title 復元が
+>   `≥0.7` で切れたのは `titleConfidence` が 0.5→0.95 と変動するから）。述語の向きも逆で、実サブタイトルは
+>   title の**下**にあるのに窓は上部（`y<0.4·SH`）→ y≥3.0 の実サブタイトル **0/45**。
+>
+> ⇒ **どの verdict も binding/role に配線する前に、その verdict の精度をコーパスで測る**こと。
+> figure/subtitle の「散文との分離」は本部品では解けない ⇒ **部品5（AI last-mile）／部品3（プロファイル）送り**が
+> 正当（#98 はこの結論で close）。実バグは #124（chrome 帯が body 序数に混ざる）・#125（ctrTitle 配下の
+> body 型 subtitle がラダーで body 固定）に分離済 — どちらも**ラダー/binding 側**の決定論修正で、scorer 非依存。
+
 ### 部品2 — do-no-harm binding ゲート（決定論の不変条件）
 
 - chrome には content を**絶対に**入れない（role 完全性は不要——header role を新設せずとも
