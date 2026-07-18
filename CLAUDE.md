@@ -52,6 +52,15 @@ Tauri IPC・DOM 操作は `src/components/` または `src/ipc/` に閉じる。
 `fit: "shrink"` は PowerPoint 側で即時反映されない場合がある。
 長いテキストにはレンダラー側でフォントサイズ事前計算を行う。
 
+### R8: 意味の重複禁止 — 一致テスト（agreement test）必須
+同じ意味（写像・判定・容量計算など）を 2 経路で計算する場合、(a) 一本化する、または
+(b) 両経路の一致テストを置く。どちらも無い変更は差し戻し対象（ADR-0031 G2）。
+先例: `resolveBinding.assignments == bindContentByRole`（PR #152）・serializer 新旧経路
+byte-identical（PR #156）。
+
+> R1（400行）・R2（engine 純度）・束縛権威（ADR-0030）・循環 import は
+> `tests/arch-conformance.test.ts` が機械検査する。凍結/許可リストの運用（ratchet）は同ファイル冒頭を参照。
+
 ---
 
 ## 禁止事項
