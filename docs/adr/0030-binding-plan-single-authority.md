@@ -1,6 +1,6 @@
 # ADR-0030: BindingPlan＝束縛の単一 authority（段階的ロールアウト A–E）
 
-- Status: Accepted（段階A 実装済・B–E は後続 Issue）
+- Status: Accepted（段階A–B 実装済＝PR #152/#156・C–E は後続 Issue）
 - Date: 2026-07-18
 - Supersedes: なし（[ADR-0011](0011-placeholder-input-bijection.md) の全単射を「観測可能な単一プラン」へ拡張）
 
