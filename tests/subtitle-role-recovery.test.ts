@@ -19,8 +19,9 @@
  * content 側と対称な idx-1 規約のみを rung にする。結果、全 404 レイアウトでロール変化 0＝ byte-identical。
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync, readdirSync, existsSync } from "fs";
-import { resolve, join } from "path";
+import { readFileSync, existsSync } from "fs";
+import { execSync } from "node:child_process";
+import { resolve } from "path";
 import JSZip from "jszip";
 import { placeholderRole, recoverLayoutSubtitle, slideIdxRole } from "../src/engine/template-catalog";
 import { bindContentByRole, unboundContent } from "../src/engine/placeholder-binding";
@@ -130,18 +131,19 @@ describe("#125 束縛: subtitle が出る／箇条書きを吸わない", () => 
 });
 
 // ── コーパス全体: 同梱テンプレ＋ fixture のロールが 1 件も変化しないこと ──
-const DIRS = [
-  resolve(__dirname, "../public/templates/slide"),
-  resolve(__dirname, "fixtures/templates"),
-  resolve(__dirname, "../test-data/master-intake"),
-];
+const REPO_ROOT = resolve(__dirname, "..");
+// Template dirs RELATIVE to the repo root (git ls-files speaks repo-relative paths).
+const TEMPLATE_DIRS = ["public/templates/slide", "tests/fixtures/templates", "test-data/master-intake"];
 
 describe("#125 コーパス: ロール変化ゼロ（byte-identical の直接ゲート）", () => {
   let files: string[] = [];
   beforeAll(() => {
-    files = DIRS.filter(existsSync).flatMap((d) =>
-      readdirSync(d).filter((f) => /\.(pptx|potx)$/.test(f)).map((f) => join(d, f)),
-    );
+    // Count only GIT-TRACKED templates, so the corpus is identical on CI's clean `npm ci` checkout and
+    // locally. gitignored IP templates (.potx / CX_sample) and any absent test-data must NOT move the
+    // count-floors below — else a floor calibrated on the local corpus passes locally and fails on CI
+    // (exactly the local-green/CI-red bug this test's floor once had).
+    const tracked = execSync(`git ls-files -z -- ${TEMPLATE_DIRS.join(" ")}`, { cwd: REPO_ROOT }).toString();
+    files = tracked.split("\0").filter((f) => /\.(pptx|potx)$/.test(f)).map((f) => resolve(REPO_ROOT, f));
   });
 
   it("全テンプレの全レイアウトで、復元の再実行はロールを1件も動かさない", async () => {
@@ -160,9 +162,8 @@ describe("#125 コーパス: ロール変化ゼロ（byte-identical の直接ゲ
         }
       }
     }
-    // 走査が空振りしていないことの sanity。floor は CI が保証する側＝**committed corpus** に較正する:
-    // gitignore された IP テンプレ（CX_sample ＋ 会社 .potx 7本）はローカルにしか無いため、
-    // ctrTitle レイアウト数は CI=30 / ローカル=40+ と環境で変わる（40 だとローカル緑・CI 赤になる）。
+    // 走査が空振りしていないことの sanity。files は git-tracked のみ（上の beforeAll）なので count は
+    // ローカルでも CI でも同一＝環境非依存。floor はその committed corpus に対して安全側に置く。
     expect(ctrTitleLayouts).toBeGreaterThan(25);
     expect(promoted).toBe(0); // 健全な表紙は subTitle 型を持つ＝発火 0＝既存出力は不変
   });
