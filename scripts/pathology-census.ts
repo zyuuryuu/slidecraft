@@ -35,6 +35,9 @@ function defaultPaths(): string[] {
     "CX_sample_MSGothic.pptx",
     "lrk-slides-velis_CC0.pptx",
     "Dirty_Adversarial_TemplateOnly.pptx",
+    "Dirty_AllBody_TemplateOnly.pptx",
+    "Dirty_Legacy43_TemplateOnly.pptx",
+    "Dirty_Grouped_TemplateOnly.pptx",
   ].map((n) => join(FIX, n));
   return [...bundled, ...real].filter(existsSync);
 }
