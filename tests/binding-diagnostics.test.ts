@@ -63,6 +63,12 @@ describe("diagnoseDeck binding-surface — #135 4-group kpi drop", () => {
     expect(issues.some((x) => x.level === "warn" && isUnbound(x.message))).toBe(true);
   });
 
+  it("new_project's OWN returned diagnostics surface it too (the new_project → edit loop has no blind spot)", async () => {
+    const s = S.createSession(null);
+    const r = await S.newProject(s, await defaultTemplateBytes(), KPI_MD);
+    expect(r.diagnostics.some((x) => x.level === "warn" && isUnbound(x.message))).toBe(true);
+  });
+
   it("diagnoseDeck(deck, catalog, layouts) surfaces it; without layouts it stays silent", async () => {
     const tpl = await loadTemplate(await defaultTemplateBytes());
     const catalog = buildCatalog(tpl);

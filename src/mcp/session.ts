@@ -86,7 +86,7 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
   s.catalog = buildCatalog(template);
   s.meta = { templateName: meta.templateName, savedAt: meta.savedAt };
   s.dirty = false;
-  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog) };
+  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog, template.layouts) };
 }
 
 /** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses
@@ -103,7 +103,7 @@ export async function newProject(s: Session, templateBytes: Uint8Array, markdown
   s.deck = deck;
   s.meta = { templateName: "", savedAt: undefined };
   s.dirty = true; // a fresh, unsaved project
-  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, catalog) };
+  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, catalog, template.layouts) };
 }
 
 export function getDeck(s: Session): DeckIR {
@@ -173,12 +173,14 @@ export function getProjectMeta(s: Session) {
  *  template's body budget. Converging the 6 mutations onto ONE sibling shape lets the agent branch on
  *  the same fields whichever lever it pulled, and gives commitMutation a `changed` flag to gate no-ops
  *  on (a no-op mutation must not bump rev / push undo / fan out deckChanged). */
-function fitTail(deck: DeckIR, catalog: LayoutCatalog): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
-  return { diagnostics: diagnoseDeck(deck, catalog), budget: budgetOf(catalog) };
+function fitTail(deck: DeckIR, catalog: LayoutCatalog, layouts: TemplateData["layouts"]): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
+  // ADR-0030 stage A: pass the raw layouts so every mutation's tail surfaces unbound content too — the
+  // new_project → edit → get_deck_issues loop must not have a blind spot vs get_deck_issues (#97 ②a / #135).
+  return { diagnostics: diagnoseDeck(deck, catalog, layouts), budget: budgetOf(catalog) };
 }
 
 export function applySlideMarkdown(s: Session, i: number, markdown: string) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog);
   const parsedSlide = parseMd(markdown).slides[0];
@@ -198,39 +200,39 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const afterMd = slideToMarkdown(s.deck, i, catalog);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, beforeMd: before, afterMd, ...fitTail(s.deck, catalog) };
+  return { ok: true as const, changed, beforeMd: before, afterMd, ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 export function applyDeckMarkdown(s: Session, markdown: string) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   const before = serializeMd(deck);
   const check = DeckIRSchema.safeParse(parseMd(markdown));
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   const changed = serializeMd(check.data) !== before;
   s.deck = check.data;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, slideCount: s.deck.slides.length, ...fitTail(s.deck, catalog) };
+  return { ok: true as const, changed, slideCount: s.deck.slides.length, ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 /** Deterministic lever: split overflowing content slides across more slides WITHOUT
  *  shrinking fonts. The whole point of harness-over-model — never make the agent re-do it. */
 export function distill(s: Session) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   const { deck: fitted, newIndices } = distillDeckReport(deck, catalog);
   const changed = fitted.slides.length !== deck.slides.length;
   s.deck = fitted;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...fitTail(fitted, catalog) };
+  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...fitTail(fitted, catalog, template.layouts) };
 }
 
 /** Deterministic lever: turn a key-value bullet run on one slide into a GFM table. When there is no
  *  key-value run to convert, that is a legitimate NON-outcome (ok:true, changed:false,
  *  status:"not-applicable") — NOT a failure (ADR-0015: don't let a no-op wear an error mask). */
 export function visualizeKeyValue(s: Session, i: number) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog);
-  const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(deck, catalog) });
+  const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(deck, catalog, template.layouts) });
   const fixed = visualizeKeyValueMd(before);
   if (!fixed) return notApplicable();
   const newSlide = parseMd(fixed).slides[0];
@@ -239,7 +241,7 @@ export function visualizeKeyValue(s: Session, i: number) {
   slides[i] = newSlide;
   s.deck = { ...deck, slides };
   s.dirty = true;
-  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog) };
+  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 /** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
@@ -249,7 +251,7 @@ export function visualizeKeyValue(s: Session, i: number) {
  *  defaulting to the 1st body region; `placeholderIdxArg` targets another region on a multi-body layout.
  *  A layout with NO body region is rejected. `created` reports add (true) vs replace (false). */
 export function setDiagram(s: Session, i: number, source: string, format: DiagramFormat, placeholderIdxArg?: string) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const slide = deck.slides[i];
   const existingIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
@@ -300,7 +302,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const afterMd = slideToMarkdown(s.deck, i, catalog);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, created, beforeMd: before, afterMd, ...fitTail(s.deck, catalog) };
+  return { ok: true as const, changed, created, beforeMd: before, afterMd, ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 /** Apply a DESIGN intent — the spatial half of two-stage editing — to a slide's figure.
@@ -310,7 +312,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
  *  and `changed` reports whether the intent actually altered the slide (e.g. unknown nodeId
  *  or a relayout to the same direction → no-op, surfaced rather than hidden). */
 export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const slide = deck.slides[i];
   if (!slide.diagram && !slide.mermaidBlock) {
@@ -329,22 +331,22 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
   const changed = JSON.stringify(applied) !== JSON.stringify(slide);
   // `skipped` names ops that took no effect (e.g. an emphasize whose nodeId the AI renamed away) so the
   // agent gets a precise, actionable reason + the ids that DO exist (#13).
-  if (!changed) return { ok: true as const, changed: false as const, skipped, beforeMd: before, afterMd: before, ...fitTail(deck, catalog) };
+  if (!changed) return { ok: true as const, changed: false as const, skipped, beforeMd: before, afterMd: before, ...fitTail(deck, catalog, template.layouts) };
   const slides = [...deck.slides];
   slides[i] = applied;
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
   s.dirty = true;
-  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog) };
+  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis
  *  in, the agent returns the edited Markdown which it then sends to apply_slide_markdown). */
 export function getSlideFix(s: Session, i: number) {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
-  const issues = diagnoseDeck(deck, catalog).filter((d) => d.slideIndex === i);
+  const issues = diagnoseDeck(deck, catalog, template.layouts).filter((d) => d.slideIndex === i);
   const fix = buildSlideFix(slideToMarkdown(deck, i, catalog), issues, contentBodyBox(catalog));
   return { requestText: slideFixRequest(fix), currentMarkdown: fix.currentMarkdown, issues, budget: fix.budget };
 }
