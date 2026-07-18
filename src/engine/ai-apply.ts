@@ -10,7 +10,7 @@ import type { SlideIR } from "./slide-schema";
 import { validateDiagramSource } from "./mermaid-to-diagram";
 import { applyRegionSplit } from "./design-intent";
 import { parseMd } from "./md-parser";
-import { serializeMd } from "./md-serializer";
+import { serializeMd, type SerializeTemplate } from "./md-serializer";
 import { reconcileEdit } from "./ai-reconcile";
 import { validateStructure, validateCondense } from "./ai-validate";
 
@@ -113,8 +113,11 @@ export interface SlideEditReconcile {
  * real reconciled result + any advisory and decides 採用/却下; once adopted the slide is valid and
  * always renders (no post-hoc blocking). Returns null when the AI output doesn't parse to a slide.
  * A broken figure is dropped so the OLD valid one is carried (and flagged), never a broken render.
+ * `tpl` (ADR-0030 stage B, #155) feeds the before-side serialization the binding authority, so a
+ * title the name-based readout would drop (closing-vocabulary auto slide) still counts in the
+ * fact-check — without it a number lost from that title went undetected.
  */
-export function reconcileSlideEdit(old: SlideIR, rawMd: string): SlideEditReconcile | null {
+export function reconcileSlideEdit(old: SlideIR, rawMd: string, tpl?: SerializeTemplate): SlideEditReconcile | null {
   const newSlide = parseMd(rawMd).slides[0];
   if (!newSlide) return null;
   const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
@@ -126,7 +129,7 @@ export function reconcileSlideEdit(old: SlideIR, rawMd: string): SlideEditReconc
   // the figure's numbers as "lost" when the output has no figure — strip the figure from the before-side
   // (mirrors validateStructure's deliberate figure-drop exception on kind='edit'). When the output DOES
   // carry a figure, keep it so a real figure-number drift is still caught.
-  const oldMd = serializeMd({ slides: [old] });
+  const oldMd = serializeMd({ slides: [old] }, tpl);
   const afterHasFigure = /```(?:diagram|mermaid)/.test(rawMd);
   const cond = validateCondense(afterHasFigure ? oldMd : stripFigureFences(oldMd), rawMd);
   const factMsgs = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);

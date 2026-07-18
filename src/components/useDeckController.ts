@@ -16,6 +16,7 @@ import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, fi
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
+import { deckMarkdown, serializeTpl } from "./deck-markdown";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
@@ -211,7 +212,7 @@ export function useDeckController() {
 
   // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
   const { generating, handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile } = useDeckIO({
-    mdText, deck, templateData, parseMdText, setMdText, setParseError,
+    mdText, deck, templateData, catalog, parseMdText, setMdText, setParseError,
     templateName, filePath, setFilePath, openDoc,
   });
 
@@ -271,10 +272,12 @@ export function useDeckController() {
   const handleEnterImport = useCallback(() => {
     if (subMode === "edit") {
       initSnapshotRef.current = deck;
-      if (deck) setMdText(serializeMd(deck));
+      // Deck-level readout through the binding authority (ADR-0030 stage B, #155) — the catalog-free
+      // serialize dropped a closing-vocabulary slide's title from the Markdown view.
+      if (deck) setMdText(deckMarkdown(deck, catalog, templateData));
     }
     setSubMode("import");
-  }, [subMode, deck, setMdText, setSubMode]);
+  }, [subMode, deck, catalog, templateData, setMdText, setSubMode]);
 
   // Cancel Initialize: kill any pending parse (so a trailing debounce can't re-apply
   // the discarded edits), restore the deck AND mdText to the pre-open snapshot, → Edit.
@@ -283,10 +286,10 @@ export function useDeckController() {
     clearParse();
     const snap = initSnapshotRef.current;
     setDeck(snap, "silent");
-    setMdText(snap ? serializeMd(snap) : "");
+    setMdText(snap ? deckMarkdown(snap, catalog, templateData) : "");
     setParseError(null);
     setSubMode("edit");
-  }, [clearParse, setDeck, setMdText, setParseError, setSubMode]);
+  }, [clearParse, catalog, templateData, setDeck, setMdText, setParseError, setSubMode]);
 
   // ── Slide editing: update a single slide in the deck ──
   // P2.5 round-trip: while collaborating, the edit is applied locally (optimistic) AND pushed to the
@@ -500,12 +503,12 @@ export function useDeckController() {
         if (ns) handleSlideUpdate(activeSlide, ns, "commit");
         return;
       }
-      const rec = reconcileSlideEdit(old, raw);
+      const rec = reconcileSlideEdit(old, raw, serializeTpl(catalog, templateData));
       if (!rec) return; // unparseable AI output — keep the slide as-is
       setEditNotice(null); // clear any stale advisory banner
       handleSlideUpdate(activeSlide, rec.slide, "commit"); // AI edit = one discrete undo step
     },
-    [deck, activeSlide, handleSlideUpdate, setEditNotice],
+    [deck, activeSlide, catalog, templateData, handleSlideUpdate, setEditNotice],
   );
 
   // Preview an AI slide edit AS IT WILL BE APPLIED (reconciled) + its validation advisories, so the
@@ -532,7 +535,7 @@ export function useDeckController() {
       const fig = previewFigureEdit(s, raw);
       if (fig) return { afterMd: fig.afterMd, warnings: [], beforeMd: fig.beforeMd };
       if (parseDesignIntent(raw)) return null; // design → raw diff
-      const rec = reconcileSlideEdit(s, raw);
+      const rec = reconcileSlideEdit(s, raw, serializeTpl(catalog, templateData));
       if (!rec) return null;
       const resolved = autoSelectLayout(rec.slide, activeSlide, deck!.slides.length, catalog);
       // L4: a figure slide that fell to the full-Markdown path AND drifted → tag it so the "変更なし"
@@ -548,7 +551,7 @@ export function useDeckController() {
         ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
       };
     },
-    [deck, activeSlide, catalog],
+    [deck, activeSlide, catalog, templateData],
   );
 
   // Markdown of the active slide → AI panel "this slide" + the Markdown view.
@@ -564,7 +567,7 @@ export function useDeckController() {
 
   // The 整形 (distill) cluster: review + manuscript structuring + per-issue fixes.
   const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue } = useDeckRevise({
-    mdText, setMdText, parseMdText, deck, catalog, activeSlide,
+    mdText, setMdText, parseMdText, deck, catalog, templateData, activeSlide,
   });
 
   const currentSlideMd = (() => {
