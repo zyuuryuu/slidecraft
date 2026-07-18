@@ -13,14 +13,14 @@
  * 絶対不変条件: 健全テンプレ（規約 idx のみ）の md は旧経路と byte-identical。
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import { buildCatalog } from "../src/engine/template-catalog";
 import { parseMd } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
 import { distillDeck } from "../src/engine/distill";
-import { batchEditDeck, type AiFixOutcome } from "../src/engine/refine";
+import { refineDeck, batchEditDeck, type AiFixOutcome } from "../src/engine/refine";
 import { reconcileSlideEdit } from "../src/engine/ai-apply";
 import { deckMarkdown, deckMarkdownForTemplate, serializeTpl } from "../src/components/deck-markdown";
 
@@ -93,6 +93,17 @@ describe("issue #155 — AI 系 before md（refine.ts:71 = slideToMd の tpl 貫
     expect(reqs[0]).toContain("# まとめ");
   });
 
+  it("Midnight + closing 語彙: refineDeck(level 2) の change-log beforeMd にタイトルが残る", async () => {
+    // refineDeck 自身の opts.tpl → slideToMd 貫通を固定する（batchEditDeck と別の呼び出し行）。
+    // key-value 3 件 → visualize レバーが level 2 で決定的に発火し、AI なしで beforeMd を観測できる。
+    const md = "# 表紙\n\nCategory: X\n\n---\n\n# まとめ\n\n- 売上: 120億円\n- 利益: 30億円\n- 社員: 500名\n";
+    const { template, catalog, deck } = await guiDeck("Midnight_Executive_30_TemplateOnly.pptx", md);
+    const { changes } = await refineDeck(deck, catalog, { level: 2, tpl: serializeTpl(catalog, template) });
+    const change = changes.find((c) => c.slideIndex === 1);
+    expect(change).toBeDefined();
+    expect(change!.beforeMd).toContain("# まとめ");
+  });
+
   it("健全デッキ (Midnight): tpl あり/なしで before md は byte-identical", async () => {
     const { template, catalog, deck } = await guiDeck("Midnight_Executive_30_TemplateOnly.pptx", HEALTHY_MD);
     const withTpl: string[] = [];
@@ -120,5 +131,27 @@ describe("issue #155 — reconcileSlideEdit（ai-apply.ts:129）の before 側 f
     const withTpl = reconcileSlideEdit(deck.slides[1], raw, serializeTpl(catalog, template));
     const without = reconcileSlideEdit(deck.slides[1], raw);
     expect(withTpl).toEqual(without);
+  });
+});
+
+describe("issue #155 — ガード: components は deck-level serializeMd を直接呼ばない", () => {
+  // hook 配線はこの repo の流儀（renderHook なし）では直接テストできない。その代わり、deck 変数を
+  // 直接 serializeMd に渡す形を deck-markdown.ts 以外から締め出す tripwire で「hook が旧経路に
+  // 戻っても全緑」という mutation ギャップを塞ぐ。per-slide の serializeMd({ slides: [...] })
+  // リテラル（Issue #155 で宣言済みの残課題）は第一引数が `{` なので対象外。
+  it("deck を直接渡す serializeMd( は deck-markdown.ts と宣言済み例外だけ", () => {
+    const dir = resolve(__dirname, "../src/components");
+    // 許可: deck-markdown.ts（唯一の配線点）／ ai-generation-types.ts:128（deckPlanToDeck は
+    // canonical 名と一致する idx で内容を構築するため、名前空間乖離が構造的に起きない）
+    const allow = new Set(["deck-markdown.ts", "ai-generation-types.ts"]);
+    const offenders: string[] = [];
+    for (const f of readdirSync(dir).filter((n) => /\.tsx?$/.test(n))) {
+      if (allow.has(f)) continue;
+      const hits = readFileSync(resolve(dir, f), "utf8").match(/serializeMd\(\s*[A-Za-z_$]/g);
+      if (hits) offenders.push(`${f} (${hits.length})`);
+    }
+    const appHits = readFileSync(resolve(__dirname, "../src/App.tsx"), "utf8").match(/serializeMd\(\s*[A-Za-z_$]/g);
+    if (appHits) offenders.push(`App.tsx (${appHits.length})`);
+    expect(offenders).toEqual([]);
   });
 });
