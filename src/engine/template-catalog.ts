@@ -323,6 +323,23 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
 }
 
 /**
+ * #124/#127 — is this placeholder a CONTENT body (a region text/figures actually land in)?
+ * = role "body" AND the scorer did NOT infer it "chrome" (a thin edge strip — a running header /
+ * footer band). The chrome gate rides ON TOP of placeholderRole, so there is exactly ONE definition
+ * of "body" (placeholderRole) and ONE definition of the chrome exclusion (here) — never duplicated
+ * (the #96 lesson). SHARED by both sides of binding so they can never disagree about the body count:
+ *   - the catalog's bodyCount / bodyBoxes / role (catalogEntry), and
+ *   - the visual+text body ORDINAL (visual-placement's bodyPlaceholders).
+ * A body-TYPED chrome band (公文書's 資料名スロット: type="body" 3.1"×0.62" at the top edge, fs 9) is an
+ * explicit type, so the recovery ladder (#96) can't reclassify it — the gate belongs on the ordinal,
+ * and (per #127) on the catalog count too. Healthy chrome is already a meta role (footer/date/番号) →
+ * never role "body" → this filter is a no-op there (byte-identical). Pure (R2).
+ */
+export function isContentBody(ph: PlaceholderInfo): boolean {
+  return placeholderRole(ph) === "body" && ph.inferredFunction !== "chrome";
+}
+
+/**
  * ADR-0025 — GATED title recovery over ONE layout's placeholders. `title` is a critical layout
  * attribute, so identify it by every means; but names are noise for binding, so promotion is gated:
  *
@@ -468,14 +485,18 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     })
     .sort((a, b) => (a.idx.length - b.idx.length) || a.idx.localeCompare(b.idx));
 
-  const bodyCount = placeholders.filter((p) => p.role === "body").length;
+  // #127: count CONTENT bodies (isContentBody = role body ∧ not chrome), NOT bare role="body". A
+  // body-TYPED chrome band (公文書 05_比較表's 資料名スロット) still gets a catalog placeholder with
+  // role "body" above (so the field stays hand-editable, bijection intact) — it is excluded ONLY here,
+  // from the body COUNT / geometry, so bodyCount matches bodyPlaceholders() (the ordinal binding sees).
+  // Both bodyCount and bodyBoxes derive from the SAME isContentBody filter — no duplicated chrome check.
+  const bodyPhs = layout.placeholders.filter(isContentBody);
+  const bodyCount = bodyPhs.length;
   const hasTitle = placeholders.some((p) => p.role === "title");
   const hasSubtitle = placeholders.some((p) => p.role === "subtitle");
   // Body geometry lets classifyLayout tell true side-by-side columns from a primary+sidebar
   // or 1-body content layout (only matters on the name-less/degraded path).
-  const bodyBoxes = layout.placeholders
-    .filter((ph) => placeholderRole(ph) === "body")
-    .map((ph) => ({ x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h }));
+  const bodyBoxes = bodyPhs.map((ph) => ({ x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h }));
   const shape = detectGroups(layout); // geometric group detection (on-demand; never mutates the above)
   return {
     name: layout.name,

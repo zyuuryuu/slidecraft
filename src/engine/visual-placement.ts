@@ -16,7 +16,7 @@
  */
 import type { SlideIR, ImageBlock, ImageRect } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
-import { placeholderRole } from "./template-catalog";
+import { placeholderRole, isContentBody } from "./template-catalog";
 import { sortByIdx } from "./placeholder-binding";
 
 /**
@@ -35,13 +35,14 @@ import { sortByIdx } from "./placeholder-binding";
  * can't disagree about what chrome is. Keep it ROLE-scoped: healthy chrome (footer/date/slideNumber)
  * is already a meta role and never reaches this filter, so healthy masters are unaffected.
  *
+ * The chrome gate is the SHARED isContentBody predicate (template-catalog), so this ordinal and the
+ * catalog's bodyCount (#127) can never disagree about how many bodies a layout has — one definition.
+ *
  * A layout whose bodies are ALL chrome yields [] → nthBody returns undefined → the visual has no home.
  * That is deliberate ("空欄OK・誤注入NG"): callers must report it (unboundVisuals), never re-home it.
  */
 export function bodyPlaceholders(layoutPlaceholders: readonly PlaceholderInfo[]): PlaceholderInfo[] {
-  return [...layoutPlaceholders]
-    .sort(sortByIdx)
-    .filter((p) => placeholderRole(p) === "body" && p.inferredFunction !== "chrome");
+  return [...layoutPlaceholders].sort(sortByIdx).filter(isContentBody);
 }
 
 /** The BODY placeholder a visual targets: placeholderIdx "1"→1st body, "2"→2nd, … (1-based). */
