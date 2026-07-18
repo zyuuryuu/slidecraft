@@ -57,11 +57,13 @@ function assertIndex(deck: DeckIR, i: number): void {
 }
 
 /** One slide → round-trippable Markdown, with 'auto' RESOLVED first so a lone slide isn't
- *  re-pinned to Title by autoSelectLayout's first-slide rule. */
-function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undefined): string {
+ *  re-pinned to Title by autoSelectLayout's first-slide rule. ADR-0030 stage B: `layouts` hands the
+ *  serializer the binding authority (slideBindingPlan) so the readout can't diverge from export. */
+function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undefined, layouts?: TemplateData["layouts"]): string {
   const sl = deck.slides[i];
   const resolved = sl.layout === "auto" ? autoSelectLayout(sl, i, deck.slides.length, catalog) : sl.layout;
-  return serializeMd({ slides: [{ ...sl, layout: resolved }] });
+  const tpl = catalog && layouts ? { catalog, layouts } : undefined;
+  return serializeMd({ slides: [{ ...sl, layout: resolved }] }, tpl);
 }
 
 function zodErr(issues: { path: PropertyKey[]; message: string }[]): string {
@@ -110,12 +112,16 @@ export function getDeck(s: Session): DeckIR {
   return requireLoaded(s).deck;
 }
 export function getDeckMarkdown(s: Session): string {
-  return serializeMd(requireLoaded(s).deck);
+  // ADR-0030 stage B: serialize through the binding authority (catalog resolves auto, layouts feed
+  // slideBindingPlan) — the catalog-free readout resolved auto slides to canonical FALLBACK names and
+  // mislabeled content whenever that name disagreed with the real binding (#144).
+  const { deck, catalog, template } = requireLoaded(s);
+  return serializeMd(deck, { catalog, layouts: template.layouts });
 }
 export function getSlideMarkdown(s: Session, i: number): string {
-  const { deck, catalog } = requireLoaded(s);
+  const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
-  return slideToMarkdown(deck, i, catalog);
+  return slideToMarkdown(deck, i, catalog, template.layouts);
 }
 /** Body capacity (max bullets / chars-per-bullet) for THIS template's content layout — a
  *  deck-level constant from contentBodyBox, robust on alien templates. Surfaced on the
@@ -182,7 +188,7 @@ function fitTail(deck: DeckIR, catalog: LayoutCatalog, layouts: TemplateData["la
 export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
-  const before = slideToMarkdown(deck, i, catalog);
+  const before = slideToMarkdown(deck, i, catalog, template.layouts);
   const parsedSlide = parseMd(markdown).slides[0];
   if (!parsedSlide) return { ok: false as const, error: "Markdown からスライドを解釈できませんでした（空？）。" };
   const old = deck.slides[i];
@@ -197,7 +203,7 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
-  const afterMd = slideToMarkdown(s.deck, i, catalog);
+  const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
   return { ok: true as const, changed, beforeMd: before, afterMd, ...fitTail(s.deck, catalog, template.layouts) };
@@ -205,10 +211,11 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
 
 export function applyDeckMarkdown(s: Session, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
-  const before = serializeMd(deck);
+  const tpl = { catalog, layouts: template.layouts };
+  const before = serializeMd(deck, tpl);
   const check = DeckIRSchema.safeParse(parseMd(markdown));
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
-  const changed = serializeMd(check.data) !== before;
+  const changed = serializeMd(check.data, tpl) !== before;
   s.deck = check.data;
   s.dirty = s.dirty || changed;
   return { ok: true as const, changed, slideCount: s.deck.slides.length, ...fitTail(s.deck, catalog, template.layouts) };
@@ -231,7 +238,7 @@ export function distill(s: Session) {
 export function visualizeKeyValue(s: Session, i: number) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
-  const before = slideToMarkdown(deck, i, catalog);
+  const before = slideToMarkdown(deck, i, catalog, template.layouts);
   const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(deck, catalog, template.layouts) });
   const fixed = visualizeKeyValueMd(before);
   if (!fixed) return notApplicable();
@@ -241,7 +248,7 @@ export function visualizeKeyValue(s: Session, i: number) {
   slides[i] = newSlide;
   s.deck = { ...deck, slides };
   s.dirty = true;
-  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 /** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
@@ -282,7 +289,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   } else {
     diagramYaml = source; // already-valid YAML, stored verbatim (matches the GUI)
   }
-  const before = slideToMarkdown(deck, i, catalog);
+  const before = slideToMarkdown(deck, i, catalog, template.layouts);
   let next: SlideIR;
   if (!created) {
     const placeholderIdx = placeholderIdxArg ?? existingIdx; // replace (optionally retarget to another region)
@@ -299,7 +306,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const slides = [...deck.slides];
   slides[i] = next;
   s.deck = { ...deck, slides };
-  const afterMd = slideToMarkdown(s.deck, i, catalog);
+  const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
   return { ok: true as const, changed, created, beforeMd: before, afterMd, ...fitTail(s.deck, catalog, template.layouts) };
@@ -322,7 +329,7 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
   if (!intent) {
     return { ok: false as const, error: 'DesignIntent を解釈できませんでした（ops 配列の JSON。例: [{"op":"relayout","direction":"LR"}]）。' };
   }
-  const before = slideToMarkdown(deck, i, catalog);
+  const before = slideToMarkdown(deck, i, catalog, template.layouts);
   const { slide: applied, skipped } = applyDesignIntentReport(slide, intent);
   // STRUCTURAL changed — a design op can move diagram.placeholderIdx / layout, which serializeMd DROPS
   // (a single-body figure's diagram fence carries no idx, and slideToMarkdown re-resolves layout:"auto").
@@ -338,7 +345,7 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
   s.dirty = true;
-  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog), ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s.deck, catalog, template.layouts) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis
@@ -347,7 +354,7 @@ export function getSlideFix(s: Session, i: number) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const issues = diagnoseDeck(deck, catalog, template.layouts).filter((d) => d.slideIndex === i);
-  const fix = buildSlideFix(slideToMarkdown(deck, i, catalog), issues, contentBodyBox(catalog));
+  const fix = buildSlideFix(slideToMarkdown(deck, i, catalog, template.layouts), issues, contentBodyBox(catalog));
   return { requestText: slideFixRequest(fix), currentMarkdown: fix.currentMarkdown, issues, budget: fix.budget };
 }
 

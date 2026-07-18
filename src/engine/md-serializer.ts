@@ -4,73 +4,24 @@
  * Inverse of md-parser.ts. Used for:
  * - Exporting edited slides back to Markdown for LLM re-modification
  * - Round-trip preservation
+ *
+ * Two readouts (dispatched per slide in serializeSlide):
+ * - PLAN-DRIVEN (md-serializer-plan.ts, ADR-0030 stage B): with a SerializeTemplate, content meaning
+ *   comes from the BindingPlan of the RESOLVED layout — the readout can never diverge from what the
+ *   export/preview actually bind (#144).
+ * - LEGACY (serializeLegacy below): template-less callers keep the historical layout-NAME namespace
+ *   fork, byte-for-byte. Grouped slides also stay here until ADR-0030 stage E unifies expandGroups.
+ *
+ * Emission primitives shared by both live in md-serializer-shared.ts (R1 split).
  */
 
-import type {
-  DeckIR,
-  SlideIR,
-  PlaceholderContent,
-  Paragraph,
-  InlineSegment,
-} from "./slide-schema";
+import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
-import { tableToMarkdown } from "./md-table";
 import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, getSeparatorType } from "./md-serializer-shared";
+import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 
-// ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
-
-function isColumnLayout(layout: string): boolean {
-  return layout.startsWith("Column.");
-}
-
-function isKpiLayout(layout: string): boolean {
-  return layout.startsWith("KPI.");
-}
-
-function isProcessLayout(layout: string): boolean {
-  return layout.startsWith("Process.");
-}
-
-// ── Inline segments → Markdown text ──
-
-function serializeSegments(segments: InlineSegment[]): string {
-  return segments
-    .map((seg) => {
-      let text = seg.text;
-      if (seg.bold) text = `**${text}**`;
-      if (seg.italic) text = `*${text}*`;
-      return text;
-    })
-    .join("");
-}
-
-// ── Paragraphs → Markdown lines ──
-
-function serializeParagraphs(paragraphs: Paragraph[]): string {
-  return paragraphs
-    .map((p) => {
-      const text = serializeSegments(p.segments);
-      if (p.heading) return `### ${text}`;
-      if (p.bullet) return `- ${text}`;
-      return text;
-    })
-    .join("\n");
-}
-
-// ── Get placeholder text by idx ──
-
-function getPlaceholder(
-  slide: SlideIR,
-  idx: string,
-): PlaceholderContent | undefined {
-  return slide.placeholders.find((p) => p.idx === idx);
-}
-
-function getPlaceholderText(slide: SlideIR, idx: string): string | undefined {
-  const ph = getPlaceholder(slide, idx);
-  if (!ph) return undefined;
-  return serializeParagraphs(ph.paragraphs);
-}
+export type { SerializeTemplate } from "./md-serializer-plan";
 
 /** The deck's display title for a tab/label = the FIRST slide's title placeholder text (canonical
  *  title namespaces: title-layout idx "0", else content-layout idx "15"), first non-empty line only.
@@ -83,63 +34,18 @@ export function deckTitle(deck: DeckIR | null): string | undefined {
   return raw?.split("\n").map((l) => l.trim()).find((l) => l.length > 0) || undefined;
 }
 
-// ── Single-body FIGURE (table / diagram / mermaid / code) → its fenced Markdown block ──
-// A table/diagram/mermaid/code is a slide-level, single-body figure — it is NOT tied to the layout
-// name. Emitting it must happen in EVERY layout branch (title / separator / single-body), else a
-// figure slide mis-pinned to a Title or a Column/KPI/Process layout serializes to nothing (silent
-// data loss that also blinds the AI to the figure it must preserve). Column-scoped diagrams/mermaid
-// in a separator layout are handled per-column separately; this is only the single-body form.
-function figureBlock(slide: SlideIR): string | null {
-  if (slide.table) return tableToMarkdown(slide.table.rows);
-  if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
-  if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
-  if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
-  // A BEHIND image is a backmost layer, not a body figure — it does NOT occupy the body region, so it
-  // is emitted SEPARATELY (behindImageLine) alongside the text/figure, never replacing them.
-  if (slide.image && !slide.image.behind) return imageLine(slide.image);
-  return null;
-}
-
-/** The `![alt](src){…}` line for an image (shared by the body-figure and the behind-layer paths). */
-function imageLine(image: NonNullable<SlideIR["image"]>): string {
-  return `![${image.alt}](${image.src})${imageAttrs(image)}`;
-}
-
-/** Serialize an image's geometry override as a `{x=…,y=…,w=…,h=…,fit=…,ar=…}` suffix (案B), or "" when
- *  the image has no override (a plain image stays `![alt](src)`). Inverse of parseImageAttrs. Numbers
- *  are rounded to 3 decimals (sub-0.001″ is below any visible tolerance) and trailing zeros trimmed. */
-function imageAttrs(image: NonNullable<SlideIR["image"]>): string {
-  const n = (v: number) => String(Math.round(v * 1000) / 1000);
-  const parts: string[] = [];
-  if (image.rect) parts.push(`x=${n(image.rect.x)}`, `y=${n(image.rect.y)}`, `w=${n(image.rect.w)}`, `h=${n(image.rect.h)}`);
-  if (image.fit) parts.push(`fit=${image.fit}`);
-  if (image.aspect !== undefined) parts.push(`ar=${n(image.aspect)}`);
-  if (image.behind) parts.push("behind=1");
-  return parts.length ? `{${parts.join(",")}}` : "";
-}
-
-// ── Determine separator type for multi-section layouts ──
-
-function getSeparatorType(
-  layout: string,
-): "col" | "kpi" | "step" | null {
-  if (isColumnLayout(layout)) return "col";
-  if (isKpiLayout(layout)) return "kpi";
-  if (isProcessLayout(layout)) return "step";
-  return null;
-}
-
 // ── Serialize a single slide ──
 
 function serializeSlide(
   slide: SlideIR,
   slideIndex: number,
   totalSlides: number,
+  tpl?: SerializeTemplate,
 ): string {
   const lines: string[] = [];
   const layout =
     slide.layout === "auto"
-      ? autoSelectLayout(slide, slideIndex, totalSlides)
+      ? autoSelectLayout(slide, slideIndex, totalSlides, tpl?.catalog)
       : slide.layout;
 
   // Emit the layout directive only when it was explicitly set. "auto" slides stay
@@ -150,6 +56,30 @@ function serializeSlide(
     lines.push(`<!-- slide: ${layout} -->`);
   }
 
+  // ADR-0030 stage B: with the template at hand, read a NON-group slide back out through the binding
+  // authority (slideBindingPlan on the RESOLVED layout) instead of the name-based namespace fork below.
+  // Grouped slides keep the legacy branch until stage E unifies expandGroups — their column readout is
+  // positional (content idx 1..N), which the plan's transformed cell copies cannot key.
+  const layoutInfo = slide.groupKind ? undefined : tpl?.layouts.find((l) => l.name === layout);
+  if (layoutInfo) {
+    serializeByPlan(slide, layout, layoutInfo, lines);
+  } else {
+    serializeLegacy(slide, layout, lines);
+  }
+
+  // A BEHIND image is emitted last, on its own line — it's a backmost LAYER, not the body figure, so it
+  // coexists with (never replaces) the title/body/figure above. The parser re-reads it into slide.image.
+  if (slide.image?.behind) {
+    lines.push("");
+    lines.push(imageLine(slide.image));
+  }
+
+  return lines.join("\n");
+}
+
+/** The historical (template-less) readout: namespace from the layout NAME + meta presence. Kept
+ *  byte-for-byte for callers without a SerializeTemplate, and for grouped slides (stage E). */
+function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void {
   // Choose the namespace with the SAME rule the parser uses (slide-roles): a Title/Closing layout OR
   // the presence of meta placeholders means the title/subtitle live at idx 0/1 (else 15/16). Deriving
   // this from isTitleNamespace (not the layout name alone) round-trips an auto-layout slide that carries
@@ -246,20 +176,11 @@ function serializeSlide(
       }
     }
   }
-
-  // A BEHIND image is emitted last, on its own line — it's a backmost LAYER, not the body figure, so it
-  // coexists with (never replaces) the title/body/figure above. The parser re-reads it into slide.image.
-  if (slide.image?.behind) {
-    lines.push("");
-    lines.push(imageLine(slide.image));
-  }
-
-  return lines.join("\n");
 }
 
 // ── Main serializer ──
 
-export function serializeMd(deck: DeckIR): string {
+export function serializeMd(deck: DeckIR, tpl?: SerializeTemplate): string {
   const parts: string[] = [];
 
   // Front matter
@@ -277,7 +198,7 @@ export function serializeMd(deck: DeckIR): string {
       parts.push("---");
       parts.push("");
     }
-    parts.push(serializeSlide(deck.slides[i], i, deck.slides.length));
+    parts.push(serializeSlide(deck.slides[i], i, deck.slides.length, tpl));
   }
 
   return parts.join("\n").trimEnd() + "\n";
