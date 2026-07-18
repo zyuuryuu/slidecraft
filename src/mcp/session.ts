@@ -126,8 +126,9 @@ function budgetOf(catalog: LayoutCatalog): { maxBullets: number; charsPerBullet:
 }
 
 export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[] } {
-  const { deck, catalog } = requireLoaded(s);
-  return { budget: budgetOf(catalog), issues: diagnoseDeck(deck, catalog) };
+  const { deck, catalog, template } = requireLoaded(s);
+  // ADR-0030 stage A: pass the raw layouts so diagnoseDeck can surface unbound content (#97 ②a / #135).
+  return { budget: budgetOf(catalog), issues: diagnoseDeck(deck, catalog, template.layouts) };
 }
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);

@@ -13,6 +13,9 @@
 import type { DeckIR, SlideIR, Paragraph } from "./slide-schema";
 import type { LayoutCatalog } from "./template-catalog";
 import { slideIdxRole } from "./template-catalog";
+import type { LayoutInfo } from "./template-loader";
+import { autoSelectLayout } from "./template-loader";
+import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
@@ -47,7 +50,7 @@ function rolePlaceholder(slide: SlideIR, role: "title" | "body") {
   return slide.placeholders.find((p) => slideIdxRole(p.idx, hasCtr) === role);
 }
 
-export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog): DeckIssue[] {
+export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: readonly LayoutInfo[]): DeckIssue[] {
   const box = catalog ? contentBodyBox(catalog) : undefined;
   const issues: DeckIssue[] = [];
 
@@ -92,6 +95,23 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog): DeckIssue[]
     const cleanKv = bullets.filter((p) => isCleanKeyValue(textOf(p))).length;
     if (!multiRegion && bullets.length >= 3 && cleanKv === bullets.length) add("info", "key-value形式 → 表にできます", ["visualize"]);
   });
+
+  // ADR-0030 stage A — SURFACE content the resolved layout cannot hold (no-silent-drop / #97 ②a). Runs
+  // ONLY when the raw layouts are supplied (a template is loaded), so every existing 2-arg call stays
+  // byte-identical. Resolves each slide's layout exactly as export does (autoSelectLayout), then observes
+  // the SAME binding dispatch export runs (slideBindingPlan) — so a warn appears iff content would truly
+  // vanish. On a healthy deck all content binds → unbound is empty → not one diagnostic is added.
+  if (layouts && layouts.length > 0 && catalog && catalog.length > 0) {
+    const layoutByName = new Map(layouts.map((l) => [l.name, l] as const));
+    deck.slides.forEach((slide, i) => {
+      const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
+      if (!layout) return;
+      const n = slideBindingPlan(slide, layout).unbound.length;
+      if (n === 0) return;
+      const title = textOf(rolePlaceholder(slide, "title")?.paragraphs[0]);
+      issues.push({ slideIndex: i, title, level: "warn", message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
+    });
+  }
 
   return issues;
 }
