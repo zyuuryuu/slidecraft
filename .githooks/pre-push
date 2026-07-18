@@ -1,40 +1,57 @@
 #!/bin/sh
 #
-# pre-push — run CI's FAST gate locally so a broken push never reaches a shared branch.
+# pre-push — fast LOCAL early-warning that mirrors CI's `test` gate, so a broken push doesn't waste a
+# CI round-trip (or, absent branch protection, land red on main).
 #
-# WHY: main went red for days (2026-07-08 → 07-17) because a push carried a lint error and nobody
-# looked at CI afterward — that blocked EVERY PR (dependabot included). A CLAUDE.md line ("push したら
-# CI を見る") is a soft promise that depends on remembering; this hook is the harness enforcing it, so
-# it can't be forgotten. It runs the same fast checks as CI's `test` job (type + lint + unit tests) —
-# NOT the slow ones (e2e, Rust/Tauri build) which stay CI-only.
+# WHY: main was red for 9 days (2026-07-08 → 07-17) — a push carried an eslint error and nobody looked at
+# CI afterward, blocking EVERY PR (dependabot included). A CLAUDE.md line ("push したら CI を見る") is a
+# soft promise; this hook is the harness enforcing it so it can't be forgotten.
 #
-# Mirrors CI's `paths-ignore` (**/*.md, docs/**, LICENSE, NOTICE): a docs-only push skips the gate,
-# exactly as CI does. Escape hatch: `git push --no-verify` (use sparingly — it's how main broke).
+# NOTE: a client hook is defense-in-depth, NOT the real gate — it never runs on the server-built MERGE
+# commit, is one `git push --no-verify` away, and is absent on a fresh clone / worktree / --ignore-scripts
+# session. The load-bearing gate is the server-side ruleset on main (required `test` check). Keep both.
 #
-# Installed via package.json "prepare" (git config core.hooksPath .githooks) on every `npm install`,
-# so every machine/session gets it automatically.
+# Runs the FAST checks (tsc type gate + typecheck:mcp + lint, always; unit tests only when pushing main).
+# The slow ones (e2e Playwright, Rust/Tauri + vite bundle) stay CI-only. Mirrors CI paths-ignore so a
+# docs-only push skips. Escape hatch: `git push --no-verify` (use sparingly — that's how main broke).
 
 set -e
 
+# A fresh clone / new git worktree runs `prepare` (arms the hook) but may not have deps. A raw
+# "tsc: not found" reads like a code failure and trains --no-verify; fail with an actionable message.
+if [ ! -x node_modules/.bin/tsc ]; then
+  echo "pre-push: node_modules が無い（tsc 不在）— まず 'npm ci' を実行。gate を走らせられないため中断。" >&2
+  exit 1
+fi
+
 ZERO='0000000000000000000000000000000000000000'
-need_gate=0
+need_gate=0   # 1 = couldn't scope the diff → gate to be safe (fail-CLOSED)
+push_main=0   # 1 = a pushed ref updates refs/heads/main → also run the full unit suite
 changed=''
 
-# stdin: <local_ref> <local_sha> <remote_ref> <remote_sha> per ref being pushed.
+# stdin (pre-push protocol): <local_ref> <local_sha> <remote_ref> <remote_sha> per ref. This loop reads
+# stdin directly (no pipe), so it runs in THIS shell and its variables persist.
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue          # branch deletion — nothing to test
+  [ "$remote_ref" = "refs/heads/main" ] && push_main=1
   if [ "$remote_sha" = "$ZERO" ]; then            # new branch on the remote
     base=$(git merge-base origin/main "$local_sha" 2>/dev/null || echo '')
-    if [ -z "$base" ]; then need_gate=1; break; fi # can't scope → gate to be safe
+    if [ -z "$base" ]; then need_gate=1; break; fi
     range="$base..$local_sha"
   else
     range="$remote_sha..$local_sha"
   fi
+  # Capture the diff in the PARENT shell: if it fails (unfetched ref, shallow/corrupt object), FORCE the
+  # gate here — an earlier version ran this inside $(… || { need_gate=1; break; }), where the assignment
+  # was lost to the subshell and a failed diff SILENTLY skipped the gate (the very bug this hook prevents).
+  if ! files=$(git -c core.quotePath=false diff --name-only "$range" 2>/dev/null); then
+    need_gate=1; break
+  fi
   changed="$changed
-$(git diff --name-only "$range" 2>/dev/null || { need_gate=1; break; })"
+$files"
 done
 
-# Decide: gate unless EVERY changed file is docs-ignored (same globs as CI paths-ignore).
+# Skip only when the whole push is docs-ignored (same globs as CI paths-ignore) AND scoping succeeded.
 if [ "$need_gate" = "0" ]; then
   non_docs=$(printf '%s\n' "$changed" | grep -vE '(\.md$|^docs/|^LICENSE$|^NOTICE$)' | grep -v '^$' || true)
   if [ -z "$non_docs" ]; then
@@ -43,9 +60,19 @@ if [ "$need_gate" = "0" ]; then
   fi
 fi
 
-echo "pre-push: CI の fast gate をローカルで実行（type + lint + unit tests）… bypass は git push --no-verify"
-npm run build          # tsc -b + vite — the type gate (green npm test can hide a broken tsc)
-npm run typecheck:mcp  # MCP tsconfig type gate (CI runs this separately)
-npm run lint           # the check that was red on main for 9 days
-npm test               # vitest
+# Type + lint — the two classes that broke main (a tsc type error / an eslint error). Fast (~15s).
+# tsc -b --force (not `npm run build`): we want the type gate WITHOUT the vite bundle, and --force avoids
+# a stale *.tsbuildinfo false-greening vs CI's clean checkout.
+echo "pre-push: type + lint gate をローカル実行… bypass は git push --no-verify"
+node_modules/.bin/tsc -b --force
+npm run typecheck:mcp
+npm run lint
+
+# The full unit suite (~25s) is heavier. CI runs it on every PR (pull_request) and on push-to-main, so a
+# feature-branch push is already covered by its PR. Run it locally only when pushing MAIN directly (the
+# surface that skips PR CI) or when scoping failed — keeping WIP pushes fast so --no-verify stays rare.
+if [ "$push_main" = "1" ] || [ "$need_gate" = "1" ]; then
+  echo "pre-push: main への push — 全 unit テストも実行"
+  npm test
+fi
 echo "pre-push: gate 緑 — push を許可"
