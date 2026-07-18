@@ -2,15 +2,17 @@ name: CI — Test & Build
 
 # Lightened for CI minutes (M1): push/PR runs Linux-only (test + e2e + a compile smoke). The full
 # cross-OS INSTALLER matrix (mac arm64 + Intel, Windows, Linux) is release.yml on a `v*` tag /
-# workflow_dispatch — NOT per-push. The old per-push 3-OS build was the drain (macOS bills ×10,
-# Windows ×2). Docs-only changes skip CI (paths-ignore).
+# workflow_dispatch — NOT per-push. The old per-push 3-OS build was the drain (macOS bills ×10, Windows ×2).
+#
+# NO workflow-level paths-ignore: `test` is a REQUIRED status check (branch ruleset on main), and a
+# workflow-level paths-ignore would skip the whole workflow on a docs-only PR → the required check never
+# reports → the PR is un-mergeable (deadlock). Instead `test` runs always (it's fast), and the heavy jobs
+# (e2e, build) skip docs-only pushes via the `changes` job below — preserving CI minutes without deadlock.
 on:
   push:
     branches: [main]
-    paths-ignore: ["**/*.md", "docs/**", "LICENSE", "NOTICE"]
   pull_request:
     branches: [main]
-    paths-ignore: ["**/*.md", "docs/**", "LICENSE", "NOTICE"]
 
 permissions:
   contents: read
@@ -20,7 +22,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Unit tests + type gates + lint (fast, Linux) ─────────────
+  # ── Detect docs-only changes (so e2e/build can skip them without skipping the whole workflow) ──
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.f.outputs.code }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - id: f
+        # code=true when ANY changed file is NOT docs (same globs as the old paths-ignore). Fail-safe: if
+        # the base sha is missing/unfetchable, run everything.
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$base" HEAD | grep -qvE '(\.md$|^docs/|^LICENSE$|^NOTICE$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Unit tests + type gates + lint (fast, Linux) — the REQUIRED check; runs on every push/PR ──
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -37,10 +61,11 @@ jobs:
       - run: npm run typecheck:mcp
       - run: npm run lint
 
-  # ── E2E tests (Playwright, Linux) ────────────────────────────
+  # ── E2E tests (Playwright, Linux) — skipped on docs-only ─────────────
   e2e:
+    needs: [test, changes]
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
-    needs: test
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -58,12 +83,13 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  # ── Linux compile smoke ──────────────────────────────────────
+  # ── Linux compile smoke — skipped on docs-only ───────────────────────
   # Catches Rust / tauri-config breaks on PR without the expensive mac/Windows legs. The real
   # cross-OS installers are built in release.yml on a `v*` tag. (rust-cache is a future speedup —
   # skipped here to keep every Action SHA-pinned per the repo's security posture.)
   build:
-    needs: test
+    needs: [test, changes]
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
