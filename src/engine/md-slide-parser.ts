@@ -67,7 +67,7 @@ function parseInline(text: string): InlineSegment[] {
 
 // ── Parse lines into paragraphs ──
 
-function linesToParagraphs(lines: string[]): Paragraph[] {
+function linesToParagraphs(lines: string[], opts?: { cellHeading?: boolean }): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   for (const line of lines) {
     let trimmed = line.trim();
@@ -86,8 +86,13 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
         continue;
       }
     }
-    // `### …` → a GROUP heading (card/step) — the group's title line.
-    const headingMatch = trimmed.match(/^###\s+(.*)/);
+    // `### …` → a GROUP heading (card/step) — the group's title line. Inside a group CELL
+    // (opts.cellHeading), `## …` gets the same promotion (#102): the #/##/### convention is
+    // title/subtitle at the slide's top level, but a cell has no subtitle slot, so a bare `##`
+    // there has no valid meaning other than "this cell's heading" and would otherwise print
+    // literally. Round-trip is stable because a heading paragraph always serializes as `### `
+    // (md-serializer-shared), regardless of which marker it was parsed from.
+    const headingMatch = opts?.cellHeading ? trimmed.match(/^#{2,3}\s+(.*)/) : trimmed.match(/^###\s+(.*)/);
     if (headingMatch) {
       paragraphs.push({ segments: parseInline(headingMatch[1] || " "), heading: true });
       continue;
@@ -370,7 +375,7 @@ export function parseSlideBlock(
         if (f.diagram) diagram = f.diagram;
         else mermaidBlock = f.mermaidBlock;
       } else {
-        const paras = linesToParagraphs(sl);
+        const paras = linesToParagraphs(sl, { cellHeading: true });
         if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
       }
     });
