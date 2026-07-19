@@ -105,6 +105,7 @@
 
 ## 協働・MCP
 
+- **MCP client 側 1エンドポイント（adaptive front：discover→solo or forward）** — `slidecraft mcp`（`cli.ts`）が起動時に GUI ホストの `host.json` を discover し、稼働中なら**透過リレー**（`mcp-relay.ts`：stdio⇄host HTTP の Transport↔Transport 純パイプ・状態ゼロ）、居なければ D1 の solo host ctx で動く。discovery（`host-discovery.ts`）は `collab.rs` の `app_local_data_dir()` 書き込み先と一致するパス解決＋軽 ping で liveness 判定、stale は never-silent に solo へフォールバック（hang しない）。「1アプリに MCP 設定が複数」の違和感を解消 （ADR-0033 D2・#224）
 - **MCP 管制の単一化（stdio が commitMutation に合流）** — stdio（cli.ts）専用の「単一 Session 直いじり」mutate 経路を廃止し、buildServer は常に HostContext を解決（collab は既存の DocRegistry、stdio は `createSoloHostContext` が回りに mint するソロ版）して全 mutation を commitMutation 経由に統一。stdio も undo/redo/list/select_document を additive に獲得し、resources.ts は固定 Session でなく sole doc を都度読む。口（stdio/HTTP）はそのまま維持・廃止したのは「2つ目の管制」のみ （ADR-0033 D1・#222）
 - **`get_slide` に容量ドライラン（capacity / predictedSplit）** — 本文容量の実測 `capacity.usedLines/maxLines` と、`split_overflowing_slides` を実行せず何枚に割れるかの `predictedSplit`（chunks/boundaries）を追加。予測は distill.ts の `splitSlideToFit` そのものを呼ぶため実行結果と構造的に一致（R8・予測==実行の同値性テスト付き）。read-only（deck/dirty 不変） （#149・PR #188・2026-07-19）
 - **host `new_project` のタブ名を先頭見出しから導出（B4）** — host モードで AI が作った Deck のタブが常に「Untitled」だった（`session.ts` が templateName を "" にリセット）のを、純粋ヘルパ `deckTitle`（先頭スライドの title placeholder＝idx 0/15）で先頭見出しから命名。`use_template`/`open_project` は既存の templateName 名が優先、見出し無しは「Untitled」にフォールバック。golden 非影響 （他AIレポート・2026-07-07）
