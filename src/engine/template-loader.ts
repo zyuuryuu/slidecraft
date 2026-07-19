@@ -755,7 +755,14 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   // while a real cover (idx 15/16, or ctrTitle idx 0 + subtitle idx 1) still coerces to title. This
   // subsumes the old hasTitle&&hasBody carve-out. See serializer-content-index0.test.ts.
   if (slideIndex === 0 && !visualIdx && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
-  if (isClosing && slideIndex === totalSlides - 1) return { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
+  // #153: a closing slide with body content (bullets) needs the body-bearing closing layout
+  // (Closing.1Steps.Single+1Notes), not the ctrTitle-only one — pickLayout's closing-role filter
+  // does the actual routing/degrade; regions:1 just signals "this closing has body content".
+  if (isClosing && slideIndex === totalSlides - 1) {
+    return hasBody
+      ? { role: "closing", regions: 1, fallback: LAYOUT_NAMES[29] }
+      : { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
+  }
   if (slide.code) return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
   if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };
   if (hasTitle && hasBody && hasIdx2) return { role: "columns", regions: 2, fallback: LAYOUT_NAMES[10] };
