@@ -18,7 +18,7 @@ import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
 import { assembleHtmlDeck, type Transition } from "../engine/html-shell";
-import { materializeDerivedSlides } from "../engine/deck-sections";
+import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { serializeParagraphs } from "../engine/md-serializer-shared";
 import type { DeckIR } from "../engine/slide-schema";
 
@@ -73,6 +73,7 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
         masterImages={template.masterImages}
         masterStaticTexts={template.masterStaticTexts}
         scale={SCALE}
+        sectionFooterText={sectionFooterFor(prepared, i)}
         exportMode
       />,
     );

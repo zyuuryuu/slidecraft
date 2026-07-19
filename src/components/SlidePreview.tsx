@@ -11,12 +11,12 @@ import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
-import { buildCatalog } from "../engine/template-catalog";
+import { buildCatalog, placeholderRole } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
-import { materializeDerivedSlides } from "../engine/deck-sections";
+import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -129,6 +129,10 @@ interface SlideCardProps {
    *  border, hover cursor, click handler, and the synthetic slide-number — so the card
    *  renders as a clean presentation slide. See docs/design/html-output.md (S1). */
   exportMode?: boolean;
+  /** 所属章名（#168・案A・chrome 経路）。呼び出し側が deck-sections.sectionFooterFor(deck, slideIndex)
+   *  で導出して渡す — PPTX export（placeholder-filler.buildSlideXml）と同じ導出関数（R8）。
+   *  null＝章扉より前 or section 無しデッキ＝注入なし。 */
+  sectionFooterText?: string | null;
 }
 
 // PowerPoint preset shapes → SVG polygon points (in a 0–100 box, stretched to the shape's rect).
@@ -192,7 +196,7 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   );
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -553,7 +557,12 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           return renderImageBox(imageRect(slide.image, ph) ?? s);
         }
 
-        const content = contentFor.get(ph.idx);
+        let content = contentFor.get(ph.idx);
+        // 章名フッタの自動注入（#168）: ftr 枠が未束縛（明示 Footer: 無し）のときだけ所属章名を書く —
+        // PPTX export（placeholder-filler.buildSlideXml）と同じ判定（R8）。
+        if (!content && sectionFooterText != null && placeholderRole(ph) === "footer") {
+          content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
+        }
         if (!content) return null;
 
         return (
@@ -691,6 +700,7 @@ export default function SlidePreview({
         masterStaticTexts={template?.masterStaticTexts}
         scale={scale}
         isActive={active}
+        sectionFooterText={sectionFooterFor(deck!, i)}
         onClick={singleSlide ? undefined : () => onSlideClick?.(i)}
         onDiagramChange={singleSlide ? onDiagramChange : undefined}
         onImageRectChange={singleSlide && active ? onImageRectChange : undefined}
