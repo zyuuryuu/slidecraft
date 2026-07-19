@@ -13,7 +13,7 @@
  *       (2) その分布が make-dirty-fixture.ts のミューテーション群の根拠になる（証拠の連鎖）。
  */
 import type { TemplateData, PlaceholderInfo, StaticText } from "./template-loader";
-import { placeholderRole } from "./template-catalog";
+import { placeholderRole, typeIdxRole, geometryRole, type PlaceholderRole } from "./template-catalog";
 
 export type PathologyKind =
   | "unresolved-geometry" // placeholder の w/h<=0（xfrm 継承未解決）→ capacity=0・isPeer 死（部品0）
@@ -30,12 +30,32 @@ export interface PathologyFinding {
   detail: string;
 }
 
+/**
+ * #146 シグナル矛盾 — type/idx 由来のロールと幾何由来の推定ロールがクラス違いで対立する枠。
+ * 層1 の first-match-wins 梯子は type が答えると幾何の異議を無言で捨てる（Dirty_AllBody:
+ * type=body vs 幾何=40pt 中央見出し）ので、梯子→証拠融合の是非を判断する前にその実頻度を測る
+ * （ADR-0030 Consequences — 融合の是非は本データを見て別 ADR で判断）。計測のみ・挙動変更ゼロ。
+ * 各エントリ＝「幾何を優先した場合に判定が変わる枠」なので、その数は conflicts.length。
+ */
+export interface SignalConflict {
+  layout: string;
+  idx: string;
+  type: string; // 生の <p:ph> type
+  typeRole: PlaceholderRole; // type/idx 由来（typeIdxRole — resolvedRole/幾何 rung を含まない生シグナル）
+  geoRole: PlaceholderRole; // 幾何由来（geometryRole read-only）
+  fs: number;
+  yRel: number; // y / スライド高さ
+  hRel: number; // h / スライド高さ
+}
+
 export interface PathologyReport {
   template: string;
   slideSize: { w: number; h: number };
   total: number;
   counts: Partial<Record<PathologyKind, number>>;
   findings: PathologyFinding[];
+  /** #146: シグナル矛盾（追加フィールド — total/counts/findings には混ぜない）。 */
+  conflicts: SignalConflict[];
 }
 
 const EMU = 914400;
@@ -48,6 +68,41 @@ function parseSlideSize(presentationXml: string): { w: number; h: number } {
 /** テキスト保持シェイプの面積（inch^2）。 */
 const areaOf = (s: { w: number; h: number }) => Math.max(0, s.w) * Math.max(0, s.h);
 
+// ── #146 シグナル矛盾の判定式 ──
+// ロールをクラスに束ねて比較する。同クラス内の食い違い（footer vs date 等、下端帯の x 位置による
+// サブ分類差）は「どちらもメタ帯」で一致しており矛盾ではない — 実測（同梱4種＋実テンプレ census）で
+// 素の geometryRole 直比較は Midnight だけで 31 件の擬陽性を出した（大半がこのサブ分類ノイズ）。
+type RoleClass = "heading" | "content" | "meta" | "visual";
+const ROLE_CLASS: Partial<Record<PlaceholderRole, RoleClass>> = {
+  title: "heading",
+  subtitle: "heading",
+  body: "content",
+  category: "meta",
+  date: "meta",
+  footer: "meta",
+  slideNumber: "meta",
+  picture: "visual",
+  chart: "visual",
+  table: "visual",
+};
+
+/**
+ * type/idx と幾何がクラス違いで対立するか。過検出しない（クリーンな同梱マスターで 0）ための
+ * 決定的証拠ゲート付き:
+ *  - 幾何の見出し主張（title/subtitle 帯）は「レイアウト最大フォント × 18pt 以上」の時だけ決定的。
+ *    素の帯判定はメタ chrome（fs10-13 の細帯）やリード文（fs14-16）を見出しと誤読する。
+ *  - 幾何のメタ帯主張 vs body 型は矛盾に数えない: placeholderRole の body 枝が既に幾何で
+ *    footer/date/slideNumber へ再分類しており（AI-Import P1 rung）、幾何の異議は捨てられていない。
+ */
+function isSignalConflict(typeRole: PlaceholderRole, geoRole: PlaceholderRole, fs: number, maxPhFs: number): boolean {
+  const tc = ROLE_CLASS[typeRole];
+  const gc = ROLE_CLASS[geoRole];
+  if (!tc || !gc || tc === gc) return false;
+  if (gc === "heading") return fs >= 18 && fs === maxPhFs;
+  if (gc === "meta") return tc !== "content";
+  return false; // geometryRole は content/visual を主張しない
+}
+
 /**
  * TemplateData（＋テンプレ名）→ 病理レポート。純粋関数。テンプレ内容（テキスト/画像/色）は読まない。
  * 閾値はスライド寸法 SW×SH に対する相対値（寸法非依存）。
@@ -58,6 +113,7 @@ export function detectPathologies(
 ): PathologyReport {
   const { w: SW, h: SH } = parseSlideSize(tpl.presentationXml);
   const findings: PathologyFinding[] = [];
+  const conflicts: SignalConflict[] = [];
   const add = (kind: PathologyKind, layout: string | undefined, detail: string) =>
     findings.push({ kind, layout, detail });
 
@@ -118,9 +174,28 @@ export function detectPathologies(
     for (const p of phRoles)
       if (p.role === "body" && areaOf(p.ph.style) >= 0.35 * SW * SH && p.ph.style.fontSize >= 24)
         add("figure-as-body", l.name, `${p.ph.type}@${p.ph.idx} area${areaOf(p.ph.style).toFixed(0)} fs${p.ph.style.fontSize}`);
+
+    // #146: シグナル矛盾（type/idx vs 幾何）— counts/findings には混ぜず conflicts に列挙する。
+    // typeRole は typeIdxRole の生シグナル（②b の resolvedRole 昇格に依らない＝復元後でも計測が安定）、
+    // geoRole は geometryRole を実測スライド寸法で read-only 評価（非16:9 でも相対化される）。
+    for (const ph of l.placeholders) {
+      const tr = typeIdxRole(ph);
+      const gr = geometryRole(ph.style, SW, SH);
+      if (tr && gr && isSignalConflict(tr, gr, ph.style.fontSize, maxPhFs))
+        conflicts.push({
+          layout: l.name,
+          idx: ph.idx,
+          type: ph.type,
+          typeRole: tr,
+          geoRole: gr,
+          fs: ph.style.fontSize,
+          yRel: ph.style.y / SH,
+          hRel: ph.style.h / SH,
+        });
+    }
   }
 
   const counts: Partial<Record<PathologyKind, number>> = {};
   for (const f of findings) counts[f.kind] = (counts[f.kind] ?? 0) + 1;
-  return { template: name, slideSize: { w: SW, h: SH }, total: findings.length, counts, findings };
+  return { template: name, slideSize: { w: SW, h: SH }, total: findings.length, counts, findings, conflicts };
 }
