@@ -18,10 +18,10 @@ const spec = (over: Partial<TemplateSpec> = {}): TemplateSpec => ({
 });
 
 describe("buildTemplatePreview", () => {
-  it("produces a multi-slide sample deck + the full 30-layout template from a spec", async () => {
+  it("produces a multi-slide sample deck + the full builtin-layout template from a spec", async () => {
     const { deck, template } = await buildTemplatePreview(spec());
     expect(deck.slides.length).toBeGreaterThanOrEqual(3);
-    expect(template.layouts.length).toBe(30);
+    expect(template.layouts.length).toBe(BUILTIN_LAYOUTS.length);
   });
 
   it("flows a changed palette colour into the rendered template (proves the preview is LIVE)", async () => {

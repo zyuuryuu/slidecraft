@@ -35,6 +35,9 @@ function defaultPaths(): string[] {
     "CX_sample_MSGothic.pptx",
     "lrk-slides-velis_CC0.pptx",
     "Dirty_Adversarial_TemplateOnly.pptx",
+    "Dirty_AllBody_TemplateOnly.pptx",
+    "Dirty_Legacy43_TemplateOnly.pptx",
+    "Dirty_Grouped_TemplateOnly.pptx",
   ].map((n) => join(FIX, n));
   return [...bundled, ...real].filter(existsSync);
 }
@@ -45,7 +48,7 @@ async function masterCount(bytes: Uint8Array): Promise<number> {
   return Object.keys(zip.files).filter((n) => /^ppt\/slideMasters\/slideMaster\d+\.xml$/.test(n)).length;
 }
 
-const KIND_LABEL: Record<PathologyKind | "multiple-masters", string> = {
+const KIND_LABEL: Record<PathologyKind | "multiple-masters" | "signal-conflict", string> = {
   "unresolved-geometry": "幾何未解決(w/h=0)",
   "typeless-placeholder": "type無しph",
   "title-as-static-text": "title=生text",
@@ -54,6 +57,7 @@ const KIND_LABEL: Record<PathologyKind | "multiple-masters", string> = {
   "no-title-role": "title role皆無",
   "non-standard-slide-size": "非16:9",
   "multiple-masters": "複数master",
+  "signal-conflict": "型×幾何矛盾", // #146: type/idx と幾何のクラス矛盾（挙動変更ゼロの計測）
 };
 
 async function main() {
@@ -93,6 +97,9 @@ async function main() {
     } else {
       bump("multiple-masters", 0);
     }
+    // #146: シグナル矛盾（counts とは別勘定の追加フィールド）
+    if (r.conflicts.length) badges.push(`${KIND_LABEL["signal-conflict"]}×${r.conflicts.length}`);
+    bump("signal-conflict", r.conflicts.length);
     for (const k of Object.keys(r.counts)) void k; // (bump 済)
 
     const sz = `${r.slideSize.w.toFixed(1)}×${r.slideSize.h.toFixed(1)}`;
@@ -103,6 +110,12 @@ async function main() {
     for (const f of r.findings.slice(0, 8))
       console.log(`     - ${KIND_LABEL[f.kind]}  [${f.layout ?? "template"}]  ${f.detail}`);
     if (r.findings.length > 8) console.log(`     … ほか ${r.findings.length - 8} 件`);
+    // 矛盾の内訳（{layout, idx, type, typeRole, geoRole, fs, y/h 相対値} — 先頭 8 件まで）
+    for (const c of r.conflicts.slice(0, 8))
+      console.log(
+        `     ⚡ 矛盾  [${c.layout}]  ${c.type || "typeless"}@${c.idx}  type→${c.typeRole} / 幾何→${c.geoRole}  fs${c.fs} y${c.yRel.toFixed(2)} h${c.hRel.toFixed(2)}`,
+      );
+    if (r.conflicts.length > 8) console.log(`     … ほか矛盾 ${r.conflicts.length - 8} 件`);
   }
 
   // 集計（病理×何テンプレに・総件数）
@@ -112,6 +125,11 @@ async function main() {
     .sort((a, b) => b[1].templates - a[1].templates || b[1].findings - a[1].findings);
   for (const [kind, v] of rows)
     console.log(`  ${(KIND_LABEL[kind as PathologyKind] ?? kind).padEnd(20)}  ${String(v.templates).padStart(2)}/${paths.length} テンプレ  計${v.findings}件`);
+  // #146: 融合判断（別 ADR）の集計行 — 各矛盾＝幾何を優先した場合に判定が変わる枠
+  const sc = agg["signal-conflict"];
+  console.log(
+    `\n  幾何を優先した場合に判定が変わる枠: 計${sc?.findings ?? 0}枠（${sc?.templates ?? 0}/${paths.length} テンプレ）`,
+  );
 }
 
 void main();

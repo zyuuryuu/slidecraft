@@ -3,7 +3,7 @@
  * child→slide coordinate transforms and custGeom <a:arcTo> → SVG arc. Tested without a full .pptx.
  */
 import { describe, it, expect } from "vitest";
-import { parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg, IDENTITY_XF } from "../src/engine/ooxml-geom";
+import { parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, IDENTITY_XF } from "../src/engine/ooxml-geom";
 
 const EMU = 914400; // 1 inch
 
@@ -62,6 +62,24 @@ describe("topLevelBlocks — depth-balanced group extraction", () => {
   it("matches an open tag that carries attributes", () => {
     const xml = `<p:grpSp id="3"><p:sp>A</p:sp></p:grpSp>`;
     expect(topLevelBlocks(xml, "p:grpSp")).toEqual([xml]);
+  });
+});
+
+describe("groupChildren — strips a group's own wrapper+grpSpPr before recursion", () => {
+  it("returns only the child shapes, not the group's own <p:grpSp> wrapper", () => {
+    const grpSpPr = `<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1" cy="1"/><a:chOff x="0" y="0"/><a:chExt cx="1" cy="1"/></a:xfrm></p:grpSpPr>`;
+    const grp = `<p:grpSp>${grpSpPr}<p:sp>A</p:sp><p:sp>B</p:sp></p:grpSp>`;
+    expect(groupChildren(grp, grpSpPr)).toBe("<p:sp>A</p:sp><p:sp>B</p:sp>");
+  });
+  // Regression (#142): passing the FULL block (wrapper intact) to a recursive topLevelBlocks call makes
+  // it re-match its own outer <p:grpSp>…</p:grpSp> as a "nested" group. With grpSpPr already stripped,
+  // parseGroupXf then fails on it → the whole group's real children get silently dropped.
+  it("the un-stripped block would self-match as a fake nested group (documents the bug this fixes)", () => {
+    const grpSpPr = `<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1" cy="1"/><a:chOff x="0" y="0"/><a:chExt cx="1" cy="1"/></a:xfrm></p:grpSpPr>`;
+    const grp = `<p:grpSp>${grpSpPr}<p:sp>A</p:sp></p:grpSp>`;
+    const unstripped = grp.replace(grpSpPr, ""); // the old (buggy) recursion input
+    expect(topLevelBlocks(unstripped, "p:grpSp")).toEqual([unstripped]); // self-match
+    expect(topLevelBlocks(groupChildren(grp, grpSpPr), "p:grpSp")).toEqual([]); // fixed: no fake nesting
   });
 });
 

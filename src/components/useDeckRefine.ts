@@ -9,20 +9,24 @@
 
 import { useCallback, useRef, useState } from "react";
 import { refineDeck, batchEditDeck, type RefineLevel, type RefineResult, type AiSlideFix } from "../engine/refine";
+import { serializeTpl } from "./deck-markdown";
 import type { DeckIR } from "../engine/slide-schema";
 import type { LayoutCatalog } from "../engine/template-catalog";
+import type { TemplateData } from "../engine/template-loader";
 import type { HistoryMode } from "./useHistoryState";
 
 interface RefineDeps {
   deck: DeckIR | null;
   catalog: LayoutCatalog | undefined;
+  /** Feeds the loop's before/after md the binding authority (ADR-0030 stage B, #155). */
+  templateData: TemplateData | null;
   setDeck: (deck: DeckIR, mode: HistoryMode) => void;
   aiFix: AiSlideFix; // ai.runOnce(req, "slide")
   aiReady: boolean; // ai.connection.ok — gates the Lv3 AI pass
   bestOfN?: number; // best-of-N per AI fix (ai.bestOfN); 1 = single-shot (ADR-0019 Option B)
 }
 
-export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN = 1 }: RefineDeps) {
+export function useDeckRefine({ deck, catalog, templateData, setDeck, aiFix, aiReady, bestOfN = 1 }: RefineDeps) {
   const [refining, setRefining] = useState(false);
   const [proposal, setProposal] = useState<RefineResult | null>(null);
   const [refineError, setRefineError] = useState<string | null>(null);
@@ -43,6 +47,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN 
           aiFix: level >= 3 && aiReady ? aiFix : undefined,
           bestOfN,
           signal: controller.signal,
+          tpl: serializeTpl(catalog, templateData),
         });
         // A cancel that landed before any change → just close, no empty proposal.
         if (!(controller.signal.aborted && result.changes.length === 0)) setProposal(result);
@@ -53,7 +58,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN 
         abortRef.current = null;
       }
     },
-    [deck, catalog, refining, aiReady, aiFix, bestOfN],
+    [deck, catalog, templateData, refining, aiReady, aiFix, bestOfN],
   );
 
   // Multi-select batch edit: apply ONE instruction to each selected slide → a proposal
@@ -67,7 +72,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN 
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const result = await batchEditDeck(deck, catalog, { indices, instruction, aiFix, bestOfN, signal: controller.signal });
+        const result = await batchEditDeck(deck, catalog, { indices, instruction, aiFix, bestOfN, signal: controller.signal, tpl: serializeTpl(catalog, templateData) });
         if (!(controller.signal.aborted && result.changes.length === 0)) setProposal(result);
       } catch (e) {
         setRefineError(e instanceof Error ? e.message : String(e));
@@ -76,7 +81,7 @@ export function useDeckRefine({ deck, catalog, setDeck, aiFix, aiReady, bestOfN 
         abortRef.current = null;
       }
     },
-    [deck, catalog, refining, aiFix, bestOfN],
+    [deck, catalog, templateData, refining, aiFix, bestOfN],
   );
 
   // Stop the loop / batch: aborts the in-flight AI task. Any changes already made still

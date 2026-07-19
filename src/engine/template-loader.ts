@@ -13,7 +13,7 @@ import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle,
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
-import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
+import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg } from "./ooxml-geom";
 
 // ── Types ──
 
@@ -25,9 +25,14 @@ export interface PlaceholderStyle {
   fontSize: number; // points
   fontColor: string; // hex without #
   fontName: string;
+  eaFontName?: string; // <a:ea> East-Asian typeface (#192/#115-a) — the visible font for JP text
   bold: boolean;
   align: string; // "l", "ctr", "r"
   bulletChar: string; // bullet glyph from the master/layout; "" = no bullet
+  // Per-level (1-3) font size in points for nested bullets (#103, preview only): the shape's own
+  // lstStyle wins, else the master bodyStyle's, else undefined (the SSR preview computes a
+  // step-down fallback — "master の lvl2-4 スタイル継承に任せ、無ければ段階縮小").
+  levelFontSizes?: (number | undefined)[];
 }
 
 export interface PlaceholderInfo {
@@ -105,9 +110,14 @@ export interface MasterStyle {
   fontSize: number;
   fontColor: string;
   fontName: string;
+  eaFontName?: string; // <a:ea> East-Asian typeface (#192/#115-a)
   bold: boolean;
   align: string;
   bulletChar: string; // lvl1 bullet glyph; "" = buNone / none
+  // lvl2pPr/lvl3pPr/lvl4pPr <a:defRPr sz> from bodyStyle, index 0..2 (#103 nested bullets, preview
+  // only — the PPTX export never pins these, PowerPoint resolves lvl="1..3" from the master itself,
+  // same as lvl1/master-font-inherit). undefined entry ⇒ the master doesn't style that level.
+  levelFontSizes?: (number | undefined)[];
 }
 
 export interface TemplateData {
@@ -257,6 +267,33 @@ function extractBackground(xml: string, theme: Record<string, string>): string |
 
 // ── Extract master style from titleStyle or bodyStyle XML ──
 
+/** A `<a:ea>` typeface value starting with "+" (e.g. "+mj-ea") is an UNRESOLVED theme fontScheme
+ *  reference, not a real font name. Unlike `<a:latin>` (kept raw here by an existing, tested
+ *  contract — resolveFontToken in master-remake.ts is the documented place that resolves it, e.g.
+ *  for masterToTemplateSpec), `eaFontName` is a NEW field (#192/#115-a) feeding straight into
+ *  cjkFontFamily's font-family CSS, so it is guarded at the source instead of inheriting the same
+ *  raw-token behavior. */
+function resolvedEaTypeface(m: RegExpMatchArray | null): string | undefined {
+  return m && !m[1].startsWith("+") ? m[1] : undefined;
+}
+
+/** lvl2pPr/lvl3pPr/lvl4pPr `<a:defRPr sz>` from a lstStyle-shaped XML fragment (master bodyStyle, or a
+ *  placeholder's own lstStyle) → per-level (1-3) font size in points, index 0=level1(lvl2pPr)…
+ *  2=level3(lvl4pPr). An undefined entry means that level isn't explicitly styled there (#103). */
+function parseLevelFontSizes(xml: string): (number | undefined)[] {
+  return [2, 3, 4].map((n) => {
+    const block = xml.match(new RegExp(`<a:lvl${n}pPr\\b[\\s\\S]*?<\\/a:lvl${n}pPr>`))?.[0];
+    const sz = block?.match(/defRPr[^>]*sz="(\d+)"/)?.[1];
+    return sz ? parseInt(sz) / 100 : undefined;
+  });
+}
+
+/** Step-down fallback when neither the placeholder's own lstStyle nor the master's bodyStyle style a
+ *  nested level explicitly (#103: "無ければ段階縮小"). ~12%/level, floored at 60% of the level-1 size. */
+function nestedFallbackFontSize(level1Size: number, level: number): number {
+  return Math.max(level1Size * 0.88 ** level, level1Size * 0.6);
+}
+
 function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme: Record<string, string>): MasterStyle {
   if (!xml) return fallback;
   const szMatch = xml.match(/defRPr[^>]*sz="(\d+)"/);
@@ -265,6 +302,7 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
   const schemeToken = srgb ? undefined : xml.match(/schemeClr val="(\w+)"/)?.[1];
   const fontColor = srgb ?? (schemeToken ? theme[schemeToken] : undefined) ?? fallback.fontColor;
   const fontMatch = xml.match(/<a:latin typeface="([^"]+)"/);
+  const eaFontName = resolvedEaTypeface(xml.match(/<a:ea typeface="([^"]+)"/));
   const alignMatch = xml.match(/algn="(\w+)"/);
   // Bullet glyph from the level-1 paragraph style (buChar), or "" when buNone.
   const lvl1 = xml.match(/<a:lvl1pPr\b[\s\S]*?<\/a:lvl1pPr>/)?.[0] ?? xml;
@@ -273,9 +311,11 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : fallback.fontSize,
     fontColor,
     fontName: fontMatch ? fontMatch[1] : fallback.fontName,
+    eaFontName: eaFontName ?? fallback.eaFontName,
     bold: boldMatch ? true : fallback.bold,
     align: alignMatch ? alignMatch[1] : fallback.align,
     bulletChar: buChar ?? (/<a:buNone\/>/.test(lvl1) ? "" : fallback.bulletChar),
+    levelFontSizes: parseLevelFontSizes(xml),
   };
 }
 
@@ -309,7 +349,7 @@ function extractMasterPlaceholderGeometry(masterXml: string, theme: Record<strin
 
 // ── Extract style from shape XML, merging with master defaults ──
 
-function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>, masterGeom: Record<string, Geom>): PlaceholderStyle {
+function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>, masterGeom: Record<string, Geom>, xf: Xf = IDENTITY_XF): PlaceholderStyle {
   // Determine if this is a title-type placeholder
   const phType = sp.match(/<p:ph[^>]*type="(\w+)"/)?.[1] || "body";
   const isTitle = phType === "ctrTitle" || phType === "title";
@@ -329,6 +369,10 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const boldMatch = run.match(/\bb="1"/) || lvl1DefRPr.match(/\bb="1"/) || sp.match(/<a:defRPr[^>]*\bb="1"/) || sp.match(/<a:rPr[^>]*\bb="1"/);
   const textColor = extractTextColor(sp, theme);
   const fontMatch = run.match(/<a:latin typeface="([^"]+)"/) || lvl1DefRPr.match(/<a:latin typeface="([^"]+)"/) || sp.match(/<a:latin typeface="([^"]+)"/);
+  const eaFontName =
+    resolvedEaTypeface(run.match(/<a:ea typeface="([^"]+)"/)) ??
+    resolvedEaTypeface(lvl1DefRPr.match(/<a:ea typeface="([^"]+)"/)) ??
+    resolvedEaTypeface(sp.match(/<a:ea typeface="([^"]+)"/));
   // Alignment for level-1 text: a paragraph's own <a:pPr>, else the lstStyle's <a:lvl1pPr>, else
   // <a:defPPr>. Deliberately NOT lvl2-9 (deeper list levels) — templates may author lvl2-9 BEFORE
   // lvl1, so a naive "first pPr-like" match grabbed a lvl2 center align for a left subtitle. The old
@@ -344,17 +388,35 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const shapeBuChar = buScope.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
   const bulletChar = shapeBuChar ?? (/<a:buNone\s*\/>/.test(buScope) ? "" : isTitle ? "" : master.bulletChar);
 
+  // Own xfrm → composed through `xf` (identity for a top-level shape; a group's composed child→slide
+  // transform when this shape sits inside a `<p:grpSp>` — see walkStaticTexts). Inherited master
+  // geometry is already slide-space (masters don't nest in groups), so it bypasses `xf`.
+  const geom = offMatch && extMatch
+    ? transformRect(xf, +offMatch[1], +offMatch[2], +extMatch[1], +extMatch[2])
+    : { x: inh?.x ?? 0, y: inh?.y ?? 0, w: inh?.w ?? 0, h: inh?.h ?? 0 };
+
+  const fontSize = szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize);
+  // Nested-bullet sizes (#103): this shape's OWN lstStyle wins, else the master bodyStyle's, else a
+  // step-down computed from THIS placeholder's level-1 size (not the master's — a resized title-adjacent
+  // body should shrink its nested levels off its own base, matching how lvl1 itself is resolved above).
+  const ownLevelSizes = parseLevelFontSizes(sp);
+  const levelFontSizes = [0, 1, 2].map(
+    (i) => ownLevelSizes[i] ?? master.levelFontSizes?.[i] ?? nestedFallbackFontSize(fontSize, i + 1),
+  );
+
   return {
-    x: offMatch ? emuToInch(offMatch[1]) : (inh?.x ?? 0),
-    y: offMatch ? emuToInch(offMatch[2]) : (inh?.y ?? 0),
-    w: extMatch ? emuToInch(extMatch[1]) : (inh?.w ?? 0),
-    h: extMatch ? emuToInch(extMatch[2]) : (inh?.h ?? 0),
-    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize),
+    x: geom.x,
+    y: geom.y,
+    w: geom.w,
+    h: geom.h,
+    fontSize,
     fontColor: textColor ?? inh?.fontColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
+    eaFontName: eaFontName ?? master.eaFontName,
     bold: boldMatch ? true : master.bold,
     align: alignMatch ? alignMatch[1] : master.align,
     bulletChar,
+    levelFontSizes,
   };
 }
 
@@ -472,7 +534,7 @@ function walkShapes(xml: string, theme: Record<string, string>, xf: Xf, out: Dec
     const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
     const gx = parseGroupXf(grpSpPr);
     if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
-    walkShapes(grp.replace(grpSpPr, ""), theme, composeXf(xf, gx), out); // children minus the group's own xfrm
+    walkShapes(groupChildren(grp, grpSpPr), theme, composeXf(xf, gx), out); // children minus the group's own wrapper+xfrm
   }
   for (const sp of rest.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) { const d = spToDeco(sp, theme, xf); if (d) out.push(d); }
   for (const cx of rest.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || []) { const d = cxnToDeco(cx, theme, xf); if (d) out.push(d); }
@@ -506,6 +568,37 @@ async function extractImages(xml: string, relsXml: string, relDir: string, zip: 
   return out;
 }
 
+/** Walk shapes at one nesting level collecting static (non-placeholder) TEXT shapes, recursing into
+ *  each `<p:grpSp>` with its composed child→slide transform — the SAME recursion/composeXf rule as
+ *  `walkShapes` (#142; R8: one shared composition rule, not duplicated), so a heading inside a scaled
+ *  group lands at its real slide geometry instead of its raw child-space coords. `xf` only ever
+ *  affects position/size (via extractStyle's `transformRect`); font size is untouched — PowerPoint
+ *  itself does not scale a group child's font with the group's box. */
+function walkStaticTexts(
+  xml: string,
+  masterTitle: MasterStyle,
+  masterBody: MasterStyle,
+  theme: Record<string, string>,
+  masterGeom: Record<string, Geom>,
+  xf: Xf,
+  out: StaticText[],
+): void {
+  let rest = xml;
+  for (const grp of topLevelBlocks(xml, "p:grpSp")) {
+    rest = rest.replace(grp, "");
+    const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
+    const gx = parseGroupXf(grpSpPr);
+    if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
+    walkStaticTexts(groupChildren(grp, grpSpPr), masterTitle, masterBody, theme, masterGeom, composeXf(xf, gx), out);
+  }
+  for (const sp of rest.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
+    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
+    const text = (sp.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((m) => m.replace(/<\/?a:t>/g, "")).join("");
+    if (!text.trim()) continue; // a pure fill shape (no text) is a decoration, not static text
+    out.push({ text, style: extractStyle(sp, masterTitle, masterBody, theme, masterGeom, xf) });
+  }
+}
+
 /** Non-placeholder shapes that carry TEXT (design labels like a cover's "日付 / 部署 / 作成者").
  *  Their box + font resolve through the SAME extractStyle as placeholders (so inherited geometry/
  *  font/color work), and the text is the concatenated runs. */
@@ -516,14 +609,8 @@ function extractStaticTexts(
   theme: Record<string, string>,
   masterGeom: Record<string, Geom>,
 ): StaticText[] {
-  const normalized = normalizeNs(layoutXml);
   const out: StaticText[] = [];
-  for (const sp of normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
-    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
-    const text = (sp.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((m) => m.replace(/<\/?a:t>/g, "")).join("");
-    if (!text.trim()) continue; // a pure fill shape (no text) is a decoration, not static text
-    out.push({ text, style: extractStyle(sp, masterTitle, masterBody, theme, masterGeom) });
-  }
+  walkStaticTexts(normalizeNs(layoutXml), masterTitle, masterBody, theme, masterGeom, IDENTITY_XF, out);
   return out;
 }
 
@@ -591,9 +678,9 @@ export async function loadTemplate(
   const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];
   const bodyStyleXml = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0];
   const masterTitleStyle = parseMasterStyle(titleStyleXml, {
-    ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF",
+    ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF", eaFontName: themeFonts.majorEa,
   }, themeColors);
-  const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle, themeColors);
+  const masterBodyStyle = parseMasterStyle(bodyStyleXml, { ...defaultStyle, eaFontName: themeFonts.minorEa }, themeColors);
   const masterGeom = extractMasterPlaceholderGeometry(masterXml, themeColors); // inherited geometry + font
 
   // ── Extract layouts ──
@@ -754,8 +841,20 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   // idx 1, no idx 0/15) falls through to content instead of binding into the cover's subtitle slot,
   // while a real cover (idx 15/16, or ctrTitle idx 0 + subtitle idx 1) still coerces to title. This
   // subsumes the old hasTitle&&hasBody carve-out. See serializer-content-index0.test.ts.
-  if (slideIndex === 0 && !visualIdx && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
-  if (isClosing && slideIndex === totalSlides - 1) return { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
+  // #195: an explicit `<!-- section -->` chapter divider authored FIRST is still a chapter divider,
+  // not a cover — without this gate the index-0 branch above coerces it to Title, whose namespace
+  // (idx0/ctrTitle) can't carry the idx15 title serializeSlide reads, so the title silently vanishes
+  // on round-trip. sectionBreak is only ever set by the explicit marker (md-slide-parser.ts), so
+  // unmarked decks are unaffected — byte-identical.
+  if (slideIndex === 0 && !visualIdx && !slide.sectionBreak && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  // #153: a closing slide with body content (bullets) needs the body-bearing closing layout
+  // (Closing.1Steps.Single+1Notes), not the ctrTitle-only one — pickLayout's closing-role filter
+  // does the actual routing/degrade; regions:1 just signals "this closing has body content".
+  if (isClosing && slideIndex === totalSlides - 1) {
+    return hasBody
+      ? { role: "closing", regions: 1, fallback: LAYOUT_NAMES[29] }
+      : { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
+  }
   if (slide.code) return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
   if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };
   if (hasTitle && hasBody && hasIdx2) return { role: "columns", regions: 2, fallback: LAYOUT_NAMES[10] };

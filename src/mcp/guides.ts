@@ -23,6 +23,8 @@ export function getAuthoringGuide(s: Session) {
   return {
     format: slideSystemPrompt(entries),
     budget, // this template's body capacity (maxBullets/charsPerBullet) — keep each content slide within it
+    capacity:
+      "容量は get_slide(i) / get_deck_issues で実測できる：capacity.usedLines/maxLines（全角換算の保守的推定）・overBudget・predictedSplit（split_overflowing_slides の dry-run、実行せず何枚に割れるか）",
     seeAlso: {
       figures: "図を入れるなら get_diagram_types で種類を選び、get_diagram_guide(type) で構文を得る",
       templateSpec: "新しいテンプレを作るなら get_template_spec_guide（→ create_template）",
@@ -40,8 +42,13 @@ export function contractDigest(s: Session) {
   return {
     layouts: entries.map((e) => e.name),
     budget,
+    capacity: "容量は get_slide(i) で実測できる（capacity.usedLines/maxLines・overBudget・predictedSplit）",
     separators:
       "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）",
+    notes:
+      "スピーカーノートは `<!-- note -->` を単独行で置き、以降スライド末尾（次の `---`）までが素の Markdown のノート本文（#150）。スライドは疎に・詳細はノートへ",
+    sections:
+      "章は著者が書く章扉スライドに `<!-- section -->` タグ（章名は `#` 見出しのまま）。`<!-- toc -->` のみのブロックは目次の派生スライドで、内容は常に章一覧から自動導出（手書き不可・#151）",
     seeAlso: { format: "get_authoring_guide", figures: "get_diagram_types" },
   };
 }

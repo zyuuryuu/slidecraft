@@ -168,6 +168,62 @@ export function unboundContent(
     .map((c) => ({ content: c, role: slideIdxRole(c.idx, hasCtrTitle) }));
 }
 
+/** A slide CONTENT item tagged with the role its (canonical) idx maps to — the content side of a bind. */
+export interface ContentRef {
+  idx: string; // the SlideIR content idx
+  role: PlaceholderRole; // slideIdxRole(idx, hasCtrTitle)
+  content: PlaceholderContent;
+}
+
+/** A LAYOUT placeholder tagged with its resolved role — the placeholder side of a bind. */
+export interface PlaceholderRef {
+  idx: string; // the layout placeholder idx (the box on the slide)
+  role: PlaceholderRole;
+}
+
+/**
+ * ADR-0030 (BindingPlan, single authority) — the OBSERVED result of binding one slide's content to a
+ * layout: which content landed where (`assignments`), which content found NO home (`unbound` — the
+ * no-silent-drop signal a caller turns into a warning), and which placeholders stayed empty (`unfilled`).
+ * Stage A is pure OBSERVATION: nothing here re-derives routing (see resolveBinding / slideBindingPlan),
+ * so `assignments` is byte-identical to what the export + preview actually write.
+ */
+export interface BindingPlan {
+  assignments: Array<{ content: ContentRef; placeholder: PlaceholderRef }>;
+  unbound: ContentRef[];
+  unfilled: PlaceholderRef[];
+}
+
+/**
+ * OBSERVE the role-binding of a slide onto a NON-group layout by COMPOSING the existing primitives —
+ * bindContentByRole (:81, the routing) + unboundContent (:159, the drop detector) — into one BindingPlan.
+ * It writes NO new routing: `assignments` is built directly from bindContentByRole's map, so binding stays
+ * byte-identical (ADR-0030 stage A: the only behaviour change is that diagnostics increase). Grouped slides
+ * go through slideBindingPlan (group-binding.ts), which mirrors expandGroups into this same envelope. The
+ * two primitives are re-invoked rather than duplicated, so there is exactly one routing authority. Pure (R2).
+ */
+export function resolveBinding(
+  slide: SlideIR,
+  layoutPlaceholders: readonly PlaceholderInfo[],
+): BindingPlan {
+  const hasCtrTitle = layoutHasCtrTitle(layoutPlaceholders);
+  const bound = bindContentByRole(slide, layoutPlaceholders);
+  const phByIdx = new Map(layoutPlaceholders.map((p) => [p.idx, p] as const));
+  const contentRef = (c: PlaceholderContent): ContentRef => ({ idx: c.idx, role: slideIdxRole(c.idx, hasCtrTitle), content: c });
+  const phRef = (p: PlaceholderInfo): PlaceholderRef => ({ idx: p.idx, role: placeholderRole(p) });
+
+  const assignments = [...bound.entries()].map(([phIdx, content]) => ({
+    content: contentRef(content),
+    placeholder: phRef(phByIdx.get(phIdx)!),
+  }));
+  const unbound = unboundContent(slide, layoutPlaceholders).map((u) => contentRef(u.content));
+  // Placeholders that received no content (observational). Slide-number is auto-filled by PowerPoint, so
+  // it is never "unfilled" — matching buildFieldMap's exclusion; keeps this list to REAL empty boxes.
+  const filled = new Set(bound.keys());
+  const unfilled = layoutPlaceholders.filter((p) => !filled.has(p.idx) && placeholderRole(p) !== "slideNumber").map(phRef);
+  return { assignments, unbound, unfilled };
+}
+
 
 /**
  * The canonical content idx that role-binds BACK to layout placeholder `ph` — the INVERSE of

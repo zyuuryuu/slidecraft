@@ -218,6 +218,65 @@ For the figure notation itself, see [Diagrams](/en/guide/diagrams).
 
 ---
 
+## Speaker notes `<!-- note -->`
+
+Put `<!-- note -->` on **its own line**, and everything from there to the **end of the slide (the next `---`)** becomes that slide's speaker notes. The note body is plain Markdown (multiple lines, bullets, `**bold**` allowed) and is never shown on the slide face.
+
+```markdown
+# Proposal outline
+
+- Only the takeaway on the slide
+
+<!-- note -->
+Speaker notes start here. Background you narrate aloud, data sources,
+anticipated Q&A — multiple lines are fine.
+
+- Bullets work too
+```
+
+Things to remember:
+
+- Place the marker at the **very end of the slide** — everything after it is consumed as notes.
+- Only the marker is invisible; the note body is ordinary Markdown paragraphs, so the source stays naturally readable on GitHub and other Markdown viewers.
+- PPTX export produces PowerPoint's **native speaker notes** (the notes pane).
+- In HTML export the notes are hidden by default; press **`n`** to toggle the notes panel ([Editing & Export](/en/guide/editing-and-export)).
+- When automatic overflow splitting occurs, the notes stay on the **first slide only** (they are not duplicated).
+- A payload form like `<!-- note: memo -->` does **not** become notes (it stays a discarded comment, as before). Write the note body on the lines after the marker.
+
+This suits the briefing style of "sparse slides, rich notes": move narration that would overflow the body budget into the notes instead.
+
+---
+
+## Sections and table of contents `<!-- section -->` / `<!-- toc -->`
+
+**Chapter covers are not generated — they are ordinary slides you write.** Put `<!-- section -->` on its own line inside the block of the slide you want to act as a chapter cover, and that slide is declared a **chapter boundary**. The chapter name stays a `#` heading, so the chapter structure remains readable in plain Markdown.
+
+A slide block containing **only** `<!-- toc -->` becomes the **table-of-contents slide**. Its content (chapter numbers + names) is **always re-derived** from the section-tagged slides.
+
+```markdown
+<!-- toc -->
+
+---
+
+<!-- section -->
+# Current State
+
+> optional chapter subtitle
+
+---
+
+# Detail slides of the chapter…
+```
+
+Things to remember:
+
+- Chapter numbers are assigned automatically in **order of appearance** of section-tagged slides.
+- The TOC cannot be edited by hand (only the single `<!-- toc -->` line is written back to Markdown). Rename a chapter cover's title and the TOC **follows automatically** on the next render/export — drift between the TOC and the actual chapters is structurally impossible.
+- Orthogonal to the `<!-- slide: LayoutName -->` pin: a chapter cover can be auto-resolved (it tends to resolve to Section-family layouts) or pinned.
+- Markdown without these tags exports exactly as before.
+
+---
+
 ## Code fences
 
 A fenced block enclosed in ` ``` ` is handled differently depending on the **fence's language name**.

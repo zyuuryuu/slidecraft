@@ -10,8 +10,19 @@ import { parseMd } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
 import { parseMarkdownTable, tableToMarkdown, isTableRow } from "../src/engine/md-table";
 import { tableGraphicFrameXml } from "../src/engine/table-ooxml";
+import { computeColumnWidthsEmu } from "../src/engine/table-layout";
 import { loadTemplate } from "../src/engine/template-loader";
 import { generatePptx } from "../src/engine/placeholder-filler";
+
+const EMU_PER_INCH = 914400;
+
+// The risk-register table from #138: "#" (1 digit) / リスク / 影響 / 発生確率 (2 chars) /
+// 対応状況 (20+ chars) — equal split wastes width on "#"/"発生確率" and crams "対応状況".
+const RISK_TABLE = [
+  ["#", "リスク", "影響", "発生確率", "対応状況"],
+  ["1", "データ漏洩", "大", "20%", "アクセス制御の見直しとログ監査の強化を継続的に実施中"],
+  ["2", "納期遅延", "中", "40%", "外部ベンダーとの週次進捗確認を導入し早期検知を徹底"],
+];
 
 const MD = `# プラン比較
 > 料金プラン
@@ -61,6 +72,26 @@ describe("table OOXML", () => {
   });
   it("escapes XML special chars in cells", () => {
     expect(tableGraphicFrameXml([["a<b>&"]], true, { x: 0, y: 0, w: 1, h: 1 }, 2)).toContain("a&lt;b&gt;&amp;");
+  });
+
+  it("#138: tblGrid is content-proportional, not an equal split — '#' col narrower than '対応状況' col", () => {
+    const box = { x: 0.5, y: 1, w: 8, h: 3 };
+    const xml = tableGraphicFrameXml(RISK_TABLE, true, box, 5);
+    const colWidths = [...xml.matchAll(/<a:gridCol w="(\d+)"\/>/g)].map((m) => Number(m[1]));
+    expect(colWidths).toHaveLength(5);
+    expect(colWidths).toEqual(computeColumnWidthsEmu(RISK_TABLE, box.w)); // shared computation (R8)
+    expect(colWidths[0]).toBeLessThan(colWidths[4]); // "#" < "対応状況"
+    expect(colWidths.reduce((a, b) => a + b, 0)).toBe(Math.round(box.w * EMU_PER_INCH)); // sums to box.w
+  });
+
+  it("#138: numeric columns ('#', '発生確率') get algn=\"r\"; text columns don't", () => {
+    const xml = tableGraphicFrameXml(RISK_TABLE, true, { x: 0, y: 0, w: 8, h: 3 }, 5);
+    // Header cell "#" is the first <a:tc> in the document → right-aligned.
+    const firstTc = xml.slice(xml.indexOf("<a:tc>"), xml.indexOf("<a:tc>", xml.indexOf("<a:tc>") + 1));
+    expect(firstTc).toContain('algn="r"');
+    // "リスク" column (2nd) is never right-aligned.
+    const riskTc = xml.slice(xml.indexOf("<a:t>リスク</a:t>") - 200, xml.indexOf("<a:t>リスク</a:t>"));
+    expect(riskTc).not.toContain('algn="r"');
   });
 });
 

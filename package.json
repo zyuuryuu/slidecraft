@@ -48,6 +48,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-http": "^2.5.9",
+    "harfbuzzjs": "^0.10.3",
     "i18next": "^26.3.6",
     "js-yaml": "^4.3.0",
     "jszip": "^3.10.1",
@@ -58,6 +59,7 @@
     "react-dom": "^19.2.7",
     "react-i18next": "^17.0.10",
     "tailwindcss": "^4.2.2",
+    "wawoff2": "^2.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -69,6 +71,7 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/wawoff2": "^1.0.2",
     "@vitejs/plugin-react": "^6.0.3",
     "esbuild": "^0.28.1",
     "eslint": "^10.7.0",

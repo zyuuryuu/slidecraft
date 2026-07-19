@@ -42,11 +42,20 @@ write slide Markdown, and follow the never-silent feedback loop until the deck i
      Format via `get_template_spec_guide`.
    - **(collab host)** `list_templates` → `use_template(id, markdown?)` — start from a registered template.
 2. **Read the contract**: `get_authoring_guide()` — this template's resolved layout names, the Markdown
-   rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code), body budget, and
-   pointers. This is your single entry point; read it before authoring.
+   rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code, `<!-- note -->`
+   speaker notes), body budget, and pointers. This is your single entry point; read it before authoring.
 3. **Write slides**: `set_slide_markdown(index, markdown)` per slide (figures/mermaid on a slide are
    auto-preserved). `get_slide(index)` gives a one-call structured edit plan (resolvedLayout, hasFigure,
-   bulletCount, budget, overBudget, this slide's issues, markdown).
+   bulletCount, budget, overBudget, this slide's issues, notes, markdown).
+   - **Speaker notes / briefing style**: put `<!-- note -->` on its own line; everything after it
+     (until the next `---`) is that slide's speaker notes — plain Markdown, invisible on the slide,
+     exported as native PPTX notes. Prefer **sparse slides + rich notes**: keep the slide to the
+     takeaway, move the narration into notes instead of overflowing the body budget.
+   - **Sections & TOC (drift-proof)**: tag an author-written chapter-cover slide with
+     `<!-- section -->` (chapter name stays a `#` heading); a block holding ONLY `<!-- toc -->`
+     becomes a derived TOC slide whose content (numbers + names) is always re-derived from the
+     section-tagged slides. Never write TOC content by hand — rename a chapter cover and the TOC
+     follows automatically, so the TOC can never diverge from the deck (G2).
 4. **Add figures**: `get_diagram_types()` → pick from the **12 authorable types** (flowchart, network,
    orgchart, sequence, timeline, quadrant, pie, gantt, journey, xychart, radar, kpi) → `get_diagram_guide(type)`
    for its syntax → `set_slide_diagram(index, source, "yaml"|"json"|"mermaid")`. class/state/ER/mindmap are

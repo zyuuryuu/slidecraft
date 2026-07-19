@@ -10,6 +10,8 @@
 import type { Session } from "./session";
 import * as S from "./session";
 import { autoSelectLayout } from "../engine/template-loader";
+import { serializeParagraphs } from "../engine/md-serializer-shared";
+import { contentBodyBox, paragraphLines, predictSplit, soleBodyPlaceholder } from "../engine/distill";
 import { GuardError } from "./guard-errors";
 
 export function getSlide(s: Session, i: number) {
@@ -30,6 +32,17 @@ export function getSlide(s: Session, i: number) {
   // figure+notes slide's body overflow is not reflected here (matches get_deck_issues' scope).
   const overBudget = issues.some((iss) => iss.levers.includes("split"));
   const bulletCount = slide.placeholders.flatMap((p) => p.paragraphs).filter((par) => par.bullet).length;
+  // #149: capacity/predictedSplit dry-run — both call distill.ts's OWN functions (contentBodyBox /
+  // soleBodyPlaceholder / paragraphLines / splitSlideToFit via predictSplit), never re-derive the
+  // fit decision here, so a prediction can't drift from what split_overflowing_slides actually does
+  // (R8). null/undefined for a figure/multi-body slide (no single measurable text body), matching
+  // overBudget's own scope.
+  const box = contentBodyBox(catalog);
+  const body = box ? soleBodyPlaceholder(slide) : undefined;
+  const capacity = box && body
+    ? { usedLines: body.paragraphs.reduce((n, p) => n + paragraphLines(p, box.charsPerLine), 0), maxLines: box.maxLines }
+    : null;
+  const predictedSplit = box ? predictSplit(slide, box) : undefined;
   return {
     index: i,
     resolvedLayout,
@@ -39,7 +52,12 @@ export function getSlide(s: Session, i: number) {
     bulletCount,
     budget, // this template's body capacity (maxBullets/charsPerBullet) or null
     overBudget,
+    capacity, // { usedLines, maxLines } for this slide's text body, or null (no measurable body) — 残容量% = usedLines/maxLines
+    predictedSplit, // { chunks, boundaries } split_overflowing_slides WOULD produce, or undefined (fits / not splittable)
     issues, // this slide's diagnostics only (levers → which fix tool)
+    notes: slide.notes?.length ? serializeParagraphs(slide.notes) : null, // speaker notes (#150), plain Markdown text
+    sectionBreak: slide.sectionBreak ?? false, // <!-- section --> chapter cover declaration (#151)
+    derived: slide.derived ?? null, // "toc" = derived slide (content re-derived; markdown is the marker only)
     markdown: S.getSlideMarkdown(s, i), // round-trip Markdown (auto layout resolved)
   };
 }

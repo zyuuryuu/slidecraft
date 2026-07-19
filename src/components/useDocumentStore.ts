@@ -45,6 +45,10 @@ export interface DocState {
   subMode: MarkdownSubMode;
   filePath: string | null;
   hostDocId?: string; // collab: the host DocRegistry doc this tab mirrors (undefined = local-only)
+  // Initialize (Import) snapshot: the deck as it stood when THIS doc's Initialize modal opened.
+  // Per-doc (#160) — subMode is per-doc too, so a shared single ref let a cross-doc switch cancel
+  // into the WRONG doc's snapshot (silent, undo-proof deck replacement). null = no open snapshot.
+  initSnapshot: DeckIR | null;
 }
 
 export interface Store {
@@ -81,6 +85,7 @@ export function makeDoc(init: Partial<DocState> = {}): DocState {
     subMode: init.subMode ?? "edit",
     filePath: init.filePath ?? null,
     hostDocId: init.hostDocId,
+    initSnapshot: init.initSnapshot ?? null,
   };
 }
 
@@ -155,6 +160,7 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
       setGotoLine: mk("gotoLine"),
       setSubMode: mk("subMode"),
       setFilePath: mk("filePath"),
+      setInitSnapshot: mk("initSnapshot"),
     };
   }, []);
 
@@ -214,6 +220,7 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
     gotoLine: active.gotoLine,
     subMode: active.subMode,
     filePath: active.filePath,
+    initSnapshot: active.initSnapshot,
     ...setters,
     // document collection (for tabs / multi-project addressing)
     docs: store.docs,

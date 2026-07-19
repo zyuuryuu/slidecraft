@@ -17,9 +17,10 @@ import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { structureManuscript } from "../engine/manuscript";
 import { refineDeck } from "../engine/refine";
 import { parseMd } from "../engine/md-parser";
-import { serializeMd } from "../engine/md-serializer";
+import { deckMarkdown, serializeTpl } from "./deck-markdown";
 import type { DeckIR } from "../engine/slide-schema";
 import type { LayoutCatalog } from "../engine/template-catalog";
+import type { TemplateData } from "../engine/template-loader";
 import type { HistoryMode } from "./useHistoryState";
 
 interface ReviseDeps {
@@ -28,10 +29,12 @@ interface ReviseDeps {
   parseMdText: (text: string, mode?: HistoryMode | "reset") => void;
   deck: DeckIR | null;
   catalog: LayoutCatalog | undefined;
+  /** Feeds the deck-level readout the binding authority (ADR-0030 stage B, #155). */
+  templateData: TemplateData | null;
   activeSlide: number;
 }
 
-export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, activeSlide }: ReviseDeps) {
+export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, templateData, activeSlide }: ReviseDeps) {
   // Non-destructive deck review (overflow / long bullets / key-value / missing title).
   const diagnostics = useMemo(() => (deck && catalog ? diagnoseDeck(deck, catalog) : []), [deck, catalog]);
   // The template's content-body capacity → the budget half of the slide-fix contract.
@@ -67,14 +70,16 @@ export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, a
     const base = structured && structured !== mdText.trim() ? structured : mdText;
     let result = base;
     if (catalog) {
-      const { deck: tidied } = await refineDeck(distillDeck(parseMd(base), catalog), catalog, { level: 2 });
-      result = serializeMd(tidied);
+      // tpl feeds ONLY the serialize side (change-log md + this readout) — refineDeck's convergence
+      // stays diagnoseDeck(deck, catalog), untouched (see refine.ts).
+      const { deck: tidied } = await refineDeck(distillDeck(parseMd(base), catalog), catalog, { level: 2, tpl: serializeTpl(catalog, templateData) });
+      result = deckMarkdown(tidied, catalog, templateData);
     }
     if (result.trim() && result.trim() !== mdText.trim()) {
       setMdText(result); // editor records this as one undoable step
       parseMdText(result, "silent");
     }
-  }, [mdText, catalog, setMdText, parseMdText]);
+  }, [mdText, catalog, templateData, setMdText, parseMdText]);
 
   // ── Fix ONE diagnostic, mechanically (deterministic lever: visualize → table) ──
   const handleFixIssue = useCallback(
