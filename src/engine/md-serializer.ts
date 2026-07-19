@@ -18,7 +18,8 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
+import { tableToMarkdown } from "./md-table";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
 
@@ -154,20 +155,24 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
 
     // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
     // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
-    // single-body table/code is NEVER column-scoped: a figure slide that merely RESOLVED to a
+    // single-body code/image is NEVER column-scoped: a figure slide that merely RESOLVED to a
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
-    // trailing table/code into the last column). So the separator branch requires no single-body figure.
+    // trailing figure into the last column). A table is the SAME — UNLESS it's genuinely
+    // column-scoped (#100: bound to its own region beside other real column content), which
+    // isColumnScopedTable (shared with md-serializer-plan, R8) distinguishes from that mis-pin.
     const sepType = slide.groupKind ?? getSeparatorType(layout);
-    const singleBodyFigure = !!(slide.table || slide.code || (slide.image && !slide.image.behind));
+    const tableColumnScoped = isColumnScopedTable(slide);
+    const singleBodyFigure = !!(slide.code || (slide.image && !slide.image.behind) || (slide.table && !tableColumnScoped));
 
     if (sepType && !singleBodyFigure) {
       // Multi-section: each numbered region (column) becomes a section. A region may
-      // hold TEXT or a FIGURE (diagram/mermaid) — emit the figure's fenced block in
+      // hold TEXT or a FIGURE (diagram/mermaid/table) — emit the figure's fenced block in
       // its own column so text+figure COEXISTENCE round-trips (the figure sits beside
       // the bullets instead of replacing them). Iterate 1..max so column positions
       // (hence the figure's placeholderIdx) survive even with gaps/empties.
       const diagIdx = slide.diagram ? parseInt(slide.diagram.placeholderIdx) : NaN;
       const mermIdx = slide.mermaidBlock ? parseInt(slide.mermaidBlock.placeholderIdx) : NaN;
+      const tableIdx = tableColumnScoped ? parseInt(slide.table!.placeholderIdx) : NaN;
       let maxCol = 0;
       for (const p of slide.placeholders) {
         const n = parseInt(p.idx);
@@ -175,6 +180,7 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
       }
       if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
       if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
+      if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
 
       for (let col = 1; col <= maxCol; col++) {
         lines.push(`<!-- ${sepType} -->`);
@@ -186,6 +192,8 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
           lines.push("```mermaid");
           lines.push(slide.mermaidBlock!.mermaid);
           lines.push("```");
+        } else if (col === tableIdx) {
+          lines.push(tableToMarkdown(slide.table!.rows));
         } else {
           const ph = slide.placeholders.find((p) => p.idx === String(col));
           if (ph) lines.push(serializeParagraphs(ph.paragraphs));

@@ -4,11 +4,11 @@
  * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
-import { extractBodyTable } from "./md-body-table";
+import { findTableInLines, extractBodyTable } from "./md-body-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
@@ -285,6 +285,9 @@ export function parseSlideBlock(
   let mermaidBlock: MermaidBlock | undefined;
   let code: CodeBlock | undefined;
   let image: ImageBlock | undefined;
+  // Declared here (not just in the standard-parse path below) so the separator branch can ALSO
+  // bind a column-scoped GFM table (#100) — mirroring how diagram/mermaidBlock are shared.
+  let table: TableBlock | undefined;
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -347,8 +350,8 @@ export function parseSlideBlock(
     sections.forEach((sectionLines, i) => {
       const colIdx = String(i + 1);
       const sl = trimBodyLines(sectionLines); // drop the blank lines around each column
-      // A column may be a FIGURE (a ```diagram / ```mermaid block) instead of text —
-      // bind it to THIS column's idx so the figure coexists beside the other columns.
+      // A column may be a FIGURE (a ```diagram / ```mermaid block, or a GFM table, #100) instead
+      // of text — bind it to THIS column's idx so the figure coexists beside the other columns.
       const fig = extractFencedBlock(sl);
       if (fig && (fig.lang === "diagram" || fig.lang === "mermaid-shapes")) {
         diagram = { yaml: fig.content, placeholderIdx: colIdx };
@@ -357,18 +360,24 @@ export function parseSlideBlock(
         if (f.diagram) diagram = f.diagram;
         else mermaidBlock = f.mermaidBlock;
       } else {
-        const paras = linesToParagraphs(sl);
-        if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
+        const found = findTableInLines(sl);
+        if (found) {
+          table = { rows: found.rows, header: true, placeholderIdx: colIdx };
+        } else {
+          const paras = linesToParagraphs(sl);
+          if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
+        }
       }
     });
 
-    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image && !notes?.length) return null;
+    if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !image && !notes?.length) return null;
 
     return {
       layout,
       placeholders,
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
+      ...(table ? { table } : {}),
       ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
       ...(notes?.length ? { notes } : {}),
       ...(sectionBreak ? { sectionBreak: true } : {}),
@@ -498,7 +507,8 @@ export function parseSlideBlock(
   // is merged into idx "1" the same way plain body text is, appending to an EXISTING idx "1" (a
   // title layout's subtitle) rather than creating a duplicate the serializer would silently drop.
   const trimmedBody = trimBodyLines(bodyLines);
-  const { table, leftover } = extractBodyTable(trimmedBody, notices);
+  const { table: foundTable, leftover } = extractBodyTable(trimmedBody, notices);
+  if (foundTable) table = foundTable;
   if (leftover.length > 0) {
     const bodyParas = linesToParagraphs(leftover);
     const existing = placeholders.find((p) => p.idx === "1");

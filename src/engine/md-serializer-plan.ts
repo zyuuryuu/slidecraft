@@ -17,7 +17,8 @@ import type { LayoutCatalog, PlaceholderRole } from "./template-catalog";
 import { slideBindingPlan } from "./group-binding";
 import { sortByIdx } from "./placeholder-binding";
 import { TITLE_NS, META_FIELDS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, getSeparatorType } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
+import { tableToMarkdown } from "./md-table";
 
 /**
  * The template context that lets the serializer read a slide back out through the SAME binding
@@ -65,7 +66,12 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
   const diagIdx = slide.diagram ? parseInt(slide.diagram.placeholderIdx) : NaN;
   const mermIdx = slide.mermaidBlock ? parseInt(slide.mermaidBlock.placeholderIdx) : NaN;
   const bodyIsh = (col: number) => roleOf.get(String(col)) === "body" || diagIdx === col || mermIdx === col;
-  const singleBodyFigure = !!(slide.table || slide.code || (slide.image && !slide.image.behind));
+  // A table is column-scoped (#100) only when the slide has ANOTHER real body region beside it —
+  // else it's the slide's ONLY content, merely (mis)pinned to a Column/KPI/Process layout name,
+  // which must still serialize single-body (isColumnScopedTable, shared with md-serializer.ts, R8).
+  const tableColumnScoped = isColumnScopedTable(slide);
+  const tableIdx = tableColumnScoped ? parseInt(slide.table!.placeholderIdx) : NaN;
+  const singleBodyFigure = !!(slide.code || (slide.image && !slide.image.behind) || (slide.table && !tableColumnScoped));
   // Separator form when the layout name says so (canonical Column./KPI./Process.), or the slide holds a
   // title + ≥2 positional body regions — the legacy Columns fallback classification, so a third-party
   // template's multi-region slide keeps its <!-- col --> markers instead of collapsing into one body.
@@ -79,6 +85,7 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
     }
     if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
     if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
+    if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
 
     for (let col = 1; col <= maxCol; col++) {
       lines.push(`<!-- ${sepType} -->`);
@@ -90,6 +97,8 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
         lines.push("```mermaid");
         lines.push(slide.mermaidBlock!.mermaid);
         lines.push("```");
+      } else if (col === tableIdx) {
+        lines.push(tableToMarkdown(slide.table!.rows));
       } else {
         const ph = slide.placeholders.find((p) => p.idx === String(col));
         if (ph && roleOf.get(ph.idx) === "body") lines.push(serializeParagraphs(ph.paragraphs));

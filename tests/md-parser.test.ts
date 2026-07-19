@@ -107,6 +107,41 @@ describe("parseMd — lead paragraph + table coexistence (#101)", () => {
   });
 });
 
+// #100: column 内の GFM テーブルがネイティブ表として列位置に出る
+describe("parseMd — column-scoped GFM table (#100)", () => {
+  it("a GFM table alone in a <!-- col --> section becomes a native table bound to that column", () => {
+    const md = `# Comparison
+
+<!-- col -->
+| A | B |
+| --- | --- |
+| 1 | 2 |
+
+<!-- col -->
+Right content`;
+    const s = parseMd(md).slides[0];
+    expect(s.table?.rows).toEqual([["A", "B"], ["1", "2"]]);
+    expect(s.table?.placeholderIdx).toBe("1"); // 1st column
+    expect(s.placeholders.find((p) => p.idx === "2")?.paragraphs[0]?.segments[0]?.text).toBe("Right content");
+  });
+
+  it("round-trips without collapsing into a single-body table (columns survive)", () => {
+    const md = `# Comparison
+
+<!-- col -->
+| A | B |
+| --- | --- |
+| 1 | 2 |
+
+<!-- col -->
+Right content`;
+    const once = parseMd(md).slides[0];
+    const back = parseMd(serializeMd({ slides: [once] })).slides[0];
+    expect(back.table?.rows).toEqual([["A", "B"], ["1", "2"]]);
+    expect(back.placeholders.find((p) => p.idx === "2")?.paragraphs[0]?.segments[0]?.text).toBe("Right content");
+  });
+});
+
 describe("parseMd", () => {
   // ── Basic structure ──
 
