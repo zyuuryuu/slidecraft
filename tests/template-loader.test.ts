@@ -25,15 +25,15 @@ beforeAll(async () => {
 });
 
 describe("loadTemplate", () => {
-  it("loads 30 layouts", () => {
-    expect(tpl.layouts).toHaveLength(30);
+  it("loads 31 layouts", () => {
+    expect(tpl.layouts).toHaveLength(31); // 30 canonical + SectionNav.1TitleList.Single (#167)
   });
 
   it("each layout has a name and index", () => {
     for (const layout of tpl.layouts) {
       expect(layout.name).toBeTruthy();
       expect(layout.index).toBeGreaterThanOrEqual(1);
-      expect(layout.index).toBeLessThanOrEqual(30);
+      expect(layout.index).toBeLessThanOrEqual(31);
     }
   });
 

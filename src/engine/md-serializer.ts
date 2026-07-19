@@ -20,6 +20,7 @@ import { autoSelectLayout } from "./template-loader";
 import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType } from "./md-serializer-shared";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
+import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
 
 export type { SerializeTemplate } from "./md-serializer-plan";
 
@@ -40,6 +41,7 @@ function serializeSlide(
   slide: SlideIR,
   slideIndex: number,
   totalSlides: number,
+  sections: SectionEntry[],
   tpl?: SerializeTemplate,
 ): string {
   const lines: string[] = [];
@@ -49,6 +51,23 @@ function serializeSlide(
   // (#151 / ADR-0032 D2: the deck never persists duplicated chapter state).
   if (slide.derived === "toc") {
     return "<!-- toc -->";
+  }
+
+  // A section-break slide materialized with the recap-list layout (#167) folds back to "auto" +
+  // drops the injected idx-1 chapter list — that content is re-derived at every consumption point
+  // (deck-sections.materializeDerivedSlides), so even a materialized deck writes nothing back
+  // (mirrors the derived-toc fold above). The layout NAME alone is NOT proof of injection — since
+  // it's a real entry in LAYOUT_NAMES, an author can explicitly pin it too and write their own idx-1
+  // body (a real round-trip loss if we stripped unconditionally, caught in review). So the fold only
+  // fires when idx-1's content DEEP-EQUALS what materialize would have derived for this exact slide —
+  // an authored pin+body can never coincidentally match the numbered/bold recap text.
+  if (slide.sectionBreak && slide.layout === SECTION_NAV_LIST_LAYOUT) {
+    const current = sections.find((s) => s.slideIndex === slideIndex);
+    const list = slide.placeholders.find((p) => p.idx === "1");
+    const derived = current ? sectionNavParagraphs(sections, current.number) : undefined;
+    if (current && list && JSON.stringify(list.paragraphs) === JSON.stringify(derived)) {
+      slide = { ...slide, layout: "auto", placeholders: slide.placeholders.filter((p) => p.idx !== "1") };
+    }
   }
 
   const layout =
@@ -208,6 +227,9 @@ export function serializeMd(deck: DeckIR, tpl?: SerializeTemplate): string {
     parts.push("");
   }
 
+  // Computed once (not per-slide) — feeds the recap-list fold guard above (#167).
+  const sections = deck.slides.some((s) => s.sectionBreak) ? scanSections(deck) : [];
+
   // Slides
   for (let i = 0; i < deck.slides.length; i++) {
     if (i > 0) {
@@ -215,7 +237,7 @@ export function serializeMd(deck: DeckIR, tpl?: SerializeTemplate): string {
       parts.push("---");
       parts.push("");
     }
-    parts.push(serializeSlide(deck.slides[i], i, deck.slides.length, tpl));
+    parts.push(serializeSlide(deck.slides[i], i, deck.slides.length, sections, tpl));
   }
 
   return parts.join("\n").trimEnd() + "\n";

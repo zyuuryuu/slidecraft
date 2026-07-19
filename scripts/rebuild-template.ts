@@ -286,6 +286,13 @@ const LAYOUTS: { name: string; placeholders: PhDef[] }[] = [
     { name: "ActionSteps.Left", type: "body", idx: 1, x: 1.2, y: 2.2, w: 6.8, h: 4.0, fontSize: 15, fontName: "Calibri", fontColor: "ice_blue", bold: false, align: "l" },
     { name: "Notes.Right", type: "body", idx: 2, x: 9.1, y: 1.3, w: 3.4, h: 5.0, fontSize: 14, fontName: "Calibri", fontColor: "white", bold: false, align: "l" },
   ]},
+  // 30: SectionNav.1TitleList.Single（#167 — physically added by scripts/add-section-nav-list-layout.ts;
+  // listed here so a future rebuild() re-run stays in sync with template-layout-library.ts）
+  { name: "SectionNav.1TitleList.Single", placeholders: [
+    { name: "Title.Top", type: "body", idx: 15, x: 1.2, y: 1.3, w: 10.5, h: 1.0, fontSize: 34, fontName: "Georgia", fontColor: "white", bold: true, align: "l" },
+    { name: "Subtitle.Top", type: "body", idx: 16, x: 1.2, y: 2.35, w: 10.5, h: 0.5, fontSize: 15, fontName: "Calibri", fontColor: "ice_blue", bold: false, align: "l" },
+    { name: "ChapterList.Bottom", type: "body", idx: 1, x: 1.2, y: 3.0, w: 10.5, h: 4.0, fontSize: 17, fontName: "Calibri", fontColor: "ice_blue", bold: false, align: "l" },
+  ]},
 ];
 
 // Master defaults
@@ -428,7 +435,7 @@ async function rebuild() {
   // Verify
   const verify = await JSZip.loadAsync(buf);
   let totalPhs = 0;
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 1; i <= LAYOUTS.length; i++) {
     const xml = await verify.file(`ppt/slideLayouts/slideLayout${i}.xml`)!.async("string");
     const phs = (xml.match(/<p:ph/g) || []).length;
     totalPhs += phs;

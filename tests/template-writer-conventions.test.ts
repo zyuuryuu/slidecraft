@@ -13,6 +13,7 @@ import JSZip from "jszip";
 import { writeTemplate, MIDNIGHT_PALETTE } from "../src/engine/template-writer";
 import { loadTemplate } from "../src/engine/template-loader";
 import { buildCatalog, assessTemplateHealth } from "../src/engine/template-catalog";
+import { BUILTIN_LAYOUTS } from "../src/engine/template-layout-library";
 
 let bytes: Uint8Array;
 let zip: JSZip;
@@ -41,7 +42,7 @@ describe("C1 マスター placeholder（継承の祖先）", () => {
   it("読み戻しゲートは不変（health ok・レイアウト数・マスター ph がレイアウトを汚染しない）", async () => {
     const tpl = await loadTemplate(bytes);
     expect(assessTemplateHealth(buildCatalog(tpl)).status).toBe("ok");
-    expect(tpl.layouts.length).toBe(30);
+    expect(tpl.layouts.length).toBe(BUILTIN_LAYOUTS.length);
     // レイアウト側の placeholder 構成は従来どおり（マスター ph はレイアウトに混入しない）
     expect(tpl.layouts[0].placeholders.length).toBe(5);
   });
