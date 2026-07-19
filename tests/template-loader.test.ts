@@ -55,11 +55,12 @@ describe("loadTemplate", () => {
     expect(idxs).toContain("0");
   });
 
-  it("body placeholder inherits the master bullet (this template = none)", () => {
+  it("body placeholder inherits the master bullet (#102: baked buChar '•' into bodyStyle)", () => {
     const l7 = tpl.layouts.find((l) => l.index === 7)!; // Content.1Body.Single
     const body = l7.placeholders.find((p) => p.idx === "1")!;
-    // Master uses buNone → no bullet glyph; we must follow that, not force "▸".
-    expect(body.style.bulletChar).toBe("");
+    // Master bodyStyle lvl1 now has buChar "•" (scripts/add-body-bullet-style.ts) so a bullet
+    // paragraph (no per-shape override) inherits it — we must follow that, not force "".
+    expect(body.style.bulletChar).toBe("•");
   });
 
   it("placeholder shapes contain XML", () => {
