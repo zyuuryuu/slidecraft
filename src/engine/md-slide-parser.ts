@@ -154,12 +154,58 @@ function matchImageLine(trimmed: string): ImageBlock | null {
   return { src: m[2], alt: m[1], placeholderIdx: "1", ...parseImageAttrs(m[3]) };
 }
 
+// ── Comment-only line stripping (#147) ──
+
+/** A line that is NOTHING but comments — one or more complete `<!-- … -->` units
+ *  (optionally whitespace-separated), plus the WHATWG abrupt-close forms `<!-->` /
+ *  `<!--->`. All render as nothing in any HTML view. A line with visible text outside
+ *  the markers never matches (inline-comment strip = #147 第2弾スコープ). */
+const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
+/** Directive comments that carry meaning — the layout pin and the group separators. */
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card)\s*-->$)/;
+
+/**
+ * #147: Drop non-directive comment-only lines (review notes / TODO markers / source IDs
+ * an upstream agent or human left in the Markdown) so they never render onto a slide.
+ * A dropped comment also swallows the blank lines directly ABOVE it — the comment
+ * "paragraph" disappears whole (`A\n\n<!-- note -->\nB` glues to `A\nB`), while a blank
+ * AFTER it still separates content as authored. Fence interiors pass through verbatim
+ * (a ``` block keeps comment-looking strings), and directive comments are untouched.
+ * Dropped comments do NOT round-trip: the serializer never sees them (spec'd in #147).
+ */
+function stripCommentOnlyLines(lines: string[]): string[] {
+  const out: string[] = [];
+  const pendingBlanks: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith("```")) {
+      inFence = !inFence;
+      out.push(...pendingBlanks.splice(0), line);
+    } else if (inFence) {
+      out.push(line);
+    } else if (t === "") {
+      pendingBlanks.push(line);
+    } else if (COMMENT_ONLY_RE.test(t) && !DIRECTIVE_COMMENT_RE.test(t)) {
+      pendingBlanks.length = 0; // the comment paragraph swallows its leading blanks
+    } else {
+      out.push(...pendingBlanks.splice(0), line);
+    }
+  }
+  out.push(...pendingBlanks); // trailing blanks (trimBodyLines handles them downstream)
+  return out;
+}
+
 // ── Parse a single slide block ──
 
 export function parseSlideBlock(
   lines: string[],
   startLine: number,
 ): SlideIR | null {
+  // sourceLineStart/End must span the ORIGINAL block — useDeckRevise slices the raw
+  // Markdown by these — so capture the length before comment lines are stripped.
+  const sourceLen = lines.length;
+  lines = stripCommentOnlyLines(lines);
   let layout = "auto";
   const placeholders: PlaceholderContent[] = [];
   let title: string | undefined;
@@ -259,7 +305,7 @@ export function parseSlideBlock(
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
       sourceLineStart: startLine,
-      sourceLineEnd: startLine + lines.length - 1,
+      sourceLineEnd: startLine + sourceLen - 1,
     };
   }
 
@@ -413,7 +459,7 @@ export function parseSlideBlock(
     ...(code ? { code } : {}),
     ...(image ? { image } : {}),
     sourceLineStart: startLine,
-    sourceLineEnd: startLine + lines.length - 1,
+    sourceLineEnd: startLine + sourceLen - 1,
   };
 }
 
