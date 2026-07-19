@@ -18,7 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, getSeparatorType } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType } from "./md-serializer-shared";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 
 export type { SerializeTemplate } from "./md-serializer-plan";
@@ -73,6 +73,9 @@ function serializeSlide(
     lines.push("");
     lines.push(imageLine(slide.image));
   }
+
+  // Speaker notes are ALWAYS the slide's last emission (the parser reads marker→slide-end as notes).
+  lines.push(...notesLines(slide));
 
   return lines.join("\n");
 }
