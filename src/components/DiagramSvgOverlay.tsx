@@ -7,7 +7,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import * as yaml from "js-yaml";
+import { loadYaml } from "../engine/yaml-io";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
 import { DiagramSpecSchema, EdgeStyleSchema } from "../engine/schema";
@@ -30,7 +30,7 @@ type OverlayProps = {
 export default function DiagramSvgOverlay(props: OverlayProps) {
   const type = useMemo(() => {
     try {
-      return DiagramSpecSchema.safeParse(yaml.load(props.diagramYaml)).data?.type;
+      return DiagramSpecSchema.safeParse(loadYaml(props.diagramYaml)).data?.type;
     } catch {
       return undefined;
     }
@@ -58,7 +58,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
 
   const spec = useMemo(() => {
     try {
-      const parsed = DiagramSpecSchema.safeParse(yaml.load(diagramYaml));
+      const parsed = DiagramSpecSchema.safeParse(loadYaml(diagramYaml));
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -156,7 +156,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
 
   function writeOverride(id: string, ov: Override) {
     try {
-      const raw = yaml.load(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
+      const raw = loadYaml(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
       const node = raw.nodes?.find((n) => n.id === id);
       if (!node) return;
       const round = (v: number) => Math.round(v * 100) / 100;
@@ -173,7 +173,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
 
   function clearOverride(id: string) {
     try {
-      const raw = yaml.load(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
+      const raw = loadYaml(diagramYaml) as { nodes?: Array<Record<string, unknown>> };
       const node = raw.nodes?.find((n) => n.id === id);
       if (!node) return;
       delete node.override;
@@ -185,7 +185,7 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
 
   function writeEdgePort(idx: number, srcPort: number) {
     try {
-      const raw = yaml.load(diagramYaml) as { edges?: Array<Record<string, unknown>> };
+      const raw = loadYaml(diagramYaml) as { edges?: Array<Record<string, unknown>> };
       const edge = raw.edges?.[idx];
       if (!edge) return;
       const style = { ...((edge.style as Record<string, unknown>) ?? {}) };
