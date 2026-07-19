@@ -282,4 +282,12 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
     { name: "ActionSteps.Left", type: "body", idx: 1, x: 1.2, y: 2.2, w: 6.8, h: 4.0, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
     { name: "Notes.Right", type: "body", idx: 2, x: 9.1, y: 1.3, w: 3.4, h: 5.0, fontSize: 14, font: "minor", color: "titleText", bold: false, align: "l" },
   ]},
+  // 30: SectionNav.1TitleList.Single — 章扉の全章リスト再掲＋現在章強調（#167 / ADR-0032 D2 段階3）。
+  // idx15/16/1 は Content.* と同じ canonical idx（title/subtitle/body）— materializeDerivedSlides が
+  // 直接 idx-exact でバインドできるよう選定（ADR-0011 pass-1）。
+  { name: "SectionNav.1TitleList.Single", family: "dark", placeholders: [
+    { name: "Title.Top", type: "body", idx: 15, x: 1.2, y: 1.3, w: 10.5, h: 1.0, fontSize: 34, font: "major", color: "titleText", bold: true, align: "l" },
+    { name: "Subtitle.Top", type: "body", idx: 16, x: 1.2, y: 2.35, w: 10.5, h: 0.5, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
+    { name: "ChapterList.Bottom", type: "body", idx: 1, x: 1.2, y: 3.0, w: 10.5, h: 4.0, fontSize: 17, font: "minor", color: "subtle", bold: false, align: "l" },
+  ]},
 ];

@@ -14,7 +14,13 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { parseMd } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
-import { scanSections, tocParagraphs, materializeDerivedSlides } from "../src/engine/deck-sections";
+import {
+  scanSections,
+  tocParagraphs,
+  sectionNavParagraphs,
+  materializeDerivedSlides,
+  SECTION_NAV_LIST_LAYOUT,
+} from "../src/engine/deck-sections";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 import type { DeckIR } from "../src/engine/slide-schema";
@@ -188,5 +194,132 @@ describe("generatePptx — 目次スライドの導出内容が出力される (
     }
     expect(all).toContain("1. 現状分析");
     expect(all).toContain("2. 解決策");
+  });
+});
+
+// ── アジェンダ再掲（#167 / ADR-0032 D2 段階3）: 章扉に全章リスト＋現在章強調 ──
+
+const MD3 = `<!-- section -->
+# 現状分析
+
+---
+
+# 詳細スライド
+
+- 内容
+
+---
+
+<!-- section -->
+# 解決策
+
+---
+
+<!-- section -->
+# まとめ
+`;
+
+describe("sectionNavParagraphs (#167)", () => {
+  it("全章を箇条書きにし、現在章のみ bold", () => {
+    const sections = scanSections(parseMd(MD3));
+    const paras = sectionNavParagraphs(sections, 2);
+    expect(paras.map((p) => p.segments[0].text)).toEqual(["1. 現状分析", "2. 解決策", "3. まとめ"]);
+    expect(paras.map((p) => !!p.segments[0].bold)).toEqual([false, true, false]);
+  });
+});
+
+describe("materializeDerivedSlides — 章扉の全章リスト再掲＋現在章強調 (#167)", () => {
+  it("3 章デッキ: 2 番目の章扉に全 3 章のリストが出て 2 番目だけ強調される", () => {
+    const deck = materializeDerivedSlides(parseMd(MD3));
+    const chapter2 = deck.slides[2]; // slides: [0]現状分析 [1]詳細 [2]解決策 [3]まとめ
+    expect(chapter2.sectionBreak).toBe(true);
+    expect(chapter2.layout).toBe(SECTION_NAV_LIST_LAYOUT);
+    const list = chapter2.placeholders.find((p) => p.idx === "1");
+    expect(list?.paragraphs.map((p) => p.segments[0].text)).toEqual(["1. 現状分析", "2. 解決策", "3. まとめ"]);
+    expect(list?.paragraphs.map((p) => !!p.segments[0].bold)).toEqual([false, true, false]);
+    // 章タイトル自体（idx 15）は既存のまま
+    expect(chapter2.placeholders.find((p) => p.idx === "15")?.paragraphs[0].segments[0].text).toBe("解決策");
+  });
+
+  it("章名（# 見出し）の変更が全章扉の再掲に反映される", () => {
+    const deck = parseMd(MD3);
+    const renamed: DeckIR = {
+      ...deck,
+      slides: deck.slides.map((s, i) =>
+        i === 0
+          ? {
+              ...s,
+              placeholders: s.placeholders.map((p) =>
+                p.idx === "15" ? { ...p, paragraphs: [{ segments: [{ text: "現状と課題" }] }] } : p,
+              ),
+            }
+          : s,
+      ),
+    };
+    const materialized = materializeDerivedSlides(renamed);
+    for (const idx of [0, 2, 3]) {
+      const list = materialized.slides[idx].placeholders.find((p) => p.idx === "1");
+      expect(list?.paragraphs[0].segments[0].text).toBe("1. 現状と課題");
+    }
+  });
+
+  it("section タグが無いデッキは同一参照のまま", () => {
+    const deck = parseMd("# T\n\n- a");
+    expect(materializeDerivedSlides(deck)).toBe(deck);
+  });
+
+  it("layout がピン済みの章扉は上書きしない（レイアウトも再掲も追加しない）", () => {
+    const md = `<!-- section -->\n<!-- slide: Section.1Title.Single -->\n# 第 1 部\n\n---\n\n<!-- section -->\n# 第 2 部\n`;
+    const deck = materializeDerivedSlides(parseMd(md));
+    const first = deck.slides[0];
+    expect(first.layout).toBe("Section.1Title.Single"); // ピンは尊重
+    expect(first.placeholders.some((p) => p.idx === "1")).toBe(false); // 再掲は注入しない
+  });
+
+  it("既に本文（idx 1）を持つ章扉は上書きしない（no-silent-drop: 著者コンテンツを保護）", () => {
+    const md = `<!-- section -->\n# 第 1 部\n\n- 既存の本文\n\n---\n\n<!-- section -->\n# 第 2 部\n`;
+    const deck = materializeDerivedSlides(parseMd(md));
+    const first = deck.slides[0];
+    // 既存の layout・本文がそのまま（強制ピンも再掲上書きもしない）
+    const body = first.placeholders.find((p) => p.idx === "1");
+    expect(body?.paragraphs[0].segments[0].text).toBe("既存の本文");
+  });
+
+  it("元の deck オブジェクトは変更しない（materialize は非破壊）", () => {
+    const deck = parseMd(MD3);
+    const before = JSON.stringify(deck);
+    materializeDerivedSlides(deck);
+    expect(JSON.stringify(deck)).toBe(before);
+  });
+});
+
+describe("serializeMd — 章扉の再掲は md に漏れない (#167)", () => {
+  it("宣言（元 deck）の往復には再掲リストが一切現れない", () => {
+    const round = serializeMd(parseMd(MD3));
+    expect(round).not.toContain("1. 現状分析");
+    expect(round).not.toContain("2. 解決策");
+    expect((round.match(/<!-- section -->/g) ?? []).length).toBe(3);
+  });
+});
+
+describe("generatePptx — 章扉の全章リスト再掲が PPTX に出力される (#167)", () => {
+  it("3 章デッキ → 2 番目の章扉のスライド XML に全章＋強調（bold run）が入る", async () => {
+    const buf = await generatePptx(parseMd(MD3), tpl);
+    const zip = await JSZip.loadAsync(buf);
+    const slideFiles = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+    let chapter2Xml = "";
+    for (const name of slideFiles) {
+      const xml = await zip.files[name].async("string");
+      // the slide whose TITLE (bare, no "N. " prefix) is "解決策" — not just any slide whose recap
+      // list happens to mention it (every chapter's recap lists all chapter names).
+      if (xml.includes("<a:t>解決策</a:t>")) chapter2Xml = xml;
+    }
+    expect(chapter2Xml).toContain("1. 現状分析");
+    expect(chapter2Xml).toContain("2. 解決策");
+    expect(chapter2Xml).toContain("3. まとめ");
+    // 現在章（2. 解決策）の run だけ bold・他章は bold なし
+    expect(chapter2Xml).toContain('<a:r><a:rPr b="1"/><a:t>2. 解決策</a:t></a:r>');
+    expect(chapter2Xml).toContain("<a:r><a:t>1. 現状分析</a:t></a:r>");
+    expect(chapter2Xml).toContain("<a:r><a:t>3. まとめ</a:t></a:r>");
   });
 });

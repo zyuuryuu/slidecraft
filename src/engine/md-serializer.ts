@@ -20,6 +20,7 @@ import { autoSelectLayout } from "./template-loader";
 import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType } from "./md-serializer-shared";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
+import { SECTION_NAV_LIST_LAYOUT } from "./deck-sections";
 
 export type { SerializeTemplate } from "./md-serializer-plan";
 
@@ -49,6 +50,16 @@ function serializeSlide(
   // (#151 / ADR-0032 D2: the deck never persists duplicated chapter state).
   if (slide.derived === "toc") {
     return "<!-- toc -->";
+  }
+
+  // A section-break slide materialized with the recap-list layout (#167) folds back to "auto" +
+  // drops the injected idx-1 chapter list — that content is re-derived at every consumption point
+  // (deck-sections.materializeDerivedSlides), so even a materialized deck writes nothing back
+  // (mirrors the derived-toc fold above). materializeDerivedSlides only ever assigns this exact
+  // layout name to a sectionBreak slide when it injected the list (an explicit author pin to this
+  // name is left alone by materialize when idx "1" is already used — see usesBodyIdx1).
+  if (slide.sectionBreak && slide.layout === SECTION_NAV_LIST_LAYOUT) {
+    slide = { ...slide, layout: "auto", placeholders: slide.placeholders.filter((p) => p.idx !== "1") };
   }
 
   const layout =

@@ -41,6 +41,7 @@ export const LAYOUT_NAMES = [
   "Summary.2Block.Equal",
   "Closing.1Message.Single",
   "Closing.1Steps.Single+1Notes",
+  "SectionNav.1TitleList.Single",
 ] as const;
 
 export type LayoutName = (typeof LAYOUT_NAMES)[number];
