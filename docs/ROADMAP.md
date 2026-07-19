@@ -5,12 +5,12 @@
 CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [shipped.md](shipped.md)、決定は
 [docs/adr/](adr/)、設計仕様は [docs/design/](design/)。
 
-**現在地（2026-07-13）**：**v0.3.0 タグ打ち直し前**（draft のまま未公開）。目玉は **faithful Re-make**
-（デザイン保持＋フォント正規化・[ADR-0027](adr/0027-remake-source-visual-preservation.md)・日本語 EA
-フォント保持）＋**取り込み透明化 UX**（進捗/結果バー・ミニプレビュー・削除）＋**Master-Intake F0/F1
-基盤**（任意マスターの取り込み理解＝病理センサス／sanitize-master 双子／決定論スコアラー／do-no-harm
-ゲート・→[shipped](shipped.md)）。**AI Re-make（option C）は撤去**（[ADR-0028](adr/0028-retire-ai-remake-option-c.md)）。
-取り込みは「忠実 Import／faithful Re-make／決定論 Re-make」に整理。
+**現在地（2026-07-19）**：v0.3.0 タグ済み。直近マイルストーンは **BindingPlan＝束縛の単一権威化**
+（[ADR-0030](adr/0030-binding-plan-single-authority.md)・段階A/B 完了＝未束縛の warn 化＋
+serializer/GUI 全経路の写像統一。C–E は下表）、**保守性ゲート**（[ADR-0031](adr/0031-maintainability-gates.md)・
+arch-conformance が CI 必須化・R8 一致テスト規則）、**敵対 fixture 第2弾＋型×幾何の矛盾センサス**
+（実コーパスで矛盾 0＝type メタデータ信頼の実証 → 層1の梯子→融合転換は当面不要、というデータ決着）、
+**オーサリング拡張の設計確定**（ノート記法 #150・章タグ/目次 #151＝READY・ADR-0032 系）。
 
 ---
 
@@ -18,14 +18,17 @@ CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [
 
 | テーマ | 中身 | Issues |
 | --- | --- | --- |
-| **任意マスター取り込み理解** | scorer 復元の拡張（figure/subtitle）・複数 master・AI ラストマイル・geometryRole の header 誤認 | [`master-intake`](https://github.com/zyuuryuu/slidecraft/labels/master-intake) |
+| **束縛の一元化（ADR-0030 C–E）** | closing の受け皿選択 → 段階C（グループ超過の根治）→ D（buildFieldMap）→ E（group 統合・着手時に起票） | #153 #135 |
+| **オーサリング表現力（ADR-0032）** | ノート記法・章タグ＋目次（READY）→ アジェンダ再掲・フッタ章名／ネスト箇条書き | #150 #151 → #167 #168・#103 |
+| **パーサ / 診断（変換レポートの完成）** | パース時フォールバック計上・容量 dry-run・CRLF・列内表/混在本文・グループセル見出し・GUI コメント段落（要判断） | #148 #149 #164 #100 #101 #102 #165 |
+| **任意マスター取り込み理解** | 未束縛の UI surface・複数 master・グループ変換合成・野生コーパス収集・AI ラストマイル・表紙 subtitle（証拠待ち） | [`master-intake`](https://github.com/zyuuryuu/slidecraft/labels/master-intake)（#97 #99 #116 #128 #142 #143） |
+| **既定テンプレ品質** | group 検出の自己整合（card/step）・日本語体裁（ea/buChar）・内蔵30オミット・Re-make dark ロゴ | #136 #137 #117 #118 |
+| **表・描画 / HTML** | 表の列幅/nowrap 乖離・図ノード衝突/折返し・SmartArt 追随・@font-face CJK 埋め込み | #138 #139 #104 #105 #115 |
 | **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
-| **HTML / 描画品質** | 図のノード衝突/折返し・SmartArt/複雑図形の追随・@font-face CJK 埋め込み | #104 #105 #115 |
-| **MCP / 連携** | エンドポイント2種の統合・スライドスクショ取得 | [`mcp`](https://github.com/zyuuryuu/slidecraft/labels/mcp) |
-| **リリース / 配布** | アプリアイコン・Win 署名・Intel mac・通知/署名付き自動更新 | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release) #114 #120 |
-| **オーサリング / パーサ** | インデント・混在本文＋表・列内 table・セル整形・未閉じ fence | #88 #89 #100 #101 #102 #103 |
-| **テンプレ資産 / 負債** | 内蔵30オミット・Re-make dark ロゴ・.scft version ゲート | [`tech-debt`](https://github.com/zyuuryuu/slidecraft/labels/tech-debt) #118 |
-| **セキュリティ** | egress hard boundary（F1'・Rust ゲート） | #119 |
+| **GUI / アプリ堅牢性** | クロス doc snapshot データ損失・最背面画像ドラッグ・Help 導線・.scft version ゲート | #160 #122 #114 #121 |
+| **MCP / 連携** | スライドスクショ取得（上流 AI の視覚レビューループ）・容量 read 増補 | [`mcp`](https://github.com/zyuuryuu/slidecraft/labels/mcp)（#109 #149） |
+| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・通知/署名付き自動更新・egress hard boundary | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#113 #120）・#119 |
+| **保守性（ADR-0031 運用）** | arch-census（G3）・凍結/許可リストの ratchet 縮小（分割は #129 型）・ADR 索引ドリフト | #158 #130 |
 
 ---
 
@@ -37,12 +40,17 @@ CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [
   大規模テンプレのロール推定ズレ＝偽（tbl/chart/pic は idx 分岐より先に尊重）。実在は
   [ADR-0023](adr/0023-third-party-master-idx-convention.md) 既知エッジ（規約 opt-in マスタの
   body@idx15/16 誤分類）のみで、素朴な typed-title ゲート修正は同梱テンプレを退行させるため不可。
+- **矛盾センサスで実証（2026-07-19・#146）**：実コーパス（会社 .potx 7種＋CX）で type×幾何の矛盾 0
+  ＝type メタデータは健全マスターで信頼できる。幾何の重み上げが効くのは velis 型の野生テンプレのみ
+  → 層1の梯子→融合転換は #143（野生コーパス）で実例が溜まったら再計測して判断。
 
 ---
 
 ## 依存・運用（継続追跡）
 
-- **js-yaml v5** — dependabot PR #13（OPEN）：4.3.0 → 5.2.1（メジャー）。破壊的変更の確認待ち。
+- **dependabot OPEN**：#123 `serde_with` 3.21（security fix 含む・cargo）・#93 `sysinfo` 0.39・
+  #92 `gitleaks-action` v3（Node 24 移行）。js-yaml v5（メジャー）はブランチのみ＝破壊的変更の確認待ち。
 - **依存脆弱性** — 残 1 件＝`glib`（medium）は gtk-rs/Tauri スタックに固定＝**Tauri の GTK バインディング
-  更新待ち**（実害小）。npm 系は vitepress 2.x（alpha）で解消済、stable 化したら追随。
+  更新待ち**（実害小）。
 - **会社 `.potx`(7) ＋ CX** — `tests/fixtures/templates/` に **gitignore**（知財・ローカル限定・skipIf のみ参照）。
+  再現可能な代替は Dirty_* 合成 fixture 群＋（将来）#143 の双子。

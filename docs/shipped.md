@@ -4,6 +4,11 @@
 
 ## 基盤・アーキテクチャ
 
+- **BindingPlan＝束縛の単一権威化（段階A/B）** — 束縛の観測型 `resolveBinding`/`slideBindingPlan` を導入し #97/#135/#128 系の silent-drop を全 MCP サーフェスで warn 化（段階A）、serializer と GUI の deck-level/per-slide readout を束縛と同一写像に統一し closing 語彙タイトル消失・round-trip 破壊を根治（段階B）。証拠ポリシーの層別（層2＝配管は合成 fixture で着手可）も本 ADR で明文化 （ADR-0030・PR #152/#156/#161/#162・2026-07-18〜19）
+- **保守性ゲート＝構造規約の実行可能化** — 権威 import 許可リスト・R2 純度・R1 凍結リスト・循環禁止を `arch-conformance.test.ts` で CI 必須化（ratchet 運用＝リスト縮小が改善の実測値）、R8「意味の重複禁止＝一致テスト必須」を CLAUDE.md/PR テンプレに制度化 （ADR-0031・PR #157・2026-07-18）
+- **敵対 fixture 第2弾（valid・見た目キレイ・慣習だけ汚い）** — Dirty_AllBody（全部 body 型）/ Dirty_Legacy43（4:3・継承だのみ・typeless/巨大 idx）/ Dirty_Grouped（スケール付きグループ内見出し＝census 盲点）を合成しコミット。#128/#144 の再現台・ADR-0030 層2ポリシーの試験台 （PR #154・2026-07-18）
+- **型×幾何の矛盾センサス（層1融合判断の実測データ）** — `typeIdxRole` 抽出（byte-identical）＋ `PathologyReport.conflicts` で「type の答えに幾何が異議を唱える枠」を計上。実コーパス（会社7種＋CX）で矛盾 0・velis のみ 9 ＝「type は健全マスターで信頼できる」をデータで決着、梯子→融合の大転換を当面不要と判断 （#146・PR #166・2026-07-19）
+- **非ディレクティブ HTML コメントの drop** — レビュー注記・TODO・出典 ID の comment-only 行が本文としてスライドに印字される罠を修正（fence 内素通し・WHATWG 異常終端形対応・sourceLine 維持）。上流エージェントの SSoT 運用（md に作業注記を残したまま変換）が可能に （#147・PR #163・2026-07-19）
 - **プレースホルダ⇄入力の全単射** — `buildFieldMap` がマーカープローブで `bindContentByRole` の全単射を実証、2-pass バインド（idx-exact → role）で疎カラムの漏れ/上書きを是正、敵対ファズで見つけた 9 件の実バグを不変条件テストで封鎖 （ADR-0011・2026-07-02）
 - **OOXML スタイル階層＝lstStyle は差分のみ** — Theme がフォント定義、Master が参照（+mj-lt/+mn-lt）、Layout の lstStyle は差分のみ、Slide はテキストのみ。placeholder-filler は `<a:t>` のみ差し替え lstStyle/spPr を保全し master UI 編集が流れ続ける （ADR-0004）
 - **主面＝視覚 deck（Markdown は入出力のみ）** — DeckIR を単一の真実とし視覚 Edit を主面に、Markdown は Initialize モーダル（入力）＋`serializeMd`（出力）に限定、統一 deck-history undo （ADR-0002・2026-06）
