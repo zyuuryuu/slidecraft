@@ -105,6 +105,7 @@
 
 ## 協働・MCP
 
+- **MCP 管制の単一化（stdio が commitMutation に合流）** — stdio（cli.ts）専用の「単一 Session 直いじり」mutate 経路を廃止し、buildServer は常に HostContext を解決（collab は既存の DocRegistry、stdio は `createSoloHostContext` が回りに mint するソロ版）して全 mutation を commitMutation 経由に統一。stdio も undo/redo/list/select_document を additive に獲得し、resources.ts は固定 Session でなく sole doc を都度読む。口（stdio/HTTP）はそのまま維持・廃止したのは「2つ目の管制」のみ （ADR-0033 D1・#222）
 - **`get_slide` に容量ドライラン（capacity / predictedSplit）** — 本文容量の実測 `capacity.usedLines/maxLines` と、`split_overflowing_slides` を実行せず何枚に割れるかの `predictedSplit`（chunks/boundaries）を追加。予測は distill.ts の `splitSlideToFit` そのものを呼ぶため実行結果と構造的に一致（R8・予測==実行の同値性テスト付き）。read-only（deck/dirty 不変） （#149・PR #188・2026-07-19）
 - **host `new_project` のタブ名を先頭見出しから導出（B4）** — host モードで AI が作った Deck のタブが常に「Untitled」だった（`session.ts` が templateName を "" にリセット）のを、純粋ヘルパ `deckTitle`（先頭スライドの title placeholder＝idx 0/15）で先頭見出しから命名。`use_template`/`open_project` は既存の templateName 名が優先、見出し無しは「Untitled」にフォールバック。golden 非影響 （他AIレポート・2026-07-07）
 - **Live MCP で AI が作った Deck を GUI タブに（モード b）** — 協働ホストの multi-doc を GUI に橋渡し。AI が `new_project` で作った Deck を**背景タブ**として開く（表示は切り替えない＝押すと開く）。タブ切替で projection のミラー先を `setTargetDoc`、ローカルタブは pause して clobber 防止。seed は `open_project` の戻り docId で race-free に link。`makeDoc` が新フィールドを落とすバグをテストで検出→修正 （2026-07-07）
