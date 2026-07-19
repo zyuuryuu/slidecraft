@@ -54,6 +54,14 @@ function parseInline(text: string): InlineSegment[] {
 
 // ── Parse lines into paragraphs ──
 
+/** Undo the serializer's `\<!-- … -->` escape (#165): a plain line's leading `\<` is the ONLY
+ *  backslash form stripped here — no general backslash-escape mechanism (scope kept minimal, per
+ *  the issue's confirmed fix). The serializer only ever emits this lead for a comment-only plain
+ *  paragraph, so pre-existing visible text is never produced in this shape by round-tripping. */
+function unescapeCommentLead(trimmed: string): string {
+  return trimmed.startsWith("\\<") ? trimmed.slice(1) : trimmed;
+}
+
 function linesToParagraphs(lines: string[], opts?: { cellHeading?: boolean }): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   for (const line of lines) {
@@ -96,7 +104,7 @@ function linesToParagraphs(lines: string[], opts?: { cellHeading?: boolean }): P
         ...(level > 0 ? { level } : {}),
       });
     } else {
-      paragraphs.push({ segments: parseInline(trimmed) });
+      paragraphs.push({ segments: parseInline(unescapeCommentLead(trimmed)) });
     }
   }
   return paragraphs;
