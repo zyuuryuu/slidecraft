@@ -179,10 +179,16 @@ Phase 4
 | `*斜体*` | `<a:rPr i="1">` |
 | `- リスト` | `<a:p>` + ブレット |
 | `<!-- note -->` 以降（スライド末尾まで） | スピーカーノート（`SlideIR.notes` → `ppt/notesSlides/notesSlideN.xml`、ADR-0032 D1） |
+| `<!-- section -->`（単独行） | 章境界の宣言（`SlideIR.sectionBreak`。章扉は著者スライド、ADR-0032 D2） |
+| `<!-- toc -->` のみのブロック | 目次の派生スライド（`SlideIR.derived: "toc"`。内容は消費点で毎回導出、ADR-0032 D2） |
 
 `<!-- note -->` はマーカー単独行のみが記法で、以降のノート本文は素の Markdown（複数行・箇条書き・強調可）。
 notes が空のスライドには notesSlide パートを一切生成しない（ノート無しデッキの出力不変を構造的に担保）。
 distill の自動分割時、ノートは先頭チャンクのみに残す。
+
+章一覧（採番＋章名）は `deck-sections.ts` の純関数が section タグ付きスライドを毎回スキャンして導出し、
+`materializeDerivedSlides` が消費点（PPTX export / HTML export / preview）で目次スライドに埋める。
+DeckIR には章構造の複製状態を持たず（R8）、シリアライザは目次を `<!-- toc -->` の 1 行にのみ畳む。
 
 ### 3.3 タイトルスライド専用フィールド
 

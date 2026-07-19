@@ -64,6 +64,18 @@ describe("drift gate — L1 features the guide teaches actually parse", () => {
     ]);
   });
 
+  it("the guide advertises sections/TOC, and the taught <!-- section --> / <!-- toc --> forms actually parse (#151)", () => {
+    const p = slideSystemPrompt();
+    expect(p).toContain("## Sections & Table of Contents");
+    expect(p).toContain("<!-- section -->");
+    expect(p).toContain("<!-- toc -->");
+    // The taught form: toc-only block + a tagged author-written chapter cover.
+    const md = "<!-- toc -->\n\n---\n\n<!-- section -->\n# Chapter Name\n\n> optional chapter subtitle\n";
+    const deck = parseMd(md);
+    expect(deck.slides[0].derived).toBe("toc");
+    expect(deck.slides[1].sectionBreak).toBe(true);
+  });
+
   it("<!-- col --> (one per column) splits the body into regions; content before the first is not a column", () => {
     // Each `<!-- col -->` LEADS a column (splitBySeparator skips pre-first-separator lines) — the
     // guide teaches "one per region", so the taught format has a separator before every column.

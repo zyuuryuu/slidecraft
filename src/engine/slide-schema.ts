@@ -163,6 +163,8 @@ export const SlideIRSchema = z.object({
   image: ImageBlockSchema.optional(), // embedded image (![alt](data URI) → <img> / PPTX pic)
   groupKind: z.enum(["card", "step", "kpi"]).optional(), // `<!-- card/step/kpi -->` groups → layout hint
   notes: z.array(ParagraphSchema).optional(), // `<!-- note -->` 以降のスピーカーノート（ADR-0032 D1、R4 承認済み）
+  sectionBreak: z.boolean().optional(), // `<!-- section -->` 章境界の宣言（ADR-0032 D2、R4 承認済み）— 章一覧は毎回スキャン導出（R8）
+  derived: z.literal("toc").optional(), // `<!-- toc -->` 派生スライド。内容は常に再導出し md へはマーカー 1 行のみ書き戻す
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });

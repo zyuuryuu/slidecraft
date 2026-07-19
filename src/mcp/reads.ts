@@ -42,6 +42,8 @@ export function getSlide(s: Session, i: number) {
     overBudget,
     issues, // this slide's diagnostics only (levers → which fix tool)
     notes: slide.notes?.length ? serializeParagraphs(slide.notes) : null, // speaker notes (#150), plain Markdown text
+    sectionBreak: slide.sectionBreak ?? false, // <!-- section --> chapter cover declaration (#151)
+    derived: slide.derived ?? null, // "toc" = derived slide (content re-derived; markdown is the marker only)
     markdown: S.getSlideMarkdown(s, i), // round-trip Markdown (auto layout resolved)
   };
 }
