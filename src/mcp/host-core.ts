@@ -43,6 +43,11 @@ export interface HostContext {
   setActive(extra: unknown, docId: string): void;
   /** AI clients see only shared docs (private-by-default); the GUI sees all. */
   sharedOnly: boolean;
+  /** Solo (stdio) adapter marker (ADR-0033 D1): exactly ONE doc is ever open. open/new_project
+   *  mint a fresh doc as usual, then the caller (server.ts's openInHost) sweeps any OTHER doc out of
+   *  the registry so `soleDocId()` keeps resolving and resources/undo stay pinned to one doc. Absent
+   *  (falsy) for the real collab host, where multiple docs coexist by design. */
+  solo?: boolean;
   /** The template registry the AI can pick from (list_templates / use_template, S2 増分2). The
    *  registry actually LIVES in the webview (useMasterRegistry / master-store, Tauri fs); the sidecar
    *  is Node with no fs plugin, so the GUI PUSHES it over the protocol (register_templates) into this
@@ -95,6 +100,24 @@ export class MemTemplateStore implements TemplateStore {
   getBytes(id: string): Uint8Array | undefined {
     return this.items.get(id)?.bytes;
   }
+}
+
+/** The single control plane's stdio adapter (ADR-0033 D1): wraps an already-created Session in a
+ *  one-doc DocRegistry so `buildServer` can route stdio's mutations through the SAME commitMutation
+ *  + undo history as the collab host, instead of a second (now-retired) direct-Session mutate path.
+ *  `active()` has nothing to track (there is only ever one doc, resolved via `soleDocId()`), and
+ *  there is no fan-out/notify — solo has no other connections to tell. Token-less, matching stdio's
+ *  OS-user trust boundary (ADR-0007) — `solo` never touches host-security's loopback+token gate. */
+export function createSoloHostContext(initialSession: Session): HostContext {
+  const registry = new DocRegistry();
+  registry.create(initialSession, "Untitled", true);
+  return {
+    registry,
+    active: () => undefined,
+    setActive: () => {},
+    sharedOnly: false,
+    solo: true,
+  };
 }
 
 /** A live map of docId → DocEntry. Holds NO transport/connection state (that lives in host.ts). */

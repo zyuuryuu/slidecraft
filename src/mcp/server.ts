@@ -1,13 +1,17 @@
 /**
  * server.ts — wires the engine Session (session.ts) to MCP as a tight set of tools. The upstream
  * agent IS the LLM; these tools are the deterministic engine ops, so the server never calls a
- * model. Two modes share ONE registration path:
- *  - stdio (cli.ts, the 正 baseline): one fixed Session; tools resolve to it; listener-less.
+ * model. ONE control plane (ADR-0033 D1): every mutation resolves a DocEntry and commits through
+ * `commitMutation` (per-doc undo history + a forward-only rev) — there is no second, direct-Session
+ * mutate path. Two transports share this single registration path:
+ *  - stdio (cli.ts): a SOLO HostContext (`createSoloHostContext`, host-core.ts) — exactly one doc,
+ *    resolved via `soleDocId()`, no fan-out/notify, no token (OS-user trust boundary, ADR-0007).
  *  - host (host.ts, P2 collab): a DocRegistry of many docs; each tool resolves the connection's
- *    target doc (explicit docId → active doc → sole doc), mutations commit through per-doc undo
- *    history + a forward-only rev, and the doc-lifecycle tools (list/select/close/undo/redo +
- *    new/open mint-new-doc) come online. The same 18 deck tools work in both modes.
- * Read-only deck state is ALSO exposed as MCP resources (deck://…) in stdio; opt-out in host.
+ *    target doc (explicit docId → active doc → sole doc), and the doc-lifecycle tools
+ *    (list/select/close/undo/redo + new/open mint-new-doc) come online. The same 18 deck tools work
+ *    in both.
+ * Read-only deck state is ALSO exposed as MCP resources (deck://…) — a per-transport config flag
+ * (`registerResources`), on by default (stdio), opt-out in collab (the GUI is the read surface there).
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -21,7 +25,7 @@ import * as R from "./reads";
 import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
-import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc } from "./host-core";
+import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
 
 interface ToolResult {
@@ -55,8 +59,9 @@ const withHints = (v: unknown): unknown => {
 };
 
 /** Build options. `onMutate` fires AFTER a mutating tool actually changed the deck — the seam the
- *  collab host uses to broadcast deckChanged. stdio passes nothing, so it's a no-op. `host` flips
- *  the server into multi-doc/collab mode. `registerResources:false` drops the deck:// resources. */
+ *  collab host uses to broadcast deckChanged. `host` supplies the control plane (DocRegistry +
+ *  commitMutation); omit it and a SOLO one is minted around `session` (stdio's default — ADR-0033
+ *  D1). `registerResources:false` drops the deck:// resources (collab opts out; stdio keeps them). */
 export interface BuildServerOptions {
   onMutate?: (tool: string) => void;
   registerResources?: boolean;
@@ -65,31 +70,33 @@ export interface BuildServerOptions {
 
 export function buildServer(session: Session, opts: BuildServerOptions = {}): McpServer {
   const server = new McpServer({ name: "slidecraft", version: "0.3.0" });
-  const host = opts.host;
+  // ONE control plane always: an explicit host (collab) or a solo one minted around `session`
+  // (stdio and any caller that doesn't bring its own multi-doc registry).
+  const host: HostContext = opts.host ?? createSoloHostContext(session);
   const index = { index: z.number().int().describe("0-based slide index") };
-  // Optional target doc (host mode only; ignored in stdio where there is one Session).
-  const doc = { docId: z.string().optional().describe("対象ドキュメント（host のみ。省略時は選択doc/唯一doc）") };
+  const doc = { docId: z.string().optional().describe("対象ドキュメント（省略時は選択doc/唯一doc）") };
   // Optional optimistic-concurrency fields (host mode, P2.5): a client-generated opId so the
   // originator can suppress its own deckChanged echo, and expectedRev so a stale edit (the doc moved
-  // on under it) is rejected NEVER-SILENTLY. Absent on AI edits and in stdio.
+  // on under it) is rejected NEVER-SILENTLY. Absent on AI edits and in stdio (a solo doc has no
+  // concurrent writer, so expectedRev is never stale there — but the field still round-trips).
   const cc = {
     opId: z.string().optional().describe("クライアント生成の操作ID（echo 抑制用・host のみ）"),
     expectedRev: z.number().int().optional().describe("この編集が前提とする rev。現在 rev と不一致なら stale 拒否（host のみ）"),
   };
 
-  // ── doc resolution ── stdio: the lone Session. host: explicit docId → connection active doc →
-  // the sole open doc; otherwise never-silent ("select a document").
+  // ── doc resolution ── explicit docId → connection active doc → the sole open doc; otherwise
+  // never-silent ("select a document"). Solo stdio always has exactly one doc, so this always
+  // resolves via soleDocId() without a docId/active().
   const entryOf = (extra: unknown, docId?: string): DocEntry => {
-    const h = host;
-    if (!h) throw new GuardError("host モードではありません", "host-mode-required");
-    const id = docId ?? h.active(extra) ?? h.registry.soleDocId();
+    const id = docId ?? host.active(extra) ?? host.registry.soleDocId();
     if (!id) throw new GuardError("ドキュメントが選択されていません（select_document か docId を指定してください）。", "document-not-selected");
-    return h.registry.get(id);
+    return host.registry.get(id);
   };
-  const sessionOf = (extra: unknown, docId?: string): Session => (host ? entryOf(extra, docId).session : session);
+  const sessionOf = (extra: unknown, docId?: string): Session => entryOf(extra, docId).session;
 
-  // A deck MUTATION: stdio runs the handler + fires onMutate on success; host commits through the
-  // doc's undo history + bumps rev. A {ok:false} reject never bumps rev / fires onMutate.
+  // A deck MUTATION always commits through commitMutation (per-doc undo history + forward-only
+  // rev) — there is no second, direct-Session mutate path (ADR-0033 D1). A {ok:false} reject never
+  // bumps rev / fires onMutate.
   const mutate = async (
     extra: unknown,
     docId: string | undefined,
@@ -97,15 +104,6 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     fn: (s: Session) => unknown | Promise<unknown>,
     cc?: { opId?: string; expectedRev?: number },
   ): Promise<ToolResult> => {
-    if (!host) {
-      try {
-        const v = await fn(session);
-        if (!(v && typeof v === "object" && (v as { ok?: unknown }).ok === false)) opts.onMutate?.(tool);
-        return ok(withHints(v));
-      } catch (e) {
-        return fail(e);
-      }
-    }
     try {
       const entry = entryOf(extra, docId);
       // Optimistic-concurrency guard (P2.5): a human edit carries the rev it was based on; if the doc
@@ -117,7 +115,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       const { result, changed, rev } = await commitMutation(entry, fn);
       if (changed) {
         opts.onMutate?.(tool);
-        host.onMutated?.(entry, tool, cc?.opId); // fan out deckChanged (opId lets the originator suppress its echo)
+        host.onMutated?.(entry, tool, cc?.opId); // fan out deckChanged (opId lets the originator suppress its echo); no-op in solo
       }
       if (changed && result && typeof result === "object") return ok(withHints({ ...(result as object), rev, docId: entry.docId, opId: cc?.opId }));
       return ok(withHints(result));
@@ -126,17 +124,23 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     }
   };
 
-  // open/new: stdio replaces the lone Session; host MINTS a new doc (fresh Session + docId, its
-  // own seeded history) and notifies the GUI to open a tab. Resolves R1 scope issue #4.
-  const openInHost = (load: (s: Session) => Promise<unknown>, extra: unknown): Promise<ToolResult> =>
+  // open/new: MINTS a new doc (fresh Session + docId, its own seeded history) and notifies the GUI
+  // to open a tab. In SOLO mode (`host.solo`), any other doc is swept out right after so the
+  // registry keeps exactly one doc (soleDocId() keeps resolving; undo/redo/resources stay pinned to
+  // it) — additive undo/redo for stdio without a second control plane.
+  const openInHost = (tool: string, load: (s: Session) => Promise<unknown>, extra: unknown): Promise<ToolResult> =>
     run(async () => {
       const s = S.createSession(null);
       const res = await load(s);
       // Tab name: the template name if known (open_project / use_template), else derive from the deck's
       // first-slide heading (an AI's new_project brings no template name → was always "Untitled"), else fall back.
-      const entry = host!.registry.create(s, s.meta.templateName || deckTitle(s.deck) || "Untitled", true); // AI-created = shared
-      host!.setActive(extra, entry.docId);
-      host!.notifyOpened?.(entry);
+      const entry = host.registry.create(s, s.meta.templateName || deckTitle(s.deck) || "Untitled", true); // AI-created = shared
+      if (host.solo) {
+        for (const d of host.registry.list()) if (d.docId !== entry.docId) host.registry.remove(d.docId);
+      }
+      host.setActive(extra, entry.docId);
+      host.notifyOpened?.(entry);
+      opts.onMutate?.(tool); // minting a doc always changes state — unlike an in-place edit, there's no no-op case here
       return { ...(res as object), docId: entry.docId };
     });
 
@@ -156,13 +160,13 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // ── entry: open / new ──
   server.registerTool(
     "open_project",
-    { description: "base64 の .scft を開く（host では新しいドキュメントとして開く）", inputSchema: { dataBase64: z.string() } },
-    (a, extra) => (host ? openInHost(withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))), extra) : mutate(extra, undefined, "open_project", withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))))),
+    { description: "base64 の .scft を開く（新しいドキュメントとして mint）", inputSchema: { dataBase64: z.string() } },
+    (a, extra) => openInHost("open_project", withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))), extra),
   );
   server.registerTool(
     "new_project",
-    { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規作成（host では新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types。テンプレ base64 が無ければ create_template で生成できる", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
-    (a, extra) => (host ? openInHost(withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)), extra) : mutate(extra, undefined, "new_project", withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)))),
+    { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規作成（新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types。テンプレ base64 が無ければ create_template で生成できる", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
+    (a, extra) => openInHost("new_project", withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)), extra),
   );
 
   // ── reads ──
@@ -226,103 +230,105 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       }),
   );
 
-  // ── host-only: multi-doc lifecycle + server-side undo ──
-  if (host) {
-    server.registerTool("list_documents", { description: "開いているドキュメント一覧（AI クライアントは共有docのみ＝private-by-default）。各docに contract（書式ダイジェスト）付き", }, (extra) =>
-      run(() => ({
-        documents: host.registry.list({ sharedOnly: host.sharedOnly }).map((d) => {
-          const c = safeContract(host.registry.get(d.docId).session); // so the list→operate flow carries the contract
-          return c ? { ...d, contract: c } : d;
-        }),
-        activeDocId: host.active(extra) ?? null,
-      })),
-    );
-    server.registerTool("select_document", { description: "このコネクションの対象ドキュメントを切り替える（AI 版 switchDoc。deck は変えない）", inputSchema: { docId: z.string() } }, ({ docId }, extra) =>
-      run(() => {
-        const e = host.registry.get(docId);
-        host.setActive(extra, docId);
-        // The AI may enter a doc via select — carry the contract here too (also on open/new + list_documents).
-        const c = safeContract(e.session);
-        return { docId: e.docId, slideCount: e.session.deck?.slides.length ?? 0, rev: e.rev, ...(c ? { contract: c } : {}) };
+  // ── multi-doc lifecycle + server-side undo (additive on solo stdio: 1 doc, no-op-ish) ──
+  server.registerTool("list_documents", { description: "開いているドキュメント一覧（AI クライアントは共有docのみ＝private-by-default）。各docに contract（書式ダイジェスト）付き", }, (extra) =>
+    run(() => ({
+      documents: host.registry.list({ sharedOnly: host.sharedOnly }).map((d) => {
+        const c = safeContract(host.registry.get(d.docId).session); // so the list→operate flow carries the contract
+        return c ? { ...d, contract: c } : d;
       }),
-    );
-    server.registerTool("close_document", { description: "ドキュメントを閉じる（dirty は force 必須＝never-silent）", inputSchema: { docId: z.string(), force: z.boolean().optional() } }, ({ docId, force }) =>
-      run(() => {
-        const e = host.registry.get(docId);
-        if (e.session.dirty && !force) return { ok: false as const, closed: false as const, dirty: true as const };
-        host.registry.remove(docId);
-        host.notifyClosed?.(docId);
-        return { ok: true as const, closed: true as const };
-      }),
-    );
-    server.registerTool("undo", { description: "サーバ側 Undo：このドキュメントの真実を1手戻す（新しい forward rev を発行）", inputSchema: doc }, (a, extra) =>
-      run(() => {
-        const e = entryOf(extra, a.docId);
-        const r = undoDoc(e);
-        if (r.ok) {
-          opts.onMutate?.("undo");
-          host.onMutated?.(e, "undo");
-        }
-        return { ...r, docId: e.docId };
-      }),
-    );
-    server.registerTool("redo", { description: "サーバ側 Redo：直前の Undo を取り消す", inputSchema: doc }, (a, extra) =>
-      run(() => {
-        const e = entryOf(extra, a.docId);
-        const r = redoDoc(e);
-        if (r.ok) {
-          opts.onMutate?.("redo");
-          host.onMutated?.(e, "redo");
-        }
-        return { ...r, docId: e.docId };
-      }),
-    );
+      activeDocId: host.active(extra) ?? null,
+    })),
+  );
+  server.registerTool("select_document", { description: "このコネクションの対象ドキュメントを切り替える（AI 版 switchDoc。deck は変えない）", inputSchema: { docId: z.string() } }, ({ docId }, extra) =>
+    run(() => {
+      const e = host.registry.get(docId);
+      host.setActive(extra, docId);
+      // The AI may enter a doc via select — carry the contract here too (also on open/new + list_documents).
+      const c = safeContract(e.session);
+      return { docId: e.docId, slideCount: e.session.deck?.slides.length ?? 0, rev: e.rev, ...(c ? { contract: c } : {}) };
+    }),
+  );
+  server.registerTool("close_document", { description: "ドキュメントを閉じる（dirty は force 必須＝never-silent）", inputSchema: { docId: z.string(), force: z.boolean().optional() } }, ({ docId, force }) =>
+    run(() => {
+      const e = host.registry.get(docId);
+      if (e.session.dirty && !force) return { ok: false as const, closed: false as const, dirty: true as const };
+      host.registry.remove(docId);
+      host.notifyClosed?.(docId);
+      return { ok: true as const, closed: true as const };
+    }),
+  );
+  server.registerTool("undo", { description: "サーバ側 Undo：このドキュメントの真実を1手戻す（新しい forward rev を発行）", inputSchema: doc }, (a, extra) =>
+    run(() => {
+      const e = entryOf(extra, a.docId);
+      const r = undoDoc(e);
+      if (r.ok) {
+        opts.onMutate?.("undo");
+        host.onMutated?.(e, "undo");
+      }
+      return { ...r, docId: e.docId };
+    }),
+  );
+  server.registerTool("redo", { description: "サーバ側 Redo：直前の Undo を取り消す", inputSchema: doc }, (a, extra) =>
+    run(() => {
+      const e = entryOf(extra, a.docId);
+      const r = redoDoc(e);
+      if (r.ok) {
+        opts.onMutate?.("redo");
+        host.onMutated?.(e, "redo");
+      }
+      return { ...r, docId: e.docId };
+    }),
+  );
 
-    // ── template selection (host-only; T3/S2 増分2) ── the AI DISCOVERS registered templates
-    // (list_templates) and STARTS a project from one (use_template) without carrying bytes. The master
-    // registry lives in the webview (useMasterRegistry / Tauri fs); the sidecar is Node with no fs
-    // plugin, so the GUI PUSHES it in via register_templates (gui-role only), mirroring how it seeds
-    // the deck. stdio has neither → it uses create_template / brings bytes to new_project.
-    const requireTemplates = (): TemplateStore => {
-      if (!host.templates) throw new GuardError("テンプレレジストリが未接続です（create_template で新規作成するか、new_project に bytes を渡してください）", "template-registry-unavailable");
-      return host.templates;
-    };
-    server.registerTool("list_templates", { description: "登録済みテンプレの一覧（GUI の master レジストリ）＝{id,name,builtin}。id を use_template に渡して着手。bytes を持たない/stdio は create_template で生成" }, () => run(() => ({ templates: requireTemplates().list() })));
+  // ── template selection (T3/S2 増分2) ── the AI DISCOVERS registered templates (list_templates)
+  // and STARTS a project from one (use_template) without carrying bytes. The master registry lives
+  // in the webview (useMasterRegistry / Tauri fs); the sidecar is Node with no fs plugin, so the GUI
+  // PUSHES it in via register_templates (gui-role only), mirroring how it seeds the deck. Solo stdio
+  // has neither → list/use degrade never-silently to a create_template hint (unless a caller wires
+  // `host.templates` itself, e.g. tests).
+  const requireTemplates = (): TemplateStore => {
+    if (!host.templates) throw new GuardError("テンプレレジストリが未接続です（create_template で新規作成するか、new_project に bytes を渡してください）", "template-registry-unavailable");
+    return host.templates;
+  };
+  server.registerTool("list_templates", { description: "登録済みテンプレの一覧（GUI の master レジストリ）＝{id,name,builtin}。id を use_template に渡して着手。bytes を持たない/stdio は create_template で生成" }, () => run(() => ({ templates: requireTemplates().list() })));
+  server.registerTool(
+    "use_template",
+    { description: "登録済みテンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id"), markdown: z.string().optional() } },
+    (a, extra) =>
+      openInHost(
+        "use_template",
+        withContract(async (s) => {
+          const store = requireTemplates();
+          const bytes = store.getBytes(a.id);
+          if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
+          const res = await S.newProject(s, bytes, a.markdown);
+          const name = store.list().find((t) => t.id === a.id)?.name;
+          if (name) s.meta.templateName = name; // the minted doc's tab is named after the template
+          return res;
+        }),
+        extra,
+      ),
+  );
+  if (!host.sharedOnly) {
+    // gui-role only: the human's webview uploads its registry so the AI can select from it. An AI
+    // client (sharedOnly) never gets this tool, so it can't spoof the shared template set.
     server.registerTool(
-      "use_template",
-      { description: "登録済みテンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id"), markdown: z.string().optional() } },
-      (a, extra) =>
-        openInHost(
-          withContract(async (s) => {
-            const store = requireTemplates();
-            const bytes = store.getBytes(a.id);
-            if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
-            const res = await S.newProject(s, bytes, a.markdown);
-            const name = store.list().find((t) => t.id === a.id)?.name;
-            if (name) s.meta.templateName = name; // the minted doc's tab is named after the template
-            return res;
-          }),
-          extra,
-        ),
+      "register_templates",
+      { description: "（GUI 専用）webview の master レジストリを host に登録し AI が list_templates/use_template で選べるようにする。呼ぶ度に全置換（GUI の一覧が真実）", inputSchema: { templates: z.array(z.object({ id: z.string(), name: z.string(), builtin: z.boolean(), bytesBase64: z.string() })) } },
+      (a) =>
+        run(() => {
+          requireTemplates().register(a.templates.map((t) => ({ id: t.id, name: t.name, builtin: t.builtin, bytes: unb64(t.bytesBase64) })));
+          return { ok: true as const, count: a.templates.length };
+        }),
     );
-    if (!host.sharedOnly) {
-      // gui-role only: the human's webview uploads its registry so the AI can select from it. An AI
-      // client (sharedOnly) never gets this tool, so it can't spoof the shared template set.
-      server.registerTool(
-        "register_templates",
-        { description: "（GUI 専用）webview の master レジストリを host に登録し AI が list_templates/use_template で選べるようにする。呼ぶ度に全置換（GUI の一覧が真実）", inputSchema: { templates: z.array(z.object({ id: z.string(), name: z.string(), builtin: z.boolean(), bytesBase64: z.string() })) } },
-        (a) =>
-          run(() => {
-            requireTemplates().register(a.templates.map((t) => ({ id: t.id, name: t.name, builtin: t.builtin, bytes: unb64(t.bytesBase64) })));
-            return { ok: true as const, count: a.templates.length };
-          }),
-      );
-    }
   }
 
   // ── read-only deck state as MCP resources (deck://… , slide://{i}/markdown) ──
-  // Opt-out in host/collab mode: the GUI is the human's surface there, so resources are orphaned.
-  if (opts.registerResources !== false && !host) registerResources(server, session);
+  // A per-transport config flag, not a mode split (ADR-0033 D1): solo stdio defaults ON (no GUI, so
+  // resources ARE the read surface); collab passes registerResources:false (the GUI is the read
+  // surface there).
+  if (opts.registerResources !== false) registerResources(server, host);
 
   return server;
 }
