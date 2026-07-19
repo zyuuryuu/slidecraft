@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **CRLF 入力の正規化（layout pin 無効化の根治）** — Windows 由来の CRLF Markdown で `<!-- slide: -->` layout pin が無効化されディレクティブ行が本文に印字される既存バグを、`parseMd` 入口の CRLF→LF 正規化（行数不変＝sourceLine 非影響）で根治。front-matter の raw 行照合も同時に救済、LF 入力は `toEqual` 同値で不変を担保 （#164・PR #187・2026-07-19）
 - **`<!-- section -->` 章タグ＋採番＋ `<!-- toc -->` 導出目次（乖離しない目次）** — 章扉は著者が書く普通のスライド（章名は `#` 見出しのまま）＋タグで章境界を宣言し、章番号と目次を `scanSections` 単一関数から毎回導出（`deck-sections.ts`・R2/R8）。消費 3 点（PPTX/HTML/プレビュー）とも同一の materialize を通り、md へは `<!-- toc -->` 1 行のみ書き戻す＝目次と本文の乖離が構造的に起きない。宣言なしデッキは同一参照素通り。段階 3/4（アジェンダ再掲・フッタ章名）は #167/#168 （ADR-0032・#151・PR #182・2026-07-19）
 - **スピーカーノート記法 `<!-- note -->`（ブリーフィング型の土台）** — マーカー以降スライド末尾までを素の Markdown のノートとして `SlideIR.notes` へ取り込み、PPTX notesSlide/notesMaster 生成・HTML の `n` キートグル・distill 分割は先頭チャンクのみ・MCP `get_slide` 露出まで配線。ノート無しデッキの出力不変（PPTX パート不生成・HTML byte-identical）を構造的に担保。「スライドは疎に・詳細はノートへ」が成立 （ADR-0032・#150・PR #176・2026-07-19）
 - **BindingPlan＝束縛の単一権威化（段階A/B）** — 束縛の観測型 `resolveBinding`/`slideBindingPlan` を導入し #97/#135/#128 系の silent-drop を全 MCP サーフェスで warn 化（段階A）、serializer と GUI の deck-level/per-slide readout を束縛と同一写像に統一し closing 語彙タイトル消失・round-trip 破壊を根治（段階B）。証拠ポリシーの層別（層2＝配管は合成 fixture で着手可）も本 ADR で明文化 （ADR-0030・PR #152/#156/#161/#162・2026-07-18〜19）
@@ -91,6 +92,7 @@
 
 ## 協働・MCP
 
+- **`get_slide` に容量ドライラン（capacity / predictedSplit）** — 本文容量の実測 `capacity.usedLines/maxLines` と、`split_overflowing_slides` を実行せず何枚に割れるかの `predictedSplit`（chunks/boundaries）を追加。予測は distill.ts の `splitSlideToFit` そのものを呼ぶため実行結果と構造的に一致（R8・予測==実行の同値性テスト付き）。read-only（deck/dirty 不変） （#149・PR #188・2026-07-19）
 - **host `new_project` のタブ名を先頭見出しから導出（B4）** — host モードで AI が作った Deck のタブが常に「Untitled」だった（`session.ts` が templateName を "" にリセット）のを、純粋ヘルパ `deckTitle`（先頭スライドの title placeholder＝idx 0/15）で先頭見出しから命名。`use_template`/`open_project` は既存の templateName 名が優先、見出し無しは「Untitled」にフォールバック。golden 非影響 （他AIレポート・2026-07-07）
 - **Live MCP で AI が作った Deck を GUI タブに（モード b）** — 協働ホストの multi-doc を GUI に橋渡し。AI が `new_project` で作った Deck を**背景タブ**として開く（表示は切り替えない＝押すと開く）。タブ切替で projection のミラー先を `setTargetDoc`、ローカルタブは pause して clobber 防止。seed は `open_project` の戻り docId で race-free に link。`makeDoc` が新フィールドを落とすバグをテストで検出→修正 （2026-07-07）
 - **MCP CLI 同梱（ビルド不要のエージェント駆動）** — 自己完結 `cli.cjs`＋Node ランタイムをインストーラに同梱、macOS は Homebrew cask が `slidecraft-mcp` を PATH 登録。ソース build もシステム Node も不要で上流 AI（Claude Code/Cursor/Claude Desktop）が駆動可。update-cask に fail-closed guard （ADR-0022・2026-07-07）
