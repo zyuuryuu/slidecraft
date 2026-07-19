@@ -37,7 +37,11 @@ const KPI_MD = `# 主要指標
 
 <!-- kpi -->
 ### 解約率
-- 5.2%`;
+- 5.2%
+
+<!-- kpi -->
+### 五番目
+- 99%`;
 
 const CARD_MD = `# カード
 
@@ -111,13 +115,15 @@ describe("resolveBinding — pure observation over the binding primitives", () =
     expect(new Set(union)).toEqual(new Set(nonBlank));
   });
 
-  it("surfaces overflow as unbound: 4 bodies onto a 3-body layout drops the 4th", async () => {
+  it("surfaces overflow as unbound: 5 bodies onto a 3-body layout drops the overflow", async () => {
     const tpl = await defaultTemplate();
     const catalog = buildCatalog(tpl);
     const deck = distillDeck(parseMd(KPI_MD), catalog);
     const slide = deck.slides[0];
     const layout = findLayout(tpl, autoSelectLayout(slide, 0, deck.slides.length, catalog))!;
-    // #135: a 4-group kpi slide falls through to a 3-body columns layout (not a group layout).
+    // #135: a 5-group kpi slide exceeds even the largest built-in kpi layout (KPI.4Value.Grid, 4
+    // groups — #136 fixed THAT case onto an exact-fit group layout) and falls through to a 3-body
+    // columns layout (not a group layout).
     expect(isGroupedLayout(layout)).toBe(false);
     const plan = resolveBinding(slide, layout.placeholders);
     expect(plan.unbound.length).toBeGreaterThan(0);

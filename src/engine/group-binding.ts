@@ -66,8 +66,15 @@ export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, Pl
     const bodySlots = col.filter((s) => s.role === "body");
     const chromeSlot = col.find((s) => s.role === "chrome");
 
-    if (headSlot && headParas.length)
+    if (headSlot && bodySlots.length === 0) {
+      // Single-slot group (#136: Process.NStep/Summary.NBlock-style layouts — one placeholder per group,
+      // no separate body box). heading + body paragraphs share that one slot instead of the body half
+      // being silently dropped.
+      const allParas = [...headParas.map((p) => ({ ...p, heading: false })), ...bodyParas];
+      if (allParas.length) out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: allParas });
+    } else if (headSlot && headParas.length) {
       out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: headParas.map((p) => ({ ...p, heading: false })) });
+    }
 
     if (bodySlots.length === 1) {
       if (bodyParas.length) out.set(bodySlots[0].phIdx, { idx: bodySlots[0].phIdx, paragraphs: bodyParas });
