@@ -2,7 +2,8 @@
  * binding-diagnostics.test.ts — ADR-0030 stage A acceptance: `diagnoseDeck` (and get_deck_issues via
  * the session) now SURFACES content the resolved layout cannot hold, instead of dropping it silently
  * (#97 ②a surface, #135 / #128 go from 無言 → 警告付き). The wrapper is pure observation, so:
- *   1. a 4-group kpi deck on the default create_template template warns (#135),
+ *   1. a 5-group kpi deck (exceeding even KPI.4Value.Grid — #136 fixed the 4-group case onto an
+ *      exact-fit group layout) on the default create_template template warns (#135),
  *   2. the adversarial cover's subtitle warns (#128),
  *   3. a HEALTHY deck gains NOT ONE new diagnostic (the byte-identical invariant), and
  *   4. resolveBinding's assignments == bindContentByRole → export input (thus bytes) is unchanged.
@@ -41,7 +42,11 @@ const KPI_MD = `# 主要指標
 
 <!-- kpi -->
 ### 解約率
-- 5.2%`;
+- 5.2%
+
+<!-- kpi -->
+### 五番目
+- 99%`;
 
 // A deck whose every content binds on any healthy template (cover + a 2-bullet content slide, NO
 // closing slide — a ctrTitle closing would legitimately drop a body, which is a different case).
