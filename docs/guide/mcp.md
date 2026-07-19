@@ -160,7 +160,7 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 
 | ツール | 役割 |
 |---|---|
-| `get_slide(index)` | 1 スライドの**構造化 read**（解決レイアウト・図の有無・箇条書き数・budget・当該 issues・Markdown）。1 呼び出しで編集計画が立つ |
+| `get_slide(index)` | 1 スライドの**構造化 read**（解決レイアウト・図の有無・箇条書き数・budget・capacity（本文容量の実測）・predictedSplit（分割ドライラン）・当該 issues・Markdown）。1 呼び出しで編集計画が立つ |
 | `get_slide_markdown(index)` | 1 スライドの素の Markdown（レイアウト解決済み） |
 | `set_slide_markdown(index, markdown)` | 1 スライドを差し替え（図/mermaid は自動保持・検証・不正は never-silent 拒否） |
 | `set_slide_diagram(index, source, format, ...)` | 図を DiagramSpec/Mermaid で設定。図ありは置換、テキストスライドには本文領域へ追加 |

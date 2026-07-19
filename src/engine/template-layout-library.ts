@@ -52,7 +52,9 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
   { name: "Title.1Title.Single", family: "dark", placeholders: [
     { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.5, w: 9, h: 0.45, fontSize: 15, font: "minor", color: "accent", bold: true, align: "l" },
     { name: "Title.Center", type: "ctrTitle", idx: 0, x: 1.2, y: 2.1, w: 10.5, h: 1.5, fontSize: 48, font: "major", color: "titleText", bold: true, align: "l" },
-    { name: "Subtitle.Center", type: "subTitle", idx: 1, x: 1.2, y: 3.7, w: 9, h: 0.7, fontSize: 20, font: "minor", color: "subtle", bold: false, align: "l" },
+    // y=3.85: タイトルが2行に折り返しても本文下端（titleTextBottomIn(2.1, 48, 2)=3.7in）と
+    // MIN_TITLE_SUBTITLE_GAP_IN（0.15in）分の余白を確保する（#137 — 旧 y=3.7 は密着/衝突していた）。
+    { name: "Subtitle.Center", type: "subTitle", idx: 1, x: 1.2, y: 3.85, w: 9, h: 0.7, fontSize: 20, font: "minor", color: "subtle", bold: false, align: "l" },
     { name: "Date.Bottom", type: "body", idx: 11, x: 1.2, y: 5.6, w: 8, h: 0.4, fontSize: 14, font: "minor", color: "subtle", bold: false, align: "l" },
     { name: "Footer.Bottom", type: "body", idx: 12, x: 1.2, y: 6.1, w: 4, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l" },
   ]},
@@ -279,5 +281,13 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
     { name: "Title.Left", type: "body", idx: 15, x: 1.2, y: 1.3, w: 6.8, h: 0.7, fontSize: 28, font: "major", color: "titleText", bold: true, align: "l" },
     { name: "ActionSteps.Left", type: "body", idx: 1, x: 1.2, y: 2.2, w: 6.8, h: 4.0, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
     { name: "Notes.Right", type: "body", idx: 2, x: 9.1, y: 1.3, w: 3.4, h: 5.0, fontSize: 14, font: "minor", color: "titleText", bold: false, align: "l" },
+  ]},
+  // 30: SectionNav.1TitleList.Single — 章扉の全章リスト再掲＋現在章強調（#167 / ADR-0032 D2 段階3）。
+  // idx15/16/1 は Content.* と同じ canonical idx（title/subtitle/body）— materializeDerivedSlides が
+  // 直接 idx-exact でバインドできるよう選定（ADR-0011 pass-1）。
+  { name: "SectionNav.1TitleList.Single", family: "dark", placeholders: [
+    { name: "Title.Top", type: "body", idx: 15, x: 1.2, y: 1.3, w: 10.5, h: 1.0, fontSize: 34, font: "major", color: "titleText", bold: true, align: "l" },
+    { name: "Subtitle.Top", type: "body", idx: 16, x: 1.2, y: 2.35, w: 10.5, h: 0.5, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
+    { name: "ChapterList.Bottom", type: "body", idx: 1, x: 1.2, y: 3.0, w: 10.5, h: 4.0, fontSize: 17, font: "minor", color: "subtle", bold: false, align: "l" },
   ]},
 ];

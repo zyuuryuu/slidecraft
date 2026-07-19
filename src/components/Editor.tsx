@@ -37,6 +37,37 @@ function layoutCompletion(context: CompletionContext): CompletionResult | null {
   };
 }
 
+// ── Directive autocomplete for `<!-- … -->`（発見性: note/col/kpi/step/card）──
+
+const DIRECTIVES = [
+  { label: "note", detail: "スピーカーノート（以降スライド末尾まで）" },
+  { label: "section", detail: "章扉の宣言（採番・目次の対象）" },
+  { label: "toc", detail: "目次スライド（章一覧を自動導出）" },
+  { label: "col", detail: "カラム区切り" },
+  { label: "kpi", detail: "KPI 区切り" },
+  { label: "step", detail: "ステップ区切り" },
+  { label: "card", detail: "カード区切り" },
+];
+
+function directiveCompletion(context: CompletionContext): CompletionResult | null {
+  // Match `<!-- ` followed by a partial directive word (layoutCompletion owns `<!-- slide: …`).
+  const line = context.state.doc.lineAt(context.pos);
+  const textBefore = line.text.slice(0, context.pos - line.from);
+  const match = textBefore.match(/<!--\s*(\w*)$/);
+  if (!match) return null;
+
+  return {
+    from: context.pos - match[1].length,
+    options: DIRECTIVES.map((d) => ({
+      label: d.label,
+      apply: `${d.label} -->`,
+      type: "keyword",
+      detail: d.detail,
+    })),
+    filter: true,
+  };
+}
+
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -68,7 +99,7 @@ export default function Editor({ value, onChange, language = "yaml", onCursorLin
         history(),
         bracketMatching(),
         closeBrackets(),
-        language === "markdown" ? autocompletion({ override: [layoutCompletion] }) : [],
+        language === "markdown" ? autocompletion({ override: [layoutCompletion, directiveCompletion] }) : [],
         syntaxHighlighting(defaultHighlightStyle),
         langExt,
         oneDark,

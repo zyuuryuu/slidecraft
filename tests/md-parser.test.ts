@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseMd } from "../src/engine/md-parser";
+import { parseMd, parseMdReport } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
 
 describe("parseMd — image block", () => {
@@ -22,6 +22,47 @@ describe("parseMd — image block", () => {
     // Was previously src-agnostic; now only a self-contained data:image URI is embedded (isSafeImageSrc)
     // so a relative/remote/javascript src can't reach <img> or the exported HTML.
     expect(parseMd(`# T\n\n![](assets/x.png)`).slides[0].image).toBeUndefined();
+  });
+});
+
+// #148: a 2nd+ GFM table (or any body content around/after the first table) is completely DROPPED —
+// findTableInLines only returns the FIRST table's rows, and the table/body branches are mutually
+// exclusive (md-slide-parser.ts), so nothing besides that first table survives into SlideIR. The raw
+// dropped lines are gone the moment parseSlideBlock returns, so ONLY the parser can report this —
+// deck-diagnostics (which only sees the parsed DeckIR) has nothing left to reconstruct from.
+describe("parseMdReport — table-dropped ParseNotice", () => {
+  const TABLE_A = "| a | b |\n| --- | --- |\n| 1 | 2 |";
+  const TABLE_B = "| c | d |\n| --- | --- |\n| 3 | 4 |";
+
+  it("fires when a 2nd table follows the first (both dropped but the 1st)", () => {
+    const { deck, notices } = parseMdReport(`# T\n\n${TABLE_A}\n\n${TABLE_B}`);
+    expect(deck.slides[0].table?.rows).toEqual([["a", "b"], ["1", "2"]]); // only the FIRST table survives
+    expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
+  });
+
+  it("fires when prose surrounds a single table (the prose is dropped too)", () => {
+    const { notices } = parseMdReport(`# T\n\n前置き\n\n${TABLE_A}\n\n後書き`);
+    expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
+  });
+
+  it("does NOT fire for a slide with exactly one table and nothing else in the body", () => {
+    const { notices } = parseMdReport(`# T\n\n> サブ\n\n${TABLE_A}`);
+    expect(notices).toEqual([]);
+  });
+
+  it("does NOT fire for a slide with no table at all", () => {
+    const { notices } = parseMdReport(`# T\n\n- a\n- b`);
+    expect(notices).toEqual([]);
+  });
+
+  it("tags the correct slideIndex across multiple slides", () => {
+    const { notices } = parseMdReport(`# 一\n\n- a\n\n---\n\n# 二\n\n${TABLE_A}\n\n${TABLE_B}`);
+    expect(notices).toEqual([{ slideIndex: 1, kind: "table-dropped" }]);
+  });
+
+  it("parseMd (the thin wrapper) returns the identical deck parseMdReport does", () => {
+    const md = `# T\n\n${TABLE_A}\n\n${TABLE_B}`;
+    expect(parseMd(md)).toEqual(parseMdReport(md).deck);
   });
 });
 
@@ -84,6 +125,27 @@ Revenue`;
     expect(deck.slides[0].layout).toBe("KPI.3Value.Equal");
   });
 
+  // ── CRLF normalization (#164) ──
+  // Windows 由来の CRLF Markdown で layout pin が無効化され、ディレクティブ行が
+  // 本文（idx=1）に印字されてしまう既存バグの回帰テスト。
+
+  it("respects <!-- slide: --> layout directive under CRLF line endings", () => {
+    const md = "<!-- slide: Content.X -->\r\n# T\r\n\r\nbody\r\n";
+    const deck = parseMd(md);
+    expect(deck.slides[0].layout).toBe("Content.X");
+
+    const body1 = deck.slides[0].placeholders.find((p) => p.idx === "1");
+    const bodyText = JSON.stringify(body1);
+    expect(bodyText).not.toContain("slide:");
+    expect(bodyText).not.toContain("-->");
+  });
+
+  it("produces byte-identical slides for CRLF vs LF input with a layout directive", () => {
+    const lf = "<!-- slide: Content.X -->\n# T\n\nbody\n";
+    const crlf = lf.replace(/\n/g, "\r\n");
+    expect(parseMd(crlf)).toEqual(parseMd(lf));
+  });
+
   // ── Front matter ──
 
   it("parses YAML front matter for template", () => {
@@ -93,6 +155,13 @@ template: MyTemplate.pptx
 
 # Title`;
 
+    const deck = parseMd(md);
+    expect(deck.template).toBe("MyTemplate.pptx");
+    expect(deck.slides).toHaveLength(1);
+  });
+
+  it("parses YAML front matter under CRLF line endings (#164)", () => {
+    const md = "---\r\ntemplate: MyTemplate.pptx\r\n---\r\n\r\n# Title";
     const deck = parseMd(md);
     expect(deck.template).toBe("MyTemplate.pptx");
     expect(deck.slides).toHaveLength(1);
@@ -471,5 +540,103 @@ print("hello")
       ? body.paragraphs.flatMap((p) => p.segments.map((s) => s.text)).join("\n")
       : "";
     expect(bodyText).not.toContain("Risk Assessment");
+  });
+});
+
+// ── #103: nested bullet lists (indent → Paragraph.level, 0-3) ──
+
+describe("parseMd — nested bullets (#103)", () => {
+  function bulletsOf(md: string) {
+    const deck = parseMd(md);
+    const body = deck.slides[0].placeholders.find((p) => p.idx === "1");
+    return body!.paragraphs.filter((p) => p.bullet);
+  }
+
+  it("2/4/6-space indent → level 1/2/3", () => {
+    const md = `# Title
+
+- Root
+  - Child (2sp)
+    - Grandchild (4sp)
+      - Great-grandchild (6sp)`;
+    const bullets = bulletsOf(md);
+    expect(bullets).toHaveLength(4);
+    expect(bullets[0].level).toBeUndefined(); // level 0 stays field-absent (byte-identical gate)
+    expect(bullets[1].level).toBe(1);
+    expect(bullets[2].level).toBe(2);
+    expect(bullets[3].level).toBe(3);
+  });
+
+  it("8-space indent CLAMPS to level 3 — content survives, not dropped or errored", () => {
+    const md = `# Title
+
+- Root
+        - Eight spaces in`;
+    const bullets = bulletsOf(md);
+    expect(bullets).toHaveLength(2);
+    expect(bullets[1].level).toBe(3);
+    expect(bullets[1].segments[0].text).toBe("Eight spaces in");
+  });
+
+  it("a flat (unindented) bullet deck never gets a level field — byte-identical gate", () => {
+    const md = `# Title
+
+- Item A
+- Item B
+- Item C`;
+    const bullets = bulletsOf(md);
+    expect(bullets.every((p) => p.level === undefined)).toBe(true);
+  });
+});
+
+describe("serializeMd(parseMd(...)) — nested bullets round-trip (#103)", () => {
+  it("a 3-level-deep nested list round-trips through parse → serialize → parse with the SAME levels", () => {
+    const md = `# Title
+
+- Root
+  - Level 1
+    - Level 2
+      - Level 3`;
+    const deck1 = parseMd(md);
+    const roundTripped = serializeMd(deck1);
+    const deck2 = parseMd(roundTripped);
+
+    const levelsOf = (d: typeof deck1) =>
+      d.slides[0].placeholders
+        .find((p) => p.idx === "1")!
+        .paragraphs.filter((p) => p.bullet)
+        .map((p) => p.level ?? 0);
+
+    expect(levelsOf(deck1)).toEqual([0, 1, 2, 3]);
+    expect(levelsOf(deck2)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("an over-indented (clamped) input stabilizes at its rounded form on the NEXT round-trip", () => {
+    // 8 spaces clamps to level 3 on first parse; re-serializing must emit the CANONICAL level-3
+    // indent (6 spaces), which reparses to the same level 3 — no drift on repeated save/load.
+    const md = `# Title
+
+- Root
+        - Clamped to level 3`;
+    const deck1 = parseMd(md);
+    const serialized1 = serializeMd(deck1);
+    const deck2 = parseMd(serialized1);
+    const serialized2 = serializeMd(deck2);
+
+    expect(serialized1).toBe(serialized2); // stable fixpoint after the first round-trip
+    const level = deck2.slides[0].placeholders
+      .find((p) => p.idx === "1")!
+      .paragraphs.find((p) => p.bullet && p.level)!.level;
+    expect(level).toBe(3);
+  });
+
+  it("existing flat bullet decks serialize byte-identically (no leading indent introduced)", () => {
+    const md = `# Title
+
+- Item A
+- Item B`;
+    const deck = parseMd(md);
+    const serialized = serializeMd(deck);
+    expect(serialized).toBe(md.trimEnd() + "\n");
   });
 });

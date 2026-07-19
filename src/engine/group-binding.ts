@@ -10,7 +10,8 @@
  */
 import type { LayoutInfo, PlaceholderInfo } from "./template-loader";
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
-import { bindContentByRole } from "./placeholder-binding";
+import { bindContentByRole, resolveBinding, isBlankParagraphs, type BindingPlan, type ContentRef, type PlaceholderRef } from "./placeholder-binding";
+import { slideIdxRole, placeholderRole } from "./template-catalog";
 import { detectGroups, bakedText } from "./group-layout";
 
 export { detectGroups, isGroupedLayout } from "./group-layout";
@@ -65,8 +66,15 @@ export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, Pl
     const bodySlots = col.filter((s) => s.role === "body");
     const chromeSlot = col.find((s) => s.role === "chrome");
 
-    if (headSlot && headParas.length)
+    if (headSlot && bodySlots.length === 0) {
+      // Single-slot group (#136: Process.NStep/Summary.NBlock-style layouts — one placeholder per group,
+      // no separate body box). heading + body paragraphs share that one slot instead of the body half
+      // being silently dropped.
+      const allParas = [...headParas.map((p) => ({ ...p, heading: false })), ...bodyParas];
+      if (allParas.length) out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: allParas });
+    } else if (headSlot && headParas.length) {
       out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: headParas.map((p) => ({ ...p, heading: false })) });
+    }
 
     if (bodySlots.length === 1) {
       if (bodyParas.length) out.set(bodySlots[0].phIdx, { idx: bodySlots[0].phIdx, paragraphs: bodyParas });
@@ -88,4 +96,45 @@ export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, Pl
     // picture slots: no entry → inherited (a Markdown deck can't fill an image).
   }
   return out;
+}
+
+/**
+ * ADR-0030 (BindingPlan) — the single OBSERVED binding plan for one slide on its resolved layout, using
+ * the EXACT dispatch the export + preview use (placeholder-filler:145 / SlidePreview:199): a grouped slide
+ * on a group layout fills via expandGroups, everything else via bindContentByRole. Lifting that same branch
+ * into a BindingPlan lets the diagnostic layer warn on `unbound` instead of dropping silently — and because
+ * it reuses the very functions export runs, the warn matches what would actually vanish.
+ *
+ * Non-group layout → delegate to resolveBinding (pure composition of the primitives). Group layout → MIRROR
+ * expandGroups' result into the envelope (integration deferred to stage E): `assignments` come verbatim from
+ * expandGroups, and `unbound` = the group content the column cap dropped (decision ②: groups beyond the
+ * layout's column count) PLUS any meta content expandGroups left unplaced. Group cells are transformed
+ * copies, so identity can't judge them — the column cap does; meta content stays by-reference, so identity
+ * judges it. Pure (R2).
+ */
+export function slideBindingPlan(slide: SlideIR, layout: LayoutInfo): BindingPlan {
+  const shape = detectGroups(layout);
+  if (!slide.groupKind || !shape) return resolveBinding(slide, layout.placeholders);
+
+  const bound = expandGroups(slide, layout);
+  const hasCtrTitle = layout.placeholders.some((p) => p.type.toLowerCase().includes("ctrtitle"));
+  const isGroupIdx = (i: string) => /^[1-9]$/.test(i);
+  const groupContents = slide.placeholders.filter((c) => isGroupIdx(c.idx)).sort((a, b) => parseInt(a.idx) - parseInt(b.idx));
+  const kept = Math.min(shape.groups.length, groupContents.length);
+  const dropped = new Set(groupContents.slice(kept)); // decision ②: extra groups have no column → dropped
+  const placed = new Set(bound.values()); // meta content is bound by reference (originals)
+
+  const phRoleByIdx = new Map(layout.placeholders.map((p) => [p.idx, placeholderRole(p)] as const));
+  const contentRef = (c: PlaceholderContent): ContentRef => ({ idx: c.idx, role: slideIdxRole(c.idx, hasCtrTitle), content: c });
+  const phRef = (idx: string): PlaceholderRef => ({ idx, role: phRoleByIdx.get(idx) ?? "other" });
+
+  const assignments = [...bound.entries()].map(([phIdx, content]) => ({ content: contentRef(content), placeholder: phRef(phIdx) }));
+  // A content item is unbound iff non-blank AND (a group content that overflowed its columns, OR a meta
+  // content expandGroups did not place). Group cells can't be judged by identity (they are copies).
+  const unbound = slide.placeholders
+    .filter((c) => !isBlankParagraphs(c.paragraphs) && (isGroupIdx(c.idx) ? dropped.has(c) : !placed.has(c)))
+    .map(contentRef);
+  const filled = new Set(bound.keys());
+  const unfilled = layout.placeholders.filter((p) => !filled.has(p.idx) && placeholderRole(p) !== "slideNumber").map((p) => phRef(p.idx));
+  return { assignments, unbound, unfilled };
 }

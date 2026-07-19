@@ -57,6 +57,57 @@ describe("get_slide — structured per-slide read", () => {
   });
 });
 
+describe("get_slide — predictedSplit / capacity dry-run (#149)", () => {
+  // applySlideMarkdown (NOT new_project) — new_project distills at intake (session.ts:102), which
+  // would pre-split this slide before get_slide ever sees it overflowing.
+  async function overstuffed() {
+    const s = await opened();
+    const many = Array.from({ length: 60 }, (_, i) => `- これは比較的長めの箇条書き項目その${i + 1}番目です`).join("\n");
+    const r = S.applySlideMarkdown(s, 1, `# 詰め込みすぎ\n\n${many}`);
+    expect(r.ok).toBe(true);
+    return s;
+  }
+
+  it("predicts the SAME chunk count split_overflowing_slides actually produces (prediction == execution, R8)", async () => {
+    const s = await overstuffed();
+    const before = R.getSlide(s, 1);
+    expect(before.overBudget).toBe(true);
+    expect(before.predictedSplit).toBeTruthy();
+    expect(before.predictedSplit!.chunks).toBeGreaterThanOrEqual(2);
+    expect(before.predictedSplit!.boundaries).toHaveLength(before.predictedSplit!.chunks);
+    expect(before.predictedSplit!.boundaries.reduce((a, b) => a + b, 0)).toBe(60); // no paragraph lost/duplicated across chunks
+
+    const r = S.distill(s);
+    expect(r.ok).toBe(true);
+    expect(r.changedSlides).toHaveLength(before.predictedSplit!.chunks); // predicted == actually executed
+  });
+
+  it("does not mutate the deck / dirty flag (read-only)", async () => {
+    const s = await overstuffed();
+    const dirtyBefore = s.dirty;
+    const deckBefore = JSON.stringify(s.deck);
+    R.getSlide(s, 1);
+    expect(s.dirty).toBe(dirtyBefore);
+    expect(JSON.stringify(s.deck)).toBe(deckBefore);
+  });
+
+  it("has no predictedSplit and a capacity within budget for a fitting slide", async () => {
+    const s = await opened(); // 3-bullet slide, well within budget
+    const r = R.getSlide(s, 1);
+    expect(r.overBudget).toBe(false);
+    expect(r.predictedSplit).toBeUndefined();
+    expect(r.capacity).toBeTruthy();
+    expect(r.capacity!.usedLines).toBeLessThanOrEqual(r.capacity!.maxLines);
+    expect(r.capacity!.maxLines).toBe(r.budget!.maxBullets); // same box the shared `budget` field reports
+  });
+
+  it("capacity is null for a figure slide (no measurable single text body)", async () => {
+    const s = await deckWithDiagram();
+    const r = R.getSlide(s, 1);
+    expect(r.capacity).toBeNull();
+  });
+});
+
 describe("set_slide_diagram — add to a text-only slide (S5 relaxation)", () => {
   it("ADDS a diagram to a text slide and COEXISTS with the bullets (regionSplit, no silent clobber; created:true)", async () => {
     const s = await opened();

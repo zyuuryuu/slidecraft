@@ -12,7 +12,7 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { buildCatalog } from "./template-catalog";
+import { buildCatalog, placeholderRole } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./visual-placement";
 import { isGroupedLayout, expandGroups } from "./group-binding";
@@ -20,6 +20,8 @@ import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
+import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT } from "./notes-ooxml";
+import { materializeDerivedSlides, sectionFooterFor } from "./deck-sections";
 import { midnightExecutive } from "./theme";
 
 /**
@@ -124,6 +126,9 @@ function dataUriToImage(src: string): { bytes: Uint8Array; ext: string; mime: st
 async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
+  // 所属章名（#168・案A）。null＝章扉より前 or section 無しデッキ＝注入なし。chrome 経路（sldNum と
+  // 同じ「テンプレに枠が無ければテンプレの意思」扱い）— 明示 Footer: が束縛済みの ftr 枠には触れない。
+  sectionFooterText: string | null = null,
 ): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined }> {
   // A Mermaid block whose content is a NATIVE diagram type exports as native,
   // editable shapes (not a rasterised mermaid.js image) — matching the preview.
@@ -198,7 +203,11 @@ async function buildSlideXml(
       id++;
       continue;
     }
-    const content = contentFor.get(ph.idx);
+    let content = contentFor.get(ph.idx);
+    // 章名フッタの自動注入（#168）: ftr 枠が未束縛（明示 Footer: 無し）のときだけ、所属章名を書く。
+    if (!content && sectionFooterText != null && placeholderRole(ph) === "footer") {
+      content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
+    }
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content);
@@ -276,7 +285,7 @@ async function buildSlideXml(
   return { xml, mermaidImageRId, imageRId };
 }
 
-function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: string }[] = []): string {
+function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: string }[] = [], notesSlideNum?: number): string {
   let rels =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
@@ -290,6 +299,13 @@ function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: s
       ` Target="${target}"/>`;
   }
 
+  // Speaker notes (#150): image rels occupy at most rId2/rId3, so rId4 is always free.
+  if (notesSlideNum !== undefined) {
+    rels += `<Relationship Id="rId4"` +
+      ` Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide"` +
+      ` Target="../notesSlides/notesSlide${notesSlideNum}.xml"/>`;
+  }
+
   rels += `</Relationships>`;
   return rels;
 }
@@ -301,6 +317,8 @@ export async function generatePptx(
   template: TemplateData,
   rasterizeSvg?: SvgRasterizer,
 ): Promise<Uint8Array> {
+  // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）。宣言なしデッキは同一参照が返る。
+  deck = materializeDerivedSlides(deck);
   // Clone by re-serializing + re-loading (JSZip has no clone method)
   const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
   const zip = await JSZip.loadAsync(tplBuf);
@@ -311,8 +329,10 @@ export async function generatePptx(
   // existing slide parts and, worse, duplicate their [Content_Types] Overrides + presentation rels
   // (invalid OOXML → PowerPoint shows 0 slides). Removing the template's slides makes the deck's
   // slides the ONLY slides, so ANY .pptx works as a master. (Layouts/master/theme are untouched.)
+  // notesSlides も同時にパージ（#150）: テンプレのスライドを消す以上、そのスライド由来の
+  // notesSlide を残すと孤児パート＋宙吊り rels になる。デッキ側の notesSlide は後段で書く。
   for (const path of Object.keys(zip.files)) {
-    if (/^ppt\/slides\/(_rels\/)?slide\d+\.xml(\.rels)?$/.test(path)) zip.remove(path);
+    if (/^ppt\/(?:slides\/(?:_rels\/)?slide|notesSlides\/(?:_rels\/)?notesSlide)\d+\.xml(?:\.rels)?$/.test(path)) zip.remove(path);
   }
 
   // Find max rId in presentation.xml.rels
@@ -329,6 +349,43 @@ export async function generatePptx(
   const slideIdBase = 256;
   // Catalog → layout selection adapts to THIS template (canonical = unchanged).
   const catalog = buildCatalog(template);
+
+  // ── Speaker notes (#150 / ADR-0032): notes を持つスライドが 1 枚でもあるときだけ notesMaster を
+  // 用意する。ノート無しデッキはこのブロック丸ごと素通り＝出力不変を構造的に担保。
+  const hasNotes = deck.slides.some((s) => s.notes?.length);
+  let notesMasterNum = 0;
+  if (hasNotes) {
+    const existingNm = Object.keys(zip.files)
+      .map((p) => p.match(/^ppt\/notesMasters\/notesMaster(\d+)\.xml$/))
+      .find(Boolean);
+    if (existingNm) {
+      notesMasterNum = parseInt(existingNm[1]);
+    } else {
+      // notesMaster はテーマ参照が必須。既存テーマを複製して専用テーマ番号を与える
+      // （slideMaster とのテーマ共有は厳格バリデータで弾かれ得るため）。
+      const themeNums = Object.keys(zip.files)
+        .map((p) => p.match(/^ppt\/theme\/theme(\d+)\.xml$/))
+        .filter((m): m is RegExpMatchArray => !!m)
+        .map((m) => parseInt(m[1]));
+      let themeTarget = "../theme/theme1.xml";
+      if (themeNums.length > 0) {
+        const srcTheme = await zip.file(`ppt/theme/theme${Math.min(...themeNums)}.xml`)!.async("string");
+        const newThemeNum = Math.max(...themeNums) + 1;
+        zip.file(`ppt/theme/theme${newThemeNum}.xml`, srcTheme);
+        ctEntries.push(
+          `<Override PartName="/ppt/theme/theme${newThemeNum}.xml"` +
+            ` ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>`,
+        );
+        themeTarget = `../theme/theme${newThemeNum}.xml`;
+      }
+      notesMasterNum = 1;
+      zip.file("ppt/notesMasters/notesMaster1.xml", notesMasterXml());
+      zip.file("ppt/notesMasters/_rels/notesMaster1.xml.rels", notesMasterRels(themeTarget));
+      ctEntries.push(
+        `<Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="${NOTES_MASTER_CT}"/>`,
+      );
+    }
+  }
 
   for (let i = 0; i < deck.slides.length; i++) {
     const slide = deck.slides[i];
@@ -350,7 +407,7 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide);
+    const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide, sectionFooterFor(deck, i));
 
     // Embed each referenced image with its OWN rId (a behind backdrop can coexist with a mermaid PNG,
     // so they no longer share one slot). Mermaid SVG→PNG is rasterized by the injected UI-layer canvas.
@@ -370,7 +427,20 @@ export async function generatePptx(
       }
     }
 
-    const slideRels = buildSlideRels(layout.index, imageRels);
+    // notes 付きスライドだけ notesSlide パートを生成（番号はスライド番号に一致させる）。
+    const notesSlideNum = slide.notes?.length ? slideNum : undefined;
+    if (notesSlideNum !== undefined) {
+      zip.file(`ppt/notesSlides/notesSlide${notesSlideNum}.xml`, notesSlideXml(slide.notes!));
+      zip.file(
+        `ppt/notesSlides/_rels/notesSlide${notesSlideNum}.xml.rels`,
+        notesSlideRels(slideNum, notesMasterNum),
+      );
+      ctEntries.push(
+        `<Override PartName="/ppt/notesSlides/notesSlide${notesSlideNum}.xml" ContentType="${NOTES_SLIDE_CT}"/>`,
+      );
+    }
+
+    const slideRels = buildSlideRels(layout.index, imageRels, notesSlideNum);
 
     zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
     zip.file(
@@ -406,6 +476,27 @@ export async function generatePptx(
   } else {
     presXml = presXml.replace("</p:presentation>", `${sldIdLstXml}</p:presentation>`);
   }
+
+  // Speaker notes (#150): notesMaster への参照（IdLst＋rel）を保証する。既にテンプレが持つなら
+  // 触らない。無ければ rel を新規採番して sldMasterIdLst の直後（スキーマ順）へ挿入する。
+  if (hasNotes && !/<p:notesMasterIdLst[\s>]/.test(presXml)) {
+    const existingNmRel = template.presentationRels.match(
+      /<Relationship Id="(rId\d+)"[^>]*Type="[^"]*\/relationships\/notesMaster"[^>]*\/>/,
+    );
+    // nextRId here is already past every slide rel; no later allocation follows, so no increment.
+    const nmRId = existingNmRel ? existingNmRel[1] : `rId${nextRId}`;
+    if (!existingNmRel) {
+      relEntries.push(
+        `<Relationship Id="${nmRId}"` +
+          ` Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster"` +
+          ` Target="notesMasters/notesMaster${notesMasterNum}.xml"/>`,
+      );
+    }
+    const nmIdLst = `<p:notesMasterIdLst><p:notesMasterId r:id="${nmRId}"/></p:notesMasterIdLst>`;
+    presXml = /<\/p:sldMasterIdLst>/.test(presXml)
+      ? presXml.replace("</p:sldMasterIdLst>", `</p:sldMasterIdLst>${nmIdLst}`)
+      : presXml.replace(sldIdLstXml, `${nmIdLst}${sldIdLstXml}`);
+  }
   zip.file("ppt/presentation.xml", presXml);
 
   // Update presentation.xml.rels — first drop the template's own slide rels (purged above), then
@@ -427,6 +518,11 @@ export async function generatePptx(
   let ct = template.contentTypes;
   ct = ct.replace(
     /<Override\b[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g,
+    "",
+  );
+  // テンプレ由来 notesSlide の Override も除去（パート本体は冒頭でパージ済み — #150）。
+  ct = ct.replace(
+    /<Override\b[^>]*PartName="\/ppt\/notesSlides\/notesSlide\d+\.xml"[^>]*\/>/g,
     "",
   );
   // Default Content-Types for any embedded media (mermaid PNG / pasted images) not already declared —

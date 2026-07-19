@@ -11,11 +11,11 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 
 ## 1. npm 依存（フロントエンド／エンジン／MCP）
 
-本番依存（`--omit=dev`）は **273 コンポーネント**、いずれも permissive ライセンス：
+本番依存（`--omit=dev`）は **275 コンポーネント**、いずれも permissive ライセンス：
 
 | ライセンス | 数 |
 | --- | --- |
-| MIT | 209 |
+| MIT | 211 |
 | ISC | 39 |
 | BSD-3-Clause | 8 |
 | Apache-2.0 | 7 |
@@ -25,7 +25,7 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 | BSD-2-Clause | 1 |
 | MPL-2.0 OR Apache-2.0（Apache-2.0 を選択） | 1 |
 
-主な直接依存：`react` / `react-dom`（MIT）・`@modelcontextprotocol/sdk`（MIT）・`@anthropic-ai/sdk`・`openai`（Apache-2.0）・`mermaid`（MIT）・`pptxgenjs`（MIT）・`jszip`（MIT or GPLv3 → MIT を選択）・`js-yaml`（MIT）・`zod`（MIT）・`@codemirror/*`（MIT）・`tailwindcss`（MIT）・`@tauri-apps/*`（MIT/Apache-2.0）。
+主な直接依存：`react` / `react-dom`（MIT）・`@modelcontextprotocol/sdk`（MIT）・`@anthropic-ai/sdk`・`openai`（Apache-2.0）・`mermaid`（MIT）・`pptxgenjs`（MIT）・`jszip`（MIT or GPLv3 → MIT を選択）・`js-yaml`（MIT）・`zod`（MIT）・`@codemirror/*`（MIT）・`tailwindcss`（MIT）・`@tauri-apps/*`（MIT/Apache-2.0）・`harfbuzzjs`（MIT — HarfBuzz `hb-subset` の WASM ビルド、実行時 CJK フォントサブセット化、#193）・`wawoff2`（MIT — WASM 版 WOFF2 エンコーダ/デコーダ、#193）。
 
 - 完全な依存リスト（バージョン・ライセンス付き）は **`npm run sbom`**（CycloneDX SBOM＝`sbom-npm.cdx.json`）で生成できる。
 - Apache-2.0 の npm コンポーネント（7件）に付属する NOTICE は、その配布物内の NOTICE として本ファイルが代替再現する。
@@ -56,6 +56,25 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 ## 5. 同梱スライドテンプレート
 
 `public/templates/slide/CREDITS.md` を参照（例：`lrk-slides-velis_CC0.pptx` = "lrk-slides-velis" by Laurens R. Krol・**CC0 1.0**）。
+
+## 6. 同梱フォント（実行時 CJK サブセット化の元フォント）
+
+HTML export の実行時フォントサブセット化（#193／#115-b）向けに、`public/fonts/` へ以下の可変フォントを
+同梱する。デックの実使用文字だけを都度切り出して埋め込むための**元フォント**であり、アプリ本体はこの
+フルセットを直接配布しない（`public/fonts/CREDITS.md` に詳細）：
+
+- **NotoSansJP-Variable.ttf**（Noto Sans JP、`wght` 100–900 の可変フォント）— © Google / Adobe
+  （Source Han Sans 系譜）— **SIL Open Font License 1.1**。ライセンス全文は
+  `public/fonts/OFL-NotoSansJP.txt`。
+- **NotoSerifJP-Variable.ttf**（Noto Serif JP、`wght` 200–900 の可変フォント）— © Google
+  （Source Han Serif 系譜）— **SIL Open Font License 1.1**。ライセンス全文は
+  `public/fonts/OFL-NotoSerifJP.txt`。
+
+いずれも Google の `google/fonts` リポジトリ（`ofl/notosansjp/`・`ofl/notoserifjp/`）から取得した
+オリジナルファイルそのもの（未改変）。OFL 1.1 は同梱・改変（サブセット化）・再配布を許諾範囲内とする
+（フォント単体売買のみ禁止、ライセンス全文の同梱が必須）。テンプレートの `<a:ea>` が指定する実際の
+フォント（Yu Gothic・游明朝・会社独自フォント等）そのものは再現しない — ゴシック/明朝の**分類**
+（font-stack.ts の `classifyCjkFont`）に応じてこれらを代役として使う設計（#115 のコメントで確認済み）。
 
 ---
 

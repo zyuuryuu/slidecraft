@@ -11,16 +11,19 @@ import { pickTextFile, pickBinaryFile, saveBinaryFile, saveTextFile } from "../i
 import { renderDeckToPptxBytes } from "./deck-export";
 import { renderDeckToHtml } from "./deck-html-export";
 import type { Transition } from "../engine/html-shell";
-import { serializeMd } from "../engine/md-serializer";
+import { deckMarkdown, deckMarkdownForTemplate } from "./deck-markdown";
 import { bundleProject, openProject, projectTitleFromFileName, PROJECT_EXT } from "../engine/project-io";
 import { readProjectFileBytes } from "../ipc/file-open";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
+import type { LayoutCatalog } from "../engine/template-catalog";
 
 interface IODeps {
   mdText: string;
   deck: DeckIR | null;
   templateData: TemplateData | null;
+  /** The active doc's catalog (built from templateData) — feeds the deck-level readout (ADR-0030 B). */
+  catalog: LayoutCatalog | undefined;
   parseMdText: (text: string, mode?: "commit" | "silent" | "reset") => void;
   setMdText: (s: string) => void;
   setParseError: (e: string | null) => void;
@@ -32,7 +35,7 @@ interface IODeps {
   openDoc: (init: { deck: DeckIR | null; templateData?: TemplateData | null; templateName?: string; mdText?: string; filePath?: string | null; title?: string }) => string;
 }
 
-export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, setParseError, templateName, filePath, setFilePath, openDoc }: IODeps) {
+export function useDeckIO({ mdText, deck, templateData, catalog, parseMdText, setMdText, setParseError, templateName, filePath, setFilePath, openDoc }: IODeps) {
   const [generating, setGenerating] = useState(false);
 
   // Open a Markdown file → a brand-new deck (Initialize).
@@ -47,8 +50,8 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
   // Save Markdown — serialize from the DECK (the source of truth) so visual Edit-mode
   // changes are always included; fall back to mdText only when there's no deck yet.
   const handleSave = useCallback(() => {
-    void saveTextFile(deck ? serializeMd(deck) : mdText, filePath ?? "slidecraft.md");
-  }, [deck, mdText, filePath]);
+    void saveTextFile(deck ? deckMarkdown(deck, catalog, templateData) : mdText, filePath ?? "slidecraft.md");
+  }, [deck, catalog, templateData, mdText, filePath]);
 
   // Generate + save the .pptx (mermaid pre-render + WYSIWYG rasterise in deck-export.ts).
   const handleGenerate = useCallback(async () => {
@@ -91,7 +94,9 @@ export function useDeckIO({ mdText, deck, templateData, parseMdText, setMdText, 
         deck: openedDeck,
         templateData: template,
         templateName: meta.templateName ?? "",
-        mdText: serializeMd(openedDeck), // keep the Markdown view in sync
+        // Keep the Markdown view in sync — bound to the OPENED project's own template (the active
+        // doc's catalog belongs to a different template, so it must not serialize this deck).
+        mdText: deckMarkdownForTemplate(openedDeck, template),
         filePath: name,
         title: projectTitleFromFileName(name),
       });

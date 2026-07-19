@@ -15,11 +15,11 @@ import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRe
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
-import { serializeMd } from "../engine/md-serializer";
+import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
-import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
+import type { SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
 import { useDeckIO } from "./useDeckIO";
@@ -65,6 +65,7 @@ export function useDeckController() {
     mdText, setMdText, templateData, setTemplateData, templateName, setTemplateName,
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
+    initSnapshot, setInitSnapshot,
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
   } = useDocumentStore({ mdText: "", templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: i18n.t("controller.untitledDoc") });
 
@@ -211,7 +212,7 @@ export function useDeckController() {
 
   // File & PPTX I/O (open / save / generate / project) — split out to keep this ≤400 (R1).
   const { generating, handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile } = useDeckIO({
-    mdText, deck, templateData, parseMdText, setMdText, setParseError,
+    mdText, deck, templateData, catalog, parseMdText, setMdText, setParseError,
     templateName, filePath, setFilePath, openDoc,
   });
 
@@ -219,13 +220,17 @@ export function useDeckController() {
 
 
   // ── LLM Assist: import result ──
+  // Snapshot the PRE-import deck before resetting (#160): entering "import" subMode without a
+  // snapshot left キャンセル with nothing of THIS doc's to restore (same root cause as
+  // handleEnterImport below — snapshot must exist whenever subMode becomes "import").
   const handleLlmImport = useCallback(
     (text: string) => {
+      setInitSnapshot(deck);
       setMdText(text);
       parseMdText(text, "reset");
       setSubMode("import");
     },
-    [parseMdText, setMdText, setSubMode],
+    [deck, parseMdText, setMdText, setSubMode, setInitSnapshot],
   );
 
   // AI panel "適用"（デッキ全体）: replace the deck but stay in Edit to keep refining.
@@ -241,9 +246,10 @@ export function useDeckController() {
   );
 
   // ── Initialize (Import) ⇄ Edit ──
-  // Snapshot of the deck when the Initialize modal opens — used by 確定 (as the undo
-  // baseline) and キャンセル (to restore). Declared before the handlers that read it.
-  const initSnapshotRef = useRef<DeckIR | null>(null);
+  // Snapshot of the deck when the Initialize modal opened — used by 確定 (as the undo
+  // baseline) and キャンセル (to restore). Per-doc (#160): subMode lives in DocState, so the
+  // snapshot must too — a controller-wide ref let a cross-doc switch (e.g. an OS file-open
+  // while doc A's modal is open) cancel doc A using doc B's snapshot (silent data loss).
 
   // 確定 → Edit: FLUSH any pending debounced parse so the committed deck matches the
   // visible Markdown, and record the whole Initialize as ONE undo step (snapshot →
@@ -256,37 +262,39 @@ export function useDeckController() {
       const parsed = mdText.trim() ? parseMd(mdText) : null;
       const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
       if (!fitted) return;
-      setDeck(initSnapshotRef.current, "silent"); // present = pre-Initialize…
+      setDeck(initSnapshot, "silent"); // present = pre-Initialize…
       setDeck(fitted, "commit"); // …then one undoable step to the committed result
       setParseError(null);
       setSubMode("edit");
     } catch (e) {
       setParseError(e instanceof Error ? e.message : String(e)); // stay in Initialize
     }
-  }, [deck, mdText, catalog, clearParse, setDeck, setParseError, setSubMode]);
+  }, [deck, mdText, catalog, initSnapshot, clearParse, setDeck, setParseError, setSubMode]);
 
   // Open the Initialize phase (modal): serialize the CURRENT deck back to Markdown so
   // it reflects the live deck (deck = truth), and snapshot the deck so キャンセル can
   // discard whatever the modal's live edits did. Guarded so re-opening mid-edit is safe.
   const handleEnterImport = useCallback(() => {
     if (subMode === "edit") {
-      initSnapshotRef.current = deck;
-      if (deck) setMdText(serializeMd(deck));
+      setInitSnapshot(deck);
+      // Deck-level readout through the binding authority (ADR-0030 stage B, #155) — the catalog-free
+      // serialize dropped a closing-vocabulary slide's title from the Markdown view.
+      if (deck) setMdText(deckMarkdown(deck, catalog, templateData));
     }
     setSubMode("import");
-  }, [subMode, deck, setMdText, setSubMode]);
+  }, [subMode, deck, catalog, templateData, setMdText, setSubMode, setInitSnapshot]);
 
   // Cancel Initialize: kill any pending parse (so a trailing debounce can't re-apply
   // the discarded edits), restore the deck AND mdText to the pre-open snapshot, → Edit.
   const handleCancelInitialize = useCallback(() => {
     if (editLockedRef.current) return; // observe-only: restoring a stale snapshot would clobber host truth
     clearParse();
-    const snap = initSnapshotRef.current;
+    const snap = initSnapshot;
     setDeck(snap, "silent");
-    setMdText(snap ? serializeMd(snap) : "");
+    setMdText(snap ? deckMarkdown(snap, catalog, templateData) : "");
     setParseError(null);
     setSubMode("edit");
-  }, [clearParse, setDeck, setMdText, setParseError, setSubMode]);
+  }, [clearParse, catalog, templateData, initSnapshot, setDeck, setMdText, setParseError, setSubMode]);
 
   // ── Slide editing: update a single slide in the deck ──
   // P2.5 round-trip: while collaborating, the edit is applied locally (optimistic) AND pushed to the
@@ -309,11 +317,13 @@ export function useDeckController() {
     // make the second stale. Awaiting keeps every buffered slide's edit landing in order.
     for (const [index, slide] of pending) {
       const resolved = slide.layout === "auto" ? autoSelectLayout(slide, index, count, catalog) : slide.layout;
-      const md = serializeMd({ slides: [{ ...slide, layout: resolved }] });
+      // Per-slide readout through the binding authority (ADR-0030 stage B, #159) — the catalog-free
+      // serialize dropped a closing-vocabulary slide's title, so the host would parse a title-less md.
+      const md = slideMarkdown({ ...slide, layout: resolved }, catalog, templateData);
       const r = await bridge.sendSlideMarkdown(index, md);
       if (!r.ok) bridge.notify(r.message ?? i18n.t("controller.slideEditSendFailed"));
     }
-  }, [catalog]);
+  }, [catalog, templateData]);
   const scheduleHostSend = useCallback(
     (index: number, slide: SlideIR, immediate: boolean) => {
       pendingSend.current.set(index, slide); // accumulate per index — no cross-slide edit is dropped
@@ -386,12 +396,12 @@ export function useDeckController() {
       const slide = cur?.slides[slideIndex];
       if (!slide) return;
       const resolved = slide.layout === "auto" ? autoSelectLayout(slide, slideIndex, cur!.slides.length, catalog) : slide.layout;
-      const fixed = visualizeKeyValueMd(serializeMd({ slides: [{ ...slide, layout: resolved }] }));
+      const fixed = visualizeKeyValueMd(slideMarkdown({ ...slide, layout: resolved }, catalog, templateData));
       if (!fixed) return;
       const newSlide = parseMd(fixed).slides[0];
       if (newSlide) handleSlideUpdate(slideIndex, newSlide, "commit");
     },
-    [catalog, handleSlideUpdate],
+    [catalog, templateData, handleSlideUpdate],
   );
 
   // Drag-to-move in the preview, or an AI diagram edit, writes the new diagram YAML
@@ -500,12 +510,12 @@ export function useDeckController() {
         if (ns) handleSlideUpdate(activeSlide, ns, "commit");
         return;
       }
-      const rec = reconcileSlideEdit(old, raw);
+      const rec = reconcileSlideEdit(old, raw, serializeTpl(catalog, templateData));
       if (!rec) return; // unparseable AI output — keep the slide as-is
       setEditNotice(null); // clear any stale advisory banner
       handleSlideUpdate(activeSlide, rec.slide, "commit"); // AI edit = one discrete undo step
     },
-    [deck, activeSlide, handleSlideUpdate, setEditNotice],
+    [deck, activeSlide, catalog, templateData, handleSlideUpdate, setEditNotice],
   );
 
   // Preview an AI slide edit AS IT WILL BE APPLIED (reconciled) + its validation advisories, so the
@@ -532,7 +542,7 @@ export function useDeckController() {
       const fig = previewFigureEdit(s, raw);
       if (fig) return { afterMd: fig.afterMd, warnings: [], beforeMd: fig.beforeMd };
       if (parseDesignIntent(raw)) return null; // design → raw diff
-      const rec = reconcileSlideEdit(s, raw);
+      const rec = reconcileSlideEdit(s, raw, serializeTpl(catalog, templateData));
       if (!rec) return null;
       const resolved = autoSelectLayout(rec.slide, activeSlide, deck!.slides.length, catalog);
       // L4: a figure slide that fell to the full-Markdown path AND drifted → tag it so the "変更なし"
@@ -543,12 +553,12 @@ export function useDeckController() {
       // the harness-authored nudge (needs the original instruction; absent for batch/✨直す w/o one).
       const shouldRetry = hadFigure && rec.warnings.length > 0;
       return {
-        afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }),
+        afterMd: slideMarkdown({ ...rec.slide, layout: resolved }, catalog, templateData),
         warnings: figureFallbackTag(hadFigure, rec.warnings),
         ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
       };
     },
-    [deck, activeSlide, catalog],
+    [deck, activeSlide, catalog, templateData],
   );
 
   // Markdown of the active slide → AI panel "this slide" + the Markdown view.
@@ -564,7 +574,7 @@ export function useDeckController() {
 
   // The 整形 (distill) cluster: review + manuscript structuring + per-issue fixes.
   const { diagnostics, contentBox, activeSlideIssues, handleStructureManuscript, handleFixIssue } = useDeckRevise({
-    mdText, setMdText, parseMdText, deck, catalog, activeSlide,
+    mdText, setMdText, parseMdText, deck, catalog, templateData, activeSlide,
   });
 
   const currentSlideMd = (() => {
@@ -573,7 +583,9 @@ export function useDeckController() {
     // Resolve unconditionally: a pinned name this template lacks degrades to a real layout (so the
     // cover's canonical pin doesn't leave the editor/preview layout-less on an alien master).
     const resolved = autoSelectLayout(s, activeSlide, deck!.slides.length, catalog);
-    return serializeMd({ slides: [{ ...s, layout: resolved }] });
+    // Per-slide readout through the binding authority (ADR-0030 stage B, #159): the catalog-free
+    // serialize showed a title-less md here, and one keystroke's parse-back made the loss REAL.
+    return slideMarkdown({ ...s, layout: resolved }, catalog, templateData);
   })();
 
   // Per-slide Markdown editing: the Markdown is the full source for this slide,

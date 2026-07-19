@@ -11,6 +11,7 @@
 
 import type { DiagramSpec, ShapeType } from "./schema";
 import { SLIDE_W, SLIDE_H, type ConnectionPoint } from "./layout-engine";
+import { cjkFontFamily } from "./font-stack";
 import {
   paintDiagram,
   type DrawTarget,
@@ -245,7 +246,7 @@ class SvgDrawTarget implements DrawTarget {
       const fs = Math.round(r.fontSize * PT * 10) / 10;
       const weight = r.bold ? "700" : "400";
       const fill = col(r.color);
-      const face = esc(r.fontFace);
+      const face = esc(cjkFontFamily(r.fontFace));
       const pieces = opts.wrap ? wrapToWidth(r.text, maxW, fs) : [r.text];
       for (const p of pieces) if (p !== "") vlines.push({ text: p, fs, weight, fill, face });
     }
@@ -273,7 +274,7 @@ class SvgDrawTarget implements DrawTarget {
         cursor += lineHs[i];
         return (
           `<tspan x="${tx}" y="${baseline}" font-size="${l.fs}px" font-weight="${l.weight}" ` +
-          `fill="${l.fill}" font-family="${l.face},sans-serif">${esc(l.text)}</tspan>`
+          `fill="${l.fill}" font-family="${l.face}">${esc(l.text)}</tspan>`
         );
       })
       .join("");
