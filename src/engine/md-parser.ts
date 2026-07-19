@@ -39,7 +39,10 @@ function extractFrontMatter(md: string): {
 
 // ── Main parser ──
 
-export function parseMd(md: string): DeckIR {
+export function parseMd(rawMd: string): DeckIR {
+  // Windows 由来の CRLF は行数を変えずに正規化する（sourceLine 計算は行数に依存するため影響なし）。
+  // これにより front matter / layout directive の raw 行照合（`\n$` 前提の正規表現）が LF と同様に効く（#164）。
+  const md = rawMd.replace(/\r\n/g, "\n");
   const { frontMatter, body } = extractFrontMatter(md);
 
   const allLines = body.split("\n");
