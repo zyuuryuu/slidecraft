@@ -146,16 +146,20 @@ export function distillDeck(deck: DeckIR, catalog: LayoutCatalog): DeckIR {
 /** As distillDeck, but ALSO report the NEW slide indices produced by splitting — a source slide that
  *  splits into N parts inserts continuation slides mid-deck, shifting all downstream indices, so an
  *  index-addressed follow-up (get_slide_markdown, set_slide_markdown…) would otherwise target a stale
- *  slide. `newIndices` are those post-split positions (Theme 3 S6: split's changedSlides). */
-export function distillDeckReport(deck: DeckIR, catalog: LayoutCatalog): { deck: DeckIR; newIndices: number[] } {
+ *  slide. `newIndices` are those post-split positions (Theme 3 S6: split's changedSlides). `offsets[k]`
+ *  is where ORIGINAL slide k's first resulting part landed — lets a caller holding pre-distill,
+ *  slide-indexed data (e.g. #148 parse notices) remap to post-distill indices. */
+export function distillDeckReport(deck: DeckIR, catalog: LayoutCatalog): { deck: DeckIR; newIndices: number[]; offsets: number[] } {
   const box = contentBodyBox(catalog);
-  if (!box) return { deck, newIndices: [] };
+  if (!box) return { deck, newIndices: [], offsets: deck.slides.map((_, i) => i) };
   const slides: SlideIR[] = [];
   const newIndices: number[] = [];
+  const offsets: number[] = [];
   for (const s of deck.slides) {
+    offsets.push(slides.length);
     const parts = splitSlideToFit(s, box);
     if (parts.length > 1) for (let k = 0; k < parts.length; k++) newIndices.push(slides.length + k);
     slides.push(...parts);
   }
-  return { deck: { ...deck, slides }, newIndices };
+  return { deck: { ...deck, slides }, newIndices, offsets };
 }

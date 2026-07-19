@@ -17,6 +17,7 @@ import type { LayoutInfo } from "./template-loader";
 import { autoSelectLayout } from "./template-loader";
 import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
+import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -35,6 +36,16 @@ function textOf(p: Paragraph | undefined): string {
   return p ? p.segments.map((s) => s.text).join("") : "";
 }
 
+function rolePlaceholder(slide: SlideIR, role: "title" | "body") {
+  const hasCtr = slide.placeholders.some((p) => p.idx === "0");
+  return slide.placeholders.find((p) => slideIdxRole(p.idx, hasCtr) === role);
+}
+
+/** The slide's title text, or "" — shared by every issue-producing pass (incl. ParseNotice→DeckIssue). */
+function slideTitle(slide: SlideIR): string {
+  return textOf(rolePlaceholder(slide, "title")?.paragraphs[0]);
+}
+
 // A bullet is "table-worthy key-value" only when the value is short and free of
 // parenthetical context: "比率: 73%" yes, "比率: 73%（目標 90%）" no — the latter
 // carries explanation and reads better as a bullet, so we don't nudge it to a table.
@@ -45,17 +56,12 @@ function isCleanKeyValue(text: string): boolean {
   return !/[（(]/.test(value) && [...value].length <= 16;
 }
 
-function rolePlaceholder(slide: SlideIR, role: "title" | "body") {
-  const hasCtr = slide.placeholders.some((p) => p.idx === "0");
-  return slide.placeholders.find((p) => slideIdxRole(p.idx, hasCtr) === role);
-}
-
 export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: readonly LayoutInfo[]): DeckIssue[] {
   const box = catalog ? contentBodyBox(catalog) : undefined;
   const issues: DeckIssue[] = [];
 
   deck.slides.forEach((slide, i) => {
-    const title = textOf(rolePlaceholder(slide, "title")?.paragraphs[0]);
+    const title = slideTitle(slide);
     const add = (level: DeckIssue["level"], message: string, levers: Lever[]) =>
       issues.push({ slideIndex: i, title, level, message, levers });
 
@@ -66,9 +72,24 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
 
     // 句読点はスライドでは prose に見える（体言止めが読みやすい）。読点「、」が最も可読性を落とすので
     // 強い警告（warn）、句点「。」は末尾を落とせば済むことが多いので軽い注意（info）。タイトル＋本文を走査。
-    const prose = slide.placeholders.flatMap((ph) => ph.paragraphs).map(textOf).join("\n");
+    const allParas = slide.placeholders.flatMap((ph) => ph.paragraphs);
+    const prose = allParas.map(textOf).join("\n");
     if (prose.includes("、")) add("warn", "読点「、」が使われている（中黒「・」や改行で整えると読みやすい）", ["polish"]);
     if (prose.includes("。")) add("info", "句点「。」が使われている（スライドでは省くのが一般的）", ["polish"]);
+
+    // #148: a paragraph carrying literal `![alt](src)` Markdown means an image line fell through to
+    // body text (a 2nd+ image, or one with an unsupported src) — never rendered, just dead text.
+    if (allParas.some((p) => IMAGE_MARKDOWN_RE.test(textOf(p)))) {
+      add("info", "画像記法（![alt](src)）が本文テキストとして残っています（2枚目以降の画像、または未対応の画像パスの可能性）", []);
+    }
+
+    // #148: a non-bullet/non-heading paragraph shaped like the parser's own recognized-field regex
+    // (`Key: Value`), but whose key ISN'T Category/Date/Footer, means it fell through unrecognized.
+    for (const p of allParas) {
+      if (p.bullet || p.heading) continue;
+      const key = unrecognizedMetaKey(textOf(p));
+      if (key) add("warn", `「${key}:」は認識されないメタキーのため本文テキスト化されました（Category/Date/Footer のみ対応）`, []);
+    }
 
     if (isVisual || !body) return;
 
@@ -108,10 +129,50 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       if (!layout) return;
       const n = slideBindingPlan(slide, layout).unbound.length;
       if (n === 0) return;
-      const title = textOf(rolePlaceholder(slide, "title")?.paragraphs[0]);
-      issues.push({ slideIndex: i, title, level: "warn", message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
+      issues.push({ slideIndex: i, title: slideTitle(slide), level: "warn", message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
     });
   }
 
   return issues;
+}
+
+/** Turn the parser's ParseNotice[] (#148 — drops only IT could see, e.g. a dropped 2nd table) into
+ *  DeckIssue[] so they read like every other diagnostic. Called at the point notices were captured
+ *  (parse time) AND on every later re-read (the caller persists the result — deck-diagnostics itself
+ *  has nothing left to reconstruct these from, per the ParseNotice module doc). */
+export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseNotice[]): DeckIssue[] {
+  return notices.map((n) => {
+    const slide = deck.slides[n.slideIndex];
+    const title = slide ? slideTitle(slide) : "";
+    const base = { slideIndex: n.slideIndex, title, levers: [] as Lever[] };
+    switch (n.kind) {
+      case "table-dropped":
+        return { ...base, level: "info" as const, message: "表以外の内容（2つ目以降の表や前後の本文）が変換時に失われました（ネイティブ表として保持されるのは1つのみ）" };
+      case "image-dropped":
+        return { ...base, level: "info" as const, message: "画像記法（![alt](src)）を含む内容が表と衝突し変換時に失われました（2枚目以降の画像、または未対応の画像パスの可能性）" };
+      case "meta-key-dropped":
+        return { ...base, level: "warn" as const, message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
+    }
+  });
+}
+
+/** #148: turn distillDeckReport's `newIndices` (the POST-split slide positions) into one info
+ *  DeckIssue per split — "this overflowing slide became N slides" — so an auto-split at intake
+ *  (new_project) or via the `distill` lever isn't silent. `newIndices` groups into contiguous runs,
+ *  one run per original slide that split; `deck` must be the POST-split deck (title reads clean off
+ *  the run's first slide — only continuations past it carry the "（続き）" marker). */
+export function splitInfoIssues(deck: DeckIR, newIndices: readonly number[]): DeckIssue[] {
+  const runs: number[][] = [];
+  for (const idx of newIndices) {
+    const last = runs[runs.length - 1];
+    if (last && last[last.length - 1] === idx - 1) last.push(idx);
+    else runs.push([idx]);
+  }
+  return runs.map((run) => ({
+    slideIndex: run[0],
+    title: slideTitle(deck.slides[run[0]]),
+    level: "info",
+    message: `スライドはテンプレ容量に収まらず ${run.length} 枚に分割されました`,
+    levers: [],
+  }));
 }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseMd } from "../src/engine/md-parser";
+import { parseMd, parseMdReport } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
 
 describe("parseMd — image block", () => {
@@ -22,6 +22,47 @@ describe("parseMd — image block", () => {
     // Was previously src-agnostic; now only a self-contained data:image URI is embedded (isSafeImageSrc)
     // so a relative/remote/javascript src can't reach <img> or the exported HTML.
     expect(parseMd(`# T\n\n![](assets/x.png)`).slides[0].image).toBeUndefined();
+  });
+});
+
+// #148: a 2nd+ GFM table (or any body content around/after the first table) is completely DROPPED —
+// findTableInLines only returns the FIRST table's rows, and the table/body branches are mutually
+// exclusive (md-slide-parser.ts), so nothing besides that first table survives into SlideIR. The raw
+// dropped lines are gone the moment parseSlideBlock returns, so ONLY the parser can report this —
+// deck-diagnostics (which only sees the parsed DeckIR) has nothing left to reconstruct from.
+describe("parseMdReport — table-dropped ParseNotice", () => {
+  const TABLE_A = "| a | b |\n| --- | --- |\n| 1 | 2 |";
+  const TABLE_B = "| c | d |\n| --- | --- |\n| 3 | 4 |";
+
+  it("fires when a 2nd table follows the first (both dropped but the 1st)", () => {
+    const { deck, notices } = parseMdReport(`# T\n\n${TABLE_A}\n\n${TABLE_B}`);
+    expect(deck.slides[0].table?.rows).toEqual([["a", "b"], ["1", "2"]]); // only the FIRST table survives
+    expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
+  });
+
+  it("fires when prose surrounds a single table (the prose is dropped too)", () => {
+    const { notices } = parseMdReport(`# T\n\n前置き\n\n${TABLE_A}\n\n後書き`);
+    expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
+  });
+
+  it("does NOT fire for a slide with exactly one table and nothing else in the body", () => {
+    const { notices } = parseMdReport(`# T\n\n> サブ\n\n${TABLE_A}`);
+    expect(notices).toEqual([]);
+  });
+
+  it("does NOT fire for a slide with no table at all", () => {
+    const { notices } = parseMdReport(`# T\n\n- a\n- b`);
+    expect(notices).toEqual([]);
+  });
+
+  it("tags the correct slideIndex across multiple slides", () => {
+    const { notices } = parseMdReport(`# 一\n\n- a\n\n---\n\n# 二\n\n${TABLE_A}\n\n${TABLE_B}`);
+    expect(notices).toEqual([{ slideIndex: 1, kind: "table-dropped" }]);
+  });
+
+  it("parseMd (the thin wrapper) returns the identical deck parseMdReport does", () => {
+    const md = `# T\n\n${TABLE_A}\n\n${TABLE_B}`;
+    expect(parseMd(md)).toEqual(parseMdReport(md).deck);
   });
 });
 

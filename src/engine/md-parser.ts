@@ -18,6 +18,7 @@
 
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { parseSlideBlock } from "./md-slide-parser";
+import type { ParseNotice, SlideParseNotice } from "./parse-notice";
 
 // ── Extract YAML front matter ──
 
@@ -39,7 +40,14 @@ function extractFrontMatter(md: string): {
 
 // ── Main parser ──
 
-export function parseMd(rawMd: string): DeckIR {
+export function parseMd(md: string): DeckIR {
+  return parseMdReport(md).deck;
+}
+
+/** As parseMd, but ALSO report the ParseNotice[] the parser raised along the way — fallbacks (like a
+ *  dropped 2nd table, #148) that are only knowable AT parse time, since the raw dropped lines don't
+ *  survive into SlideIR. Mirrors distillDeckReport's `{ deck, ... }` side-channel shape. */
+export function parseMdReport(rawMd: string): { deck: DeckIR; notices: SlideParseNotice[] } {
   // Windows 由来の CRLF は行数を変えずに正規化する（sourceLine 計算は行数に依存するため影響なし）。
   // これにより front matter / layout directive の raw 行照合（`\n$` 前提の正規表現）が LF と同様に効く（#164）。
   const md = rawMd.replace(/\r\n/g, "\n");
@@ -93,10 +101,14 @@ export function parseMd(rawMd: string): DeckIR {
 
   // Parse each block into a SlideIR
   const slides: SlideIR[] = [];
+  const notices: SlideParseNotice[] = [];
   for (const block of slideBlocks) {
-    const slide = parseSlideBlock(block.lines, block.startLine);
+    const blockNotices: ParseNotice[] = [];
+    const slide = parseSlideBlock(block.lines, block.startLine, blockNotices);
     if (slide) {
+      const slideIndex = slides.length;
       slides.push(slide);
+      for (const n of blockNotices) notices.push({ ...n, slideIndex });
     }
   }
 
@@ -110,7 +122,7 @@ export function parseMd(rawMd: string): DeckIR {
   }
 
   return {
-    template: frontMatter.template,
-    slides,
+    deck: { template: frontMatter.template, slides },
+    notices,
   };
 }
