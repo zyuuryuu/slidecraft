@@ -11,7 +11,7 @@
 import { serializeMd, type SerializeTemplate } from "../engine/md-serializer";
 import { buildCatalog, type LayoutCatalog } from "../engine/template-catalog";
 import type { TemplateData } from "../engine/template-loader";
-import type { DeckIR } from "../engine/slide-schema";
+import type { DeckIR, SlideIR } from "../engine/slide-schema";
 
 /** GUI が保持する catalog + templateData → serializeMd の束縛 authority。どちらか欠けると
  *  undefined（＝旧経路）: 片方だけで束縛を再構成しない（no-silent-drop より do-no-harm）。 */
@@ -29,6 +29,17 @@ export function deckMarkdown(
   templateData: TemplateData | null | undefined,
 ): string {
   return serializeMd(deck, serializeTpl(catalog, templateData));
+}
+
+/** per-slide readout（collab 送信・per-slide エディタ / AiPanel 入力・変更プレビュー・→表, #159）。
+ *  layout は呼び手が解決済みのものを渡す — auto の解決規則がサイトごとに違う（エディタ系は無条件
+ *  resolve で不在 pin を実レイアウトに落とす／collab 送信・→表 は auto のみ resolve）ため。 */
+export function slideMarkdown(
+  slide: SlideIR,
+  catalog: LayoutCatalog | undefined,
+  templateData: TemplateData | null | undefined,
+): string {
+  return serializeMd({ slides: [slide] }, serializeTpl(catalog, templateData));
 }
 
 /** まだ文書ストアに入っていない template（.scft オープン直後）の readout — アクティブ文書の
