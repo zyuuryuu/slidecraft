@@ -3,6 +3,11 @@
  * (no subprocess, no build): list tools, run the open→edit→validate→export loop over the
  * protocol, and confirm GUARD failures surface as modeled { ok:false, code } results (isError is
  * reserved for unmodeled crashes) — the error-contract unification.
+ *
+ * `connect()` calls `buildServer(createSession(null))` with NO explicit `host` — that's stdio's
+ * shape (cli.ts), so this is really the SOLO control plane (ADR-0033 D1: `createSoloHostContext`
+ * minted internally by `buildServer`), same commitMutation/undo as the collab host, pinned to one
+ * doc. Hence undo/redo round-trips below even with no host object in sight.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -152,5 +157,44 @@ describe("mcp server (in-memory client↔server pair)", () => {
   it("a resource read before open surfaces the engine's not-opened error (never a fake-empty deck)", async () => {
     const client = await connect(); // fresh session, nothing opened
     await expect(client.readResource({ uri: "deck://current" })).rejects.toThrow(/開かれていません/);
+  });
+
+  it("solo stdio: open→edit→validate→export round-trips AND undo→redo the deck (single-doc history, ADR-0033 D1)", async () => {
+    const client = await connect();
+    await call(client, "open_project", { dataBase64: bundleB64 });
+    const beforeEdit = (await call(client, "get_slide_markdown", { index: 1 })).data as string;
+    expect(beforeEdit).toContain("速度");
+
+    const applied = (await call(client, "set_slide_markdown", { index: 1, markdown: "# 差替\n\n- 一点" })).data as { ok: boolean; afterMd: string };
+    expect(applied.ok).toBe(true);
+    expect(applied.afterMd).toContain("差替");
+
+    const v = (await call(client, "validate_deck")).data as { ok: boolean };
+    expect(v.ok).toBe(true);
+    const exp = (await call(client, "export_pptx")).data as { dataBase64: string };
+    expect(Buffer.from(exp.dataBase64, "base64").length).toBeGreaterThan(1000);
+
+    // server-side undo/redo work on solo stdio too — no second control plane needed for them.
+    const u = (await call(client, "undo")).data as { ok: boolean };
+    expect(u.ok).toBe(true);
+    const afterUndo = (await call(client, "get_slide_markdown", { index: 1 })).data as string;
+    expect(afterUndo).not.toContain("差替");
+    expect(afterUndo).toContain("速度"); // the deck went all the way back to its opened state
+
+    const r = (await call(client, "redo")).data as { ok: boolean };
+    expect(r.ok).toBe(true);
+    const afterRedo = (await call(client, "get_slide_markdown", { index: 1 })).data as string;
+    expect(afterRedo).toContain("差替"); // and forward again to the edit
+  });
+
+  it("buildServer has no direct-Session mutate path — every mutation commits through commitMutation (ADR-0033 D1)", () => {
+    const src = readFileSync(resolve(__dirname, "../src/mcp/server.ts"), "utf8");
+    // The retired shape looked like `if (!host) { ... fn(session) ... }` — a second, host-less
+    // mutate branch that bypassed commitMutation/undo entirely. Guard it stays gone.
+    expect(src).not.toMatch(/if\s*\(\s*!host\s*\)/);
+    expect(src).toContain("commitMutation");
+    // The `mutate` closure must resolve an entry and commit through it, not call `fn(session)` on a
+    // bare Session captured from buildServer's outer scope.
+    expect(src).not.toMatch(/await\s+fn\(session\)/);
   });
 });

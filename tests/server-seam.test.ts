@@ -61,9 +61,22 @@ describe("buildServer onMutate seam", () => {
     await call(client, "new_project", { templateBase64: templateB64, markdown: "# A\n\n---\n\n# B\n\n- x\n- y" });
     await call(client, "set_slide_markdown", { index: 0, markdown: "# 差替\n\n- 一点" });
     await call(client, "set_deck_markdown", { markdown: "# X\n\n---\n\n# Y\n\n- 速度: 0.8秒\n- 重量: 1.2kg" });
+    // split_overflowing_slides is a real no-op here (nothing overflows) — the unified no-op gate
+    // (ADR-0033 D1: commitMutation's changed:false never fires onMutate, on stdio too now) correctly
+    // skips it; see the dedicated "changed:true" case below.
     await call(client, "split_overflowing_slides");
     await call(client, "convert_bullets_to_table", { index: 1 }); // slide 1 = key-value run
-    expect(mutated).toEqual(["new_project", "set_slide_markdown", "set_deck_markdown", "split_overflowing_slides", "convert_bullets_to_table"]);
+    expect(mutated).toEqual(["new_project", "set_slide_markdown", "set_deck_markdown", "convert_bullets_to_table"]);
+  });
+
+  it("split_overflowing_slides fires onMutate when it actually splits (changed:true)", async () => {
+    const { client, mutated } = await connect();
+    await call(client, "new_project", { templateBase64: templateB64, markdown: "# 表紙" });
+    const bullets = Array.from({ length: 40 }, (_, i) => `- 長い箇条書き項目${i}：容量を超過させるための十分に長いテキストをここに置きます`).join("\n");
+    await call(client, "set_deck_markdown", { markdown: `# 表紙\n\n---\n\n# 中身\n\n${bullets}` });
+    const before = [...mutated];
+    await call(client, "split_overflowing_slides");
+    expect(mutated).toEqual([...before, "split_overflowing_slides"]);
   });
 
   it("a mutating tool returning {ok:false} does NOT fire onMutate (reject = no change)", async () => {
