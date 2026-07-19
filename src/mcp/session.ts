@@ -12,10 +12,11 @@ import { DeckIRSchema, type DeckIR, type SlideIR } from "../engine/slide-schema"
 import { type TemplateData, autoSelectLayout, loadTemplate } from "../engine/template-loader";
 import { buildCatalog, deckCapabilities, assessTemplateHealth, type LayoutCatalog } from "../engine/template-catalog";
 import { openProject, bundleProject } from "../engine/project-io";
-import { parseMd } from "../engine/md-parser";
+import { parseMdReport } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { distillDeck, distillDeckReport, contentBodyBox } from "../engine/distill";
-import { diagnoseDeck, type DeckIssue } from "../engine/deck-diagnostics";
+import { distillDeckReport, contentBodyBox } from "../engine/distill";
+import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue } from "../engine/deck-diagnostics";
+import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
 import { diagramSpecToYaml } from "../engine/diagram-serialize";
@@ -32,10 +33,14 @@ export interface Session {
   catalog: LayoutCatalog | undefined;
   meta: { templateName: string; savedAt?: string };
   dirty: boolean;
+  // #148: fallbacks only the PARSER could see (e.g. a dropped 2nd table) — deck-diagnostics can't
+  // reconstruct these from s.deck alone, so they're captured at parse time and merged into every
+  // later diagnostics read (getDiagnostics / fitTail) until the affected slide is re-parsed.
+  parseNotices: SlideParseNotice[];
 }
 
 export function createSession(root: string | null = null): Session {
-  return { root, deck: null, template: null, catalog: undefined, meta: { templateName: "" }, dirty: false };
+  return { root, deck: null, template: null, catalog: undefined, meta: { templateName: "" }, dirty: false, parseNotices: [] };
 }
 
 interface Loaded {
@@ -88,24 +93,31 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
   s.catalog = buildCatalog(template);
   s.meta = { templateName: meta.templateName, savedAt: meta.savedAt };
   s.dirty = false;
+  s.parseNotices = []; // an opened .pptx isn't Markdown-parsed — no parse-time notices apply
   return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog, template.layouts) };
 }
 
-/** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses
- *  the exact engine path as the GUI's Draft flow (parseMd → distillDeck), so "submit
- *  Markdown, get well-fitted slides on this template" works with zero new layout logic.
- *  With no Markdown, yields a valid single-slide deck the agent can then fill. */
+/** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses the exact
+ *  engine path as the GUI's Draft flow (parseMd → distillDeck), so "submit Markdown, get well-fitted
+ *  slides on this template" works with zero new layout logic. With no Markdown, yields a valid
+ *  single-slide deck the agent can then fill.
+ *  #148: parseMdReport/distillDeckReport (report variants of the same parseMd/distillDeck) additionally
+ *  surface parse-time fallbacks (dropped 2nd table) + auto-split info as diagnostics — the deck itself
+ *  is byte-identical either way. */
 export async function newProject(s: Session, templateBytes: Uint8Array, markdown?: string) {
   const template = await loadTemplate(templateBytes);
   const catalog = buildCatalog(template);
   assertTemplateUsable(catalog); // reject a structurally-unusable master, never-silent
-  const deck = distillDeck(parseMd(markdown?.trim() ? markdown : "# Untitled"), catalog);
+  const { deck: parsed, notices } = parseMdReport(markdown?.trim() ? markdown : "# Untitled");
+  const { deck, offsets } = distillDeckReport(parsed, catalog);
   s.template = template;
   s.catalog = catalog;
   s.deck = deck;
   s.meta = { templateName: "", savedAt: undefined };
   s.dirty = true; // a fresh, unsaved project
-  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, catalog, template.layouts) };
+  s.parseNotices = notices.map((n) => ({ ...n, slideIndex: offsets[n.slideIndex] ?? n.slideIndex }));
+  const diagnostics = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, offsets)];
+  return { slideCount: deck.slides.length, diagnostics };
 }
 
 export function getDeck(s: Session): DeckIR {
@@ -134,7 +146,10 @@ function budgetOf(catalog: LayoutCatalog): { maxBullets: number; charsPerBullet:
 export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[] } {
   const { deck, catalog, template } = requireLoaded(s);
   // ADR-0030 stage A: pass the raw layouts so diagnoseDeck can surface unbound content (#97 ②a / #135).
-  return { budget: budgetOf(catalog), issues: diagnoseDeck(deck, catalog, template.layouts) };
+  // #148: parseNotices (e.g. a dropped 2nd table) live on the session — deck-diagnostics can't
+  // reconstruct them from `deck` alone, so every read merges the persisted notices back in.
+  const issues = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices)];
+  return { budget: budgetOf(catalog), issues };
 }
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);
@@ -179,17 +194,27 @@ export function getProjectMeta(s: Session) {
  *  template's body budget. Converging the 6 mutations onto ONE sibling shape lets the agent branch on
  *  the same fields whichever lever it pulled, and gives commitMutation a `changed` flag to gate no-ops
  *  on (a no-op mutation must not bump rev / push undo / fan out deckChanged). */
-function fitTail(deck: DeckIR, catalog: LayoutCatalog, layouts: TemplateData["layouts"]): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
+/** #148: replace slide `i`'s persisted parse notices with freshly-parsed ones — called whenever slide
+ *  `i`'s content is re-derived from new Markdown, so a stale notice (e.g. a table-drop that a later
+ *  edit fixed) doesn't linger, and a newly-introduced one isn't missed. */
+function replaceSlideNotices(s: Session, i: number, fresh: readonly ParseNotice[]): void {
+  s.parseNotices = [...s.parseNotices.filter((n) => n.slideIndex !== i), ...fresh.map((n) => ({ ...n, slideIndex: i }))];
+}
+
+function fitTail(s: Session, deck: DeckIR, catalog: LayoutCatalog, layouts: TemplateData["layouts"]): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
   // ADR-0030 stage A: pass the raw layouts so every mutation's tail surfaces unbound content too — the
   // new_project → edit → get_deck_issues loop must not have a blind spot vs get_deck_issues (#97 ②a / #135).
-  return { diagnostics: diagnoseDeck(deck, catalog, layouts), budget: budgetOf(catalog) };
+  // #148: same for the session's persisted parse notices (a dropped 2nd table etc.).
+  const diagnostics = [...diagnoseDeck(deck, catalog, layouts), ...parseNoticesToIssues(deck, s.parseNotices)];
+  return { diagnostics, budget: budgetOf(catalog) };
 }
 
 export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  const parsedSlide = parseMd(markdown).slides[0];
+  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown);
+  const parsedSlide = parsedDeck.slides[0];
   if (!parsedSlide) return { ok: false as const, error: "Markdown からスライドを解釈できませんでした（空？）。" };
   const old = deck.slides[i];
   // Preserve a diagram/mermaid the text edit doesn't carry (mirrors the GUI apply).
@@ -203,33 +228,44 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
+  // #148: notices track the FRESHLY-parsed slide, not the old one — but `markdown` may contain `---`
+  // and parse into MULTIPLE blocks (only slides[0] is ever applied, same as `parsedSlide` above), so
+  // only slideIndex===0 notices belong to slide i — a 2nd block's own notice must NOT attach here.
+  replaceSlideNotices(s, i, parsedNotices.filter((n) => n.slideIndex === 0));
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, beforeMd: before, afterMd, ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed, beforeMd: before, afterMd, ...fitTail(s, s.deck, catalog, template.layouts) };
 }
 
 export function applyDeckMarkdown(s: Session, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   const tpl = { catalog, layouts: template.layouts };
   const before = serializeMd(deck, tpl);
-  const check = DeckIRSchema.safeParse(parseMd(markdown));
+  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown);
+  const check = DeckIRSchema.safeParse(parsedDeck);
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   const changed = serializeMd(check.data, tpl) !== before;
   s.deck = check.data;
+  s.parseNotices = parsedNotices; // #148: the WHOLE deck is fresh-parsed, so notices reset 1:1 (no remap needed — no distill here)
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, slideCount: s.deck.slides.length, ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed, slideCount: s.deck.slides.length, ...fitTail(s, s.deck, catalog, template.layouts) };
 }
 
 /** Deterministic lever: split overflowing content slides across more slides WITHOUT
  *  shrinking fonts. The whole point of harness-over-model — never make the agent re-do it. */
 export function distill(s: Session) {
   const { deck, catalog, template } = requireLoaded(s);
-  const { deck: fitted, newIndices } = distillDeckReport(deck, catalog);
+  const { deck: fitted, newIndices, offsets } = distillDeckReport(deck, catalog);
   const changed = fitted.slides.length !== deck.slides.length;
   s.deck = fitted;
+  // #148: a split shifts every downstream slide's index — remap persisted parse notices the same way
+  // distillDeckReport remapped the slides, and merge in this pass's OWN split-info issues.
+  s.parseNotices = s.parseNotices.map((n) => ({ ...n, slideIndex: offsets[n.slideIndex] ?? n.slideIndex }));
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...fitTail(fitted, catalog, template.layouts) };
+  const tail = fitTail(s, fitted, catalog, template.layouts);
+  const diagnostics = [...tail.diagnostics, ...splitInfoIssues(fitted, offsets)];
+  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...tail, diagnostics };
 }
 
 /** Deterministic lever: turn a key-value bullet run on one slide into a GFM table. When there is no
@@ -239,16 +275,21 @@ export function visualizeKeyValue(s: Session, i: number) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(deck, catalog, template.layouts) });
+  const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(s, deck, catalog, template.layouts) });
   const fixed = visualizeKeyValueMd(before);
   if (!fixed) return notApplicable();
-  const newSlide = parseMd(fixed).slides[0];
+  const { deck: fixedDeck, notices: fixedNotices } = parseMdReport(fixed);
+  const newSlide = fixedDeck.slides[0];
   if (!newSlide) return notApplicable();
   const slides = [...deck.slides];
   slides[i] = newSlide;
   s.deck = { ...deck, slides };
+  // #148: slide i's content was just re-derived from fresh Markdown — filtered to slideIndex===0 for
+  // the same reason as applySlideMarkdown (visualizeKeyValueMd always emits single-slide Markdown
+  // today, so this is a symmetry/defensive filter rather than an active bug, per review on #197).
+  replaceSlideNotices(s, i, fixedNotices.filter((n) => n.slideIndex === 0));
   s.dirty = true;
-  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s, s.deck, catalog, template.layouts) };
 }
 
 /** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
@@ -309,7 +350,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
-  return { ok: true as const, changed, created, beforeMd: before, afterMd, ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed, created, beforeMd: before, afterMd, ...fitTail(s, s.deck, catalog, template.layouts) };
 }
 
 /** Apply a DESIGN intent — the spatial half of two-stage editing — to a slide's figure.
@@ -338,14 +379,14 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
   const changed = JSON.stringify(applied) !== JSON.stringify(slide);
   // `skipped` names ops that took no effect (e.g. an emphasize whose nodeId the AI renamed away) so the
   // agent gets a precise, actionable reason + the ids that DO exist (#13).
-  if (!changed) return { ok: true as const, changed: false as const, skipped, beforeMd: before, afterMd: before, ...fitTail(deck, catalog, template.layouts) };
+  if (!changed) return { ok: true as const, changed: false as const, skipped, beforeMd: before, afterMd: before, ...fitTail(s, deck, catalog, template.layouts) };
   const slides = [...deck.slides];
   slides[i] = applied;
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
   s.dirty = true;
-  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s.deck, catalog, template.layouts) };
+  return { ok: true as const, changed: true as const, skipped, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s, s.deck, catalog, template.layouts) };
 }
 
 /** The fix PACKET the agent fulfills AS the LLM (inverted aiFix: constraints + diagnosis

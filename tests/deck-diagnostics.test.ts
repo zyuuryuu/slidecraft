@@ -72,4 +72,45 @@ describe("diagnoseDeck", () => {
     expect(diagnoseDeck(parseMd("# 速く、確実に\n\n- 要点")).some((x) => x.message.includes("読点"))).toBe(true);
     expect(diagnoseDeck(parseMd("# まとめ\n\n- 速い\n- 安い")).some((x) => x.message.includes("読点") || x.message.includes("句点"))).toBe(false);
   });
+
+  // #148: a 2nd+ image line and an unrecognized `Key: Value` line both fall through to plain body text
+  // (md-slide-parser) — the raw markdown SURVIVES verbatim as a body paragraph, so (unlike the table
+  // drop) diagnoseDeck can reconstruct these directly from the parsed DeckIR (R2: no parser touch).
+  describe("parser-fallback surfacing (#148)", () => {
+    const DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+
+    it("flags a 2nd image line that leaked into body text as literal Markdown", () => {
+      const md = `# 画像\n\n![一枚目](${DATA_URI})\n\n![二枚目](${DATA_URI})`;
+      const issues = diagnoseDeck(parseMd(md));
+      const img = issues.find((x) => x.slideIndex === 0 && x.message.includes("画像"));
+      expect(img).toBeTruthy();
+      expect(img!.level).toBe("info");
+    });
+
+    it("does NOT flag a slide with exactly one embedded image", () => {
+      const md = `# 画像\n\n![一枚目](${DATA_URI})`;
+      expect(diagnoseDeck(parseMd(md)).some((x) => x.message.includes("画像"))).toBe(false);
+    });
+
+    it("flags an unsupported (non data:image) src that fell through to body text too", () => {
+      const md = `# 画像\n\n![外部](https://example.com/x.png)`;
+      expect(diagnoseDeck(parseMd(md)).some((x) => x.message.includes("画像"))).toBe(true);
+    });
+
+    it("flags an unrecognized `Key: Value` line (e.g. Meta:) that fell through to body text", () => {
+      const issues = diagnoseDeck(parseMd("# T\n\nMeta: 補足情報です"));
+      const meta = issues.find((x) => x.slideIndex === 0 && x.message.includes("Meta"));
+      expect(meta).toBeTruthy();
+      expect(meta!.level).toBe("warn");
+    });
+
+    it("does NOT flag the recognized fields Category/Date/Footer", () => {
+      const issues = diagnoseDeck(parseMd("# T\n\nCategory: 営業\nDate: 2026-07-19\nFooter: 社外秘"));
+      expect(issues.some((x) => /Category|Date|Footer/.test(x.message))).toBe(false);
+    });
+
+    it("does NOT flag a normal bullet that happens to contain a colon (table-worthy key-value)", () => {
+      expect(diagnoseDeck(parseMd("# 指標\n\n- 速度: 0.8秒\n- 重量: 1.2kg")).some((x) => /^「.*」は認識/.test(x.message))).toBe(false);
+    });
+  });
 });

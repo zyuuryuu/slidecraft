@@ -10,13 +10,16 @@ import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type ParseNotice } from "./parse-notice";
 
-/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line). */
-function findTableInLines(lines: string[]): string[][] | null {
+/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line), plus WHERE it
+ *  starts and how many lines it consumed — so the caller can tell whether anything besides that
+ *  table (leading prose, a 2nd table, trailing prose) is left over in `lines`. */
+function findTableInLines(lines: string[]): { rows: string[][]; start: number; consumed: number } | null {
   for (let i = 0; i + 1 < lines.length; i++) {
     if (isTableRow(lines[i])) {
       const parsed = parseMarkdownTable(lines.slice(i));
-      if (parsed) return parsed.rows;
+      if (parsed) return { rows: parsed.rows, start: i, consumed: parsed.consumed };
     }
   }
   return null;
@@ -253,6 +256,7 @@ function stripCommentOnlyLines(lines: string[]): string[] {
 export function parseSlideBlock(
   lines: string[],
   startLine: number,
+  notices?: ParseNotice[],
 ): SlideIR | null {
   // sourceLineStart/End must span the ORIGINAL block — useDeckRevise slices the raw
   // Markdown by these — so capture the length before comment lines are stripped.
@@ -499,9 +503,21 @@ export function parseSlideBlock(
   // the body lines become bullet/text paragraphs (idx 1).
   const trimmedBody = trimBodyLines(bodyLines);
   let table: TableBlock | undefined;
-  const tableRows = findTableInLines(trimmedBody);
-  if (tableRows) {
-    table = { rows: tableRows, header: true, placeholderIdx: "1" };
+  const found = findTableInLines(trimmedBody);
+  if (found) {
+    table = { rows: found.rows, header: true, placeholderIdx: "1" };
+    // #148 no-silent-drop: the table/body branches are mutually exclusive — ANYTHING else in the body
+    // (leading prose, a 2nd+ table, trailing prose) is discarded, not converted to a paragraph. Once
+    // this function returns, those raw lines are gone from SlideIR, so only the parser can report it —
+    // classify the leftover (a leaked image line / unrecognized meta key) the same way deck-diagnostics
+    // would have from surviving body text, since a table's presence is what stopped it from surviving.
+    const leftover = trimBodyLines([...trimmedBody.slice(0, found.start), ...trimmedBody.slice(found.start + found.consumed)]);
+    if (leftover.length > 0) {
+      notices?.push({ kind: "table-dropped" });
+      if (leftover.some((l) => IMAGE_MARKDOWN_RE.test(l))) notices?.push({ kind: "image-dropped" });
+      const metaKey = leftover.map(unrecognizedMetaKey).find((k): k is string => k !== null);
+      if (metaKey) notices?.push({ kind: "meta-key-dropped", detail: metaKey });
+    }
   } else if (trimmedBody.length > 0) {
     // Merge into an EXISTING idx "1" (a title layout's subtitle) rather than create a
     // DUPLICATE idx "1": the serializer reads only the first idx-1 placeholder, so a
