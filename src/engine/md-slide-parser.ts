@@ -8,23 +8,10 @@ import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageB
 import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
-import { isTableRow, parseMarkdownTable } from "./md-table";
+import { findTableInLines, extractBodyTable } from "./md-body-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type ParseNotice } from "./parse-notice";
+import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
-
-/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line), plus WHERE it
- *  starts and how many lines it consumed — so the caller can tell whether anything besides that
- *  table (leading prose, a 2nd table, trailing prose) is left over in `lines`. */
-function findTableInLines(lines: string[]): { rows: string[][]; start: number; consumed: number } | null {
-  for (let i = 0; i + 1 < lines.length; i++) {
-    if (isTableRow(lines[i])) {
-      const parsed = parseMarkdownTable(lines.slice(i));
-      if (parsed) return { rows: parsed.rows, start: i, consumed: parsed.consumed };
-    }
-  }
-  return null;
-}
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -303,6 +290,9 @@ export function parseSlideBlock(
   let mermaidBlock: MermaidBlock | undefined;
   let code: CodeBlock | undefined;
   let image: ImageBlock | undefined;
+  // Declared here (not just in the standard-parse path below) so the separator branch can ALSO
+  // bind a column-scoped GFM table (#100) — mirroring how diagram/mermaidBlock are shared.
+  let table: TableBlock | undefined;
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -365,8 +355,8 @@ export function parseSlideBlock(
     sections.forEach((sectionLines, i) => {
       const colIdx = String(i + 1);
       const sl = trimBodyLines(sectionLines); // drop the blank lines around each column
-      // A column may be a FIGURE (a ```diagram / ```mermaid block) instead of text —
-      // bind it to THIS column's idx so the figure coexists beside the other columns.
+      // A column may be a FIGURE (a ```diagram / ```mermaid block, or a GFM table, #100) instead
+      // of text — bind it to THIS column's idx so the figure coexists beside the other columns.
       const fig = extractFencedBlock(sl);
       if (fig && (fig.lang === "diagram" || fig.lang === "mermaid-shapes")) {
         diagram = { yaml: fig.content, placeholderIdx: colIdx };
@@ -375,18 +365,24 @@ export function parseSlideBlock(
         if (f.diagram) diagram = f.diagram;
         else mermaidBlock = f.mermaidBlock;
       } else {
-        const paras = linesToParagraphs(sl, { cellHeading: true });
-        if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
+        const found = findTableInLines(sl);
+        if (found) {
+          table = { rows: found.rows, header: true, placeholderIdx: colIdx };
+        } else {
+          const paras = linesToParagraphs(sl, { cellHeading: true });
+          if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
+        }
       }
     });
 
-    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image && !notes?.length) return null;
+    if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !image && !notes?.length) return null;
 
     return {
       layout,
       placeholders,
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
+      ...(table ? { table } : {}),
       ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
       ...(notes?.length ? { notes } : {}),
       ...(sectionBreak ? { sectionBreak: true } : {}),
@@ -510,31 +506,16 @@ export function parseSlideBlock(
     }
   }
 
-  // Body: a GFM table becomes a NATIVE table block (fills body region 1); otherwise
-  // the body lines become bullet/text paragraphs (idx 1).
+  // Body: a GFM table becomes a NATIVE table block (fills body region 1 by default); otherwise
+  // the body lines become bullet/text paragraphs (idx 1). A single table COEXISTS with any
+  // surrounding prose (#101 no-silent-drop, md-body-table.extractBodyTable) — the leftover text
+  // is merged into idx "1" the same way plain body text is, appending to an EXISTING idx "1" (a
+  // title layout's subtitle) rather than creating a duplicate the serializer would silently drop.
   const trimmedBody = trimBodyLines(bodyLines);
-  let table: TableBlock | undefined;
-  const found = findTableInLines(trimmedBody);
-  if (found) {
-    table = { rows: found.rows, header: true, placeholderIdx: "1" };
-    // #148 no-silent-drop: the table/body branches are mutually exclusive — ANYTHING else in the body
-    // (leading prose, a 2nd+ table, trailing prose) is discarded, not converted to a paragraph. Once
-    // this function returns, those raw lines are gone from SlideIR, so only the parser can report it —
-    // classify the leftover (a leaked image line / unrecognized meta key) the same way deck-diagnostics
-    // would have from surviving body text, since a table's presence is what stopped it from surviving.
-    const leftover = trimBodyLines([...trimmedBody.slice(0, found.start), ...trimmedBody.slice(found.start + found.consumed)]);
-    if (leftover.length > 0) {
-      notices?.push({ kind: "table-dropped" });
-      if (leftover.some((l) => IMAGE_MARKDOWN_RE.test(l))) notices?.push({ kind: "image-dropped" });
-      const metaKey = leftover.map(unrecognizedMetaKey).find((k): k is string => k !== null);
-      if (metaKey) notices?.push({ kind: "meta-key-dropped", detail: metaKey });
-    }
-  } else if (trimmedBody.length > 0) {
-    // Merge into an EXISTING idx "1" (a title layout's subtitle) rather than create a
-    // DUPLICATE idx "1": the serializer reads only the first idx-1 placeholder, so a
-    // duplicate silently drops the body on round-trip. Content layouts put the subtitle
-    // at idx 16, so there's no idx-1 yet and the body becomes its own placeholder.
-    const bodyParas = linesToParagraphs(trimmedBody);
+  const { table: foundTable, leftover } = extractBodyTable(trimmedBody, notices);
+  if (foundTable) table = foundTable;
+  if (leftover.length > 0) {
+    const bodyParas = linesToParagraphs(leftover);
     const existing = placeholders.find((p) => p.idx === "1");
     if (existing) existing.paragraphs.push(...bodyParas);
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
