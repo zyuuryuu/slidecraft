@@ -22,6 +22,10 @@ import {
   type EdgeLineOpts,
   type PaintOptions,
 } from "./diagram-painter";
+import { shrinkScale, wrapToWidth } from "./draw-target";
+
+// Re-export so existing consumers/tests keep their import path (moved to draw-target in #228).
+export { wrapToWidth } from "./draw-target";
 
 const SCALE = 96; // px per inch
 const PT = 96 / 72; // pt → px
@@ -43,58 +47,6 @@ function esc(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;"); // also escape ' so a value in a future single-quoted attr can't break out (ADR-0016 F4)
-}
-
-/** CJK/fullwidth code-point test (via code point → no literal CJK glyphs / irregular-whitespace lint). */
-function isCjkCode(o: number): boolean {
-  return (o >= 0x3000 && o <= 0x9fff) || (o >= 0xac00 && o <= 0xd7a3) || (o >= 0xff00 && o <= 0xffef);
-}
-
-/** Estimated rendered width of a string at font size fs (px): CJK ≈ 1em, Latin ≈ 0.55em.
- *  Errs slightly wide so shrink/wrap never leave text overflowing its box. */
-function estWidth(s: string, fs: number): number {
-  let w = 0;
-  for (const c of s) w += fs * (isCjkCode(c.charCodeAt(0)) ? 1.0 : 0.55);
-  return w;
-}
-
-/**
- * Greedy width-based line wrap for opts.wrap labels (timeline event cards, quadrant cells,
- * swimlane headers, journey steps). SVG <text> can't soft-wrap like the old foreignObject
- * <div>; this approximates the browser: break on spaces, hard-break over-long tokens.
- * Exported for unit testing.
- */
-export function wrapToWidth(text: string, maxW: number, fs: number): string[] {
-  if (estWidth(text, fs) <= maxW) return [text];
-  const cw = (c: string) => fs * (isCjkCode(c.charCodeAt(0)) ? 1.0 : 0.55);
-
-  // Tokenize into words, spaces, and individual CJK chars (which may break anywhere).
-  const tokens: string[] = [];
-  let buf = "";
-  for (const c of [...text]) {
-    if (c === " ") { if (buf) { tokens.push(buf); buf = ""; } tokens.push(" "); }
-    else if (isCjkCode(c.charCodeAt(0))) { if (buf) { tokens.push(buf); buf = ""; } tokens.push(c); }
-    else buf += c;
-  }
-  if (buf) tokens.push(buf);
-
-  const lines: string[] = [];
-  let cur = "";
-  for (let tok of tokens) {
-    while (estWidth(tok, fs) > maxW) { // hard-break a single token wider than the line
-      const chars = [...tok];
-      let i = 0, acc = 0;
-      for (; i < chars.length; i++) { acc += cw(chars[i]); if (acc > maxW) break; }
-      i = Math.max(1, i);
-      if (cur.trim()) { lines.push(cur.trim()); cur = ""; }
-      lines.push(chars.slice(0, i).join(""));
-      tok = chars.slice(i).join("");
-    }
-    if (cur !== "" && estWidth(cur + tok, fs) > maxW) { lines.push(cur.trim()); cur = tok === " " ? "" : tok; }
-    else cur += tok;
-  }
-  if (cur.trim()) lines.push(cur.trim());
-  return lines.length ? lines : [text];
 }
 
 class SvgDrawTarget implements DrawTarget {
@@ -256,12 +208,8 @@ class SvgDrawTarget implements DrawTarget {
     // no overflow:hidden, so without this a too-long label would spill over neighbours — the old
     // foreignObject clipped it. Scale every line's font size by the widest line's overflow ratio.
     if (opts.shrink) {
-      let widest = 0;
-      for (const l of vlines) widest = Math.max(widest, estWidth(l.text, l.fs));
-      if (widest > maxW) {
-        const s = maxW / widest;
-        for (const l of vlines) l.fs = Math.round(l.fs * s * 100) / 100;
-      }
+      const s = shrinkScale(vlines, maxW); // shared with the PPTX writer's pre-shrink (#228, R8)
+      if (s < 1) for (const l of vlines) l.fs = Math.round(l.fs * s * 100) / 100;
     }
 
     const lineHs = vlines.map((l) => l.fs * LH);
