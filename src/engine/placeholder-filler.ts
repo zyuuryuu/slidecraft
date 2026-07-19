@@ -12,7 +12,7 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { buildCatalog } from "./template-catalog";
+import { buildCatalog, placeholderRole } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./visual-placement";
 import { isGroupedLayout, expandGroups } from "./group-binding";
@@ -21,7 +21,7 @@ import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
 import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT } from "./notes-ooxml";
-import { materializeDerivedSlides } from "./deck-sections";
+import { materializeDerivedSlides, sectionFooterFor } from "./deck-sections";
 import { midnightExecutive } from "./theme";
 
 /**
@@ -126,6 +126,9 @@ function dataUriToImage(src: string): { bytes: Uint8Array; ext: string; mime: st
 async function buildSlideXml(
   layout: LayoutInfo,
   slide: SlideIR,
+  // 所属章名（#168・案A）。null＝章扉より前 or section 無しデッキ＝注入なし。chrome 経路（sldNum と
+  // 同じ「テンプレに枠が無ければテンプレの意思」扱い）— 明示 Footer: が束縛済みの ftr 枠には触れない。
+  sectionFooterText: string | null = null,
 ): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined }> {
   // A Mermaid block whose content is a NATIVE diagram type exports as native,
   // editable shapes (not a rasterised mermaid.js image) — matching the preview.
@@ -200,7 +203,11 @@ async function buildSlideXml(
       id++;
       continue;
     }
-    const content = contentFor.get(ph.idx);
+    let content = contentFor.get(ph.idx);
+    // 章名フッタの自動注入（#168）: ftr 枠が未束縛（明示 Footer: 無し）のときだけ、所属章名を書く。
+    if (!content && sectionFooterText != null && placeholderRole(ph) === "footer") {
+      content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
+    }
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content);
@@ -400,7 +407,7 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide);
+    const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide, sectionFooterFor(deck, i));
 
     // Embed each referenced image with its OWN rId (a behind backdrop can coexist with a mermaid PNG,
     // so they no longer share one slot). Mermaid SVG→PNG is rasterized by the injected UI-layer canvas.
