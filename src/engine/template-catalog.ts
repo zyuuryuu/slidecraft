@@ -216,8 +216,9 @@ const SLIDE_H_IN = 7.5;
 /** Best-effort role from POSITION/size — a BONUS recovery tier for type-stripped masters
  *  that still carry explicit xfrm (e.g. canonical). Returns null when geometry is absent
  *  (inherited xfrm → w/h 0, the common real-world case) or the box is large/central (left
- *  to the area→body fallback), so it never misfires on a healthy or geometry-less master. */
-function geometryRole(
+ *  to the area→body fallback), so it never misfires on a healthy or geometry-less master.
+ *  Exported for the #146 signal-conflict census (master-pathology) — read-only reuse. */
+export function geometryRole(
   s: { x: number; y: number; w: number; h: number },
   sw: number = SLIDE_W_IN,
   sh: number = SLIDE_H_IN,
@@ -252,15 +253,13 @@ function nameRole(name: string): PlaceholderRole | null {
 }
 
 /**
- * Placeholder role from its PPTX type, idx conventions as refinement, then a RECOVERY
- * ladder (geometry → name → area) reached ONLY when the type is "" (a typeless ph, the
- * loader no longer fakes "body") AND the idx is non-conventional. Every explicit-type /
- * conventional-idx branch returns exactly as before → healthy masters are byte-identical.
+ * The TYPE/IDX rungs of the role ladder alone — explicit <p:ph> type, then idx conventions.
+ * Returns null when neither answers (a typeless ph at a non-conventional idx — the recovery
+ * ladder's territory). Split out of placeholderRole so the #146 signal-conflict census can
+ * read the RAW type/idx verdict (no geometry, no resolvedRole) without duplicating the rungs;
+ * placeholderRole composes this verbatim, so the split is byte-identical.
  */
-export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
-  // ADR-0025: a load-time role resolved by the gated title recovery (recoverLayoutTitle) wins over
-  // the context-free ladder, so binding/catalog/fieldMap all see the SAME promoted role (bijection).
-  if (ph.resolvedRole) return ph.resolvedRole;
+export function typeIdxRole(ph: PlaceholderInfo): PlaceholderRole | null {
   const t = ph.type.toLowerCase();
   const idx = ph.idx;
   // Explicit placeholder TYPE is authoritative — it must win over the idx convention (a template
@@ -287,18 +286,35 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
     if (idx === "15") return "title";
     if (idx === "16") return "subtitle";
   }
-  if (t === "body") {
+  if (t === "body") return "body";
+  if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
+  return null;
+}
+
+/**
+ * Placeholder role from its PPTX type, idx conventions as refinement, then a RECOVERY
+ * ladder (geometry → name → area) reached ONLY when the type is "" (a typeless ph, the
+ * loader no longer fakes "body") AND the idx is non-conventional. Every explicit-type /
+ * conventional-idx branch returns exactly as before → healthy masters are byte-identical.
+ */
+export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
+  // ADR-0025: a load-time role resolved by the gated title recovery (recoverLayoutTitle) wins over
+  // the context-free ladder, so binding/catalog/fieldMap all see the SAME promoted role (bijection).
+  if (ph.resolvedRole) return ph.resolvedRole;
+  const tr = typeIdxRole(ph);
+  if (tr === "body" && ph.type.toLowerCase() === "body") {
     // AI-Import P1 (docs/design/ai-import.md §4-A): a body-TYPED placeholder that is geometrically a
     // footer-band strip (a rule / footer / label — e.g. body@30 at y=6.7 h=0.3 on EVERY layout) is a
     // design/meta element, NOT content. Reclassify by geometry so it doesn't inflate bodyCount, skew
     // column detection, or steal binding. GATED to geometryRole's meta band (thin + very bottom) — a
     // real content body (taller / higher) yields null here and stays "body". Title/subtitle promotion
-    // is left to the gated recoverLayoutTitle, so only the 3 unambiguous META roles trigger.
+    // is left to the gated recoverLayoutTitle, so only the 3 unambiguous META roles trigger. A typeless
+    // conventional-idx body (tr "body" via idx 1-9) keeps the old behavior: no geometry reclass.
     const gm = geometryRole(ph.style, ph.slideSize?.w, ph.slideSize?.h);
     if (gm === "footer" || gm === "date" || gm === "slideNumber") return gm;
     return "body"; // a REAL body type
   }
-  if (/^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 9) return "body"; // conventional body idx
+  if (tr) return tr;
   // ── RECOVERY (only a typeless ph with a non-conventional idx falls through to here) ──
   const g = geometryRole(ph.style, ph.slideSize?.w, ph.slideSize?.h); // T3 geometry (bonus; null when xfrm inherited)
   // A meta STRIP recovers first and is ORDER-CRITICAL: a bottom footer/date/番号 strip IS itself a chrome
