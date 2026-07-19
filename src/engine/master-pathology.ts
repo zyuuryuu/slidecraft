@@ -91,15 +91,24 @@ const ROLE_CLASS: Partial<Record<PlaceholderRole, RoleClass>> = {
  * 決定的証拠ゲート付き:
  *  - 幾何の見出し主張（title/subtitle 帯）は「レイアウト最大フォント × 18pt 以上」の時だけ決定的。
  *    素の帯判定はメタ chrome（fs10-13 の細帯）やリード文（fs14-16）を見出しと誤読する。
- *  - 幾何のメタ帯主張 vs body 型は矛盾に数えない: placeholderRole の body 枝が既に幾何で
+ *    maxTextFs は TEXT 系 ph の最大フォント — loader は pic/chart/tbl にも継承 body フォントを
+ *    stamp するため（テキストは描画しないのに）、視覚型を含めると幻フォントが本物の見出し矛盾を隠す。
+ *  - 幾何のメタ帯主張 vs 明示 body 型は矛盾に数えない: placeholderRole の body 枝が既に幾何で
  *    footer/date/slideNumber へ再分類しており（AI-Import P1 rung）、幾何の異議は捨てられていない。
+ *    typeless×慣習 idx の body（idx rung 経由）はこの再分類を受けない＝異議が捨てられる → 数える。
  */
-function isSignalConflict(typeRole: PlaceholderRole, geoRole: PlaceholderRole, fs: number, maxPhFs: number): boolean {
+function isSignalConflict(
+  typeRole: PlaceholderRole,
+  geoRole: PlaceholderRole,
+  fs: number,
+  maxTextFs: number,
+  bodyTyped: boolean,
+): boolean {
   const tc = ROLE_CLASS[typeRole];
   const gc = ROLE_CLASS[geoRole];
   if (!tc || !gc || tc === gc) return false;
-  if (gc === "heading") return fs >= 18 && fs === maxPhFs;
-  if (gc === "meta") return tc !== "content";
+  if (gc === "heading") return fs >= 18 && fs === maxTextFs;
+  if (gc === "meta") return tc !== "content" || !bodyTyped;
   return false; // geometryRole は content/visual を主張しない
 }
 
@@ -178,10 +187,17 @@ export function detectPathologies(
     // #146: シグナル矛盾（type/idx vs 幾何）— counts/findings には混ぜず conflicts に列挙する。
     // typeRole は typeIdxRole の生シグナル（②b の resolvedRole 昇格に依らない＝復元後でも計測が安定）、
     // geoRole は geometryRole を実測スライド寸法で read-only 評価（非16:9 でも相対化される）。
+    // 最大フォントは TEXT 系 ph に限定（既存病理の maxPhFs とは別勘定 — あちらは凍結済みの既存挙動）。
+    const maxTextFs = Math.max(
+      0,
+      ...l.placeholders
+        .filter((p) => { const tr = typeIdxRole(p); return !(tr && ROLE_CLASS[tr] === "visual"); })
+        .map((p) => p.style.fontSize),
+    );
     for (const ph of l.placeholders) {
       const tr = typeIdxRole(ph);
       const gr = geometryRole(ph.style, SW, SH);
-      if (tr && gr && isSignalConflict(tr, gr, ph.style.fontSize, maxPhFs))
+      if (tr && gr && isSignalConflict(tr, gr, ph.style.fontSize, maxTextFs, ph.type.toLowerCase() === "body"))
         conflicts.push({
           layout: l.name,
           idx: ph.idx,
