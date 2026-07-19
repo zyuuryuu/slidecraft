@@ -5,6 +5,8 @@
  * so it needs no tableStyles part from the template. Pure logic (R2): no DOM/Tauri.
  */
 
+import { computeColumnWidthsEmu, computeNumericColumns } from "./table-layout";
+
 const EMU = (inches: number) => Math.round(inches * 914400);
 const xmlEscape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -20,15 +22,16 @@ function border(tag: string): string {
   return `<a:${tag} w="6350" cap="flat"><a:solidFill><a:srgbClr val="${BORDER}"/></a:solidFill></a:${tag}>`;
 }
 
-function cellXml(text: string, isHeader: boolean, band: boolean): string {
+function cellXml(text: string, isHeader: boolean, band: boolean, rightAlign: boolean): string {
   const color = isHeader ? HEADER_TEXT : BODY_TEXT;
   const fill = isHeader ? HEADER_FILL : band ? BAND_FILL : "FFFFFF";
   const bold = isHeader ? ` b="1"` : "";
+  const pPr = rightAlign ? `<a:pPr algn="r"/>` : "";
   const run = text
     ? `<a:r><a:rPr lang="en-US" sz="1100"${bold}><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr><a:t>${xmlEscape(text)}</a:t></a:r>`
     : `<a:endParaRPr lang="en-US" sz="1100"/>`;
   return (
-    `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p>${run}</a:p></a:txBody>` +
+    `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p>${pPr}${run}</a:p></a:txBody>` +
     `<a:tcPr marL="91440" marR="91440" marT="45720" marB="45720" anchor="ctr">` +
     border("lnL") + border("lnR") + border("lnT") + border("lnB") +
     `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill></a:tcPr></a:tc>`
@@ -43,14 +46,15 @@ export function tableGraphicFrameXml(
   id: number,
 ): string {
   const ncol = Math.max(1, ...rows.map((r) => r.length));
-  const colW = Math.round(EMU(box.w) / ncol);
+  const colWidths = computeColumnWidthsEmu(rows, box.w);
+  const numericCols = computeNumericColumns(rows, header);
   const rowH = Math.round(EMU(box.h) / Math.max(1, rows.length));
-  const grid = Array.from({ length: ncol }, () => `<a:gridCol w="${colW}"/>`).join("");
+  const grid = colWidths.map((w) => `<a:gridCol w="${w}"/>`).join("");
   const trs = rows
     .map((r, ri) => {
       const isHeader = header && ri === 0;
       const cells = Array.from({ length: ncol }, (_, ci) =>
-        cellXml(r[ci] ?? "", isHeader, !isHeader && ri % 2 === 0),
+        cellXml(r[ci] ?? "", isHeader, !isHeader && ri % 2 === 0, numericCols[ci]),
       ).join("");
       return `<a:tr h="${rowH}">${cells}</a:tr>`;
     })

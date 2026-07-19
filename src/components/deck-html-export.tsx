@@ -18,6 +18,7 @@ import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
 import { assembleHtmlDeck, type Transition } from "../engine/html-shell";
+import { serializeParagraphs } from "../engine/md-serializer-shared";
 import type { DeckIR } from "../engine/slide-schema";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
@@ -81,6 +82,8 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
     stageW: SLIDE_W * SCALE,
     stageH: SLIDE_H * SCALE,
     cspNonce: makeNonce(), // locks the exported .html under a CSP (ADR-0016 F2)
+    // Speaker notes (#150): default-hidden panel, 'n' toggles. Plain Markdown text per slide.
+    notes: prepared.slides.map((s) => (s.notes?.length ? serializeParagraphs(s.notes) : undefined)),
   });
 }
 

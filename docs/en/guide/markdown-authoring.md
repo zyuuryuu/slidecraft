@@ -218,6 +218,35 @@ For the figure notation itself, see [Diagrams](/en/guide/diagrams).
 
 ---
 
+## Speaker notes `<!-- note -->`
+
+Put `<!-- note -->` on **its own line**, and everything from there to the **end of the slide (the next `---`)** becomes that slide's speaker notes. The note body is plain Markdown (multiple lines, bullets, `**bold**` allowed) and is never shown on the slide face.
+
+```markdown
+# Proposal outline
+
+- Only the takeaway on the slide
+
+<!-- note -->
+Speaker notes start here. Background you narrate aloud, data sources,
+anticipated Q&A — multiple lines are fine.
+
+- Bullets work too
+```
+
+Things to remember:
+
+- Place the marker at the **very end of the slide** — everything after it is consumed as notes.
+- Only the marker is invisible; the note body is ordinary Markdown paragraphs, so the source stays naturally readable on GitHub and other Markdown viewers.
+- PPTX export produces PowerPoint's **native speaker notes** (the notes pane).
+- In HTML export the notes are hidden by default; press **`n`** to toggle the notes panel ([Editing & Export](/en/guide/editing-and-export)).
+- When automatic overflow splitting occurs, the notes stay on the **first slide only** (they are not duplicated).
+- A payload form like `<!-- note: memo -->` does **not** become notes (it stays a discarded comment, as before). Write the note body on the lines after the marker.
+
+This suits the briefing style of "sparse slides, rich notes": move narration that would overflow the body budget into the notes instead.
+
+---
+
 ## Code fences
 
 A fenced block enclosed in ` ``` ` is handled differently depending on the **fence's language name**.

@@ -13,6 +13,7 @@ import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
+import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { MERMAID_CONFIG } from "./mermaid";
@@ -464,8 +465,13 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         }
 
         // Native table → an HTML <table> at the placeholder box (matches the export).
+        // Column widths + numeric alignment come from table-layout's shared computation
+        // (R8) so the preview never drifts from what table-ooxml actually exports (#138).
         if (slide.table && ph.idx === tableBodyIdx) {
           const t = slide.table;
+          const colWidthsEmu = computeColumnWidthsEmu(t.rows, s.w);
+          const totalEmu = colWidthsEmu.reduce((a, b) => a + b, 0);
+          const numericCols = computeNumericColumns(t.rows, t.header);
           return (
             <div
               key={`table-${ph.idx}`}
@@ -479,6 +485,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               }}
             >
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 * (scale / 72), tableLayout: "fixed" }}>
+                <colgroup>
+                  {colWidthsEmu.map((w, ci) => (
+                    <col key={ci} style={{ width: `${(w / totalEmu) * 100}%` }} />
+                  ))}
+                </colgroup>
                 <tbody>
                   {t.rows.map((row, ri) => {
                     const isHeader = t.header && ri === 0;
@@ -494,8 +505,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                               background: isHeader ? "#1E2761" : band ? "#F1F4F9" : "#FFFFFF",
                               color: isHeader ? "#FFFFFF" : "#1E293B",
                               fontWeight: isHeader ? 700 : 400,
-                              overflow: "hidden",
-                              whiteSpace: "nowrap",
+                              textAlign: numericCols[ci] ? "right" : "left",
+                              wordBreak: "break-word",
                             }}
                           >
                             {cell}

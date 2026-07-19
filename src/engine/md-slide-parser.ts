@@ -161,8 +161,29 @@ function matchImageLine(trimmed: string): ImageBlock | null {
  *  `<!--->`. All render as nothing in any HTML view. A line with visible text outside
  *  the markers never matches (inline-comment strip = #147 第2弾スコープ). */
 const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
-/** Directive comments that carry meaning — the layout pin and the group separators. */
-const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card)\s*-->$)/;
+/** Directive comments that carry meaning — the layout pin, the group separators, and the
+ *  speaker-note marker (ADR-0032 D1). `<!-- note: … -->` (with a payload) is NOT a directive
+ *  and stays in the #147 drop class — only the bare marker survives. */
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note)\s*-->$)/;
+
+// ── Speaker notes (#150 / ADR-0032 D1) ──
+
+/** The bare `<!-- note -->` marker: everything after it (to the slide's end) is speaker notes. */
+const NOTE_MARKER_RE = /^<!--\s*note\s*-->$/;
+
+/** Split a slide block at the first fence-external `<!-- note -->` marker. Fence-aware so a
+ *  comment-looking line inside ``` stays code (#147 と同じ理由). Marker absent → notes: null. */
+function splitNoteLines(lines: string[]): { content: string[]; notes: string[] | null } {
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t.startsWith("```")) inFence = !inFence;
+    else if (!inFence && NOTE_MARKER_RE.test(t)) {
+      return { content: lines.slice(0, i), notes: lines.slice(i + 1) };
+    }
+  }
+  return { content: lines, notes: null };
+}
 
 /**
  * #147: Drop non-directive comment-only lines (review notes / TODO markers / source IDs
@@ -206,6 +227,10 @@ export function parseSlideBlock(
   // Markdown by these — so capture the length before comment lines are stripped.
   const sourceLen = lines.length;
   lines = stripCommentOnlyLines(lines);
+  // `<!-- note -->` 以降スライド末尾まではスピーカーノート（本文パースの前に切り離す）。
+  const noteSplit = splitNoteLines(lines);
+  lines = noteSplit.content;
+  const notes = noteSplit.notes ? linesToParagraphs(trimBodyLines(noteSplit.notes)) : undefined;
   let layout = "auto";
   const placeholders: PlaceholderContent[] = [];
   let title: string | undefined;
@@ -293,7 +318,7 @@ export function parseSlideBlock(
       }
     });
 
-    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image) return null;
+    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image && !notes?.length) return null;
 
     return {
       layout,
@@ -301,6 +326,7 @@ export function parseSlideBlock(
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
       ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
+      ...(notes?.length ? { notes } : {}),
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
@@ -439,7 +465,7 @@ export function parseSlideBlock(
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image && !notes?.length) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
@@ -458,6 +484,7 @@ export function parseSlideBlock(
     ...(table ? { table } : {}),
     ...(code ? { code } : {}),
     ...(image ? { image } : {}),
+    ...(notes?.length ? { notes } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + sourceLen - 1,
   };
