@@ -17,6 +17,7 @@ import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-l
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
+import { cjkFontFamily } from "../engine/font-stack";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -577,9 +578,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               fontSize: s.fontSize * (scale / 72),
               color: `#${s.fontColor}`,
               fontWeight: s.bold ? "bold" : "normal",
-              fontFamily: s.fontName.includes("Georgia")
-                ? "Georgia, serif"
-                : `${s.fontName}, sans-serif`,
+              fontFamily: cjkFontFamily(s.fontName, s.eaFontName),
               textAlign: s.align === "ctr"
                 ? "center"
                 : s.align === "r"
