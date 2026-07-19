@@ -63,6 +63,20 @@ describe("#148 — new_project → get_deck_issues surfaces all 3 parse-time fal
   });
 });
 
+// Review feedback on PR #197: apply_slide_markdown/visualize_key_value only ever APPLY block 0 of a
+// (possibly multi-block, `---`-separated) Markdown string — but parseMdReport's notices span every
+// block it parsed. Blindly re-tagging ALL of them onto the target slide misattributes a 2nd block's
+// own fallback (which was silently discarded, same as its content) to the slide that's actually there.
+describe("#148 — apply_slide_markdown doesn't misattribute a discarded 2nd block's notices", () => {
+  it("only block 0's notices attach to the target slide; a table-drop in a DISCARDED 2nd block is not surfaced", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, await defaultTemplateBytes(), "# クリーン\n\n- a\n- b");
+    const droppedBlock2Md = `# クリーン更新\n\n- a\n- b\n\n---\n\n# 表\n\n${"| a | b |\n| --- | --- |\n| 1 | 2 |"}\n\n${"| c | d |\n| --- | --- |\n| 3 | 4 |"}`;
+    await S.applySlideMarkdown(s, 0, droppedBlock2Md);
+    expect(S.getDiagnostics(s).issues.some((x) => x.message.includes("表以外の内容"))).toBe(false);
+  });
+});
+
 describe("#148 — healthy sample decks gain ZERO new false-positive fallback warnings", () => {
   const samplesDir = resolve(__dirname, "../samples");
   const deckFiles = readdirSync(samplesDir).filter((f) => /^deck-0[1-4]/.test(f));
@@ -95,5 +109,18 @@ describe("#148 — distill auto-split surfaces an info diagnostic", () => {
     const s = S.createSession(null);
     const r = await S.newProject(s, await defaultTemplateBytes(), "# まとめ\n\n- 速い\n- 安い");
     expect(r.diagnostics.some((x) => /分割/.test(x.message))).toBe(false);
+  });
+
+  // Review feedback on PR #197: contiguous-run grouping over `newIndices` alone can't tell two
+  // back-to-back split originals apart from one bigger split — [0,1,2,3] from two 2-part splits looks
+  // identical to one 4-part split. Two ADJACENT overflowing slides is the realistic case (a bullet dump
+  // that overflows tends to overflow across consecutive slides), so this must report TWO infos, not one.
+  it("two ADJACENT overflowing slides each get their OWN split-info diagnostic (not fused into one)", async () => {
+    const bullets = Array.from({ length: 40 }, (_, i) => `- 項目${i} の説明テキストをそれなりの長さで書いてオーバーフローさせる`).join("\n");
+    const s = S.createSession(null);
+    const r = await S.newProject(s, await defaultTemplateBytes(), `# 一\n\n${bullets}\n\n---\n\n# 二\n\n${bullets}`);
+    const splits = r.diagnostics.filter((x) => x.level === "info" && /分割/.test(x.message));
+    expect(splits.length).toBe(2);
+    expect(new Set(splits.map((x) => x.slideIndex)).size).toBe(2); // two DISTINCT origin slides
   });
 });

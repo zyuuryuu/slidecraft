@@ -109,14 +109,14 @@ export async function newProject(s: Session, templateBytes: Uint8Array, markdown
   const catalog = buildCatalog(template);
   assertTemplateUsable(catalog); // reject a structurally-unusable master, never-silent
   const { deck: parsed, notices } = parseMdReport(markdown?.trim() ? markdown : "# Untitled");
-  const { deck, newIndices, offsets } = distillDeckReport(parsed, catalog);
+  const { deck, offsets } = distillDeckReport(parsed, catalog);
   s.template = template;
   s.catalog = catalog;
   s.deck = deck;
   s.meta = { templateName: "", savedAt: undefined };
   s.dirty = true; // a fresh, unsaved project
   s.parseNotices = notices.map((n) => ({ ...n, slideIndex: offsets[n.slideIndex] ?? n.slideIndex }));
-  const diagnostics = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, newIndices)];
+  const diagnostics = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, offsets)];
   return { slideCount: deck.slides.length, diagnostics };
 }
 
@@ -228,7 +228,10 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
-  replaceSlideNotices(s, i, parsedNotices); // #148: notices track the FRESHLY-parsed slide, not the old one
+  // #148: notices track the FRESHLY-parsed slide, not the old one — but `markdown` may contain `---`
+  // and parse into MULTIPLE blocks (only slides[0] is ever applied, same as `parsedSlide` above), so
+  // only slideIndex===0 notices belong to slide i — a 2nd block's own notice must NOT attach here.
+  replaceSlideNotices(s, i, parsedNotices.filter((n) => n.slideIndex === 0));
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
   s.dirty = s.dirty || changed;
@@ -261,7 +264,7 @@ export function distill(s: Session) {
   s.parseNotices = s.parseNotices.map((n) => ({ ...n, slideIndex: offsets[n.slideIndex] ?? n.slideIndex }));
   s.dirty = s.dirty || changed;
   const tail = fitTail(s, fitted, catalog, template.layouts);
-  const diagnostics = [...tail.diagnostics, ...splitInfoIssues(fitted, newIndices)];
+  const diagnostics = [...tail.diagnostics, ...splitInfoIssues(fitted, offsets)];
   return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...tail, diagnostics };
 }
 
@@ -281,7 +284,10 @@ export function visualizeKeyValue(s: Session, i: number) {
   const slides = [...deck.slides];
   slides[i] = newSlide;
   s.deck = { ...deck, slides };
-  replaceSlideNotices(s, i, fixedNotices); // #148: slide i's content was just re-derived from fresh Markdown
+  // #148: slide i's content was just re-derived from fresh Markdown — filtered to slideIndex===0 for
+  // the same reason as applySlideMarkdown (visualizeKeyValueMd always emits single-slide Markdown
+  // today, so this is a symmetry/defensive filter rather than an active bug, per review on #197).
+  replaceSlideNotices(s, i, fixedNotices.filter((n) => n.slideIndex === 0));
   s.dirty = true;
   return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s, s.deck, catalog, template.layouts) };
 }

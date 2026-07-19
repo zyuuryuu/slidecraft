@@ -156,23 +156,29 @@ export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseN
   });
 }
 
-/** #148: turn distillDeckReport's `newIndices` (the POST-split slide positions) into one info
- *  DeckIssue per split — "this overflowing slide became N slides" — so an auto-split at intake
- *  (new_project) or via the `distill` lever isn't silent. `newIndices` groups into contiguous runs,
- *  one run per original slide that split; `deck` must be the POST-split deck (title reads clean off
- *  the run's first slide — only continuations past it carry the "（続き）" marker). */
-export function splitInfoIssues(deck: DeckIR, newIndices: readonly number[]): DeckIssue[] {
-  const runs: number[][] = [];
-  for (const idx of newIndices) {
-    const last = runs[runs.length - 1];
-    if (last && last[last.length - 1] === idx - 1) last.push(idx);
-    else runs.push([idx]);
-  }
-  return runs.map((run) => ({
-    slideIndex: run[0],
-    title: slideTitle(deck.slides[run[0]]),
-    level: "info",
-    message: `スライドはテンプレ容量に収まらず ${run.length} 枚に分割されました`,
-    levers: [],
-  }));
+/** #148: turn distillDeckReport's `offsets` (offsets[k] = where ORIGINAL slide k's first resulting
+ *  part landed) into one info DeckIssue per split — "this overflowing slide became N slides" — so an
+ *  auto-split at intake (new_project) or via the `distill` lever isn't silent. `deck` must be the
+ *  POST-split deck (title reads clean off the run's first slide — only continuations past it carry
+ *  the "（続き）" marker).
+ *
+ *  MUST derive run boundaries from `offsets`, NOT by grouping `newIndices` into contiguous runs: two
+ *  back-to-back ORIGINAL slides that both split produce ADJACENT post-split ranges (e.g. slide0→[0,1],
+ *  slide1→[2,3]), so `newIndices=[0,1,2,3]` is indistinguishable, by contiguity alone, from ONE
+ *  4-part split — offsets keeps each original slide's boundary explicit regardless of adjacency. */
+export function splitInfoIssues(deck: DeckIR, offsets: readonly number[]): DeckIssue[] {
+  const issues: DeckIssue[] = [];
+  offsets.forEach((start, k) => {
+    const end = k + 1 < offsets.length ? offsets[k + 1] : deck.slides.length;
+    const count = end - start;
+    if (count <= 1) return;
+    issues.push({
+      slideIndex: start,
+      title: slideTitle(deck.slides[start]),
+      level: "info",
+      message: `スライドはテンプレ容量に収まらず ${count} 枚に分割されました`,
+      levers: [],
+    });
+  });
+  return issues;
 }
