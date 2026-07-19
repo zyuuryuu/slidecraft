@@ -1,17 +1,26 @@
 /**
- * font-subsetter.ts — runtime CJK font subsetting via WASM harfbuzz (hb-subset) + wawoff2
- * (#193 / #115-b). Orchestrator layer (async/WASM allowed, R2 keeps this out of src/engine/).
+ * font-subsetter.ts — runtime CJK font subsetting via WASM harfbuzz (hb-subset)
+ * (#193 / #115-b / #194). Orchestrator layer (async/WASM allowed, R2 keeps this out of src/engine/).
  *
  * Given a full source font (Noto Sans/Serif JP Regular/Bold — bundled as app assets, #193 asset
- * half) and the deck's actually-used text, returns a WOFF2 buffer containing ONLY the glyphs the
- * deck needs (typically tens of KB instead of the multi-MB source). harfbuzz drops codepoints
- * that aren't in the source font rather than failing, so unknown characters (emoji, rare glyphs)
- * simply aren't in the subset — the caller's CSS font-family fallback chain (font-stack.ts /
+ * half) and the deck's actually-used text, returns a raw sfnt (TTF/OpenType) buffer containing ONLY
+ * the glyphs the deck needs (typically tens of KB instead of the multi-MB source). harfbuzz drops
+ * codepoints that aren't in the source font rather than failing, so unknown characters (emoji, rare
+ * glyphs) simply aren't in the subset — the caller's CSS font-family fallback chain (font-stack.ts /
  * #192) takes over for those runs. This function only rejects for a genuinely unusable input
  * (e.g. a corrupt font buffer); callers should treat any rejection as "skip embedding, keep
  * relying on the fallback stack" (do-no-harm — embedding is additive, never load-bearing).
+ *
+ * No WOFF2 compression step: an earlier version piped the subset through `wawoff2`, but that
+ * package's legacy Emscripten glue hangs forever (never resolves, never rejects) when it's actually
+ * loaded through Vite's browser dep-optimizer — confirmed in a real Chromium session and in CI's e2e
+ * job (#194 was the first caller to ever exercise this path outside vitest/Node, where the same glue
+ * happens to init synchronously enough to dodge the race). The package is unmaintained since 2022
+ * with no fix available. Embedding the raw subsetted sfnt directly via `format("truetype")` sidesteps
+ * the broken dependency entirely — every browser has supported raw TTF `@font-face` embedding since
+ * long before WOFF2 existed, and since subsetting already strips the font down to only the deck's
+ * used glyphs, the size difference vs. WOFF2 compression is modest (tens of KB either way).
  */
-import wawoff2 from "wawoff2";
 
 // hb-subset.wasm ships as a plain binary in the harfbuzzjs package (no JS wrapper needed for
 // subsetting — only the raw C-ABI exports below). Vite's built-in `?init` wasm handling resolves
@@ -77,10 +86,11 @@ async function loadHarfbuzz(): Promise<HbExports> {
   return hbPromise;
 }
 
-/** Subset `sourceFont` down to the glyphs required to render `text`, returned as WOFF2 bytes.
- *  Rejects only on a structurally-invalid source font or WASM init failure — never on characters
- *  in `text` that the font doesn't contain (those are simply excluded from the result). */
-export async function subsetFontToWoff2(sourceFont: Uint8Array, text: string, opts: SubsetOptions = {}): Promise<Uint8Array> {
+/** Subset `sourceFont` down to the glyphs required to render `text`, returned as raw sfnt (TTF)
+ *  bytes — no WOFF2 compression (see file header for why). Rejects only on a structurally-invalid
+ *  source font or WASM init failure — never on characters in `text` that the font doesn't contain
+ *  (those are simply excluded from the result). */
+export async function subsetFontToTtf(sourceFont: Uint8Array, text: string, opts: SubsetOptions = {}): Promise<Uint8Array> {
   const hb = await loadHarfbuzz();
   const heap = () => new Uint8Array(hb.memory.buffer);
 
@@ -134,6 +144,5 @@ export async function subsetFontToWoff2(sourceFont: Uint8Array, text: string, op
     hb.free(fontPtr);
   }
 
-  const woff2Bytes = await wawoff2.compress(sfntBuffer);
-  return new Uint8Array(woff2Bytes);
+  return sfntBuffer;
 }
