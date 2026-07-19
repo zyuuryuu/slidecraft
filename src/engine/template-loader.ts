@@ -29,6 +29,10 @@ export interface PlaceholderStyle {
   bold: boolean;
   align: string; // "l", "ctr", "r"
   bulletChar: string; // bullet glyph from the master/layout; "" = no bullet
+  // Per-level (1-3) font size in points for nested bullets (#103, preview only): the shape's own
+  // lstStyle wins, else the master bodyStyle's, else undefined (the SSR preview computes a
+  // step-down fallback — "master の lvl2-4 スタイル継承に任せ、無ければ段階縮小").
+  levelFontSizes?: (number | undefined)[];
 }
 
 export interface PlaceholderInfo {
@@ -110,6 +114,10 @@ export interface MasterStyle {
   bold: boolean;
   align: string;
   bulletChar: string; // lvl1 bullet glyph; "" = buNone / none
+  // lvl2pPr/lvl3pPr/lvl4pPr <a:defRPr sz> from bodyStyle, index 0..2 (#103 nested bullets, preview
+  // only — the PPTX export never pins these, PowerPoint resolves lvl="1..3" from the master itself,
+  // same as lvl1/master-font-inherit). undefined entry ⇒ the master doesn't style that level.
+  levelFontSizes?: (number | undefined)[];
 }
 
 export interface TemplateData {
@@ -269,6 +277,23 @@ function resolvedEaTypeface(m: RegExpMatchArray | null): string | undefined {
   return m && !m[1].startsWith("+") ? m[1] : undefined;
 }
 
+/** lvl2pPr/lvl3pPr/lvl4pPr `<a:defRPr sz>` from a lstStyle-shaped XML fragment (master bodyStyle, or a
+ *  placeholder's own lstStyle) → per-level (1-3) font size in points, index 0=level1(lvl2pPr)…
+ *  2=level3(lvl4pPr). An undefined entry means that level isn't explicitly styled there (#103). */
+function parseLevelFontSizes(xml: string): (number | undefined)[] {
+  return [2, 3, 4].map((n) => {
+    const block = xml.match(new RegExp(`<a:lvl${n}pPr\\b[\\s\\S]*?<\\/a:lvl${n}pPr>`))?.[0];
+    const sz = block?.match(/defRPr[^>]*sz="(\d+)"/)?.[1];
+    return sz ? parseInt(sz) / 100 : undefined;
+  });
+}
+
+/** Step-down fallback when neither the placeholder's own lstStyle nor the master's bodyStyle style a
+ *  nested level explicitly (#103: "無ければ段階縮小"). ~12%/level, floored at 60% of the level-1 size. */
+function nestedFallbackFontSize(level1Size: number, level: number): number {
+  return Math.max(level1Size * 0.88 ** level, level1Size * 0.6);
+}
+
 function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme: Record<string, string>): MasterStyle {
   if (!xml) return fallback;
   const szMatch = xml.match(/defRPr[^>]*sz="(\d+)"/);
@@ -290,6 +315,7 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
     bold: boldMatch ? true : fallback.bold,
     align: alignMatch ? alignMatch[1] : fallback.align,
     bulletChar: buChar ?? (/<a:buNone\/>/.test(lvl1) ? "" : fallback.bulletChar),
+    levelFontSizes: parseLevelFontSizes(xml),
   };
 }
 
@@ -369,18 +395,28 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
     ? transformRect(xf, +offMatch[1], +offMatch[2], +extMatch[1], +extMatch[2])
     : { x: inh?.x ?? 0, y: inh?.y ?? 0, w: inh?.w ?? 0, h: inh?.h ?? 0 };
 
+  const fontSize = szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize);
+  // Nested-bullet sizes (#103): this shape's OWN lstStyle wins, else the master bodyStyle's, else a
+  // step-down computed from THIS placeholder's level-1 size (not the master's — a resized title-adjacent
+  // body should shrink its nested levels off its own base, matching how lvl1 itself is resolved above).
+  const ownLevelSizes = parseLevelFontSizes(sp);
+  const levelFontSizes = [0, 1, 2].map(
+    (i) => ownLevelSizes[i] ?? master.levelFontSizes?.[i] ?? nestedFallbackFontSize(fontSize, i + 1),
+  );
+
   return {
     x: geom.x,
     y: geom.y,
     w: geom.w,
     h: geom.h,
-    fontSize: szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize),
+    fontSize,
     fontColor: textColor ?? inh?.fontColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
     eaFontName: eaFontName ?? master.eaFontName,
     bold: boldMatch ? true : master.bold,
     align: alignMatch ? alignMatch[1] : master.align,
     bulletChar,
+    levelFontSizes,
   };
 }
 

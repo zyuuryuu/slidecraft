@@ -82,6 +82,29 @@ describe("md-to-ooxml", () => {
     expect(xml).toContain("Line 2");
     expect((xml.match(/<a:p>/g) || []).length).toBe(2);
   });
+
+  // #103: nested bullets → <a:pPr lvl="1..3">. Level 0 (field absent) stays byte-identical with
+  // the pre-#103 output above ("bullet paragraph INHERITS the master's bullet" — no pPr at all);
+  // PowerPoint resolves lvl 1-3's font/glyph/indent from the master's lvl2pPr..lvl4pPr, same
+  // inheritance contract as lvl1 (master-font-inherit.test.ts) — nothing else is pinned here (R7).
+  it("#103: level 1/2/3 emit <a:pPr lvl=\"1..3\"/>, nothing else pinned", () => {
+    expect(paragraphToOoxml({ segments: [{ text: "Child" }], bullet: true, level: 1 })).toBe(
+      '<a:p><a:pPr lvl="1"/><a:r><a:t>Child</a:t></a:r></a:p>',
+    );
+    expect(paragraphToOoxml({ segments: [{ text: "Grandchild" }], bullet: true, level: 2 })).toBe(
+      '<a:p><a:pPr lvl="2"/><a:r><a:t>Grandchild</a:t></a:r></a:p>',
+    );
+    expect(paragraphToOoxml({ segments: [{ text: "GGC" }], bullet: true, level: 3 })).toBe(
+      '<a:p><a:pPr lvl="3"/><a:r><a:t>GGC</a:t></a:r></a:p>',
+    );
+  });
+
+  it("#103: level 0 (field absent) is byte-identical to a plain bullet paragraph", () => {
+    const withLevel0 = paragraphToOoxml({ segments: [{ text: "Item" }], bullet: true, level: 0 });
+    const withoutLevel = paragraphToOoxml({ segments: [{ text: "Item" }], bullet: true });
+    expect(withLevel0).toBe(withoutLevel);
+    expect(withLevel0).not.toContain("pPr");
+  });
 });
 
 // ── PPTX generation tests ──
@@ -263,5 +286,36 @@ Footer: Confidential
 
     const s3 = await zip.file("ppt/slides/slide3.xml")!.async("string");
     expect(s3).toContain("比較分析");
+  });
+});
+
+// ── #103: nested bullets, end-to-end through generatePptx ──
+
+describe("generatePptx — nested bullets (#103)", () => {
+  const md = `# ネスト箇条書き
+
+- ルート
+  - レベル1
+    - レベル2
+      - レベル3`;
+
+  it("emits lvl=\"1\"/\"2\"/\"3\" for the nested bullets, in document order", async () => {
+    const buf = await generatePptx(parseMd(md), tpl);
+    const zip = await JSZip.loadAsync(buf);
+    const slideXml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+    const lvls = [...slideXml.matchAll(/<a:pPr lvl="(\d)"\/>/g)].map((m) => m[1]);
+    expect(lvls).toEqual(["1", "2", "3"]);
+    expect(slideXml).toContain("ルート");
+    expect(slideXml).toContain("レベル3");
+  });
+
+  it("a flat (unindented) bullet deck's slide XML is byte-identical whether or not #103 shipped", async () => {
+    const flatMd = "# タイトル\n\n- 項目A\n- 項目B\n- 項目C";
+    const buf = await generatePptx(parseMd(flatMd), tpl);
+    const zip = await JSZip.loadAsync(buf);
+    const slideXml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+    expect(slideXml).not.toContain("<a:pPr lvl=");
+    // Each bullet paragraph is the plain, glyph-inheriting form (no <a:pPr> element at all).
+    expect(slideXml).toContain("<a:p><a:r><a:t>項目A</a:t></a:r></a:p>");
   });
 });

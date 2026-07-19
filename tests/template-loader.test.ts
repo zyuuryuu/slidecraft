@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import JSZip from "jszip";
 import {
   loadTemplate,
   type TemplateData,
@@ -223,5 +224,43 @@ describe("<a:ea> (East-Asian typeface) extraction", () => {
     );
     expect(corp.masterTitleStyle.eaFontName?.startsWith("+")).not.toBe(true);
     expect(corp.masterBodyStyle.eaFontName?.startsWith("+")).not.toBe(true);
+  });
+});
+
+// #103: per-level (1-3) font sizes for nested bullets, extracted for the SSR preview only (the
+// PPTX export never pins these — PowerPoint inherits lvl1-4 from the master natively, R7).
+describe("nested-bullet levelFontSizes (#103)", () => {
+  it("this fixture's master defines no lvl2-4 body style → a decreasing step-down fallback", async () => {
+    // Confirmed via the fixture's raw bodyStyle: only <a:lvl1pPr> is present.
+    const l7 = tpl.layouts.find((l) => l.index === 7)!; // Content.1Body.Single
+    const body = l7.placeholders.find((p) => p.idx === "1")!;
+    const sizes = body.style.levelFontSizes;
+    expect(sizes).toBeDefined();
+    expect(sizes).toHaveLength(3);
+    expect(sizes![0]).toBeLessThan(body.style.fontSize);
+    expect(sizes![1]).toBeLessThan(sizes![0]!);
+    expect(sizes![2]).toBeLessThan(sizes![1]!);
+  });
+
+  it("an explicit master lvl2pPr size WINS over the step-down fallback", async () => {
+    const buf = readFileSync(TEMPLATE_PATH);
+    const zip = await JSZip.loadAsync(buf);
+    const masterPath = "ppt/slideMasters/slideMaster1.xml";
+    const masterXml = await zip.file(masterPath)!.async("string");
+    // This fixture's bodyStyle has only <a:lvl1pPr>…</a:lvl1pPr> — inject an explicit lvl2pPr
+    // sized well outside the fallback's plausible range (fallback ≈ 14*0.88 ≈ 12.3pt) so a pass
+    // means the master value was actually read, not coincidentally matched.
+    const patched = masterXml.replace(
+      "</a:lvl1pPr></p:bodyStyle>",
+      '</a:lvl1pPr><a:lvl2pPr><a:defRPr sz="900"/></a:lvl2pPr></p:bodyStyle>',
+    );
+    expect(patched).not.toBe(masterXml); // sanity: the replace actually matched
+    zip.file(masterPath, patched);
+    const patchedBuf = await zip.generateAsync({ type: "uint8array" });
+
+    const patchedTpl = await loadTemplate(patchedBuf);
+    const l7 = patchedTpl.layouts.find((l) => l.index === 7)!;
+    const body = l7.placeholders.find((p) => p.idx === "1")!;
+    expect(body.style.levelFontSizes![0]).toBe(9); // sz="900" → 9pt, not the fallback's ~12.3pt
   });
 });
