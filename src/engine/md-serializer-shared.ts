@@ -45,12 +45,21 @@ function serializeSegments(segments: InlineSegment[]): string {
 
 // ── Paragraphs → Markdown lines ──
 
+/** A PLAIN paragraph's text is, trimmed, EXACTLY one complete `<!-- … -->` comment — the shape #147's
+ *  comment-only-line parser strips. Escaping only this exact shape (not "≥1 comments", not partial
+ *  text) is the #165 fix's whole scope — see the leading `\<` strip in md-slide-parser.ts. */
+const COMMENT_ONLY_TEXT_RE = /^<!--(?:(?!-->).)*-->$/;
+
 export function serializeParagraphs(paragraphs: Paragraph[]): string {
   return paragraphs
     .map((p) => {
       const text = serializeSegments(p.segments);
       if (p.heading) return `### ${text}`;
       if (p.bullet) return `${indentForLevel(p.level ?? 0)}- ${text}`;
+      // #165: a GUI-authored comment-only PLAIN paragraph would otherwise emit a line #147's parser
+      // drops on the next parse (silent text loss). Escape its leading `<` so the line survives —
+      // md-slide-parser.ts strips exactly this one leading backslash back off.
+      if (COMMENT_ONLY_TEXT_RE.test(text.trim())) return `\\${text}`;
       return text;
     })
     .join("\n");
