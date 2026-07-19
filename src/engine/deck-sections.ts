@@ -33,6 +33,21 @@ export function scanSections(deck: DeckIR): SectionEntry[] {
   return out;
 }
 
+/**
+ * スライド `slideIndex` が属する章名（フッタ自動注入用・#168・案A/chrome 経路）。
+ * `scanSections` の中で `slideIndex` 以下の最後のエントリ＝所属章（章扉スライド自身を含む）。
+ * 該当エントリが無い＝最初の章扉より前 → null（注入なし）。section タグ無しデッキは常に null。
+ * DeckIR に複製状態を持たず、呼ぶたび再導出する（materializeDerivedSlides と同型・R8）。
+ */
+export function sectionFooterFor(deck: DeckIR, slideIndex: number): string | null {
+  let current: SectionEntry | null = null;
+  for (const s of scanSections(deck)) {
+    if (s.slideIndex > slideIndex) break;
+    current = s;
+  }
+  return current ? current.title : null;
+}
+
 /** 章一覧 → 目次の本文段落（`1. 章名` の箇条書き）。 */
 export function tocParagraphs(sections: SectionEntry[]): Paragraph[] {
   return sections.map((s) => ({
