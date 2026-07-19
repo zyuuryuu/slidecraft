@@ -805,7 +805,12 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   // idx 1, no idx 0/15) falls through to content instead of binding into the cover's subtitle slot,
   // while a real cover (idx 15/16, or ctrTitle idx 0 + subtitle idx 1) still coerces to title. This
   // subsumes the old hasTitle&&hasBody carve-out. See serializer-content-index0.test.ts.
-  if (slideIndex === 0 && !visualIdx && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  // #195: an explicit `<!-- section -->` chapter divider authored FIRST is still a chapter divider,
+  // not a cover — without this gate the index-0 branch above coerces it to Title, whose namespace
+  // (idx0/ctrTitle) can't carry the idx15 title serializeSlide reads, so the title silently vanishes
+  // on round-trip. sectionBreak is only ever set by the explicit marker (md-slide-parser.ts), so
+  // unmarked decks are unaffected — byte-identical.
+  if (slideIndex === 0 && !visualIdx && !slide.sectionBreak && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
   // #153: a closing slide with body content (bullets) needs the body-bearing closing layout
   // (Closing.1Steps.Single+1Notes), not the ctrTitle-only one — pickLayout's closing-role filter
   // does the actual routing/degrade; regions:1 just signals "this closing has body content".
