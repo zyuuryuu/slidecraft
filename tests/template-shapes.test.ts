@@ -50,3 +50,33 @@ describe.skipIf(!existsSync(VELIS))("group shapes (<p:grpSp>) → children trans
     }
   });
 });
+
+describe.skipIf(!existsSync(VELIS))("attribute-bearing <p:spPr>/<p:grpSpPr> (#225)", () => {
+  // PowerPoint-authored parts write `<p:spPr bwMode="auto">` / `<p:grpSpPr bwMode="auto">`; the
+  // extractor's attribute-less regexes missed them, dropping 76 shapes and ALL 28 groups of this
+  // real CC0 template from the preview (cover/section/close layouts rendered near-blank).
+  it("velis cover (layout1) keeps its full decoration set: bg rect + both logo groups' children", async () => {
+    const tpl = await loadTemplate(readFileSync(VELIS));
+    const cover = tpl.layouts.find((l) => l.index === 1)!;
+    // 7 decorative shapes in the XML; 5 are VISIBLE: 1 top-level bg rect + 2 groups × 2 filled
+    // Freeform children (each group's third child is a noFill/noLine spacer PowerPoint doesn't
+    // paint either — correctly dropped). Before the fix only the bg rect survived (1).
+    expect(cover.decorations.length).toBeGreaterThanOrEqual(5);
+    // The 4 Freeform children are custGeom → must reach the preview as real SVG paths.
+    const paths = cover.decorations.filter((d) => d.path);
+    expect(paths.length).toBeGreaterThanOrEqual(4);
+    // Group children are mapped through the group's child→slide transform: on-canvas, non-degenerate.
+    for (const d of cover.decorations) {
+      expect(d.x).toBeGreaterThan(-5); expect(d.x).toBeLessThan(20);
+      expect(d.y).toBeGreaterThan(-5); expect(d.y).toBeLessThan(13);
+      expect(d.w).toBeGreaterThan(0);
+      expect(d.h).toBeGreaterThan(0);
+    }
+  });
+
+  it("section title (layout4) recovers its grouped decorations too", async () => {
+    const tpl = await loadTemplate(readFileSync(VELIS));
+    const section = tpl.layouts.find((l) => l.index === 4)!;
+    expect(section.decorations.length).toBeGreaterThanOrEqual(5);
+  });
+});

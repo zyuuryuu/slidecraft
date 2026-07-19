@@ -13,7 +13,7 @@ import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle,
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
-import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg } from "./ooxml-geom";
+import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
 
 // ── Types ──
 
@@ -249,7 +249,8 @@ function extractTextColor(sp: string, theme: Record<string, string>): string | u
   if (scoped) return scoped;
   const srgb = sp.match(/srgbClr val="([A-Fa-f0-9]{6})"/)?.[1];
   if (srgb) return srgb;
-  const txScope = sp.replace(/<p:spPr>[\s\S]*?<\/p:spPr>/, ""); // exclude the shape fill/outline
+  const spPrBlk = propBlock(sp, "p:spPr"); // attribute-tolerant (#225)
+  const txScope = spPrBlk ? sp.replace(spPrBlk, "") : sp; // exclude the shape fill/outline
   return resolveColor(parseColorRef(txScope), { theme });
 }
 
@@ -483,7 +484,7 @@ function parseCustGeom(spPr: string): { path: string; viewBox: string } | undefi
  *  shape; a group's composed transform for a child). undefined = a placeholder or a bare text box. */
 function spToDeco(sp: string, theme: Record<string, string>, xf: Xf): DecoRect | undefined {
   if (sp.includes("<p:ph")) return undefined; // placeholders are rendered separately
-  const spPr = sp.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? "";
+  const spPr = propBlock(sp, "p:spPr") ?? "";
   const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
   const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
   if (!offMatch || !extMatch) return undefined;
@@ -512,7 +513,7 @@ function spToDeco(sp: string, theme: Record<string, string>, xf: Xf): DecoRect |
 /** One connector line (<p:cxnSp>) → a DecoRect, mapped through `xf`. A horizontal line has cy=0, so
  *  give it a visible thickness from <a:ln w>. Colored by the LINE fill, not a shape fill. */
 function cxnToDeco(cx: string, theme: Record<string, string>, xf: Xf): DecoRect | undefined {
-  const spPr = cx.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] ?? cx;
+  const spPr = propBlock(cx, "p:spPr") ?? cx;
   const offMatch = spPr.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
   const extMatch = spPr.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
   const color = shapeLineColor(spPr, theme);
@@ -531,7 +532,7 @@ function walkShapes(xml: string, theme: Record<string, string>, xf: Xf, out: Dec
   let rest = xml;
   for (const grp of topLevelBlocks(xml, "p:grpSp")) {
     rest = rest.replace(grp, "");
-    const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
+    const grpSpPr = propBlock(grp, "p:grpSpPr") ?? "";
     const gx = parseGroupXf(grpSpPr);
     if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
     walkShapes(groupChildren(grp, grpSpPr), theme, composeXf(xf, gx), out); // children minus the group's own wrapper+xfrm
@@ -586,7 +587,7 @@ function walkStaticTexts(
   let rest = xml;
   for (const grp of topLevelBlocks(xml, "p:grpSp")) {
     rest = rest.replace(grp, "");
-    const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
+    const grpSpPr = propBlock(grp, "p:grpSpPr") ?? "";
     const gx = parseGroupXf(grpSpPr);
     if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
     walkStaticTexts(groupChildren(grp, grpSpPr), masterTitle, masterBody, theme, masterGeom, composeXf(xf, gx), out);

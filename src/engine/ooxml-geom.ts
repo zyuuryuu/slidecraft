@@ -54,6 +54,15 @@ export function groupChildren(grpBlock: string, grpSpPr: string): string {
   return grpBlock.slice(openEnd, closeStart).replace(grpSpPr, "");
 }
 
+/** The FIRST `<tag …>…</tag>` property block in `xml`, tolerating attributes on the opening tag.
+ *  PowerPoint-authored parts write `<p:spPr bwMode="auto">` / `<p:grpSpPr bwMode="auto">`; the old
+ *  attribute-less literals missed those, so parseGroupXf saw no xfrm and the walker skipped ENTIRE
+ *  groups (and spToDeco found no off/ext → dropped the shape) on real-world templates (#225). Only
+ *  for non-self-nesting tags (spPr/grpSpPr) — a lazy match would mis-close a nestable one. */
+export function propBlock(xml: string, tag: string): string | undefined {
+  return xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?</${tag}>`))?.[0];
+}
+
 /** The top-level `<tag>…</tag>` blocks in `xml`, matched with DEPTH counting so a same-tag nested
  *  inside another (a group within a group) is captured as ONE outer block — a lazy regex would
  *  mis-split it at the first inner close tag. */
