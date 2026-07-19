@@ -19,7 +19,7 @@ import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
-import type { DeckIR, SlideIR, ImageRect } from "../engine/slide-schema";
+import type { SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
 import { useDeckIO } from "./useDeckIO";
@@ -65,6 +65,7 @@ export function useDeckController() {
     mdText, setMdText, templateData, setTemplateData, templateName, setTemplateName,
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
+    initSnapshot, setInitSnapshot,
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
   } = useDocumentStore({ mdText: "", templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: i18n.t("controller.untitledDoc") });
 
@@ -219,13 +220,17 @@ export function useDeckController() {
 
 
   // ── LLM Assist: import result ──
+  // Snapshot the PRE-import deck before resetting (#160): entering "import" subMode without a
+  // snapshot left キャンセル with nothing of THIS doc's to restore (same root cause as
+  // handleEnterImport below — snapshot must exist whenever subMode becomes "import").
   const handleLlmImport = useCallback(
     (text: string) => {
+      setInitSnapshot(deck);
       setMdText(text);
       parseMdText(text, "reset");
       setSubMode("import");
     },
-    [parseMdText, setMdText, setSubMode],
+    [deck, parseMdText, setMdText, setSubMode, setInitSnapshot],
   );
 
   // AI panel "適用"（デッキ全体）: replace the deck but stay in Edit to keep refining.
@@ -241,9 +246,10 @@ export function useDeckController() {
   );
 
   // ── Initialize (Import) ⇄ Edit ──
-  // Snapshot of the deck when the Initialize modal opens — used by 確定 (as the undo
-  // baseline) and キャンセル (to restore). Declared before the handlers that read it.
-  const initSnapshotRef = useRef<DeckIR | null>(null);
+  // Snapshot of the deck when the Initialize modal opened — used by 確定 (as the undo
+  // baseline) and キャンセル (to restore). Per-doc (#160): subMode lives in DocState, so the
+  // snapshot must too — a controller-wide ref let a cross-doc switch (e.g. an OS file-open
+  // while doc A's modal is open) cancel doc A using doc B's snapshot (silent data loss).
 
   // 確定 → Edit: FLUSH any pending debounced parse so the committed deck matches the
   // visible Markdown, and record the whole Initialize as ONE undo step (snapshot →
@@ -256,39 +262,39 @@ export function useDeckController() {
       const parsed = mdText.trim() ? parseMd(mdText) : null;
       const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
       if (!fitted) return;
-      setDeck(initSnapshotRef.current, "silent"); // present = pre-Initialize…
+      setDeck(initSnapshot, "silent"); // present = pre-Initialize…
       setDeck(fitted, "commit"); // …then one undoable step to the committed result
       setParseError(null);
       setSubMode("edit");
     } catch (e) {
       setParseError(e instanceof Error ? e.message : String(e)); // stay in Initialize
     }
-  }, [deck, mdText, catalog, clearParse, setDeck, setParseError, setSubMode]);
+  }, [deck, mdText, catalog, initSnapshot, clearParse, setDeck, setParseError, setSubMode]);
 
   // Open the Initialize phase (modal): serialize the CURRENT deck back to Markdown so
   // it reflects the live deck (deck = truth), and snapshot the deck so キャンセル can
   // discard whatever the modal's live edits did. Guarded so re-opening mid-edit is safe.
   const handleEnterImport = useCallback(() => {
     if (subMode === "edit") {
-      initSnapshotRef.current = deck;
+      setInitSnapshot(deck);
       // Deck-level readout through the binding authority (ADR-0030 stage B, #155) — the catalog-free
       // serialize dropped a closing-vocabulary slide's title from the Markdown view.
       if (deck) setMdText(deckMarkdown(deck, catalog, templateData));
     }
     setSubMode("import");
-  }, [subMode, deck, catalog, templateData, setMdText, setSubMode]);
+  }, [subMode, deck, catalog, templateData, setMdText, setSubMode, setInitSnapshot]);
 
   // Cancel Initialize: kill any pending parse (so a trailing debounce can't re-apply
   // the discarded edits), restore the deck AND mdText to the pre-open snapshot, → Edit.
   const handleCancelInitialize = useCallback(() => {
     if (editLockedRef.current) return; // observe-only: restoring a stale snapshot would clobber host truth
     clearParse();
-    const snap = initSnapshotRef.current;
+    const snap = initSnapshot;
     setDeck(snap, "silent");
     setMdText(snap ? deckMarkdown(snap, catalog, templateData) : "");
     setParseError(null);
     setSubMode("edit");
-  }, [clearParse, catalog, templateData, setDeck, setMdText, setParseError, setSubMode]);
+  }, [clearParse, catalog, templateData, initSnapshot, setDeck, setMdText, setParseError, setSubMode]);
 
   // ── Slide editing: update a single slide in the deck ──
   // P2.5 round-trip: while collaborating, the edit is applied locally (optimistic) AND pushed to the
