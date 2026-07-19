@@ -25,6 +25,7 @@ export interface PlaceholderStyle {
   fontSize: number; // points
   fontColor: string; // hex without #
   fontName: string;
+  eaFontName?: string; // <a:ea> East-Asian typeface (#192/#115-a) — the visible font for JP text
   bold: boolean;
   align: string; // "l", "ctr", "r"
   bulletChar: string; // bullet glyph from the master/layout; "" = no bullet
@@ -105,6 +106,7 @@ export interface MasterStyle {
   fontSize: number;
   fontColor: string;
   fontName: string;
+  eaFontName?: string; // <a:ea> East-Asian typeface (#192/#115-a)
   bold: boolean;
   align: string;
   bulletChar: string; // lvl1 bullet glyph; "" = buNone / none
@@ -257,6 +259,16 @@ function extractBackground(xml: string, theme: Record<string, string>): string |
 
 // ── Extract master style from titleStyle or bodyStyle XML ──
 
+/** A `<a:ea>` typeface value starting with "+" (e.g. "+mj-ea") is an UNRESOLVED theme fontScheme
+ *  reference, not a real font name. Unlike `<a:latin>` (kept raw here by an existing, tested
+ *  contract — resolveFontToken in master-remake.ts is the documented place that resolves it, e.g.
+ *  for masterToTemplateSpec), `eaFontName` is a NEW field (#192/#115-a) feeding straight into
+ *  cjkFontFamily's font-family CSS, so it is guarded at the source instead of inheriting the same
+ *  raw-token behavior. */
+function resolvedEaTypeface(m: RegExpMatchArray | null): string | undefined {
+  return m && !m[1].startsWith("+") ? m[1] : undefined;
+}
+
 function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme: Record<string, string>): MasterStyle {
   if (!xml) return fallback;
   const szMatch = xml.match(/defRPr[^>]*sz="(\d+)"/);
@@ -265,6 +277,7 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
   const schemeToken = srgb ? undefined : xml.match(/schemeClr val="(\w+)"/)?.[1];
   const fontColor = srgb ?? (schemeToken ? theme[schemeToken] : undefined) ?? fallback.fontColor;
   const fontMatch = xml.match(/<a:latin typeface="([^"]+)"/);
+  const eaFontName = resolvedEaTypeface(xml.match(/<a:ea typeface="([^"]+)"/));
   const alignMatch = xml.match(/algn="(\w+)"/);
   // Bullet glyph from the level-1 paragraph style (buChar), or "" when buNone.
   const lvl1 = xml.match(/<a:lvl1pPr\b[\s\S]*?<\/a:lvl1pPr>/)?.[0] ?? xml;
@@ -273,6 +286,7 @@ function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme:
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : fallback.fontSize,
     fontColor,
     fontName: fontMatch ? fontMatch[1] : fallback.fontName,
+    eaFontName: eaFontName ?? fallback.eaFontName,
     bold: boldMatch ? true : fallback.bold,
     align: alignMatch ? alignMatch[1] : fallback.align,
     bulletChar: buChar ?? (/<a:buNone\/>/.test(lvl1) ? "" : fallback.bulletChar),
@@ -329,6 +343,10 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const boldMatch = run.match(/\bb="1"/) || lvl1DefRPr.match(/\bb="1"/) || sp.match(/<a:defRPr[^>]*\bb="1"/) || sp.match(/<a:rPr[^>]*\bb="1"/);
   const textColor = extractTextColor(sp, theme);
   const fontMatch = run.match(/<a:latin typeface="([^"]+)"/) || lvl1DefRPr.match(/<a:latin typeface="([^"]+)"/) || sp.match(/<a:latin typeface="([^"]+)"/);
+  const eaFontName =
+    resolvedEaTypeface(run.match(/<a:ea typeface="([^"]+)"/)) ??
+    resolvedEaTypeface(lvl1DefRPr.match(/<a:ea typeface="([^"]+)"/)) ??
+    resolvedEaTypeface(sp.match(/<a:ea typeface="([^"]+)"/));
   // Alignment for level-1 text: a paragraph's own <a:pPr>, else the lstStyle's <a:lvl1pPr>, else
   // <a:defPPr>. Deliberately NOT lvl2-9 (deeper list levels) — templates may author lvl2-9 BEFORE
   // lvl1, so a naive "first pPr-like" match grabbed a lvl2 center align for a left subtitle. The old
@@ -359,6 +377,7 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize),
     fontColor: textColor ?? inh?.fontColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
+    eaFontName: eaFontName ?? master.eaFontName,
     bold: boldMatch ? true : master.bold,
     align: alignMatch ? alignMatch[1] : master.align,
     bulletChar,
@@ -623,9 +642,9 @@ export async function loadTemplate(
   const titleStyleXml = masterXml.match(/<p:titleStyle>[\s\S]*?<\/p:titleStyle>/)?.[0];
   const bodyStyleXml = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0];
   const masterTitleStyle = parseMasterStyle(titleStyleXml, {
-    ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF",
+    ...defaultStyle, fontSize: 44, fontName: "Georgia", bold: true, fontColor: "FFFFFF", eaFontName: themeFonts.majorEa,
   }, themeColors);
-  const masterBodyStyle = parseMasterStyle(bodyStyleXml, defaultStyle, themeColors);
+  const masterBodyStyle = parseMasterStyle(bodyStyleXml, { ...defaultStyle, eaFontName: themeFonts.minorEa }, themeColors);
   const masterGeom = extractMasterPlaceholderGeometry(masterXml, themeColors); // inherited geometry + font
 
   // ── Extract layouts ──
