@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **スピーカーノート記法 `<!-- note -->`（ブリーフィング型の土台）** — マーカー以降スライド末尾までを素の Markdown のノートとして `SlideIR.notes` へ取り込み、PPTX notesSlide/notesMaster 生成・HTML の `n` キートグル・distill 分割は先頭チャンクのみ・MCP `get_slide` 露出まで配線。ノート無しデッキの出力不変（PPTX パート不生成・HTML byte-identical）を構造的に担保。「スライドは疎に・詳細はノートへ」が成立 （ADR-0032・#150・PR #176・2026-07-19）
 - **BindingPlan＝束縛の単一権威化（段階A/B）** — 束縛の観測型 `resolveBinding`/`slideBindingPlan` を導入し #97/#135/#128 系の silent-drop を全 MCP サーフェスで warn 化（段階A）、serializer と GUI の deck-level/per-slide readout を束縛と同一写像に統一し closing 語彙タイトル消失・round-trip 破壊を根治（段階B）。証拠ポリシーの層別（層2＝配管は合成 fixture で着手可）も本 ADR で明文化 （ADR-0030・PR #152/#156/#161/#162・2026-07-18〜19）
 - **保守性ゲート＝構造規約の実行可能化** — 権威 import 許可リスト・R2 純度・R1 凍結リスト・循環禁止を `arch-conformance.test.ts` で CI 必須化（ratchet 運用＝リスト縮小が改善の実測値）、R8「意味の重複禁止＝一致テスト必須」を CLAUDE.md/PR テンプレに制度化 （ADR-0031・PR #157・2026-07-18）
 - **敵対 fixture 第2弾（valid・見た目キレイ・慣習だけ汚い）** — Dirty_AllBody（全部 body 型）/ Dirty_Legacy43（4:3・継承だのみ・typeless/巨大 idx）/ Dirty_Grouped（スケール付きグループ内見出し＝census 盲点）を合成しコミット。#128/#144 の再現台・ADR-0030 層2ポリシーの試験台 （PR #154・2026-07-18）
