@@ -5,7 +5,7 @@
  *
  * The bundled sources (public/fonts/, see CREDITS.md there) are Noto Sans JP and Noto Serif JP,
  * each a variable font spanning the full weight axis — one file covers both Regular and Bold, so
- * the caller pins `wght` at subset time (subsetFontToWoff2's `wght` option) rather than needing
+ * the caller pins `wght` at subset time (subsetFontToTtf's `wght` option) rather than needing
  * separate static-weight files.
  */
 import type { CjkClass } from "./font-stack";

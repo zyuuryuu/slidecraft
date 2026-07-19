@@ -23,7 +23,7 @@ import { serializeParagraphs } from "../engine/md-serializer-shared";
 import { collectDeckText, deckUsesBold, deckHasCjkText } from "../engine/deck-text-collect";
 import { resolveFontSubsetSource } from "../engine/font-subset-plan";
 import { classifyCjkFont, embedFallbackFamily, type CjkClass } from "../engine/font-stack";
-import { subsetFontToWoff2 } from "./font-subsetter";
+import { subsetFontToTtf } from "./font-subsetter";
 import type { DeckIR } from "../engine/slide-schema";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
@@ -77,8 +77,8 @@ async function subsetEmbedFaces(cjkClass: CjkClass, boldFlags: boolean[], text: 
   for (const bold of boldFlags) {
     const { wght } = resolveFontSubsetSource(cjkClass, bold);
     try {
-      const subset = await subsetFontToWoff2(sourceFont, text, { wght });
-      faces.push({ family, weight: wght, woff2Base64: bytesToBase64(subset) });
+      const subset = await subsetFontToTtf(sourceFont, text, { wght });
+      faces.push({ family, weight: wght, ttfBase64: bytesToBase64(subset) });
     } catch {
       // harfbuzz/WASM failure for this weight — skip it, the CSS fallback stack still renders (do-no-harm)
     }
@@ -104,7 +104,7 @@ async function buildEmbeddedFonts(deck: DeckIR, template: TemplateData): Promise
   return faces;
 }
 
-/** btoa needs a binary string; chunk the conversion so a large WOFF2 buffer never blows the call
+/** btoa needs a binary string; chunk the conversion so a large font buffer never blows the call
  *  stack via `String.fromCharCode(...bytes)` on the whole array at once. */
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";

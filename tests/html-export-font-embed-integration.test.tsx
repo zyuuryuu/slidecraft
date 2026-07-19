@@ -1,7 +1,8 @@
 /**
  * html-export-font-embed-integration.test.tsx — S3 end-to-end: renderDeckToHtml wires
- * collectDeckText → resolveFontSubsetSource → subsetFontToWoff2 into the exported HTML's
+ * collectDeckText → resolveFontSubsetSource → subsetFontToTtf into the exported HTML's
  * @font-face (#194, final wiring stage of #115). Default ON (no opt-in toggle — issue #194).
+ * Raw sfnt (TTF), not WOFF2 — see font-subsetter.ts for why.
  *
  * `fetch` is stubbed to serve public/fonts/*.ttf straight off disk (no dev server runs under
  * vitest); this is test-only plumbing, production `fetch("/fonts/...")` hits the real static asset.
@@ -37,12 +38,12 @@ describe("HTML export: CJK font-face embedding is wired end-to-end (default ON)"
     tpl = await loadTemplate(readFileSync(CANON));
   });
 
-  it("embeds a data:font/woff2 @font-face for a CJK-containing deck", async () => {
+  it("embeds a data:font/ttf @font-face for a CJK-containing deck", async () => {
     const deck = parseMd("# 四半期レビュー\n\n- 売上は前年比120%\n- 新規顧客が32社増加");
     const html = await renderDeckToHtml(deck, tpl, { title: "四半期レビュー" });
 
     expect(html).toContain("@font-face");
-    expect(html).toMatch(/src:url\(data:font\/woff2;base64,[A-Za-z0-9+/=]+\)\s*format\("woff2"\)/);
+    expect(html).toMatch(/src:url\(data:font\/ttf;base64,[A-Za-z0-9+/=]+\)\s*format\("truetype"\)/);
     expect(html).toMatch(/font-weight:400/);
   });
 
@@ -84,7 +85,7 @@ describe("HTML export: CJK font-face embedding is wired end-to-end (default ON)"
     const html = await renderDeckToHtml(deck, tpl, { title: "Quarterly Review" });
 
     expect(html).not.toContain("@font-face");
-    expect(html).not.toContain("font/woff2");
+    expect(html).not.toContain("font/ttf");
   });
 
   it("embeds both regular (400) and bold (700) weight subsets when the deck uses bold", async () => {

@@ -1,7 +1,7 @@
 /**
  * deck-text-collect.ts — walk a DeckIR and collect every rendered text string (pure, R2: no
  * DOM/Tauri). Feeds the runtime CJK font-subsetting pipeline (#193 / #115-b): the caller needs
- * the deck's actual used characters to ask harfbuzz for a WOFF2 subset containing only them.
+ * the deck's actual used characters to ask harfbuzz for a font subset containing only them.
  *
  * Scope: placeholder paragraphs, table cells, code blocks, image alt text, and speaker notes —
  * everything SlideCard renders as literal text. Diagram/mermaid blocks carry their own YAML/DSL

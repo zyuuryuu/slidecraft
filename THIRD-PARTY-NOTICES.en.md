@@ -26,7 +26,7 @@ The production dependencies (`--omit=dev`) comprise **275 components**, all unde
 | BSD-2-Clause | 1 |
 | MPL-2.0 OR Apache-2.0 (Apache-2.0 selected) | 1 |
 
-Principal direct dependencies: `react` / `react-dom` (MIT), `@modelcontextprotocol/sdk` (MIT), `@anthropic-ai/sdk`, `openai` (Apache-2.0), `mermaid` (MIT), `pptxgenjs` (MIT), `jszip` (MIT or GPLv3 → MIT selected), `js-yaml` (MIT), `zod` (MIT), `@codemirror/*` (MIT), `tailwindcss` (MIT), `@tauri-apps/*` (MIT/Apache-2.0), `harfbuzzjs` (MIT — WASM build of HarfBuzz's `hb-subset`, runtime CJK font subsetting, #193), `wawoff2` (MIT — WASM WOFF2 encoder/decoder, #193).
+Principal direct dependencies: `react` / `react-dom` (MIT), `@modelcontextprotocol/sdk` (MIT), `@anthropic-ai/sdk`, `openai` (Apache-2.0), `mermaid` (MIT), `pptxgenjs` (MIT), `jszip` (MIT or GPLv3 → MIT selected), `js-yaml` (MIT), `zod` (MIT), `@codemirror/*` (MIT), `tailwindcss` (MIT), `@tauri-apps/*` (MIT/Apache-2.0), `harfbuzzjs` (MIT — WASM build of HarfBuzz's `hb-subset`, runtime CJK font subsetting, #193).
 
 - The complete dependency list (with versions and licenses) can be generated with **`npm run sbom`** (CycloneDX SBOM = `sbom-npm.cdx.json`).
 - For the Apache-2.0 npm components (7 of them), the NOTICE accompanying each is reproduced in this file as a substitute for the NOTICE within their distribution.

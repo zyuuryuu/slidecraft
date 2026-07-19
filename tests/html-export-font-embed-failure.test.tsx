@@ -8,7 +8,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 vi.mock("../src/components/font-subsetter", () => ({
-  subsetFontToWoff2: vi.fn(async () => {
+  subsetFontToTtf: vi.fn(async () => {
     throw new Error("simulated harfbuzz failure");
   }),
 }));

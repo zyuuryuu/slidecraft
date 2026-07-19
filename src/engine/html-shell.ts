@@ -45,21 +45,23 @@ export interface HtmlShellOptions {
    *  Markdown text (escaped here). Default HIDDEN; the viewer toggles the panel with 'n'.
    *  Absent/empty → the document is byte-identical to a pre-notes export (invariant). */
   notes?: (string | undefined | null)[];
-  /** Runtime CJK subset WOFF2s to embed as @font-face (#193/#115-b subset generation, #194 wiring —
+  /** Runtime CJK subset fonts to embed as @font-face (#193/#115-b subset generation, #194 wiring —
    *  default ON, no toggle). Each face's `family` must already appear in the slides' rendered
    *  font-family CSS (font-stack.ts's embedFallbackFamily) so it's picked up with zero per-element
    *  changes. Absent/empty → the document is byte-identical to a pre-embedding export (do-no-harm). */
   embeddedFonts?: EmbeddedFontFace[];
 }
 
-/** One subsetted, base64-encoded WOFF2 font face to embed via @font-face (#194). */
+/** One subsetted, base64-encoded raw sfnt (TTF) font face to embed via @font-face (#194). Raw TTF,
+ *  not WOFF2 — see font-subsetter.ts's file header for why (a WOFF2 compression step via `wawoff2`
+ *  hangs forever in real browsers; harfbuzz's own subset output is embedded directly instead). */
 export interface EmbeddedFontFace {
   /** font-family name this face installs (an existing fallback-chain entry, not a new one). */
   family: string;
   /** Static weight the source was pinned to at subset time (font-subsetter's `wght` option). */
   weight: 400 | 700;
-  /** Base64-encoded WOFF2 bytes — no `data:` prefix, this function adds it. */
-  woff2Base64: string;
+  /** Base64-encoded raw sfnt (TTF) bytes — no `data:` prefix, this function adds it. */
+  ttfBase64: string;
 }
 
 function esc(s: string): string {
@@ -247,7 +249,7 @@ sync();
  *  data:` unconditionally (see cspMeta below), so no CSP change is needed for these to load. */
 function fontFaceCss(fonts: EmbeddedFontFace[]): string {
   return fonts
-    .map((f) => `@font-face{font-family:"${f.family}";font-weight:${f.weight};font-display:swap;src:url(data:font/woff2;base64,${f.woff2Base64}) format("woff2")}`)
+    .map((f) => `@font-face{font-family:"${f.family}";font-weight:${f.weight};font-display:swap;src:url(data:font/ttf;base64,${f.ttfBase64}) format("truetype")}`)
     .join("");
 }
 
