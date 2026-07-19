@@ -43,10 +43,24 @@ function serializeSlide(
   tpl?: SerializeTemplate,
 ): string {
   const lines: string[] = [];
+
+  // A derived TOC slide folds to its declaration ONLY — the content is re-derived at every
+  // consumption point (deck-sections), so even a materialized deck writes no toc body back
+  // (#151 / ADR-0032 D2: the deck never persists duplicated chapter state).
+  if (slide.derived === "toc") {
+    return "<!-- toc -->";
+  }
+
   const layout =
     slide.layout === "auto"
       ? autoSelectLayout(slide, slideIndex, totalSlides, tpl?.catalog)
       : slide.layout;
+
+  // `<!-- section -->` chapter declaration rides FIRST (the ADR-0032 D2 taught form); the
+  // parser strips it before the layout-pin check, so ordering stays round-trip-safe.
+  if (slide.sectionBreak) {
+    lines.push("<!-- section -->");
+  }
 
   // Emit the layout directive only when it was explicitly set. "auto" slides stay
   // directive-free so they round-trip as "auto" (re-resolved deterministically on

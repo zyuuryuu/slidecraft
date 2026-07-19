@@ -41,6 +41,8 @@ function layoutCompletion(context: CompletionContext): CompletionResult | null {
 
 const DIRECTIVES = [
   { label: "note", detail: "スピーカーノート（以降スライド末尾まで）" },
+  { label: "section", detail: "章扉の宣言（採番・目次の対象）" },
+  { label: "toc", detail: "目次スライド（章一覧を自動導出）" },
   { label: "col", detail: "カラム区切り" },
   { label: "kpi", detail: "KPI 区切り" },
   { label: "step", detail: "ステップ区切り" },

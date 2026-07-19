@@ -18,6 +18,7 @@ import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
 import { assembleHtmlDeck, type Transition } from "../engine/html-shell";
+import { materializeDerivedSlides } from "../engine/deck-sections";
 import { serializeParagraphs } from "../engine/md-serializer-shared";
 import type { DeckIR } from "../engine/slide-schema";
 
@@ -51,7 +52,8 @@ async function preRenderNonNativeMermaid(deck: DeckIR): Promise<DeckIR> {
 }
 
 export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string; transition?: Transition } = {}): Promise<string> {
-  const prepared = await preRenderNonNativeMermaid(deck);
+  // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）— PPTX/preview と同じ単一関数（R8）。
+  const prepared = await preRenderNonNativeMermaid(materializeDerivedSlides(deck));
   const catalog = buildCatalog(template);
 
   const slideHtmls = prepared.slides.map((slide, i) => {

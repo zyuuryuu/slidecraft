@@ -21,6 +21,7 @@ import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
 import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT } from "./notes-ooxml";
+import { materializeDerivedSlides } from "./deck-sections";
 import { midnightExecutive } from "./theme";
 
 /**
@@ -309,6 +310,8 @@ export async function generatePptx(
   template: TemplateData,
   rasterizeSvg?: SvgRasterizer,
 ): Promise<Uint8Array> {
+  // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）。宣言なしデッキは同一参照が返る。
+  deck = materializeDerivedSlides(deck);
   // Clone by re-serializing + re-loading (JSZip has no clone method)
   const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
   const zip = await JSZip.loadAsync(tplBuf);

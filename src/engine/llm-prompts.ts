@@ -173,6 +173,25 @@ Full explanation the presenter reads aloud.
 Prefer SPARSE slides + RICH notes (briefing style): keep the slide to the takeaway, move the
 narration into the notes.
 
+## Sections & Table of Contents
+
+Declare a chapter by writing a NORMAL section-cover slide and tagging it with \`<!-- section -->\`
+(the chapter name stays a \`#\` heading). A slide block containing ONLY \`<!-- toc -->\` becomes a
+DERIVED table-of-contents slide: its content (chapter numbers + names) is always re-derived from
+the section-tagged slides, so the TOC can never drift from the actual chapters. Do not write TOC
+content by hand.
+
+\`\`\`
+<!-- toc -->
+
+---
+
+<!-- section -->
+# Chapter Name
+
+> optional chapter subtitle
+\`\`\`
+
 ## Rules
 
 - Write in the same language as the user's request

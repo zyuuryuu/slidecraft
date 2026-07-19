@@ -16,6 +16,7 @@ import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
+import { materializeDerivedSlides } from "../engine/deck-sections";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -625,7 +626,7 @@ interface SlidePreviewProps {
 }
 
 export default function SlidePreview({
-  deck,
+  deck: deckProp,
   template,
   error,
   notice,
@@ -640,6 +641,9 @@ export default function SlidePreview({
   const { t } = useTranslation();
   // Catalog → layout selection adapts to the template (canonical = unchanged).
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
+  // 派生スライド（<!-- toc -->）は消費点で導出（#151）— export と同じ単一関数なので WYSIWYG が保たれ、
+  // 章名変更は次のレンダーで自動反映される（deck 状態には導出内容を持たない）。
+  const deck = useMemo(() => (deckProp ? materializeDerivedSlides(deckProp) : deckProp), [deckProp]);
 
   // Fit the slide to the available pane by default (the fixed 72-dpi render overflowed
   // narrow panes); a small zoom control lets the user scale it down/up by %.

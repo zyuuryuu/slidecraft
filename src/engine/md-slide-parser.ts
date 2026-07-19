@@ -161,15 +161,46 @@ function matchImageLine(trimmed: string): ImageBlock | null {
  *  `<!--->`. All render as nothing in any HTML view. A line with visible text outside
  *  the markers never matches (inline-comment strip = #147 第2弾スコープ). */
 const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
-/** Directive comments that carry meaning — the layout pin, the group separators, and the
- *  speaker-note marker (ADR-0032 D1). `<!-- note: … -->` (with a payload) is NOT a directive
- *  and stays in the #147 drop class — only the bare marker survives. */
-const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note)\s*-->$)/;
+/** Directive comments that carry meaning — the layout pin, the group separators, the
+ *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
+ *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
+ *  drop class — only the bare markers survive. */
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note|section|toc)\s*-->$)/;
 
 // ── Speaker notes (#150 / ADR-0032 D1) ──
 
 /** The bare `<!-- note -->` marker: everything after it (to the slide's end) is speaker notes. */
 const NOTE_MARKER_RE = /^<!--\s*note\s*-->$/;
+
+// ── Section / TOC declarations (#151 / ADR-0032 D2) ──
+
+/** `<!-- section -->` — declares THIS authored slide as a chapter cover (a slide ATTRIBUTE,
+ *  not an in-slide separator). `<!-- toc -->` — a block holding ONLY this marker becomes the
+ *  derived table-of-contents slide (content re-derived from section-tagged slides). */
+const SECTION_MARKER_RE = /^<!--\s*section\s*-->$/;
+const TOC_MARKER_RE = /^<!--\s*toc\s*-->$/;
+
+/** Remove fence-external `<!-- section -->` lines, reporting whether any was present. A stray
+ *  fence-external `<!-- toc -->` on a slide that has OTHER content is dropped the same way
+ *  (#147-consistent: a misplaced marker vanishes rather than rendering as literal text). */
+function extractSectionFlag(lines: string[]): { content: string[]; sectionBreak: boolean } {
+  let sectionBreak = false;
+  let inFence = false;
+  const content = lines.filter((ln) => {
+    const t = ln.trim();
+    if (t.startsWith("```")) {
+      inFence = !inFence;
+      return true;
+    }
+    if (!inFence && SECTION_MARKER_RE.test(t)) {
+      sectionBreak = true;
+      return false;
+    }
+    if (!inFence && TOC_MARKER_RE.test(t)) return false; // toc-only blocks return earlier; here it's stray
+    return true;
+  });
+  return { content, sectionBreak };
+}
 
 /** Split a slide block at the first fence-external `<!-- note -->` marker. Fence-aware so a
  *  comment-looking line inside ``` stays code (#147 と同じ理由). Marker absent → notes: null. */
@@ -227,10 +258,26 @@ export function parseSlideBlock(
   // Markdown by these — so capture the length before comment lines are stripped.
   const sourceLen = lines.length;
   lines = stripCommentOnlyLines(lines);
+
+  // `<!-- toc -->` のみのブロック → 導出専用の派生スライド（内容は消費点で毎回再導出、#151）。
+  const nonBlank = lines.map((l) => l.trim()).filter((l) => l !== "");
+  if (nonBlank.length === 1 && TOC_MARKER_RE.test(nonBlank[0])) {
+    return {
+      layout: "auto",
+      placeholders: [],
+      derived: "toc",
+      sourceLineStart: startLine,
+      sourceLineEnd: startLine + sourceLen - 1,
+    };
+  }
+
   // `<!-- note -->` 以降スライド末尾まではスピーカーノート（本文パースの前に切り離す）。
   const noteSplit = splitNoteLines(lines);
-  lines = noteSplit.content;
   const notes = noteSplit.notes ? linesToParagraphs(trimBodyLines(noteSplit.notes)) : undefined;
+  // `<!-- section -->` は章境界の宣言（スライド属性）— 本文から取り除きフラグ化（#151）。
+  const sectionSplit = extractSectionFlag(noteSplit.content);
+  lines = sectionSplit.content;
+  const sectionBreak = sectionSplit.sectionBreak;
   let layout = "auto";
   const placeholders: PlaceholderContent[] = [];
   let title: string | undefined;
@@ -327,6 +374,7 @@ export function parseSlideBlock(
       ...(mermaidBlock ? { mermaidBlock } : {}),
       ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
       ...(notes?.length ? { notes } : {}),
+      ...(sectionBreak ? { sectionBreak: true } : {}),
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
@@ -485,6 +533,7 @@ export function parseSlideBlock(
     ...(code ? { code } : {}),
     ...(image ? { image } : {}),
     ...(notes?.length ? { notes } : {}),
+    ...(sectionBreak ? { sectionBreak: true } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + sourceLen - 1,
   };

@@ -51,6 +51,11 @@ write slide Markdown, and follow the never-silent feedback loop until the deck i
      (until the next `---`) is that slide's speaker notes — plain Markdown, invisible on the slide,
      exported as native PPTX notes. Prefer **sparse slides + rich notes**: keep the slide to the
      takeaway, move the narration into notes instead of overflowing the body budget.
+   - **Sections & TOC (drift-proof)**: tag an author-written chapter-cover slide with
+     `<!-- section -->` (chapter name stays a `#` heading); a block holding ONLY `<!-- toc -->`
+     becomes a derived TOC slide whose content (numbers + names) is always re-derived from the
+     section-tagged slides. Never write TOC content by hand — rename a chapter cover and the TOC
+     follows automatically, so the TOC can never diverge from the deck (G2).
 4. **Add figures**: `get_diagram_types()` → pick from the **12 authorable types** (flowchart, network,
    orgchart, sequence, timeline, quadrant, pie, gantt, journey, xychart, radar, kpi) → `get_diagram_guide(type)`
    for its syntax → `set_slide_diagram(index, source, "yaml"|"json"|"mermaid")`. class/state/ER/mindmap are
