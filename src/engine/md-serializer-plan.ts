@@ -99,17 +99,18 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
     return;
   }
 
+  // Single body: idx 1 (only when the binder reads it as BODY — on a ctrTitle layout idx 1 is the
+  // subtitle, already emitted above). A lead paragraph can coexist BESIDE a single-body
+  // table/figure (#101) — both emit, body text first, then the figure block.
+  const body = roleOf.get("1") === "body" ? getPlaceholderText(slide, "1") : undefined;
+  if (body) lines.push(body);
   const fig = figureBlock(slide);
   if (fig) {
-    if (metaCount > 0) lines.push(""); // keep the meta block visually separate from the figure
+    if (body || metaCount > 0) lines.push(""); // keep the body/meta block visually separate from the figure
     lines.push(fig);
     return;
   }
 
-  // Single body: idx 1 (only when the binder reads it as BODY — on a ctrTitle layout idx 1 is the
-  // subtitle, already emitted above), then secondary regions 2..6 as before.
-  const body = roleOf.get("1") === "body" ? getPlaceholderText(slide, "1") : undefined;
-  if (body) lines.push(body);
   for (let idx = 2; idx <= 6; idx++) {
     const text = getPlaceholderText(slide, String(idx));
     if (text) {

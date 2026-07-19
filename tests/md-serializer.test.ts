@@ -72,6 +72,19 @@ describe("text + figure COEXISTENCE round-trips (stage ①)", () => {
     expect(back.placeholders.find((p) => p.idx === "2")?.paragraphs[0].segments[0].text).toBe("R");
   });
 
+  it("lead paragraph + table coexist in a single body region (#101)", () => {
+    const back = rt({ slides: [{
+      layout: "Content.1Body.Single",
+      placeholders: [
+        { idx: "15", paragraphs: [{ segments: [{ text: "Q3" }] }] },
+        { idx: "1", paragraphs: [{ segments: [{ text: "前置き" }] }] },
+      ],
+      table: { rows: [["Metric", "Value"], ["Latency", "12ms"]], header: true, placeholderIdx: "1" },
+    }] });
+    expect(back.table?.rows).toEqual([["Metric", "Value"], ["Latency", "12ms"]]);
+    expect(back.placeholders.find((p) => p.idx === "1")?.paragraphs[0].segments[0].text).toBe("前置き");
+  });
+
   it("a solo diagram (single body) still round-trips", () => {
     const back = rt({ slides: [{
       layout: "Content.1Body.Single",

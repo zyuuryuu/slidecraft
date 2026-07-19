@@ -4,27 +4,14 @@
  * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
-import { isTableRow, parseMarkdownTable } from "./md-table";
+import { extractBodyTable } from "./md-body-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type ParseNotice } from "./parse-notice";
+import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
-
-/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line), plus WHERE it
- *  starts and how many lines it consumed — so the caller can tell whether anything besides that
- *  table (leading prose, a 2nd table, trailing prose) is left over in `lines`. */
-function findTableInLines(lines: string[]): { rows: string[][]; start: number; consumed: number } | null {
-  for (let i = 0; i + 1 < lines.length; i++) {
-    if (isTableRow(lines[i])) {
-      const parsed = parseMarkdownTable(lines.slice(i));
-      if (parsed) return { rows: parsed.rows, start: i, consumed: parsed.consumed };
-    }
-  }
-  return null;
-}
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -505,31 +492,15 @@ export function parseSlideBlock(
     }
   }
 
-  // Body: a GFM table becomes a NATIVE table block (fills body region 1); otherwise
-  // the body lines become bullet/text paragraphs (idx 1).
+  // Body: a GFM table becomes a NATIVE table block (fills body region 1 by default); otherwise
+  // the body lines become bullet/text paragraphs (idx 1). A single table COEXISTS with any
+  // surrounding prose (#101 no-silent-drop, md-body-table.extractBodyTable) — the leftover text
+  // is merged into idx "1" the same way plain body text is, appending to an EXISTING idx "1" (a
+  // title layout's subtitle) rather than creating a duplicate the serializer would silently drop.
   const trimmedBody = trimBodyLines(bodyLines);
-  let table: TableBlock | undefined;
-  const found = findTableInLines(trimmedBody);
-  if (found) {
-    table = { rows: found.rows, header: true, placeholderIdx: "1" };
-    // #148 no-silent-drop: the table/body branches are mutually exclusive — ANYTHING else in the body
-    // (leading prose, a 2nd+ table, trailing prose) is discarded, not converted to a paragraph. Once
-    // this function returns, those raw lines are gone from SlideIR, so only the parser can report it —
-    // classify the leftover (a leaked image line / unrecognized meta key) the same way deck-diagnostics
-    // would have from surviving body text, since a table's presence is what stopped it from surviving.
-    const leftover = trimBodyLines([...trimmedBody.slice(0, found.start), ...trimmedBody.slice(found.start + found.consumed)]);
-    if (leftover.length > 0) {
-      notices?.push({ kind: "table-dropped" });
-      if (leftover.some((l) => IMAGE_MARKDOWN_RE.test(l))) notices?.push({ kind: "image-dropped" });
-      const metaKey = leftover.map(unrecognizedMetaKey).find((k): k is string => k !== null);
-      if (metaKey) notices?.push({ kind: "meta-key-dropped", detail: metaKey });
-    }
-  } else if (trimmedBody.length > 0) {
-    // Merge into an EXISTING idx "1" (a title layout's subtitle) rather than create a
-    // DUPLICATE idx "1": the serializer reads only the first idx-1 placeholder, so a
-    // duplicate silently drops the body on round-trip. Content layouts put the subtitle
-    // at idx 16, so there's no idx-1 yet and the body becomes its own placeholder.
-    const bodyParas = linesToParagraphs(trimmedBody);
+  const { table, leftover } = extractBodyTable(trimmedBody, notices);
+  if (leftover.length > 0) {
+    const bodyParas = linesToParagraphs(leftover);
     const existing = placeholders.find((p) => p.idx === "1");
     if (existing) existing.paragraphs.push(...bodyParas);
     else placeholders.push({ idx: "1", paragraphs: bodyParas });

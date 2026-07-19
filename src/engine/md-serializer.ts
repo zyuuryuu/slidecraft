@@ -193,13 +193,15 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
         lines.push("");
       }
     } else {
-      // Single body: idx 1 (table / code / diagram / mermaid all serialize here).
+      // Single body: idx 1 (table / code / diagram / mermaid all serialize here). A lead
+      // paragraph (idx 1 TEXT) can coexist BESIDE a single-body table/figure (#101) — both
+      // emit, body text first, then the figure block.
+      const body = getPlaceholderText(slide, "1");
+      if (body) lines.push(body);
       const fig = figureBlock(slide);
       if (fig) {
+        if (body) lines.push("");
         lines.push(fig);
-      } else {
-        const body = getPlaceholderText(slide, "1");
-        if (body) lines.push(body);
       }
 
       // Secondary placeholders (2, 3, etc.) for non-column layouts
