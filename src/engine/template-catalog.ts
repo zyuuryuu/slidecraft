@@ -622,11 +622,21 @@ export function pickLayout(
   regions?: number,
   hasImage?: boolean,
 ): CatalogEntry | undefined {
-  const candidates = catalog.filter((e) => e.role === role);
+  let candidates = catalog.filter((e) => e.role === role);
   if (candidates.length === 0) return undefined;
   const usableBody = (e: CatalogEntry) =>
     e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0);
   const hasPictureFrame = (e: CatalogEntry) => e.placeholders.some((p) => p.role === "picture");
+  // #153: a closing slide that carries body content (regions>0) needs a closing layout that can
+  // actually hold it — a ctrTitle-only closing (e.g. Closing.1Message.Single) has no body region and
+  // would silently drop it. Restrict to closing candidates with a usable body; none → undefined, so
+  // the caller's degrade chain (pickLayout(..., "content", ...)) picks up the content instead. A
+  // title-only closing (regions undefined) is unaffected — byte-identical.
+  if (role === "closing" && regions !== undefined && regions > 0) {
+    const bodyBearing = candidates.filter(usableBody);
+    if (bodyBearing.length === 0) return undefined;
+    candidates = bodyBearing;
+  }
   const score = (e: CatalogEntry): number => {
     let s = e.name.match(/\+/g)?.length ?? 0; // prefer fewer addons
     if (regions !== undefined) s += Math.abs(e.bodyCount - regions) * 10;
