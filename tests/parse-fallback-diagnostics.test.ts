@@ -73,7 +73,7 @@ describe("#148 — apply_slide_markdown doesn't misattribute a discarded 2nd blo
     await S.newProject(s, await defaultTemplateBytes(), "# クリーン\n\n- a\n- b");
     const droppedBlock2Md = `# クリーン更新\n\n- a\n- b\n\n---\n\n# 表\n\n${"| a | b |\n| --- | --- |\n| 1 | 2 |"}\n\n${"| c | d |\n| --- | --- |\n| 3 | 4 |"}`;
     await S.applySlideMarkdown(s, 0, droppedBlock2Md);
-    expect(S.getDiagnostics(s).issues.some((x) => x.message.includes("表以外の内容"))).toBe(false);
+    expect(S.getDiagnostics(s).issues.some((x) => x.message.includes("2つ目以降の表"))).toBe(false);
   });
 });
 
@@ -90,7 +90,7 @@ describe("#148 — healthy sample decks gain ZERO new false-positive fallback wa
       for (const list of [diagnostics, issues]) {
         expect(list.some((x) => x.message.includes("画像記法"))).toBe(false);
         expect(list.some((x) => /^「.*」は認識されない/.test(x.message))).toBe(false);
-        expect(list.some((x) => x.message.includes("表以外の内容"))).toBe(false);
+        expect(list.some((x) => x.message.includes("2つ目以降の表"))).toBe(false);
       }
     });
   }
