@@ -85,6 +85,7 @@ Exports as `.pptx`. The key point is that **diagrams and tables are exported as 
 - The template's colors, fonts, and layout are preserved as-is.
 - The 12 `diagram` types, plus convertible `mermaid` (class / state / ER / mindmap), become native shapes.
 - Images (data URIs) are decoded and embedded as media.
+- [Speaker notes](/en/guide/markdown-authoring#speaker-notes-note) written with `<!-- note -->` land in PowerPoint's **native notes pane**. Slides without notes get no notes part at all, so a deck without notes exports exactly as before.
 
 ### Standalone HTML
 
@@ -99,6 +100,7 @@ At export time you can choose the default **transition style** (`fade` / `slide`
 | `Home` / `End` | Jump to the first / last slide |
 | `o` | Toggle the **overview** (a grid of all slides). Click a thumbnail / press Enter to navigate |
 | `t` | Cycle through transition styles |
+| `n` | Toggle the **speaker notes** panel (hidden by default; only in decks that have notes) |
 | `f` | Toggle full scope (fullscreen) |
 | A URL hash like `#3` | Jump directly to that slide (deep link) |
 

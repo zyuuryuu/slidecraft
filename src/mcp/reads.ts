@@ -10,6 +10,7 @@
 import type { Session } from "./session";
 import * as S from "./session";
 import { autoSelectLayout } from "../engine/template-loader";
+import { serializeParagraphs } from "../engine/md-serializer-shared";
 import { GuardError } from "./guard-errors";
 
 export function getSlide(s: Session, i: number) {
@@ -40,6 +41,7 @@ export function getSlide(s: Session, i: number) {
     budget, // this template's body capacity (maxBullets/charsPerBullet) or null
     overBudget,
     issues, // this slide's diagnostics only (levers → which fix tool)
+    notes: slide.notes?.length ? serializeParagraphs(slide.notes) : null, // speaker notes (#150), plain Markdown text
     markdown: S.getSlideMarkdown(s, i), // round-trip Markdown (auto layout resolved)
   };
 }

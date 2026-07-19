@@ -87,6 +87,16 @@ export function figureBlock(slide: SlideIR): string | null {
   return null;
 }
 
+// ── Speaker notes (#150 / ADR-0032 D1) → `<!-- note -->` + Markdown body ──
+// Notes are a slide-level tail (marker to the slide's end), independent of the layout branch —
+// emitted ONCE at the single dispatch point (serializeSlide), so the plan-driven and legacy
+// readouts can't disagree (R8: 一本化). Must stay the LAST emission of a slide: the parser
+// consumes everything after the marker as notes, so anything after it would be swallowed.
+export function notesLines(slide: SlideIR): string[] {
+  if (!slide.notes?.length) return [];
+  return ["", "<!-- note -->", serializeParagraphs(slide.notes)];
+}
+
 /** The `![alt](src){…}` line for an image (shared by the body-figure and the behind-layer paths). */
 export function imageLine(image: NonNullable<SlideIR["image"]>): string {
   return `![${image.alt}](${image.src})${imageAttrs(image)}`;
