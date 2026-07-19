@@ -17,12 +17,19 @@ import type { DeckIR } from "../src/engine/slide-schema";
 // A synthetic TTF authored for this test only (fontTools, ~400 dummy square glyphs covering
 // ASCII + the JP test text below + 300 unused CJK-range padding codepoints so subsetting has
 // something real to discard) — no third-party font content, so it carries no license obligations.
-// The real Noto Sans/Serif JP source fonts land in a later #193 PR (the asset-bundling half).
 const FIXTURE_PATH = resolve(__dirname, "fixtures/font-subset-test.ttf");
 
-async function loadFixtureFont(): Promise<Uint8Array> {
-  const buf = await readFile(FIXTURE_PATH);
+// The real bundled source font (#193 asset half) — Noto Sans JP, a variable font (wght 100-900).
+// Used below to test the variationAxes weight-pinning path against production-shaped input.
+const NOTO_SANS_JP_PATH = resolve(__dirname, "../public/fonts/NotoSansJP-Variable.ttf");
+
+async function loadFont(path: string): Promise<Uint8Array> {
+  const buf = await readFile(path);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
+async function loadFixtureFont(): Promise<Uint8Array> {
+  return loadFont(FIXTURE_PATH);
 }
 
 const JP_DECK: DeckIR = {
@@ -64,5 +71,27 @@ describe("subsetFontToWoff2", () => {
   it("rejects (does not throw synchronously) on a corrupt/non-font buffer, for callers to fall back", async () => {
     const garbage = new Uint8Array([1, 2, 3, 4, 5]);
     await expect(subsetFontToWoff2(garbage, "abc")).rejects.toThrow();
+  });
+});
+
+describe("subsetFontToWoff2 — variable-font weight pinning (#193 asset half)", () => {
+  const text = "日本語のスライド資料を作成します。こんにちは、世界！";
+
+  it("pins the wght axis so Regular (400) and Bold (700) subsets differ", async () => {
+    const original = await loadFont(NOTO_SANS_JP_PATH);
+    const regular = await subsetFontToWoff2(original, text, { wght: 400 });
+    const bold = await subsetFontToWoff2(original, text, { wght: 700 });
+
+    expect(regular.byteLength).toBeGreaterThan(0);
+    expect(bold.byteLength).toBeGreaterThan(0);
+    expect(Buffer.from(regular).equals(Buffer.from(bold))).toBe(false);
+  });
+
+  it("produces a WOFF2 buffer many orders of magnitude smaller than the ~9.6 MB source", async () => {
+    const original = await loadFont(NOTO_SANS_JP_PATH);
+    const subset = await subsetFontToWoff2(original, text, { wght: 400 });
+
+    expect(subset.byteLength).toBeGreaterThan(0);
+    expect(subset.byteLength).toBeLessThan(original.byteLength / 100);
   });
 });

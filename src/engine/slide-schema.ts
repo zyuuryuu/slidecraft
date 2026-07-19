@@ -62,6 +62,9 @@ export const ParagraphSchema = z.object({
   segments: z.array(InlineSegmentSchema).min(1),
   bullet: z.boolean().optional(),
   heading: z.boolean().optional(), // a `### …` group heading (card/step) — the group's title line
+  // Nested-bullet depth (#103): 0-3, omitted = 0 (flat — existing decks stay byte-identical since
+  // the field is simply absent). Only meaningful on a `bullet` paragraph.
+  level: z.number().int().min(0).max(3).optional(),
 });
 
 export type Paragraph = z.infer<typeof ParagraphSchema>;
