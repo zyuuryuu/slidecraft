@@ -72,6 +72,9 @@ export function splitSlideToFit(slide: SlideIR, box: FitBox): SlideIR[] {
 
   return chunks.map((chunk, ci) => ({
     ...slide,
+    // Speaker notes stay on the FIRST chunk only (ADR-0032 D1) — the spread above would
+    // otherwise duplicate them onto every continuation slide.
+    ...(ci > 0 ? { notes: undefined } : {}),
     // a fresh deck slide per chunk: keep title/subtitle/meta, swap the body text.
     placeholders: slide.placeholders.map((p) => {
       if (p.idx === body.idx) return { ...p, paragraphs: chunk };

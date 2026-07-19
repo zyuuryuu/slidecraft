@@ -155,6 +155,24 @@ def greet(name):
 \`\`\`
 \`\`\`\`
 
+## Speaker Notes
+
+Put \`<!-- note -->\` on its own line; everything AFTER it (until the next \`---\`) is the slide's
+speaker notes — plain Markdown (multiple lines, bullets, **bold** allowed), invisible on the slide:
+
+\`\`\`
+# Slide Title
+
+- Key point only
+
+<!-- note -->
+Full explanation the presenter reads aloud.
+- supporting detail
+\`\`\`
+
+Prefer SPARSE slides + RICH notes (briefing style): keep the slide to the takeaway, move the
+narration into the notes.
+
 ## Rules
 
 - Write in the same language as the user's request

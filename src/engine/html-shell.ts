@@ -41,6 +41,10 @@ export interface HtmlShellOptions {
    *  `.html` — which has no CSP otherwise — can't run injected inline script or phone home.
    *  The orchestrator (deck-html-export) generates it; engine stays pure (R2). ADR-0016 F2. */
   cspNonce?: string;
+  /** Per-slide speaker-note text (#150 / ADR-0032): index-aligned with `slideHtmls`, plain
+   *  Markdown text (escaped here). Default HIDDEN; the viewer toggles the panel with 'n'.
+   *  Absent/empty → the document is byte-identical to a pre-notes export (invariant). */
+  notes?: (string | undefined | null)[];
 }
 
 function esc(s: string): string {
@@ -197,6 +201,32 @@ for(var j=0;j<n;j++)slides[j].classList.toggle('active',j===start);i=start;chrom
 })();`;
 }
 
+// ── Speaker notes (#150 / ADR-0032): default-hidden panel + 'n' toggle ──
+// A SEPARATE add-on (CSS/markup/JS strings below) appended ONLY when a note exists, so a
+// no-notes export never enters this code path (byte-identical invariant). The runtime is its
+// own IIFE that observes #counter (chrome() rewrites it on every show; history.replaceState
+// fires no hashchange, so the counter is the only reliable "current slide" signal) — the nav
+// script itself stays untouched. CSP: it rides inside the SAME nonce'd <script> tag.
+
+const NOTES_CSS = `
+.notesrc{display:none}
+.notespanel{display:none}
+body.shownotes .notespanel{display:block;position:fixed;left:0;right:0;bottom:0;max-height:34%;overflow:auto;background:rgba(10,14,26,.94);color:#dbe2f0;border-top:1px solid #2a3550;padding:14px 18px 20px;font:400 14px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;white-space:pre-wrap;z-index:4}
+body.shownotes .notespanel:empty{display:none}
+body.ov .notespanel{display:none}
+@media print{.notespanel,.notesrc{display:none}}`;
+
+const NOTES_JS = `(function(){
+var panel=document.getElementById('notespanel'),counter=document.getElementById('counter');
+if(!panel||!counter)return;
+var srcs={};
+[].slice.call(document.querySelectorAll('.notesrc')).forEach(function(el){srcs[el.getAttribute('data-i')]=el.textContent;});
+function sync(){var k=parseInt(counter.textContent,10)||1;panel.textContent=srcs[String(k-1)]||'';}
+new MutationObserver(sync).observe(counter,{childList:true,characterData:true,subtree:true});
+addEventListener('keydown',function(e){if(e.key==='n'||e.key==='N'){document.body.classList.toggle('shownotes');e.preventDefault();}});
+sync();
+})();`;
+
 /** Assemble N pre-rendered slide HTML strings into one self-contained .html document. */
 export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): string {
   const { stageW, stageH } = opts;
@@ -213,6 +243,18 @@ export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): 
   // default-src 'none' (no fetch/script/img/font from anywhere), scripts ONLY via this nonce
   // (so an injected inline handler/script can't run), inline styles + data:/blob: images kept
   // (the slides need them). The nonce is attribute-escaped defensively (ADR-0016 F2).
+  // Speaker notes: only a deck with ≥1 non-empty note gets the panel/sources/toggle at all.
+  const notes = opts.notes ?? [];
+  const hasNotes = notes.some((t) => t && t.trim() !== "");
+  const notesCss = hasNotes ? NOTES_CSS : "";
+  const notesHtml = hasNotes
+    ? notes
+        .map((t, i) => (t && t.trim() !== "" ? `<div class="notesrc" data-i="${i}" hidden>${esc(t)}</div>` : ""))
+        .filter(Boolean)
+        .join("\n") + `\n<div class="notespanel" id="notespanel" aria-label="スピーカーノート"></div>\n`
+    : "";
+  const notesJs = hasNotes ? NOTES_JS : "";
+
   const nonce = opts.cspNonce ? esc(opts.cspNonce) : "";
   const cspMeta = nonce
     ? `\n<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'">`
@@ -225,15 +267,15 @@ export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">${cspMeta}
 <title>${title}</title>
-<style>${shellCss(stageW, stageH)}</style>
+<style>${shellCss(stageW, stageH)}${notesCss}</style>
 </head>
 <body>
 <div class="viewport"><div class="stage">
 ${sections}
 </div></div>
-<div class="progress" id="progress"></div>
+${notesHtml}<div class="progress" id="progress"></div>
 <div class="counter" id="counter">1 / ${n}</div>
-${scriptTag}${shellJs(stageW, stageH)}</script>
+${scriptTag}${shellJs(stageW, stageH)}${notesJs}</script>
 </body>
 </html>`;
 }

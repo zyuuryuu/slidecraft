@@ -40,7 +40,7 @@ describe("parseMd — comment-only line drop (#147)", () => {
 
 論点A
 
-<!-- note -->
+<!-- memo -->
 
 論点B`;
     expect(paraTexts(parseMd(md).slides[0], "1")).toEqual(["論点A", "", "論点B"]);
@@ -81,7 +81,7 @@ Revenue`;
     const md = `# 比較
 
 <!-- col -->
-<!-- note: 左は旧プラン -->
+<!-- memo: 左は旧プラン -->
 - 旧プラン
 
 <!-- col -->
@@ -122,7 +122,7 @@ Revenue`;
   it("keeps sourceLineStart/End spanning the ORIGINAL block (useDeckRevise slices raw md)", () => {
     const md = `# S1
 
-<!-- note -->
+<!-- memo -->
 - A
 
 ---

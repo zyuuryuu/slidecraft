@@ -162,6 +162,7 @@ export const SlideIRSchema = z.object({
   code: CodeBlockSchema.optional(), // embedded code/log (```lang fence → monospace body)
   image: ImageBlockSchema.optional(), // embedded image (![alt](data URI) → <img> / PPTX pic)
   groupKind: z.enum(["card", "step", "kpi"]).optional(), // `<!-- card/step/kpi -->` groups → layout hint
+  notes: z.array(ParagraphSchema).optional(), // `<!-- note -->` 以降のスピーカーノート（ADR-0032 D1、R4 承認済み）
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });

@@ -42,6 +42,8 @@ export function contractDigest(s: Session) {
     budget,
     separators:
       "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）",
+    notes:
+      "スピーカーノートは `<!-- note -->` を単独行で置き、以降スライド末尾（次の `---`）までが素の Markdown のノート本文（#150）。スライドは疎に・詳細はノートへ",
     seeAlso: { format: "get_authoring_guide", figures: "get_diagram_types" },
   };
 }
