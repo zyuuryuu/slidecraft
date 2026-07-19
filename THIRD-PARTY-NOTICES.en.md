@@ -58,6 +58,26 @@ Use of each model is subject to the license and terms of use of the original mod
 
 See `public/templates/slide/CREDITS.md` (e.g., `lrk-slides-velis_CC0.pptx` = "lrk-slides-velis" by Laurens R. Krol, **CC0 1.0**).
 
+## 6. Bundled Fonts (source fonts for runtime CJK subsetting)
+
+For runtime CJK font subsetting in HTML export (#193 / #115-b), the following variable fonts are
+bundled under `public/fonts/`. They are the **source** fonts a deck's actually-used glyphs are cut
+from — the app never distributes the full font sets directly (see `public/fonts/CREDITS.md`):
+
+- **NotoSansJP-Variable.ttf** (Noto Sans JP, a variable font spanning `wght` 100–900) — © Google /
+  Adobe (Source Han Sans lineage) — **SIL Open Font License 1.1**. Full license text in
+  `public/fonts/OFL-NotoSansJP.txt`.
+- **NotoSerifJP-Variable.ttf** (Noto Serif JP, a variable font spanning `wght` 200–900) — © Google
+  (Source Han Serif lineage) — **SIL Open Font License 1.1**. Full license text in
+  `public/fonts/OFL-NotoSerifJP.txt`.
+
+Both are the unmodified original files fetched from Google's `google/fonts` repository
+(`ofl/notosansjp/`, `ofl/notoserifjp/`). OFL 1.1 permits bundling, modification (subsetting), and
+redistribution (only selling the font standalone is prohibited; the full license text must be
+included). The template's actually-named font (Yu Gothic, 游明朝, a company's own font, etc.) is
+never reproduced — this feature substitutes these bundled fonts based on the gothic/mincho
+**classification** (`classifyCjkFont` in font-stack.ts), a design confirmed in the #115 discussion.
+
 ---
 
 For the full text of each license, refer to `node_modules/<pkg>/LICENSE` for npm packages, crates.io for Rust crates,
