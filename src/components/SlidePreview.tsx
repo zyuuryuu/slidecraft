@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
-import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, PlaceholderStyle } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, placeholderRole } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
@@ -95,10 +95,27 @@ function renderSegments(segments: InlineSegment[]) {
   });
 }
 
-function renderParagraph(para: Paragraph, idx: number, bulletChar: string) {
+// Nested-bullet indent step (#103), in points — scaled the same way font sizes are (pt × scale/72) so
+// it stays proportional at every zoom level. ~0.25in/level, matching a typical PowerPoint list indent.
+const NEST_INDENT_PT = 18;
+
+function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number) {
+  const level = para.bullet ? (para.level ?? 0) : 0;
+  // Font size for a nested level: the layout/master's own lvl2-4 style when extractStyle found one,
+  // else its computed step-down fallback (template-loader.nestedFallbackFontSize) — level 0 is
+  // untouched (no override), keeping a flat deck's preview byte-identical to before #103.
+  const nestedSize = level > 0 ? s.levelFontSizes?.[level - 1] : undefined;
   return (
-    <div key={idx} style={{ marginBottom: "0.15em", ...(para.heading ? { fontWeight: "bold" } : {}) }}>
-      {para.bullet && bulletChar && <span style={{ marginRight: "0.4em" }}>{bulletChar}</span>}
+    <div
+      key={idx}
+      style={{
+        marginBottom: "0.15em",
+        ...(level > 0 ? { marginLeft: `${level * NEST_INDENT_PT * (scale / 72)}px` } : {}),
+        ...(nestedSize ? { fontSize: nestedSize * (scale / 72) } : {}),
+        ...(para.heading ? { fontWeight: "bold" } : {}),
+      }}
+    >
+      {para.bullet && s.bulletChar && <span style={{ marginRight: "0.4em" }}>{s.bulletChar}</span>}
       {renderSegments(para.segments)}
     </div>
   );
@@ -588,7 +605,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               lineHeight: 1.3,
             }}
           >
-            {content.paragraphs.map((p, i) => renderParagraph(p, i, s.bulletChar))}
+            {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale))}
           </div>
         );
       })}

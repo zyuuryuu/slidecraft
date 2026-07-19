@@ -11,6 +11,7 @@ import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separator
 import { isTableRow, parseMarkdownTable } from "./md-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type ParseNotice } from "./parse-notice";
+import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 
 /** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line), plus WHERE it
  *  starts and how many lines it consumed — so the caller can tell whether anything besides that
@@ -93,9 +94,14 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
     }
     const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
     if (bulletMatch) {
+      // Nesting depth from the ORIGINAL line's leading whitespace (#103) — clamped to
+      // MAX_NEST_LEVEL rather than dropped (no-silent-drop), 0 stays field-absent (byte-identical
+      // for existing flat decks).
+      const level = levelFromIndent(measureIndent(line));
       paragraphs.push({
         segments: parseInline(bulletMatch[1]),
         bullet: true,
+        ...(level > 0 ? { level } : {}),
       });
     } else {
       paragraphs.push({ segments: parseInline(trimmed) });

@@ -542,3 +542,101 @@ print("hello")
     expect(bodyText).not.toContain("Risk Assessment");
   });
 });
+
+// ── #103: nested bullet lists (indent → Paragraph.level, 0-3) ──
+
+describe("parseMd — nested bullets (#103)", () => {
+  function bulletsOf(md: string) {
+    const deck = parseMd(md);
+    const body = deck.slides[0].placeholders.find((p) => p.idx === "1");
+    return body!.paragraphs.filter((p) => p.bullet);
+  }
+
+  it("2/4/6-space indent → level 1/2/3", () => {
+    const md = `# Title
+
+- Root
+  - Child (2sp)
+    - Grandchild (4sp)
+      - Great-grandchild (6sp)`;
+    const bullets = bulletsOf(md);
+    expect(bullets).toHaveLength(4);
+    expect(bullets[0].level).toBeUndefined(); // level 0 stays field-absent (byte-identical gate)
+    expect(bullets[1].level).toBe(1);
+    expect(bullets[2].level).toBe(2);
+    expect(bullets[3].level).toBe(3);
+  });
+
+  it("8-space indent CLAMPS to level 3 — content survives, not dropped or errored", () => {
+    const md = `# Title
+
+- Root
+        - Eight spaces in`;
+    const bullets = bulletsOf(md);
+    expect(bullets).toHaveLength(2);
+    expect(bullets[1].level).toBe(3);
+    expect(bullets[1].segments[0].text).toBe("Eight spaces in");
+  });
+
+  it("a flat (unindented) bullet deck never gets a level field — byte-identical gate", () => {
+    const md = `# Title
+
+- Item A
+- Item B
+- Item C`;
+    const bullets = bulletsOf(md);
+    expect(bullets.every((p) => p.level === undefined)).toBe(true);
+  });
+});
+
+describe("serializeMd(parseMd(...)) — nested bullets round-trip (#103)", () => {
+  it("a 3-level-deep nested list round-trips through parse → serialize → parse with the SAME levels", () => {
+    const md = `# Title
+
+- Root
+  - Level 1
+    - Level 2
+      - Level 3`;
+    const deck1 = parseMd(md);
+    const roundTripped = serializeMd(deck1);
+    const deck2 = parseMd(roundTripped);
+
+    const levelsOf = (d: typeof deck1) =>
+      d.slides[0].placeholders
+        .find((p) => p.idx === "1")!
+        .paragraphs.filter((p) => p.bullet)
+        .map((p) => p.level ?? 0);
+
+    expect(levelsOf(deck1)).toEqual([0, 1, 2, 3]);
+    expect(levelsOf(deck2)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("an over-indented (clamped) input stabilizes at its rounded form on the NEXT round-trip", () => {
+    // 8 spaces clamps to level 3 on first parse; re-serializing must emit the CANONICAL level-3
+    // indent (6 spaces), which reparses to the same level 3 — no drift on repeated save/load.
+    const md = `# Title
+
+- Root
+        - Clamped to level 3`;
+    const deck1 = parseMd(md);
+    const serialized1 = serializeMd(deck1);
+    const deck2 = parseMd(serialized1);
+    const serialized2 = serializeMd(deck2);
+
+    expect(serialized1).toBe(serialized2); // stable fixpoint after the first round-trip
+    const level = deck2.slides[0].placeholders
+      .find((p) => p.idx === "1")!
+      .paragraphs.find((p) => p.bullet && p.level)!.level;
+    expect(level).toBe(3);
+  });
+
+  it("existing flat bullet decks serialize byte-identically (no leading indent introduced)", () => {
+    const md = `# Title
+
+- Item A
+- Item B`;
+    const deck = parseMd(md);
+    const serialized = serializeMd(deck);
+    expect(serialized).toBe(md.trimEnd() + "\n");
+  });
+});

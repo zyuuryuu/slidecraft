@@ -6,6 +6,7 @@
 
 import type { SlideIR, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { tableToMarkdown } from "./md-table";
+import { indentForLevel } from "./paragraph-nesting";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -49,7 +50,7 @@ export function serializeParagraphs(paragraphs: Paragraph[]): string {
     .map((p) => {
       const text = serializeSegments(p.segments);
       if (p.heading) return `### ${text}`;
-      if (p.bullet) return `- ${text}`;
+      if (p.bullet) return `${indentForLevel(p.level ?? 0)}- ${text}`;
       return text;
     })
     .join("\n");
