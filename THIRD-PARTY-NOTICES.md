@@ -11,11 +11,11 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 
 ## 1. npm 依存（フロントエンド／エンジン／MCP）
 
-本番依存（`--omit=dev`）は **273 コンポーネント**、いずれも permissive ライセンス：
+本番依存（`--omit=dev`）は **275 コンポーネント**、いずれも permissive ライセンス：
 
 | ライセンス | 数 |
 | --- | --- |
-| MIT | 209 |
+| MIT | 211 |
 | ISC | 39 |
 | BSD-3-Clause | 8 |
 | Apache-2.0 | 7 |
@@ -25,7 +25,7 @@ SlideCraft（Apache-2.0）は以下の第三者コンポーネントを利用・
 | BSD-2-Clause | 1 |
 | MPL-2.0 OR Apache-2.0（Apache-2.0 を選択） | 1 |
 
-主な直接依存：`react` / `react-dom`（MIT）・`@modelcontextprotocol/sdk`（MIT）・`@anthropic-ai/sdk`・`openai`（Apache-2.0）・`mermaid`（MIT）・`pptxgenjs`（MIT）・`jszip`（MIT or GPLv3 → MIT を選択）・`js-yaml`（MIT）・`zod`（MIT）・`@codemirror/*`（MIT）・`tailwindcss`（MIT）・`@tauri-apps/*`（MIT/Apache-2.0）。
+主な直接依存：`react` / `react-dom`（MIT）・`@modelcontextprotocol/sdk`（MIT）・`@anthropic-ai/sdk`・`openai`（Apache-2.0）・`mermaid`（MIT）・`pptxgenjs`（MIT）・`jszip`（MIT or GPLv3 → MIT を選択）・`js-yaml`（MIT）・`zod`（MIT）・`@codemirror/*`（MIT）・`tailwindcss`（MIT）・`@tauri-apps/*`（MIT/Apache-2.0）・`harfbuzzjs`（MIT — HarfBuzz `hb-subset` の WASM ビルド、実行時 CJK フォントサブセット化、#193）・`wawoff2`（MIT — WASM 版 WOFF2 エンコーダ/デコーダ、#193）。
 
 - 完全な依存リスト（バージョン・ライセンス付き）は **`npm run sbom`**（CycloneDX SBOM＝`sbom-npm.cdx.json`）で生成できる。
 - Apache-2.0 の npm コンポーネント（7件）に付属する NOTICE は、その配布物内の NOTICE として本ファイルが代替再現する。
