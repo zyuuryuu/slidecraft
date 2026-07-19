@@ -51,6 +51,17 @@ export function packParagraphs(paragraphs: Paragraph[], box: FitBox): Paragraph[
   return chunks.length > 0 ? chunks : [paragraphs];
 }
 
+/** The slide's single text body among its placeholders — the shape splitSlideToFit acts on
+ *  (diagrams/mermaid/multi-body slides have none). Exported so a dry-run read (get_slide's
+ *  predictedSplit/capacity, #149) can measure the SAME body splitSlideToFit would split,
+ *  without re-deriving which placeholder that is. */
+export function soleBodyPlaceholder(slide: SlideIR) {
+  if (slide.diagram || slide.mermaidBlock) return undefined;
+  const hasCtrTitle = slide.placeholders.some((p) => p.idx === "0");
+  const bodies = slide.placeholders.filter((p) => slideIdxRole(p.idx, hasCtrTitle) === "body");
+  return bodies.length === 1 ? bodies[0] : undefined;
+}
+
 /**
  * Split a content slide whose single body overflows `box` into multiple slides,
  * repeating the title/meta on each. Returns [slide] unchanged when it fits, or
@@ -58,15 +69,10 @@ export function packParagraphs(paragraphs: Paragraph[], box: FitBox): Paragraph[
  * multi-body/column slides are left to other levers).
  */
 export function splitSlideToFit(slide: SlideIR, box: FitBox): SlideIR[] {
-  if (slide.diagram || slide.mermaidBlock) return [slide];
+  const body = soleBodyPlaceholder(slide);
+  if (!body) return [slide];
 
   const hasCtrTitle = slide.placeholders.some((p) => p.idx === "0");
-  const bodies = slide.placeholders.filter(
-    (p) => slideIdxRole(p.idx, hasCtrTitle) === "body",
-  );
-  if (bodies.length !== 1) return [slide];
-
-  const body = bodies[0];
   const chunks = packParagraphs(body.paragraphs, box);
   if (chunks.length <= 1) return [slide];
 
@@ -89,6 +95,19 @@ export function splitSlideToFit(slide: SlideIR, box: FitBox): SlideIR[] {
     sourceLineStart: undefined,
     sourceLineEnd: undefined,
   }));
+}
+
+/** Dry-run of splitSlideToFit (#149): how many slides `slide` WOULD become in `box`, and how
+ *  many paragraphs land in each, WITHOUT mutating anything. Calls splitSlideToFit itself — the
+ *  exact function split_overflowing_slides runs — so the prediction can never drift from the
+ *  actual split (R8). undefined when the slide doesn't split (fits, or isn't a plain
+ *  single-body content slide). */
+export function predictSplit(slide: SlideIR, box: FitBox): { chunks: number; boundaries: number[] } | undefined {
+  const parts = splitSlideToFit(slide, box);
+  if (parts.length <= 1) return undefined;
+  const bodyIdx = soleBodyPlaceholder(slide)?.idx;
+  const boundaries = parts.map((p) => p.placeholders.find((ph) => ph.idx === bodyIdx)?.paragraphs.length ?? 0);
+  return { chunks: parts.length, boundaries };
 }
 
 /** Append a marker segment to the title's last paragraph (provisional split title). */
