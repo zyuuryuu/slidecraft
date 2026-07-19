@@ -300,6 +300,22 @@ describe("serializeMd — 章扉の再掲は md に漏れない (#167)", () => {
     expect(round).not.toContain("2. 解決策");
     expect((round.match(/<!-- section -->/g) ?? []).length).toBe(3);
   });
+
+  it("materialize 済みデッキでも再掲は <!-- section --> タグ＋タイトルのみに畳まれる（内容を書き戻さない）", () => {
+    const round = serializeMd(materializeDerivedSlides(parseMd(MD3)));
+    expect(round).not.toContain("1. 現状分析");
+    expect(round).not.toContain("2. 解決策");
+    expect(round).not.toContain(SECTION_NAV_LIST_LAYOUT);
+    expect((round.match(/<!-- section -->/g) ?? []).length).toBe(3);
+  });
+
+  it("著者が SectionNav.1TitleList.Single を明示ピンし自分で本文を書いた章扉は、fold の対象外（no-silent-drop）", () => {
+    // レビュー指摘の repro: layout 名の一致だけで fold すると、著者の pin と自書き本文が全損する。
+    const md = `<!-- section -->\n<!-- slide: ${SECTION_NAV_LIST_LAYOUT} -->\n# 第 1 部\n\n- 著者自身の本文\n`;
+    const round = serializeMd(parseMd(md));
+    expect(round).toContain(`<!-- slide: ${SECTION_NAV_LIST_LAYOUT} -->`);
+    expect(round).toContain("著者自身の本文");
+  });
 });
 
 describe("generatePptx — 章扉の全章リスト再掲が PPTX に出力される (#167)", () => {
