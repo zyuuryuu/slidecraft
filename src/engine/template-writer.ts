@@ -140,7 +140,7 @@ const emptySpTreeHeader =
 
 // bodyStyle lvl1 の既定バレット（#137: 箇条書きが本文と区別できない = master に buChar/buAutoNum が
 // 無いのが根本原因）。段落間スペーシングも合わせて焼き、長文箇条書きが「壁テキスト」に見えるのを防ぐ。
-const BODY_BULLET_PPR =
+export const BODY_BULLET_PPR =
   `<a:spcBef><a:spcPts val="600"/></a:spcBef>` +
   `<a:buFont typeface="Arial" pitchFamily="34" charset="0"/><a:buChar char="•"/>`;
 

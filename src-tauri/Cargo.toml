@@ -25,7 +25,7 @@ sha2 = "0.10"
 # when no backend is present the commands error and the webview falls back to localStorage.
 keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 # Host capability probe (total RAM) to pick the default model tier by environment (ADR: 環境適応既定モデル).
-sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 
 # Desktop-only: route a warm double-click of a `.scft` into the running instance instead of
 # spawning a duplicate app (ADR-0024). init-only (no webview command → no capability entry).

@@ -8,7 +8,7 @@ import { computeLayout } from "../src/engine/layout-engine";
 import { renderDiagramToSvg } from "../src/engine/svg-writer";
 import { mermaidToDiagramSpec } from "../src/engine/mermaid-to-diagram";
 import { parseMd } from "../src/engine/md-parser";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const SPEC = DiagramSpecSchema.parse({
   type: "flowchart",

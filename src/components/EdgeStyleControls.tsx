@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import * as yaml from "js-yaml";
+import { loadYaml } from "../engine/yaml-io";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 
 interface RawEdge {
@@ -32,7 +32,7 @@ export default function EdgeStyleControls({
 
   let edges: RawEdge[];
   try {
-    edges = ((yaml.load(diagramYaml) ?? {}) as RawDiagram).edges ?? [];
+    edges = ((loadYaml(diagramYaml) ?? {}) as RawDiagram).edges ?? [];
   } catch {
     return null;
   }
@@ -48,7 +48,7 @@ export default function EdgeStyleControls({
 
   const patch = (p: Record<string, unknown>) => {
     try {
-      const obj = (yaml.load(diagramYaml) ?? {}) as RawDiagram;
+      const obj = (loadYaml(diagramYaml) ?? {}) as RawDiagram;
       const edge = obj.edges?.[idx];
       if (!edge) return;
       const next: Record<string, unknown> = { ...(edge.style ?? {}), ...p };

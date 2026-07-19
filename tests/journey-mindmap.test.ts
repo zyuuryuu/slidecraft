@@ -9,7 +9,7 @@ import { mermaidToDiagramSpec } from "../src/engine/mermaid-to-diagram";
 import { diagramSpecToMermaid, canSerializeToMermaid } from "../src/engine/diagram-serialize";
 import { renderDiagramToSvg } from "../src/engine/svg-writer";
 import { parseMd } from "../src/engine/md-parser";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const JOURNEY = `journey
   title 一日の業務
