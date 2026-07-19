@@ -17,7 +17,7 @@
 
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
-import { isTitleNamespace, META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
@@ -114,18 +114,27 @@ function serializeSlide(
   return lines.join("\n");
 }
 
-/** The historical (template-less) readout: namespace from the layout NAME + meta presence. Kept
+/** The historical (template-less) readout: namespace from the slide's OWN placeholder idxs. Kept
  *  byte-for-byte for callers without a SerializeTemplate, and for grouped slides (stage E). */
 function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void {
-  // Choose the namespace with the SAME rule the parser uses (slide-roles): a Title/Closing layout OR
-  // the presence of meta placeholders means the title/subtitle live at idx 0/1 (else 15/16). Deriving
-  // this from isTitleNamespace (not the layout name alone) round-trips an auto-layout slide that carries
-  // Category/Date/Footer — otherwise its title + meta would be read from the empty content idxs and lost.
+  // Choose the namespace from the placeholders the slide ACTUALLY carries — the same idx a title-only
+  // slide was written into at parse time (md-slide-parser: isTitleNamespace(rawLayout, hasMeta), where
+  // rawLayout is "auto" for an undirected slide) — never from the RESOLVED layout name used here. The
+  // two can diverge: autoSelectLayout may resolve an "auto" title-only slide to a Title/Closing name
+  // (no catalog to say otherwise) while the parser, seeing the un-resolved "auto", filed it under the
+  // CONTENT namespace (idx 15) — reading idx 0 then finds nothing and the title vanishes (#183, the
+  // template-less residue of #144). Checking the real idx instead makes the readout immune to whatever
+  // autoSelectLayout resolves the name to.
+  // idx "0" (title) and the meta idxs are UNAMBIGUOUSLY title-namespace-only slots — unlike idx "1",
+  // which doubles as the title namespace's subtitle AND the content namespace's body, so it can't be
+  // used as a namespace signal (a content slide's bulleted body at idx 1 would false-positive as a
+  // title-namespace subtitle).
+  const hasMeta = META_IDXS.some((idx) => getPlaceholderText(slide, idx));
+  const hasTitleNsContent = hasMeta || !!getPlaceholderText(slide, TITLE_NS.title);
   // A grouped slide (card/step/kpi) is NEVER a title slide — even if autoSelectLayout resolves it to a
   // Title layout — so it must not take the title branch (which would read the title from the empty
   // title-namespace idx and drop the columns + groupKind). Gate the title branch on !groupKind.
-  const hasMeta = META_IDXS.some((idx) => getPlaceholderText(slide, idx));
-  if (!slide.groupKind && isTitleNamespace(layout, hasMeta)) {
+  if (!slide.groupKind && hasTitleNsContent) {
     // Title namespace: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = meta fields.
     const title = getPlaceholderText(slide, TITLE_NS.title);
     const subtitle = getPlaceholderText(slide, TITLE_NS.subtitle);
