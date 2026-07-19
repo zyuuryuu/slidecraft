@@ -197,3 +197,31 @@ describe("autoSelectLayout", () => {
     expect(autoSelectLayout(slide, 1, 5)).toMatch(/^Content\./);
   });
 });
+
+// #192 / #115-a: <a:ea> (East-Asian typeface) extraction, wired through to PlaceholderStyle so the
+// CJK fallback stack (font-stack.ts) knows the template's declared JP brand font.
+describe("<a:ea> (East-Asian typeface) extraction", () => {
+  it("a real corporate template's layout placeholder carries its declared ea typeface", async () => {
+    const corp = await loadTemplate(
+      readFileSync(resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx")),
+    );
+    const l1 = corp.layouts.find((l) => l.index === 1)!; // Title.1Title.Single
+    // idx 14 ("メタ情報（日付・部署・作成者）") declares <a:latin typeface="Yu Gothic"/>
+    // <a:ea typeface="Yu Gothic"/> explicitly in its lstStyle lvl1 defRPr.
+    const meta = l1.placeholders.find((p) => p.idx === "14")!;
+    expect(meta.style.eaFontName).toBe("Yu Gothic");
+  });
+
+  it("never leaks an unresolved theme reference (+mj-ea/+mn-ea) as a literal ea font name", async () => {
+    // This template's <p:titleStyle>/<p:bodyStyle> declare <a:ea typeface="+mj-ea"/>/"+mn-ea"
+    // (PowerPoint's own default authoring convention) — unlike <a:latin> (an existing, separately
+    // tested raw-token contract — see master-remake.test.ts "theme-font token resolution"),
+    // eaFontName is a NEW field feeding straight into cjkFontFamily's font-family CSS, so it must
+    // never surface the raw "+mj-ea"/"+mn-ea" token.
+    const corp = await loadTemplate(
+      readFileSync(resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx")),
+    );
+    expect(corp.masterTitleStyle.eaFontName?.startsWith("+")).not.toBe(true);
+    expect(corp.masterBodyStyle.eaFontName?.startsWith("+")).not.toBe(true);
+  });
+});
