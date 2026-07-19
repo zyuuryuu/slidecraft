@@ -84,6 +84,27 @@ Revenue`;
     expect(deck.slides[0].layout).toBe("KPI.3Value.Equal");
   });
 
+  // ── CRLF normalization (#164) ──
+  // Windows 由来の CRLF Markdown で layout pin が無効化され、ディレクティブ行が
+  // 本文（idx=1）に印字されてしまう既存バグの回帰テスト。
+
+  it("respects <!-- slide: --> layout directive under CRLF line endings", () => {
+    const md = "<!-- slide: Content.X -->\r\n# T\r\n\r\nbody\r\n";
+    const deck = parseMd(md);
+    expect(deck.slides[0].layout).toBe("Content.X");
+
+    const body1 = deck.slides[0].placeholders.find((p) => p.idx === "1");
+    const bodyText = JSON.stringify(body1);
+    expect(bodyText).not.toContain("slide:");
+    expect(bodyText).not.toContain("-->");
+  });
+
+  it("produces byte-identical slides for CRLF vs LF input with a layout directive", () => {
+    const lf = "<!-- slide: Content.X -->\n# T\n\nbody\n";
+    const crlf = lf.replace(/\n/g, "\r\n");
+    expect(parseMd(crlf)).toEqual(parseMd(lf));
+  });
+
   // ── Front matter ──
 
   it("parses YAML front matter for template", () => {
@@ -93,6 +114,13 @@ template: MyTemplate.pptx
 
 # Title`;
 
+    const deck = parseMd(md);
+    expect(deck.template).toBe("MyTemplate.pptx");
+    expect(deck.slides).toHaveLength(1);
+  });
+
+  it("parses YAML front matter under CRLF line endings (#164)", () => {
+    const md = "---\r\ntemplate: MyTemplate.pptx\r\n---\r\n\r\n# Title";
     const deck = parseMd(md);
     expect(deck.template).toBe("MyTemplate.pptx");
     expect(deck.slides).toHaveLength(1);
