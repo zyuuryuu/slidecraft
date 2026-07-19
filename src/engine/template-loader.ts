@@ -13,7 +13,7 @@ import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle,
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
-import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, arcToSvg } from "./ooxml-geom";
+import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg } from "./ooxml-geom";
 
 // ── Types ──
 
@@ -309,7 +309,7 @@ function extractMasterPlaceholderGeometry(masterXml: string, theme: Record<strin
 
 // ── Extract style from shape XML, merging with master defaults ──
 
-function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>, masterGeom: Record<string, Geom>): PlaceholderStyle {
+function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterStyle, theme: Record<string, string>, masterGeom: Record<string, Geom>, xf: Xf = IDENTITY_XF): PlaceholderStyle {
   // Determine if this is a title-type placeholder
   const phType = sp.match(/<p:ph[^>]*type="(\w+)"/)?.[1] || "body";
   const isTitle = phType === "ctrTitle" || phType === "title";
@@ -344,11 +344,18 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   const shapeBuChar = buScope.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
   const bulletChar = shapeBuChar ?? (/<a:buNone\s*\/>/.test(buScope) ? "" : isTitle ? "" : master.bulletChar);
 
+  // Own xfrm → composed through `xf` (identity for a top-level shape; a group's composed child→slide
+  // transform when this shape sits inside a `<p:grpSp>` — see walkStaticTexts). Inherited master
+  // geometry is already slide-space (masters don't nest in groups), so it bypasses `xf`.
+  const geom = offMatch && extMatch
+    ? transformRect(xf, +offMatch[1], +offMatch[2], +extMatch[1], +extMatch[2])
+    : { x: inh?.x ?? 0, y: inh?.y ?? 0, w: inh?.w ?? 0, h: inh?.h ?? 0 };
+
   return {
-    x: offMatch ? emuToInch(offMatch[1]) : (inh?.x ?? 0),
-    y: offMatch ? emuToInch(offMatch[2]) : (inh?.y ?? 0),
-    w: extMatch ? emuToInch(extMatch[1]) : (inh?.w ?? 0),
-    h: extMatch ? emuToInch(extMatch[2]) : (inh?.h ?? 0),
+    x: geom.x,
+    y: geom.y,
+    w: geom.w,
+    h: geom.h,
     fontSize: szMatch ? parseInt(szMatch[1]) / 100 : (inh?.fontSize ?? master.fontSize),
     fontColor: textColor ?? inh?.fontColor ?? master.fontColor,
     fontName: fontMatch ? fontMatch[1] : master.fontName,
@@ -472,7 +479,7 @@ function walkShapes(xml: string, theme: Record<string, string>, xf: Xf, out: Dec
     const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
     const gx = parseGroupXf(grpSpPr);
     if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
-    walkShapes(grp.replace(grpSpPr, ""), theme, composeXf(xf, gx), out); // children minus the group's own xfrm
+    walkShapes(groupChildren(grp, grpSpPr), theme, composeXf(xf, gx), out); // children minus the group's own wrapper+xfrm
   }
   for (const sp of rest.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) { const d = spToDeco(sp, theme, xf); if (d) out.push(d); }
   for (const cx of rest.match(/<p:cxnSp>[\s\S]*?<\/p:cxnSp>/g) || []) { const d = cxnToDeco(cx, theme, xf); if (d) out.push(d); }
@@ -506,6 +513,37 @@ async function extractImages(xml: string, relsXml: string, relDir: string, zip: 
   return out;
 }
 
+/** Walk shapes at one nesting level collecting static (non-placeholder) TEXT shapes, recursing into
+ *  each `<p:grpSp>` with its composed child→slide transform — the SAME recursion/composeXf rule as
+ *  `walkShapes` (#142; R8: one shared composition rule, not duplicated), so a heading inside a scaled
+ *  group lands at its real slide geometry instead of its raw child-space coords. `xf` only ever
+ *  affects position/size (via extractStyle's `transformRect`); font size is untouched — PowerPoint
+ *  itself does not scale a group child's font with the group's box. */
+function walkStaticTexts(
+  xml: string,
+  masterTitle: MasterStyle,
+  masterBody: MasterStyle,
+  theme: Record<string, string>,
+  masterGeom: Record<string, Geom>,
+  xf: Xf,
+  out: StaticText[],
+): void {
+  let rest = xml;
+  for (const grp of topLevelBlocks(xml, "p:grpSp")) {
+    rest = rest.replace(grp, "");
+    const grpSpPr = grp.match(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/)?.[0] ?? "";
+    const gx = parseGroupXf(grpSpPr);
+    if (!gx) continue; // no child coordinate system → can't place its children reliably; skip
+    walkStaticTexts(groupChildren(grp, grpSpPr), masterTitle, masterBody, theme, masterGeom, composeXf(xf, gx), out);
+  }
+  for (const sp of rest.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
+    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
+    const text = (sp.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((m) => m.replace(/<\/?a:t>/g, "")).join("");
+    if (!text.trim()) continue; // a pure fill shape (no text) is a decoration, not static text
+    out.push({ text, style: extractStyle(sp, masterTitle, masterBody, theme, masterGeom, xf) });
+  }
+}
+
 /** Non-placeholder shapes that carry TEXT (design labels like a cover's "日付 / 部署 / 作成者").
  *  Their box + font resolve through the SAME extractStyle as placeholders (so inherited geometry/
  *  font/color work), and the text is the concatenated runs. */
@@ -516,14 +554,8 @@ function extractStaticTexts(
   theme: Record<string, string>,
   masterGeom: Record<string, Geom>,
 ): StaticText[] {
-  const normalized = normalizeNs(layoutXml);
   const out: StaticText[] = [];
-  for (const sp of normalized.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
-    if (sp.includes("<p:ph")) continue; // placeholders are rendered separately
-    const text = (sp.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((m) => m.replace(/<\/?a:t>/g, "")).join("");
-    if (!text.trim()) continue; // a pure fill shape (no text) is a decoration, not static text
-    out.push({ text, style: extractStyle(sp, masterTitle, masterBody, theme, masterGeom) });
-  }
+  walkStaticTexts(normalizeNs(layoutXml), masterTitle, masterBody, theme, masterGeom, IDENTITY_XF, out);
   return out;
 }
 
