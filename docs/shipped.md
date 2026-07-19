@@ -4,6 +4,10 @@
 
 ## 基盤・アーキテクチャ
 
+- **変換レポートの完成＝パース時フォールバックの計上** — 無言で起きていた4種（2つ目以降の表で周辺本文ごと破棄＝issue 記載より広い既存バグを発見・2枚目以降の画像・非認識メタキーの本文化・distill 自動分割）を `get_deck_issues` に計上。パーサしか見えない drop は ParseNotice 側路（`parse-notice.ts` に判定を一本化＝R8）、再構成可能なものは deck-diagnostics 側（R2）、分割は `offsets` ベースで原スライド単位に正確に報告。DeckIR は byte-identical （#148・PR #197・2026-07-19）
+- **章扉の全章リスト再掲＋現在章強調（ADR-0032 D2 段階3）** — `SectionNav.1TitleList.Single` レイアウト新設（テンプレはスクリプトから byte 再現可能に再生成）＋ `materializeDerivedSlides` 拡張。serializer は idx-1 が導出結果と深い一致の時のみ畳む（著者 pin＋自書き本文は no-silent-drop で保全＝レビューで是正） （#167・PR #191・2026-07-19）
+- **フッタ章名の伝播（ADR-0032 D2 段階4）** — content スライドの ftr 枠へ所属章名を自動注入。導出は純関数 `sectionFooterFor` 一本を PPTX/プレビュー/HTML の全消費点が共有（R8）・DeckIR に状態を持たないため serializer 対応自体が不要。明示 `Footer:` 優先・section 無しデッキ byte-identical （#168・PR #190・2026-07-19）
+- **保守性ゲートの運用整備** — arch-census（G3・churn×行数 hotspot＋jscpd コピペ率の非 fail 傾向観測スクリプト）＋ ADR 索引ドリフト是正（0019–0028 の10件補完） （#158/#130・PR #174/#172・2026-07-19）
 - **CRLF 入力の正規化（layout pin 無効化の根治）** — Windows 由来の CRLF Markdown で `<!-- slide: -->` layout pin が無効化されディレクティブ行が本文に印字される既存バグを、`parseMd` 入口の CRLF→LF 正規化（行数不変＝sourceLine 非影響）で根治。front-matter の raw 行照合も同時に救済、LF 入力は `toEqual` 同値で不変を担保 （#164・PR #187・2026-07-19）
 - **`<!-- section -->` 章タグ＋採番＋ `<!-- toc -->` 導出目次（乖離しない目次）** — 章扉は著者が書く普通のスライド（章名は `#` 見出しのまま）＋タグで章境界を宣言し、章番号と目次を `scanSections` 単一関数から毎回導出（`deck-sections.ts`・R2/R8）。消費 3 点（PPTX/HTML/プレビュー）とも同一の materialize を通り、md へは `<!-- toc -->` 1 行のみ書き戻す＝目次と本文の乖離が構造的に起きない。宣言なしデッキは同一参照素通り。段階 3/4（アジェンダ再掲・フッタ章名）は #167/#168 （ADR-0032・#151・PR #182・2026-07-19）
 - **スピーカーノート記法 `<!-- note -->`（ブリーフィング型の土台）** — マーカー以降スライド末尾までを素の Markdown のノートとして `SlideIR.notes` へ取り込み、PPTX notesSlide/notesMaster 生成・HTML の `n` キートグル・distill 分割は先頭チャンクのみ・MCP `get_slide` 露出まで配線。ノート無しデッキの出力不変（PPTX パート不生成・HTML byte-identical）を構造的に担保。「スライドは疎に・詳細はノートへ」が成立 （ADR-0032・#150・PR #176・2026-07-19）
@@ -68,6 +72,7 @@
 
 ## HTML・描画
 
+- **CJK フォールバックスタック＋ea フォントの描画配線（#115 その1）** — 素の `fontName, sans-serif` 単発だった preview/SVG の font-family を、`<a:ea>` 抽出値の `PlaceholderStyle` 配線＋ゴシック/明朝分類つきフォールバック連鎖（`font-stack.ts` に一本化・SlideCard/svg-writer 両消費＝R8）に。未解決テーマ参照 `+mj-ea` はソース側でガード。PPTX 出力非影響。後続は #193（実行時サブセット化）→ #194（@font-face 埋め込み） （#192・PR #196・2026-07-19）
 - **表の列幅内容比例化＋数値列右寄せ＋プレビュー折り返し** — `table-ooxml` の均等割り列幅を、新設 `table-layout.ts`（CJK=2 換算の最大セル幅重み・[8%,50%] クランプ・EMU 合計厳密一致）による内容比例に置換し、数値列（¥/％/桁区切り対応）へ `algn="r"`。プレビューは同一関数から `<colgroup>` を導出し nowrap/hidden を撤廃して折り返し表示（export と一致することをテストで検証＝R8） （#138/#139・PR #178・2026-07-19）
 - **プレビュー/HTML の背景画像・グラデ・図形グラデ描画（A1/A2/A3）** — レイアウト/マスターの `<p:bg>` 画像塗り(blipFill)・グラデ塗り(gradFill) を全面描画、`<p:pic>` の非web主 blip（EMF/WMF/wdp）を `svgBlip`(SVG) へフォールバック、装飾図形の `gradFill` を CSS グラデで描画。純粋 `ooxml-fill.ts` に集約（プレビュー＋HTML 共有・PPTX/golden 非影響）。実 HTML レンダで確認 （他AIレポート＋敵対検証・2026-07-07）
 - **プレビュー/HTML のグループ図形・custGeom 弧の描画** — `<p:grpSp>` の子図形を chOff/chExt→off/ext の座標変換（＋ネスト合成）で正しい位置に描画（従来は child-space 座標で誤配置・velis の 26 グループ）、custGeom の `arcTo` セグメントを SVG 楕円弧に変換。純粋 `ooxml-geom.ts`（プレビュー/HTML 限定・PPTX 非影響）。velis 実レンダ＋純粋/実フィクスチャテストで確認 （2026-07-07）
