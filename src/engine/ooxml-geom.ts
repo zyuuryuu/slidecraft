@@ -41,6 +41,19 @@ export function transformRect(xf: Xf, xEmu: number, yEmu: number, cxEmu: number,
   };
 }
 
+/** The children of a `<p:grpSp>` block (as returned by `topLevelBlocks`), with the group's OWN
+ *  opening/closing wrapper tags and its `<p:grpSpPr>` (own xfrm, not a child) stripped. Recursing on
+ *  `grpBlock` itself (minus only grpSpPr) left the outer `<p:grpSp>…</p:grpSp>` wrapper intact, so the
+ *  very next `topLevelBlocks` call re-matched the whole block as if it were its own nested child group
+ *  — with grpSpPr already gone, `parseGroupXf` failed on it and the ENTIRE group's contents (every
+ *  real child) were silently dropped. This is why group recursion must strip the wrapper before the
+ *  caller recurses (#142). */
+export function groupChildren(grpBlock: string, grpSpPr: string): string {
+  const openEnd = grpBlock.indexOf(">") + 1;
+  const closeStart = grpBlock.lastIndexOf("</p:grpSp>");
+  return grpBlock.slice(openEnd, closeStart).replace(grpSpPr, "");
+}
+
 /** The top-level `<tag>…</tag>` blocks in `xml`, matched with DEPTH counting so a same-tag nested
  *  inside another (a group within a group) is captured as ONE outer block — a lazy regex would
  *  mis-split it at the first inner close tag. */

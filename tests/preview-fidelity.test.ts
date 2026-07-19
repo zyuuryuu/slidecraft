@@ -102,9 +102,10 @@ describe("preview fidelity: layout background + decorations", () => {
   });
 
   it("keeps ONLY real solid-filled panels on the canonical master (no text-box ghosts)", () => {
-    // 29 real spPr-solidFill panels; the 68 noFill text boxes must be dropped (were ghosted before).
+    // 29 real spPr-solidFill panels + 2 more (BG/AccentBar) on SectionNav.1TitleList.Single (#167);
+    // the 68 noFill text boxes must be dropped (were ghosted before).
     const total = canon.layouts.reduce((n, l) => n + l.decorations.length, 0);
-    expect(total).toBe(29);
+    expect(total).toBe(31);
     // the signature navy panel color is still present.
     expect(canon.layouts.some((l) => l.decorations.some((d) => d.color === "1E2761"))).toBe(true);
   });

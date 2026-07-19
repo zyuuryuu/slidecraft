@@ -41,6 +41,7 @@ export const LAYOUT_NAMES = [
   "Summary.2Block.Equal",
   "Closing.1Message.Single",
   "Closing.1Steps.Single+1Notes",
+  "SectionNav.1TitleList.Single",
 ] as const;
 
 export type LayoutName = (typeof LAYOUT_NAMES)[number];
@@ -61,6 +62,9 @@ export const ParagraphSchema = z.object({
   segments: z.array(InlineSegmentSchema).min(1),
   bullet: z.boolean().optional(),
   heading: z.boolean().optional(), // a `### …` group heading (card/step) — the group's title line
+  // Nested-bullet depth (#103): 0-3, omitted = 0 (flat — existing decks stay byte-identical since
+  // the field is simply absent). Only meaningful on a `bullet` paragraph.
+  level: z.number().int().min(0).max(3).optional(),
 });
 
 export type Paragraph = z.infer<typeof ParagraphSchema>;
@@ -162,6 +166,9 @@ export const SlideIRSchema = z.object({
   code: CodeBlockSchema.optional(), // embedded code/log (```lang fence → monospace body)
   image: ImageBlockSchema.optional(), // embedded image (![alt](data URI) → <img> / PPTX pic)
   groupKind: z.enum(["card", "step", "kpi"]).optional(), // `<!-- card/step/kpi -->` groups → layout hint
+  notes: z.array(ParagraphSchema).optional(), // `<!-- note -->` 以降のスピーカーノート（ADR-0032 D1、R4 承認済み）
+  sectionBreak: z.boolean().optional(), // `<!-- section -->` 章境界の宣言（ADR-0032 D2、R4 承認済み）— 章一覧は毎回スキャン導出（R8）
+  derived: z.literal("toc").optional(), // `<!-- toc -->` 派生スライド。内容は常に再導出し md へはマーカー 1 行のみ書き戻す
   sourceLineStart: z.number().optional(), // for editor↔preview linking
   sourceLineEnd: z.number().optional(),
 });

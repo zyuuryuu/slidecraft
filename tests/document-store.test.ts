@@ -89,6 +89,31 @@ describe("documentReducer — document collection + ISOLATION", () => {
     expect(s.activeId).toBe("b");
   });
 
+  it("initSnapshot (Initialize snapshot) is per-doc — switching docs never leaks doc A's snapshot into doc B (#160)", () => {
+    // doc A opens Initialize: snapshot = its own deck.
+    let s = documentReducer(one(), setDeck(deck(1), "commit")); // doc a → deck1
+    s = documentReducer(s, { type: "patchActiveFn", fn: () => ({ subMode: "import", initSnapshot: deck(1) }) });
+    expect(byId(s, "a").initSnapshot).toEqual(deck(1));
+
+    // A file-open activates doc B in the background, then switches to it (repro step 2).
+    s = documentReducer(s, {
+      type: "newDoc",
+      doc: makeDoc({ id: "b", history: { past: [], present: deck(2), future: [], lastTs: 0 } }),
+      activate: true,
+    });
+    expect(byId(s, "b").initSnapshot ?? null).toBeNull(); // doc B starts with NO snapshot of its own
+
+    // doc B enters Initialize too: its OWN snapshot, independent of A's.
+    s = documentReducer(s, { type: "patchActiveFn", fn: () => ({ subMode: "import", initSnapshot: deck(2) }) });
+    expect(byId(s, "b").initSnapshot).toEqual(deck(2));
+
+    // Switch back to A (still "import", still frozen from step 1) — A's snapshot must be UNCHANGED
+    // by anything that happened to B (this is exactly the cross-doc leak #160 reports).
+    s = documentReducer(s, { type: "switchDoc", id: "a" });
+    expect(byId(s, "a").subMode).toBe("import");
+    expect(byId(s, "a").initSnapshot).toEqual(deck(1)); // NOT deck(2)
+  });
+
   it("switchDoc changes the active doc; closeDoc removes it and reactivates a neighbor; the last doc is never closed", () => {
     let s: Store = { docs: [makeDoc({ id: "a" }), makeDoc({ id: "b" }), makeDoc({ id: "c" })], activeId: "c" };
     s = documentReducer(s, { type: "switchDoc", id: "a" });

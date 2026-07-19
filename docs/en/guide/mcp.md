@@ -161,7 +161,7 @@ while `class` / `state` / `ER` / `mindmap` go in ` ```mermaid `. See [Diagrams](
 
 | Tool | Role |
 |---|---|
-| `get_slide(index)` | A **structured read** of one slide (resolved layout, presence of a diagram, bullet count, budget, that slide's issues, Markdown). One call is enough to plan an edit |
+| `get_slide(index)` | A **structured read** of one slide (resolved layout, presence of a diagram, bullet count, budget, capacity — measured body usage, predictedSplit — a split dry-run, that slide's issues, Markdown). One call is enough to plan an edit |
 | `get_slide_markdown(index)` | The raw Markdown of one slide (layout already resolved) |
 | `set_slide_markdown(index, markdown)` | Replaces one slide (diagrams/mermaid are auto-preserved, validated, and invalid input is never-silent rejected) |
 | `set_slide_diagram(index, source, format, ...)` | Sets a diagram from DiagramSpec/Mermaid. Replaces an existing diagram, or adds to the body area on a text slide |

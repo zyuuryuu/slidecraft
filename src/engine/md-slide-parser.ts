@@ -10,13 +10,17 @@ import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { isTableRow, parseMarkdownTable } from "./md-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type ParseNotice } from "./parse-notice";
+import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 
-/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line). */
-function findTableInLines(lines: string[]): string[][] | null {
+/** Find the first GFM table anywhere in `lines` (a `| … |` row + a `|---|` line), plus WHERE it
+ *  starts and how many lines it consumed — so the caller can tell whether anything besides that
+ *  table (leading prose, a 2nd table, trailing prose) is left over in `lines`. */
+function findTableInLines(lines: string[]): { rows: string[][]; start: number; consumed: number } | null {
   for (let i = 0; i + 1 < lines.length; i++) {
     if (isTableRow(lines[i])) {
       const parsed = parseMarkdownTable(lines.slice(i));
-      if (parsed) return parsed.rows;
+      if (parsed) return { rows: parsed.rows, start: i, consumed: parsed.consumed };
     }
   }
   return null;
@@ -90,9 +94,14 @@ function linesToParagraphs(lines: string[]): Paragraph[] {
     }
     const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
     if (bulletMatch) {
+      // Nesting depth from the ORIGINAL line's leading whitespace (#103) — clamped to
+      // MAX_NEST_LEVEL rather than dropped (no-silent-drop), 0 stays field-absent (byte-identical
+      // for existing flat decks).
+      const level = levelFromIndent(measureIndent(line));
       paragraphs.push({
         segments: parseInline(bulletMatch[1]),
         bullet: true,
+        ...(level > 0 ? { level } : {}),
       });
     } else {
       paragraphs.push({ segments: parseInline(trimmed) });
@@ -154,12 +163,131 @@ function matchImageLine(trimmed: string): ImageBlock | null {
   return { src: m[2], alt: m[1], placeholderIdx: "1", ...parseImageAttrs(m[3]) };
 }
 
+// ── Comment-only line stripping (#147) ──
+
+/** A line that is NOTHING but comments — one or more complete `<!-- … -->` units
+ *  (optionally whitespace-separated), plus the WHATWG abrupt-close forms `<!-->` /
+ *  `<!--->`. All render as nothing in any HTML view. A line with visible text outside
+ *  the markers never matches (inline-comment strip = #147 第2弾スコープ). */
+const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
+/** Directive comments that carry meaning — the layout pin, the group separators, the
+ *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
+ *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
+ *  drop class — only the bare markers survive. */
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note|section|toc)\s*-->$)/;
+
+// ── Speaker notes (#150 / ADR-0032 D1) ──
+
+/** The bare `<!-- note -->` marker: everything after it (to the slide's end) is speaker notes. */
+const NOTE_MARKER_RE = /^<!--\s*note\s*-->$/;
+
+// ── Section / TOC declarations (#151 / ADR-0032 D2) ──
+
+/** `<!-- section -->` — declares THIS authored slide as a chapter cover (a slide ATTRIBUTE,
+ *  not an in-slide separator). `<!-- toc -->` — a block holding ONLY this marker becomes the
+ *  derived table-of-contents slide (content re-derived from section-tagged slides). */
+const SECTION_MARKER_RE = /^<!--\s*section\s*-->$/;
+const TOC_MARKER_RE = /^<!--\s*toc\s*-->$/;
+
+/** Remove fence-external `<!-- section -->` lines, reporting whether any was present. A stray
+ *  fence-external `<!-- toc -->` on a slide that has OTHER content is dropped the same way
+ *  (#147-consistent: a misplaced marker vanishes rather than rendering as literal text). */
+function extractSectionFlag(lines: string[]): { content: string[]; sectionBreak: boolean } {
+  let sectionBreak = false;
+  let inFence = false;
+  const content = lines.filter((ln) => {
+    const t = ln.trim();
+    if (t.startsWith("```")) {
+      inFence = !inFence;
+      return true;
+    }
+    if (!inFence && SECTION_MARKER_RE.test(t)) {
+      sectionBreak = true;
+      return false;
+    }
+    if (!inFence && TOC_MARKER_RE.test(t)) return false; // toc-only blocks return earlier; here it's stray
+    return true;
+  });
+  return { content, sectionBreak };
+}
+
+/** Split a slide block at the first fence-external `<!-- note -->` marker. Fence-aware so a
+ *  comment-looking line inside ``` stays code (#147 と同じ理由). Marker absent → notes: null. */
+function splitNoteLines(lines: string[]): { content: string[]; notes: string[] | null } {
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t.startsWith("```")) inFence = !inFence;
+    else if (!inFence && NOTE_MARKER_RE.test(t)) {
+      return { content: lines.slice(0, i), notes: lines.slice(i + 1) };
+    }
+  }
+  return { content: lines, notes: null };
+}
+
+/**
+ * #147: Drop non-directive comment-only lines (review notes / TODO markers / source IDs
+ * an upstream agent or human left in the Markdown) so they never render onto a slide.
+ * A dropped comment also swallows the blank lines directly ABOVE it — the comment
+ * "paragraph" disappears whole (`A\n\n<!-- note -->\nB` glues to `A\nB`), while a blank
+ * AFTER it still separates content as authored. Fence interiors pass through verbatim
+ * (a ``` block keeps comment-looking strings), and directive comments are untouched.
+ * Dropped comments do NOT round-trip: the serializer never sees them (spec'd in #147).
+ */
+function stripCommentOnlyLines(lines: string[]): string[] {
+  const out: string[] = [];
+  const pendingBlanks: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith("```")) {
+      inFence = !inFence;
+      out.push(...pendingBlanks.splice(0), line);
+    } else if (inFence) {
+      out.push(line);
+    } else if (t === "") {
+      pendingBlanks.push(line);
+    } else if (COMMENT_ONLY_RE.test(t) && !DIRECTIVE_COMMENT_RE.test(t)) {
+      pendingBlanks.length = 0; // the comment paragraph swallows its leading blanks
+    } else {
+      out.push(...pendingBlanks.splice(0), line);
+    }
+  }
+  out.push(...pendingBlanks); // trailing blanks (trimBodyLines handles them downstream)
+  return out;
+}
+
 // ── Parse a single slide block ──
 
 export function parseSlideBlock(
   lines: string[],
   startLine: number,
+  notices?: ParseNotice[],
 ): SlideIR | null {
+  // sourceLineStart/End must span the ORIGINAL block — useDeckRevise slices the raw
+  // Markdown by these — so capture the length before comment lines are stripped.
+  const sourceLen = lines.length;
+  lines = stripCommentOnlyLines(lines);
+
+  // `<!-- toc -->` のみのブロック → 導出専用の派生スライド（内容は消費点で毎回再導出、#151）。
+  const nonBlank = lines.map((l) => l.trim()).filter((l) => l !== "");
+  if (nonBlank.length === 1 && TOC_MARKER_RE.test(nonBlank[0])) {
+    return {
+      layout: "auto",
+      placeholders: [],
+      derived: "toc",
+      sourceLineStart: startLine,
+      sourceLineEnd: startLine + sourceLen - 1,
+    };
+  }
+
+  // `<!-- note -->` 以降スライド末尾まではスピーカーノート（本文パースの前に切り離す）。
+  const noteSplit = splitNoteLines(lines);
+  const notes = noteSplit.notes ? linesToParagraphs(trimBodyLines(noteSplit.notes)) : undefined;
+  // `<!-- section -->` は章境界の宣言（スライド属性）— 本文から取り除きフラグ化（#151）。
+  const sectionSplit = extractSectionFlag(noteSplit.content);
+  lines = sectionSplit.content;
+  const sectionBreak = sectionSplit.sectionBreak;
   let layout = "auto";
   const placeholders: PlaceholderContent[] = [];
   let title: string | undefined;
@@ -247,7 +375,7 @@ export function parseSlideBlock(
       }
     });
 
-    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image) return null;
+    if (placeholders.length === 0 && !diagram && !mermaidBlock && !image && !notes?.length) return null;
 
     return {
       layout,
@@ -255,11 +383,13 @@ export function parseSlideBlock(
       ...(diagram ? { diagram } : {}),
       ...(mermaidBlock ? { mermaidBlock } : {}),
       ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
+      ...(notes?.length ? { notes } : {}),
+      ...(sectionBreak ? { sectionBreak: true } : {}),
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
       sourceLineStart: startLine,
-      sourceLineEnd: startLine + lines.length - 1,
+      sourceLineEnd: startLine + sourceLen - 1,
     };
   }
 
@@ -379,9 +509,21 @@ export function parseSlideBlock(
   // the body lines become bullet/text paragraphs (idx 1).
   const trimmedBody = trimBodyLines(bodyLines);
   let table: TableBlock | undefined;
-  const tableRows = findTableInLines(trimmedBody);
-  if (tableRows) {
-    table = { rows: tableRows, header: true, placeholderIdx: "1" };
+  const found = findTableInLines(trimmedBody);
+  if (found) {
+    table = { rows: found.rows, header: true, placeholderIdx: "1" };
+    // #148 no-silent-drop: the table/body branches are mutually exclusive — ANYTHING else in the body
+    // (leading prose, a 2nd+ table, trailing prose) is discarded, not converted to a paragraph. Once
+    // this function returns, those raw lines are gone from SlideIR, so only the parser can report it —
+    // classify the leftover (a leaked image line / unrecognized meta key) the same way deck-diagnostics
+    // would have from surviving body text, since a table's presence is what stopped it from surviving.
+    const leftover = trimBodyLines([...trimmedBody.slice(0, found.start), ...trimmedBody.slice(found.start + found.consumed)]);
+    if (leftover.length > 0) {
+      notices?.push({ kind: "table-dropped" });
+      if (leftover.some((l) => IMAGE_MARKDOWN_RE.test(l))) notices?.push({ kind: "image-dropped" });
+      const metaKey = leftover.map(unrecognizedMetaKey).find((k): k is string => k !== null);
+      if (metaKey) notices?.push({ kind: "meta-key-dropped", detail: metaKey });
+    }
   } else if (trimmedBody.length > 0) {
     // Merge into an EXISTING idx "1" (a title layout's subtitle) rather than create a
     // DUPLICATE idx "1": the serializer reads only the first idx-1 placeholder, so a
@@ -393,7 +535,7 @@ export function parseSlideBlock(
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image) return null;
+  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image && !notes?.length) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
@@ -412,8 +554,10 @@ export function parseSlideBlock(
     ...(table ? { table } : {}),
     ...(code ? { code } : {}),
     ...(image ? { image } : {}),
+    ...(notes?.length ? { notes } : {}),
+    ...(sectionBreak ? { sectionBreak: true } : {}),
     sourceLineStart: startLine,
-    sourceLineEnd: startLine + lines.length - 1,
+    sourceLineEnd: startLine + sourceLen - 1,
   };
 }
 

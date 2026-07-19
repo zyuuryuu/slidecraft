@@ -9,12 +9,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
-import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, PlaceholderStyle } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
-import { buildCatalog } from "../engine/template-catalog";
+import { buildCatalog, placeholderRole } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
+import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
+import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
+import { cjkFontFamily } from "../engine/font-stack";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -92,10 +95,27 @@ function renderSegments(segments: InlineSegment[]) {
   });
 }
 
-function renderParagraph(para: Paragraph, idx: number, bulletChar: string) {
+// Nested-bullet indent step (#103), in points — scaled the same way font sizes are (pt × scale/72) so
+// it stays proportional at every zoom level. ~0.25in/level, matching a typical PowerPoint list indent.
+const NEST_INDENT_PT = 18;
+
+function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number) {
+  const level = para.bullet ? (para.level ?? 0) : 0;
+  // Font size for a nested level: the layout/master's own lvl2-4 style when extractStyle found one,
+  // else its computed step-down fallback (template-loader.nestedFallbackFontSize) — level 0 is
+  // untouched (no override), keeping a flat deck's preview byte-identical to before #103.
+  const nestedSize = level > 0 ? s.levelFontSizes?.[level - 1] : undefined;
   return (
-    <div key={idx} style={{ marginBottom: "0.15em", ...(para.heading ? { fontWeight: "bold" } : {}) }}>
-      {para.bullet && bulletChar && <span style={{ marginRight: "0.4em" }}>{bulletChar}</span>}
+    <div
+      key={idx}
+      style={{
+        marginBottom: "0.15em",
+        ...(level > 0 ? { marginLeft: `${level * NEST_INDENT_PT * (scale / 72)}px` } : {}),
+        ...(nestedSize ? { fontSize: nestedSize * (scale / 72) } : {}),
+        ...(para.heading ? { fontWeight: "bold" } : {}),
+      }}
+    >
+      {para.bullet && s.bulletChar && <span style={{ marginRight: "0.4em" }}>{s.bulletChar}</span>}
       {renderSegments(para.segments)}
     </div>
   );
@@ -127,6 +147,10 @@ interface SlideCardProps {
    *  border, hover cursor, click handler, and the synthetic slide-number — so the card
    *  renders as a clean presentation slide. See docs/design/html-output.md (S1). */
   exportMode?: boolean;
+  /** 所属章名（#168・案A・chrome 経路）。呼び出し側が deck-sections.sectionFooterFor(deck, slideIndex)
+   *  で導出して渡す — PPTX export（placeholder-filler.buildSlideXml）と同じ導出関数（R8）。
+   *  null＝章扉より前 or section 無しデッキ＝注入なし。 */
+  sectionFooterText?: string | null;
 }
 
 // PowerPoint preset shapes → SVG polygon points (in a 0–100 box, stretched to the shape's rect).
@@ -190,7 +214,7 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   );
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -464,8 +488,13 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         }
 
         // Native table → an HTML <table> at the placeholder box (matches the export).
+        // Column widths + numeric alignment come from table-layout's shared computation
+        // (R8) so the preview never drifts from what table-ooxml actually exports (#138).
         if (slide.table && ph.idx === tableBodyIdx) {
           const t = slide.table;
+          const colWidthsEmu = computeColumnWidthsEmu(t.rows, s.w);
+          const totalEmu = colWidthsEmu.reduce((a, b) => a + b, 0);
+          const numericCols = computeNumericColumns(t.rows, t.header);
           return (
             <div
               key={`table-${ph.idx}`}
@@ -479,6 +508,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               }}
             >
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 * (scale / 72), tableLayout: "fixed" }}>
+                <colgroup>
+                  {colWidthsEmu.map((w, ci) => (
+                    <col key={ci} style={{ width: `${(w / totalEmu) * 100}%` }} />
+                  ))}
+                </colgroup>
                 <tbody>
                   {t.rows.map((row, ri) => {
                     const isHeader = t.header && ri === 0;
@@ -494,8 +528,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                               background: isHeader ? "#1E2761" : band ? "#F1F4F9" : "#FFFFFF",
                               color: isHeader ? "#FFFFFF" : "#1E293B",
                               fontWeight: isHeader ? 700 : 400,
-                              overflow: "hidden",
-                              whiteSpace: "nowrap",
+                              textAlign: numericCols[ci] ? "right" : "left",
+                              wordBreak: "break-word",
                             }}
                           >
                             {cell}
@@ -541,7 +575,12 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           return renderImageBox(imageRect(slide.image, ph) ?? s);
         }
 
-        const content = contentFor.get(ph.idx);
+        let content = contentFor.get(ph.idx);
+        // 章名フッタの自動注入（#168）: ftr 枠が未束縛（明示 Footer: 無し）のときだけ所属章名を書く —
+        // PPTX export（placeholder-filler.buildSlideXml）と同じ判定（R8）。
+        if (!content && sectionFooterText != null && placeholderRole(ph) === "footer") {
+          content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
+        }
         if (!content) return null;
 
         return (
@@ -556,9 +595,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               fontSize: s.fontSize * (scale / 72),
               color: `#${s.fontColor}`,
               fontWeight: s.bold ? "bold" : "normal",
-              fontFamily: s.fontName.includes("Georgia")
-                ? "Georgia, serif"
-                : `${s.fontName}, sans-serif`,
+              fontFamily: cjkFontFamily(s.fontName, s.eaFontName),
               textAlign: s.align === "ctr"
                 ? "center"
                 : s.align === "r"
@@ -568,7 +605,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               lineHeight: 1.3,
             }}
           >
-            {content.paragraphs.map((p, i) => renderParagraph(p, i, s.bulletChar))}
+            {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale))}
           </div>
         );
       })}
@@ -614,7 +651,7 @@ interface SlidePreviewProps {
 }
 
 export default function SlidePreview({
-  deck,
+  deck: deckProp,
   template,
   error,
   notice,
@@ -629,6 +666,9 @@ export default function SlidePreview({
   const { t } = useTranslation();
   // Catalog → layout selection adapts to the template (canonical = unchanged).
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
+  // 派生スライド（<!-- toc -->）は消費点で導出（#151）— export と同じ単一関数なので WYSIWYG が保たれ、
+  // 章名変更は次のレンダーで自動反映される（deck 状態には導出内容を持たない）。
+  const deck = useMemo(() => (deckProp ? materializeDerivedSlides(deckProp) : deckProp), [deckProp]);
 
   // Fit the slide to the available pane by default (the fixed 72-dpi render overflowed
   // narrow panes); a small zoom control lets the user scale it down/up by %.
@@ -676,6 +716,7 @@ export default function SlidePreview({
         masterStaticTexts={template?.masterStaticTexts}
         scale={scale}
         isActive={active}
+        sectionFooterText={sectionFooterFor(deck!, i)}
         onClick={singleSlide ? undefined : () => onSlideClick?.(i)}
         onDiagramChange={singleSlide ? onDiagramChange : undefined}
         onImageRectChange={singleSlide && active ? onImageRectChange : undefined}

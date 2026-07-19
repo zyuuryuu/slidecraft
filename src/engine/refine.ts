@@ -22,7 +22,7 @@ import { buildSlideFix, slideFixRequest } from "./slide-fix";
 import { validateCondense, validateStructure, mergeVerdicts } from "./ai-validate";
 import { reconcileEdit } from "./ai-reconcile";
 import { visualizeKeyValueMd } from "./slide-rewrite";
-import { serializeMd } from "./md-serializer";
+import { serializeMd, type SerializeTemplate } from "./md-serializer";
 import { parseMd } from "./md-parser";
 import { autoSelectLayout } from "./template-loader";
 
@@ -64,11 +64,13 @@ export interface RefineResult {
 }
 
 /** Serialize ONE slide to Markdown with its RESOLVED layout (so a lone slide isn't
- *  re-pinned to Title by autoSelect's first-slide rule). */
-function slideToMd(deck: DeckIR, idx: number, catalog: LayoutCatalog): string {
+ *  re-pinned to Title by autoSelect's first-slide rule). ADR-0030 stage B (#155): `tpl` hands the
+ *  serializer the binding authority so a closing-vocabulary title isn't dropped from the AI's
+ *  before-md by the name-based namespace fork. */
+function slideToMd(deck: DeckIR, idx: number, catalog: LayoutCatalog, tpl?: SerializeTemplate): string {
   const s = deck.slides[idx];
   const layout = s.layout === "auto" ? autoSelectLayout(s, idx, deck.slides.length, catalog) : s.layout;
-  return serializeMd({ slides: [{ ...s, layout }] });
+  return serializeMd({ slides: [{ ...s, layout }] }, tpl);
 }
 
 function replaceSlide(deck: DeckIR, idx: number, slide: SlideIR): DeckIR {
@@ -90,7 +92,9 @@ function groupBySlide(issues: DeckIssue[]): Map<number, DeckIssue[]> {
 export async function refineDeck(
   deck: DeckIR,
   catalog: LayoutCatalog,
-  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; maxAiRetries?: number; bestOfN?: number; signal?: AbortSignal },
+  // `tpl` feeds ONLY the slide serialization (before/after md) — the convergence condition stays
+  // diagnoseDeck(deck, catalog) untouched (the diagnostics `layouts` wiring is a separate concern).
+  opts: { level: RefineLevel; aiFix?: AiSlideFix; maxIterations?: number; maxAiRetries?: number; bestOfN?: number; signal?: AbortSignal; tpl?: SerializeTemplate },
 ): Promise<RefineResult> {
   const maxIter = opts.maxIterations ?? 6;
   const maxRetries = opts.maxAiRetries ?? 2; // up to 1 + maxRetries AI attempts per slide
@@ -116,7 +120,7 @@ export async function refineDeck(
     for (const [idx, slideIssues] of groupBySlide(issues)) {
       if (opts.signal?.aborted) break;
       if (!current.slides[idx]) continue;
-      const before = slideToMd(current, idx, catalog);
+      const before = slideToMd(current, idx, catalog, opts.tpl);
 
       // ① Deterministic — a pure key-value list → native table (split is auto on parse).
       const pureKeyValue = slideIssues.some((d) => d.levers.includes("visualize") && !d.levers.includes("split"));
@@ -201,7 +205,7 @@ export async function refineDeck(
 export async function batchEditDeck(
   deck: DeckIR,
   catalog: LayoutCatalog,
-  opts: { indices: number[]; instruction: string; aiFix: AiSlideFix; bestOfN?: number; signal?: AbortSignal },
+  opts: { indices: number[]; instruction: string; aiFix: AiSlideFix; bestOfN?: number; signal?: AbortSignal; tpl?: SerializeTemplate },
 ): Promise<RefineResult> {
   const bestOfN = Math.max(1, Math.floor(opts.bestOfN ?? 1));
   let current = deck;
@@ -209,7 +213,7 @@ export async function batchEditDeck(
   for (const idx of opts.indices) {
     if (opts.signal?.aborted) break;
     if (!current.slides[idx]) continue;
-    const before = slideToMd(current, idx, catalog);
+    const before = slideToMd(current, idx, catalog, opts.tpl);
     const req = `Current slide:\n${before}\n\nInstruction: ${opts.instruction}`;
     // Best-of-N: fan out N candidates. A FREE-FORM edit has no preserve-contract (the instruction may
     // legitimately change language, e.g. "英語にして"), so we can't score by HARD violations like the

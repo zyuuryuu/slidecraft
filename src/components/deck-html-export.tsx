@@ -18,6 +18,8 @@ import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
 import { assembleHtmlDeck, type Transition } from "../engine/html-shell";
+import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
+import { serializeParagraphs } from "../engine/md-serializer-shared";
 import type { DeckIR } from "../engine/slide-schema";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
@@ -50,7 +52,8 @@ async function preRenderNonNativeMermaid(deck: DeckIR): Promise<DeckIR> {
 }
 
 export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string; transition?: Transition } = {}): Promise<string> {
-  const prepared = await preRenderNonNativeMermaid(deck);
+  // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）— PPTX/preview と同じ単一関数（R8）。
+  const prepared = await preRenderNonNativeMermaid(materializeDerivedSlides(deck));
   const catalog = buildCatalog(template);
 
   const slideHtmls = prepared.slides.map((slide, i) => {
@@ -70,6 +73,7 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
         masterImages={template.masterImages}
         masterStaticTexts={template.masterStaticTexts}
         scale={SCALE}
+        sectionFooterText={sectionFooterFor(prepared, i)}
         exportMode
       />,
     );
@@ -81,6 +85,8 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
     stageW: SLIDE_W * SCALE,
     stageH: SLIDE_H * SCALE,
     cspNonce: makeNonce(), // locks the exported .html under a CSP (ADR-0016 F2)
+    // Speaker notes (#150): default-hidden panel, 'n' toggles. Plain Markdown text per slide.
+    notes: prepared.slides.map((s) => (s.notes?.length ? serializeParagraphs(s.notes) : undefined)),
   });
 }
 

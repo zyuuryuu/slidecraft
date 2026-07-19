@@ -151,7 +151,7 @@ export default function App() {
   const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
-    deck, catalog, setDeck,
+    deck, catalog, templateData, setDeck,
     aiFix: async (req, meta) => {
       const label = t("app.taskEditSlide", { n: meta.slideIndex + 1 })
         + (meta.attempt > 1 ? t("app.taskRetrySuffix", { attempt: meta.attempt - 1 }) : "")

@@ -33,6 +33,71 @@ const CHROME_NAME = /番号|step|no\.?$/i; // NOT /ラベル/: KPIラベル is a
 // ≤0.06in, KPI value ≥0.45in — 0.3 separates them with margin on both sides.
 const CHROME_TOP_BAND = 0.3;
 
+/** Tag one group's cells (chrome/heading/body), top→bottom. Shared by the x-clustered column path AND
+ *  the canonical-name-hinted path (#136) so both produce identically-shaped GroupSlot[].
+ *  `nameChrome`: whether a NAME match (CHROME_NAME) alone can mark a slot as chrome. Disabled for the
+ *  name-hinted path — SlideCraft's own content placeholders are descriptively named ("Step1.Top",
+ *  "SectionNumber.Left") and would otherwise false-positive on the "step"/"番号" substrings in their OWN
+ *  name; only an actually-BAKED number/STEP badge (CHROME_BAKED) counts as chrome there. */
+function tagGroupSlots(cells: PlaceholderInfo[], nameChrome = true): { slots: GroupSlot[]; chromeBaked: string } {
+  const sorted = [...cells].sort((a, b) => a.style.y - b.style.y);
+  const topY = sorted[0].style.y;
+  let headingDone = false;
+  let chromeBaked = "";
+  const slots = sorted.map((p): GroupSlot => {
+    const t = p.type.toLowerCase();
+    const baked = bakedText(p.shapeXml);
+    let role: GroupSlotRole;
+    if (t === "pic") role = "picture";
+    else if ((CHROME_BAKED.test(baked) || (nameChrome && CHROME_NAME.test(p.name))) && p.style.y <= topY + CHROME_TOP_BAND) {
+      role = "chrome";
+      chromeBaked = baked;
+    } else if (!headingDone) { role = "heading"; headingDone = true; }
+    else role = "body";
+    return { phIdx: p.idx, role, y: p.style.y };
+  });
+  return { slots, chromeBaked };
+}
+
+// #136: create_template()'s OWN canonical dotted-name convention (Family.NDetail.Modifier — e.g.
+// "Process.3Step.Sequential", "KPI.4Value.Grid") encodes the group kind + count directly in the name.
+// The geometric algorithm below can't always recover that shape (a 2x2 KPI grid reads as 2 columns of
+// 2, not 4 single-value groups; a single-placeholder-per-step layout has no [heading,body] pair to
+// column-cluster on). Trust the name ONLY for this exact family+count+noun pattern — no third-party
+// master is named like this (see group-detect.test.ts's untouched corpus), so this never fires outside
+// SlideCraft's own generated templates. Overrides the geometric kind/grouping entirely when it matches
+// (rather than patching individual mis-detections) so our own canonical set stays self-consistent.
+const CANONICAL_NAME_HINTS: Array<{ re: RegExp; kind: GroupLayoutShape["kind"] }> = [
+  { re: /^Process\.(\d+)Step\./, kind: "step" },
+  { re: /^KPI\.(\d+)Value\./, kind: "kpi" },
+  { re: /^Summary\.(\d+)Block\./, kind: "card" },
+];
+
+/** Build a GroupLayoutShape straight from the canonical name's group count, chunking candidate cells by
+ *  idx order (our own idx assignment is always in group/reading order) instead of x-position clustering.
+ *  Returns null when the geometry doesn't actually divide evenly into the named count (degrade safely —
+ *  a hand-edited or unexpected layout falls through to the geometric algorithm below). */
+function nameHintedGroups(name: string, cands: PlaceholderInfo[]): GroupLayoutShape | null {
+  for (const { re, kind } of CANONICAL_NAME_HINTS) {
+    const m = re.exec(name);
+    if (!m) continue;
+    const count = Number(m[1]);
+    if (!(count >= 1) || cands.length === 0 || cands.length % count !== 0) return null;
+    const groupSize = cands.length / count;
+    const byIdx = [...cands].sort((a, b) => parseInt(a.idx, 10) - parseInt(b.idx, 10));
+    const groups: GroupSlot[][] = [];
+    for (let i = 0; i < count; i++) {
+      const { slots } = tagGroupSlots(byIdx.slice(i * groupSize, (i + 1) * groupSize), false);
+      groups.push(slots);
+    }
+    // Same role-sequence uniform gate as the geometric path (step 4b) — cheap safety net.
+    const sig = (col: GroupSlot[]) => col.map((s) => s.role).join("|");
+    if (groups.some((c) => sig(c) !== sig(groups[0]))) return null;
+    return { kind, groups };
+  }
+  return null;
+}
+
 /**
  * Detect whether a layout is a repeated-GROUP layout (card/step/kpi/compare) purely from geometry, and
  * return its column×slot shape (each slot tagged chrome/picture/heading/body). Returns null for a plain
@@ -50,6 +115,13 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
     if (/出典|資料名|注記|source|footer/i.test(p.name)) return false;
     return true;
   });
+
+  // #136: trust SlideCraft's OWN canonical dotted name (Family.NDetail.*) before falling back to pure
+  // geometry — see nameHintedGroups' docstring for why (2x2 grids / single-slot-per-group layouts the
+  // geometric clustering below can't shape correctly). No-op (returns null) for any non-canonical name.
+  const hinted = nameHintedGroups(layout.name, cands);
+  if (hinted) return hinted;
+
   if (cands.length < 4) return null; // need at least 2 columns × 2 slots
 
   // 2. X-cluster into columns (left→right). tol scales with the typical column pitch.
@@ -76,24 +148,9 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
   // 4. Within each column, sort top→bottom and tag slots.
   let chromeBaked = "";
   const groups: GroupSlot[][] = columns.map((col) => {
-    const sorted = [...col].sort((a, b) => a.style.y - b.style.y);
-    const topY = sorted[0].style.y;
-    let headingDone = false;
-    return sorted.map((p): GroupSlot => {
-      const t = p.type.toLowerCase();
-      const baked = bakedText(p.shapeXml);
-      let role: GroupSlotRole;
-      if (t === "pic") role = "picture";
-      // chrome = a number/STEP badge in the column's TOP BAND. Position-independent (the badge may sort
-      // just BELOW its sibling heading — see 公文書 masters), but the top-band gate keeps a mid-column
-      // KPI value box out of chrome even when it bakes a bare number.
-      else if ((CHROME_BAKED.test(baked) || CHROME_NAME.test(p.name)) && p.style.y <= topY + CHROME_TOP_BAND) {
-        role = "chrome";
-        chromeBaked = baked;
-      } else if (!headingDone) { role = "heading"; headingDone = true; }
-      else role = "body";
-      return { phIdx: p.idx, role, y: p.style.y };
-    });
+    const { slots, chromeBaked: baked } = tagGroupSlots(col);
+    if (baked) chromeBaked = baked;
+    return slots;
   });
 
   // 4b. Role-sequence uniform gate: a genuine repeated-GROUP layout has the SAME per-column role

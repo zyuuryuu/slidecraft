@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import JSZip from "jszip";
 import {
   loadTemplate,
   type TemplateData,
@@ -25,15 +26,15 @@ beforeAll(async () => {
 });
 
 describe("loadTemplate", () => {
-  it("loads 30 layouts", () => {
-    expect(tpl.layouts).toHaveLength(30);
+  it("loads 31 layouts", () => {
+    expect(tpl.layouts).toHaveLength(31); // 30 canonical + SectionNav.1TitleList.Single (#167)
   });
 
   it("each layout has a name and index", () => {
     for (const layout of tpl.layouts) {
       expect(layout.name).toBeTruthy();
       expect(layout.index).toBeGreaterThanOrEqual(1);
-      expect(layout.index).toBeLessThanOrEqual(30);
+      expect(layout.index).toBeLessThanOrEqual(31);
     }
   });
 
@@ -195,5 +196,71 @@ describe("autoSelectLayout", () => {
       mermaidBlock: { mermaid: "graph TD\n A-->B", placeholderIdx: "1" },
     });
     expect(autoSelectLayout(slide, 1, 5)).toMatch(/^Content\./);
+  });
+});
+
+// #192 / #115-a: <a:ea> (East-Asian typeface) extraction, wired through to PlaceholderStyle so the
+// CJK fallback stack (font-stack.ts) knows the template's declared JP brand font.
+describe("<a:ea> (East-Asian typeface) extraction", () => {
+  it("a real corporate template's layout placeholder carries its declared ea typeface", async () => {
+    const corp = await loadTemplate(
+      readFileSync(resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx")),
+    );
+    const l1 = corp.layouts.find((l) => l.index === 1)!; // Title.1Title.Single
+    // idx 14 ("メタ情報（日付・部署・作成者）") declares <a:latin typeface="Yu Gothic"/>
+    // <a:ea typeface="Yu Gothic"/> explicitly in its lstStyle lvl1 defRPr.
+    const meta = l1.placeholders.find((p) => p.idx === "14")!;
+    expect(meta.style.eaFontName).toBe("Yu Gothic");
+  });
+
+  it("never leaks an unresolved theme reference (+mj-ea/+mn-ea) as a literal ea font name", async () => {
+    // This template's <p:titleStyle>/<p:bodyStyle> declare <a:ea typeface="+mj-ea"/>/"+mn-ea"
+    // (PowerPoint's own default authoring convention) — unlike <a:latin> (an existing, separately
+    // tested raw-token contract — see master-remake.test.ts "theme-font token resolution"),
+    // eaFontName is a NEW field feeding straight into cjkFontFamily's font-family CSS, so it must
+    // never surface the raw "+mj-ea"/"+mn-ea" token.
+    const corp = await loadTemplate(
+      readFileSync(resolve(__dirname, "fixtures/templates/報告書テンプレート_全レイアウト見本.pptx")),
+    );
+    expect(corp.masterTitleStyle.eaFontName?.startsWith("+")).not.toBe(true);
+    expect(corp.masterBodyStyle.eaFontName?.startsWith("+")).not.toBe(true);
+  });
+});
+
+// #103: per-level (1-3) font sizes for nested bullets, extracted for the SSR preview only (the
+// PPTX export never pins these — PowerPoint inherits lvl1-4 from the master natively, R7).
+describe("nested-bullet levelFontSizes (#103)", () => {
+  it("this fixture's master defines no lvl2-4 body style → a decreasing step-down fallback", async () => {
+    // Confirmed via the fixture's raw bodyStyle: only <a:lvl1pPr> is present.
+    const l7 = tpl.layouts.find((l) => l.index === 7)!; // Content.1Body.Single
+    const body = l7.placeholders.find((p) => p.idx === "1")!;
+    const sizes = body.style.levelFontSizes;
+    expect(sizes).toBeDefined();
+    expect(sizes).toHaveLength(3);
+    expect(sizes![0]).toBeLessThan(body.style.fontSize);
+    expect(sizes![1]).toBeLessThan(sizes![0]!);
+    expect(sizes![2]).toBeLessThan(sizes![1]!);
+  });
+
+  it("an explicit master lvl2pPr size WINS over the step-down fallback", async () => {
+    const buf = readFileSync(TEMPLATE_PATH);
+    const zip = await JSZip.loadAsync(buf);
+    const masterPath = "ppt/slideMasters/slideMaster1.xml";
+    const masterXml = await zip.file(masterPath)!.async("string");
+    // This fixture's bodyStyle has only <a:lvl1pPr>…</a:lvl1pPr> — inject an explicit lvl2pPr
+    // sized well outside the fallback's plausible range (fallback ≈ 14*0.88 ≈ 12.3pt) so a pass
+    // means the master value was actually read, not coincidentally matched.
+    const patched = masterXml.replace(
+      "</a:lvl1pPr></p:bodyStyle>",
+      '</a:lvl1pPr><a:lvl2pPr><a:defRPr sz="900"/></a:lvl2pPr></p:bodyStyle>',
+    );
+    expect(patched).not.toBe(masterXml); // sanity: the replace actually matched
+    zip.file(masterPath, patched);
+    const patchedBuf = await zip.generateAsync({ type: "uint8array" });
+
+    const patchedTpl = await loadTemplate(patchedBuf);
+    const l7 = patchedTpl.layouts.find((l) => l.index === 7)!;
+    const body = l7.placeholders.find((p) => p.idx === "1")!;
+    expect(body.style.levelFontSizes![0]).toBe(9); // sz="900" → 9pt, not the fallback's ~12.3pt
   });
 });

@@ -24,7 +24,7 @@ describe("slideLayout enumeration is gap-tolerant", () => {
 
   it("still loads a contiguous template (no regression)", async () => {
     const tpl = await loadTemplate(readFileSync(CONTIGUOUS));
-    expect(tpl.layouts.length).toBe(30);
+    expect(tpl.layouts.length).toBe(31); // 30 canonical + SectionNav.1TitleList.Single (#167)
     expect(tpl.layouts[0].index).toBe(1);
   });
 });

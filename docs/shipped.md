@@ -4,6 +4,18 @@
 
 ## 基盤・アーキテクチャ
 
+- **変換レポートの完成＝パース時フォールバックの計上** — 無言で起きていた4種（2つ目以降の表で周辺本文ごと破棄＝issue 記載より広い既存バグを発見・2枚目以降の画像・非認識メタキーの本文化・distill 自動分割）を `get_deck_issues` に計上。パーサしか見えない drop は ParseNotice 側路（`parse-notice.ts` に判定を一本化＝R8）、再構成可能なものは deck-diagnostics 側（R2）、分割は `offsets` ベースで原スライド単位に正確に報告。DeckIR は byte-identical （#148・PR #197・2026-07-19）
+- **章扉の全章リスト再掲＋現在章強調（ADR-0032 D2 段階3）** — `SectionNav.1TitleList.Single` レイアウト新設（テンプレはスクリプトから byte 再現可能に再生成）＋ `materializeDerivedSlides` 拡張。serializer は idx-1 が導出結果と深い一致の時のみ畳む（著者 pin＋自書き本文は no-silent-drop で保全＝レビューで是正） （#167・PR #191・2026-07-19）
+- **フッタ章名の伝播（ADR-0032 D2 段階4）** — content スライドの ftr 枠へ所属章名を自動注入。導出は純関数 `sectionFooterFor` 一本を PPTX/プレビュー/HTML の全消費点が共有（R8）・DeckIR に状態を持たないため serializer 対応自体が不要。明示 `Footer:` 優先・section 無しデッキ byte-identical （#168・PR #190・2026-07-19）
+- **保守性ゲートの運用整備** — arch-census（G3・churn×行数 hotspot＋jscpd コピペ率の非 fail 傾向観測スクリプト）＋ ADR 索引ドリフト是正（0019–0028 の10件補完） （#158/#130・PR #174/#172・2026-07-19）
+- **CRLF 入力の正規化（layout pin 無効化の根治）** — Windows 由来の CRLF Markdown で `<!-- slide: -->` layout pin が無効化されディレクティブ行が本文に印字される既存バグを、`parseMd` 入口の CRLF→LF 正規化（行数不変＝sourceLine 非影響）で根治。front-matter の raw 行照合も同時に救済、LF 入力は `toEqual` 同値で不変を担保 （#164・PR #187・2026-07-19）
+- **`<!-- section -->` 章タグ＋採番＋ `<!-- toc -->` 導出目次（乖離しない目次）** — 章扉は著者が書く普通のスライド（章名は `#` 見出しのまま）＋タグで章境界を宣言し、章番号と目次を `scanSections` 単一関数から毎回導出（`deck-sections.ts`・R2/R8）。消費 3 点（PPTX/HTML/プレビュー）とも同一の materialize を通り、md へは `<!-- toc -->` 1 行のみ書き戻す＝目次と本文の乖離が構造的に起きない。宣言なしデッキは同一参照素通り。段階 3/4（アジェンダ再掲・フッタ章名）は #167/#168 （ADR-0032・#151・PR #182・2026-07-19）
+- **スピーカーノート記法 `<!-- note -->`（ブリーフィング型の土台）** — マーカー以降スライド末尾までを素の Markdown のノートとして `SlideIR.notes` へ取り込み、PPTX notesSlide/notesMaster 生成・HTML の `n` キートグル・distill 分割は先頭チャンクのみ・MCP `get_slide` 露出まで配線。ノート無しデッキの出力不変（PPTX パート不生成・HTML byte-identical）を構造的に担保。「スライドは疎に・詳細はノートへ」が成立 （ADR-0032・#150・PR #176・2026-07-19）
+- **BindingPlan＝束縛の単一権威化（段階A/B）** — 束縛の観測型 `resolveBinding`/`slideBindingPlan` を導入し #97/#135/#128 系の silent-drop を全 MCP サーフェスで warn 化（段階A）、serializer と GUI の deck-level/per-slide readout を束縛と同一写像に統一し closing 語彙タイトル消失・round-trip 破壊を根治（段階B）。証拠ポリシーの層別（層2＝配管は合成 fixture で着手可）も本 ADR で明文化 （ADR-0030・PR #152/#156/#161/#162・2026-07-18〜19）
+- **保守性ゲート＝構造規約の実行可能化** — 権威 import 許可リスト・R2 純度・R1 凍結リスト・循環禁止を `arch-conformance.test.ts` で CI 必須化（ratchet 運用＝リスト縮小が改善の実測値）、R8「意味の重複禁止＝一致テスト必須」を CLAUDE.md/PR テンプレに制度化 （ADR-0031・PR #157・2026-07-18）
+- **敵対 fixture 第2弾（valid・見た目キレイ・慣習だけ汚い）** — Dirty_AllBody（全部 body 型）/ Dirty_Legacy43（4:3・継承だのみ・typeless/巨大 idx）/ Dirty_Grouped（スケール付きグループ内見出し＝census 盲点）を合成しコミット。#128/#144 の再現台・ADR-0030 層2ポリシーの試験台 （PR #154・2026-07-18）
+- **型×幾何の矛盾センサス（層1融合判断の実測データ）** — `typeIdxRole` 抽出（byte-identical）＋ `PathologyReport.conflicts` で「type の答えに幾何が異議を唱える枠」を計上。実コーパス（会社7種＋CX）で矛盾 0・velis のみ 9 ＝「type は健全マスターで信頼できる」をデータで決着、梯子→融合の大転換を当面不要と判断 （#146・PR #166・2026-07-19）
+- **非ディレクティブ HTML コメントの drop** — レビュー注記・TODO・出典 ID の comment-only 行が本文としてスライドに印字される罠を修正（fence 内素通し・WHATWG 異常終端形対応・sourceLine 維持）。上流エージェントの SSoT 運用（md に作業注記を残したまま変換）が可能に （#147・PR #163・2026-07-19）
 - **プレースホルダ⇄入力の全単射** — `buildFieldMap` がマーカープローブで `bindContentByRole` の全単射を実証、2-pass バインド（idx-exact → role）で疎カラムの漏れ/上書きを是正、敵対ファズで見つけた 9 件の実バグを不変条件テストで封鎖 （ADR-0011・2026-07-02）
 - **OOXML スタイル階層＝lstStyle は差分のみ** — Theme がフォント定義、Master が参照（+mj-lt/+mn-lt）、Layout の lstStyle は差分のみ、Slide はテキストのみ。placeholder-filler は `<a:t>` のみ差し替え lstStyle/spPr を保全し master UI 編集が流れ続ける （ADR-0004）
 - **主面＝視覚 deck（Markdown は入出力のみ）** — DeckIR を単一の真実とし視覚 Edit を主面に、Markdown は Initialize モーダル（入力）＋`serializeMd`（出力）に限定、統一 deck-history undo （ADR-0002・2026-06）
@@ -37,6 +49,10 @@
 
 ## テンプレ・マスター
 
+- **staticText のグループ変換合成（census 盲点の解消）** — `extractStaticTexts` がグループ（`<p:grpSp>` chOff/chExt スケール）内の生テキスト見出しを子座標のまま返し、幾何ベースの病理検出・ロール推定が「見た目キレイだがツールだけ誤読」する盲点を解消。`walkShapes` と同じ `composeXf` 合成則を共有（R8）し、副産物として walkShapes の自己マッチ再帰でグループ内装飾が全滅していた先在バグも `groupChildren` で根治。Dirty_Grouped の GAP テストをスライド座標側へ反転 （#142・PR #181・2026-07-19）
+- **create_template の日本語ファースト体裁** — 生成マスターの bodyStyle lvl1 に buChar「•」＋段落間 spcBef を焼き（タイトルは buNone 明示）、theme の `<a:ea>` に既定 CJK フォールバック（Yu Gothic・spec 明示時は上書き）、表紙サブタイトル y を `titleTextBottomIn`（タイトル2行折返し＋gap 0.15in）と整合する 3.85in へ。幾何整合は BUILTIN_LAYOUTS 全表紙レイアウトをテストで検査 （#137・PR #180・2026-07-19）
+- **closing の受け皿選択（body 保持レイアウトへ）** — closing 語彙スライドに本文があるのに body 枠ゼロの Closing レイアウトへ誘導され本文が落ちる問題を、`pickLayout` の closing 候補を usable-body 保持でフィルタして根治（`slideRoleRegions` が regions:1 を通知） （#153・PR #175・2026-07-19）
+- **card/step ヒントの group 検出自己整合** — 既定テンプレで `<!-- cards -->`/`<!-- steps -->` ヒントが不発だった問題を、canonical 名ヒント付き group 検出で修正 （#136・PR #177・2026-07-19）
 - **Master-Intake F1 do-no-harm ハードニング（chrome 一貫性＋実出荷テンプレの誤注入根治）** — F1 基盤の後、実出荷テンプレで踏む do-no-harm 違反4件を実測ベースで根治し、chrome シグナルを全経路で一貫させた。**#96** geometryRole が幅広 running header 帯を title 誤認 → RECOVERY tier に chrome guard（`isChromeBand` を単一定義化）。**#124** chrome 帯が visual 経路（`bodyPlaceholders`/`nthBody`）の body 序数に混ざり、出荷テンプレ（配布資料 05_比較表）で図/表が 3.1″×0.62″ のヘッダー帯に描かれていた → 序数ゲート＋`unboundVisuals`（no-silent-drop の visual 版）。**#125** ctrTitle 配下の body 型サブタイトル枠が body 判定になり subtitle 未束縛＋箇条書きを吸う → binding 両側の対称性を idx-1 規約で復元（幾何 rung は CX Quote 実測で不可＝[ADR-0029](adr/0029-cover-subtitle-role-recovery.md)）。**#127** catalog の `bodyCount`/`bodyBoxes` が chrome 未適用で binding と食い違い、実 body 0 のレイアウトへ content を誘導 → `isContentBody`（role body ∧ not chrome）を catalog と binding で共有（chrome 判定を複製しない）・layout 割り当ての golden 付き。全て実出力（python-pptx）検証・健全テンプレ byte-identical・全 1361 テスト緑 （#96/#124/#125/#127・2026-07-17〜18）
 - **Master-Intake 基盤 F0/F1（任意マスターの取り込み理解）** — 「重要な所は絶対外さず・間違った所には絶対入れない」を北極星に、決定論で任意マスターの取り込み理解を底上げ。**F0a 証拠ツール**: 病理センサス（機密ゼロで実テンプレの構造病理を計測・`master-pathology.ts`／`scripts/pathology-census.ts`）＋ sanitize-master 構造双子（実物→機密ゼロの骨格双子・忠実性を parse-audit 一致で機械証明・`scripts/sanitize-master.ts`）。**F0b** geometryRole の sldSz 相対化（非16:9=A4/4:3 対応・16:9 は byte-identical）。**F1-①** 決定論スコアラー `inferFunction`（placeholders∪staticTexts の相対属性＋読み順＋confidence で title/primaryBody/chrome/accent/figure を分離・敵対 fixture で title 0/4→**5/5**）。**F1-②** do-no-harm binding ゲート（`inferredFunction=chrome` の枠へ body/title content を入れない＝**header 誤注入を根治**）＋ no-silent-drop プリミティブ（`unboundContent`＝未束縛の報告）＋ scorer 駆動 title 復元（body 見出し→title role・名前ヒント無しでも幾何で拾う）。health テンプレ byte-identical・velis(実 outlier)で content 安全を検証。設計 [master-intake.md](design/master-intake.md)（ADR-0025/0027/0028 系）。テストファースト（全 1297 テスト緑） （2026-07-13）
 - **Placeholder ロール解決に gate 付き title リカバリ** — `type="body"`／idx0 でも名前が "Title"/"タイトル" の placeholder が title を受け取らずデッキ題が宙に浮く不具合を修正。ロール解決を「Phase 1: 従来の type→idx→body ラダー」＋「Phase 2: **layout に title 不在時のみ**、非meta の box を `name一致 かつ (idx0 or title 形状)` の合議で title に昇格（取込時に `resolvedRole` 確定→bind/catalog/fieldMap が共有）」に整理。gate により健全テンプレは byte-identical（全 1229 テスト・回帰ゼロ）。テストファースト（`placeholder-role-recovery.test.ts` 10 例） （ADR-0025・2026-07-08）
@@ -56,6 +72,8 @@
 
 ## HTML・描画
 
+- **CJK フォールバックスタック＋ea フォントの描画配線（#115 その1）** — 素の `fontName, sans-serif` 単発だった preview/SVG の font-family を、`<a:ea>` 抽出値の `PlaceholderStyle` 配線＋ゴシック/明朝分類つきフォールバック連鎖（`font-stack.ts` に一本化・SlideCard/svg-writer 両消費＝R8）に。未解決テーマ参照 `+mj-ea` はソース側でガード。PPTX 出力非影響。後続は #193（実行時サブセット化）→ #194（@font-face 埋め込み） （#192・PR #196・2026-07-19）
+- **表の列幅内容比例化＋数値列右寄せ＋プレビュー折り返し** — `table-ooxml` の均等割り列幅を、新設 `table-layout.ts`（CJK=2 換算の最大セル幅重み・[8%,50%] クランプ・EMU 合計厳密一致）による内容比例に置換し、数値列（¥/％/桁区切り対応）へ `algn="r"`。プレビューは同一関数から `<colgroup>` を導出し nowrap/hidden を撤廃して折り返し表示（export と一致することをテストで検証＝R8） （#138/#139・PR #178・2026-07-19）
 - **プレビュー/HTML の背景画像・グラデ・図形グラデ描画（A1/A2/A3）** — レイアウト/マスターの `<p:bg>` 画像塗り(blipFill)・グラデ塗り(gradFill) を全面描画、`<p:pic>` の非web主 blip（EMF/WMF/wdp）を `svgBlip`(SVG) へフォールバック、装飾図形の `gradFill` を CSS グラデで描画。純粋 `ooxml-fill.ts` に集約（プレビュー＋HTML 共有・PPTX/golden 非影響）。実 HTML レンダで確認 （他AIレポート＋敵対検証・2026-07-07）
 - **プレビュー/HTML のグループ図形・custGeom 弧の描画** — `<p:grpSp>` の子図形を chOff/chExt→off/ext の座標変換（＋ネスト合成）で正しい位置に描画（従来は child-space 座標で誤配置・velis の 26 グループ）、custGeom の `arcTo` セグメントを SVG 楕円弧に変換。純粋 `ooxml-geom.ts`（プレビュー/HTML 限定・PPTX 非影響）。velis 実レンダ＋純粋/実フィクスチャテストで確認 （2026-07-07）
 - **図のエッジラベル コントラスト適応＋埋め込み図の自前タイトル抑止** — 図のエッジ/関係ラベルをスライド背景に対しコントラスト適応（低コントラスト ~2.4:1 を解消）、埋め込み図はスライド題枠に一任し自前タイトルを描かない（`omitTitle`・重複/上下逆転を解消）。共有 painter 経由でプレビュー SVG も PPTX も同一挙動（実レンダ敵対監査 M11 の高インパクト分） （PR #83／82569eb・59ef092・2026-07-07）
@@ -68,6 +86,7 @@
 
 ## スライド編集・画像
 
+- **クロス doc 切替の snapshot データ損失を修正** — 複数ドキュメント切替時に他 doc の snapshot が現 doc の状態で上書きされ編集が失われる GUI コントローラのバグを修正 （#160・PR #173・2026-07-19）
 - **画像埋め込み＝data URI 埋め込み** — 自己完結 data-URI SlideIR image ブロック（Markdown `![alt](src)` round-trip・SlideCard `<img>`／HTML 自動・PPTX decode → media/pic）、paste＋Tauri/browser file-drop 挿入、picture 枠優先バインド、rect/fit/aspect 手動幾何＋pointer drag/resize、既存を壊さない最背面（behind）モード （ADR-0020・2026-07-06）
 - **スライドのドラッグ並べ替え** — pointer イベント方式・PowerPoint 風インジケータでスライドを並べ替え （2026-07-06）
 - **useAiGeneration 分割** — `useAiGeneration` をモジュール分割 （2026-07-06）
@@ -78,6 +97,7 @@
 
 ## 協働・MCP
 
+- **`get_slide` に容量ドライラン（capacity / predictedSplit）** — 本文容量の実測 `capacity.usedLines/maxLines` と、`split_overflowing_slides` を実行せず何枚に割れるかの `predictedSplit`（chunks/boundaries）を追加。予測は distill.ts の `splitSlideToFit` そのものを呼ぶため実行結果と構造的に一致（R8・予測==実行の同値性テスト付き）。read-only（deck/dirty 不変） （#149・PR #188・2026-07-19）
 - **host `new_project` のタブ名を先頭見出しから導出（B4）** — host モードで AI が作った Deck のタブが常に「Untitled」だった（`session.ts` が templateName を "" にリセット）のを、純粋ヘルパ `deckTitle`（先頭スライドの title placeholder＝idx 0/15）で先頭見出しから命名。`use_template`/`open_project` は既存の templateName 名が優先、見出し無しは「Untitled」にフォールバック。golden 非影響 （他AIレポート・2026-07-07）
 - **Live MCP で AI が作った Deck を GUI タブに（モード b）** — 協働ホストの multi-doc を GUI に橋渡し。AI が `new_project` で作った Deck を**背景タブ**として開く（表示は切り替えない＝押すと開く）。タブ切替で projection のミラー先を `setTargetDoc`、ローカルタブは pause して clobber 防止。seed は `open_project` の戻り docId で race-free に link。`makeDoc` が新フィールドを落とすバグをテストで検出→修正 （2026-07-07）
 - **MCP CLI 同梱（ビルド不要のエージェント駆動）** — 自己完結 `cli.cjs`＋Node ランタイムをインストーラに同梱、macOS は Homebrew cask が `slidecraft-mcp` を PATH 登録。ソース build もシステム Node も不要で上流 AI（Claude Code/Cursor/Claude Desktop）が駆動可。update-cask に fail-closed guard （ADR-0022・2026-07-07）
