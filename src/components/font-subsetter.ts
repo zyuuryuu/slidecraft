@@ -27,6 +27,11 @@ const HB_MEMORY_MODE_WRITABLE = 2;
 // features (equivalent to hb-subset CLI's `--font-features=*`).
 const HB_SUBSET_SETS_LAYOUT_FEATURE_TAG = 6;
 
+/** 4-byte OpenType tag → the uint32 harfbuzz's C API expects (e.g. hb_tag_t HB_TAG('w','g','h','t')). */
+function hbTag(tag: string): number {
+  return tag.split("").reduce((acc, ch) => (acc << 8) + ch.charCodeAt(0), 0);
+}
+
 interface HbExports {
   memory: WebAssembly.Memory;
   malloc(size: number): number;
@@ -45,7 +50,16 @@ interface HbExports {
   hb_set_clear(set: number): void;
   hb_set_invert(set: number): void;
   hb_set_add(set: number, value: number): void;
+  hb_subset_input_pin_axis_location(input: number, face: number, axisTag: number, value: number): number;
   hb_subset_or_fail(face: number, input: number): number;
+}
+
+export interface SubsetOptions {
+  /** Pin a variable font's `wght` axis to this value (e.g. 400 for Regular, 700 for Bold) before
+   *  subsetting, so the result is a static-weight font instead of inheriting whatever instance the
+   *  source font defaults to. Ignored (harmless) if the source font isn't a variable font / has no
+   *  `wght` axis. */
+  wght?: number;
 }
 
 let hbPromise: Promise<HbExports> | null = null;
@@ -66,7 +80,7 @@ async function loadHarfbuzz(): Promise<HbExports> {
 /** Subset `sourceFont` down to the glyphs required to render `text`, returned as WOFF2 bytes.
  *  Rejects only on a structurally-invalid source font or WASM init failure — never on characters
  *  in `text` that the font doesn't contain (those are simply excluded from the result). */
-export async function subsetFontToWoff2(sourceFont: Uint8Array, text: string): Promise<Uint8Array> {
+export async function subsetFontToWoff2(sourceFont: Uint8Array, text: string, opts: SubsetOptions = {}): Promise<Uint8Array> {
   const hb = await loadHarfbuzz();
   const heap = () => new Uint8Array(hb.memory.buffer);
 
@@ -81,6 +95,10 @@ export async function subsetFontToWoff2(sourceFont: Uint8Array, text: string): P
     hb.hb_face_destroy(face);
     hb.free(fontPtr);
     throw new Error("hb_subset_input_create_or_fail returned 0 (harfbuzz init failure)");
+  }
+
+  if (opts.wght != null) {
+    hb.hb_subset_input_pin_axis_location(input, face, hbTag("wght"), opts.wght);
   }
 
   // Keep every OpenType layout feature (ligatures, vertical forms, etc.) — equivalent to
