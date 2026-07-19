@@ -11,7 +11,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import * as yaml from "js-yaml";
+import { loadYaml } from "../engine/yaml-io";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
 import { DiagramSpecSchema } from "../engine/schema";
@@ -40,7 +40,7 @@ export default function SequenceDragOverlay({ diagramYaml, editable = false, onC
 
   const spec = useMemo(() => {
     try {
-      const parsed = DiagramSpecSchema.safeParse(yaml.load(diagramYaml));
+      const parsed = DiagramSpecSchema.safeParse(loadYaml(diagramYaml));
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -126,7 +126,7 @@ export default function SequenceDragOverlay({ diagramYaml, editable = false, onC
 
   function commitOrder(newOrder: string[]) {
     try {
-      const raw = yaml.load(diagramYaml) as { nodes?: Array<{ id: string }> };
+      const raw = loadYaml(diagramYaml) as { nodes?: Array<{ id: string }> };
       if (!raw.nodes) return;
       const byId = new Map(raw.nodes.map((n) => [n.id, n]));
       const reordered: Array<{ id: string }> = [];

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import JSZip from "jszip";
 import { DesignIntentSchema, applyDesignIntent, parseDesignIntent } from "../src/engine/design-intent";
 import { DiagramSpecSchema, type DiagramSpec } from "../src/engine/schema";
