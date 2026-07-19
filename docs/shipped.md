@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **`<!-- section -->` 章タグ＋採番＋ `<!-- toc -->` 導出目次（乖離しない目次）** — 章扉は著者が書く普通のスライド（章名は `#` 見出しのまま）＋タグで章境界を宣言し、章番号と目次を `scanSections` 単一関数から毎回導出（`deck-sections.ts`・R2/R8）。消費 3 点（PPTX/HTML/プレビュー）とも同一の materialize を通り、md へは `<!-- toc -->` 1 行のみ書き戻す＝目次と本文の乖離が構造的に起きない。宣言なしデッキは同一参照素通り。段階 3/4（アジェンダ再掲・フッタ章名）は #167/#168 （ADR-0032・#151・PR #182・2026-07-19）
 - **スピーカーノート記法 `<!-- note -->`（ブリーフィング型の土台）** — マーカー以降スライド末尾までを素の Markdown のノートとして `SlideIR.notes` へ取り込み、PPTX notesSlide/notesMaster 生成・HTML の `n` キートグル・distill 分割は先頭チャンクのみ・MCP `get_slide` 露出まで配線。ノート無しデッキの出力不変（PPTX パート不生成・HTML byte-identical）を構造的に担保。「スライドは疎に・詳細はノートへ」が成立 （ADR-0032・#150・PR #176・2026-07-19）
 - **BindingPlan＝束縛の単一権威化（段階A/B）** — 束縛の観測型 `resolveBinding`/`slideBindingPlan` を導入し #97/#135/#128 系の silent-drop を全 MCP サーフェスで warn 化（段階A）、serializer と GUI の deck-level/per-slide readout を束縛と同一写像に統一し closing 語彙タイトル消失・round-trip 破壊を根治（段階B）。証拠ポリシーの層別（層2＝配管は合成 fixture で着手可）も本 ADR で明文化 （ADR-0030・PR #152/#156/#161/#162・2026-07-18〜19）
 - **保守性ゲート＝構造規約の実行可能化** — 権威 import 許可リスト・R2 純度・R1 凍結リスト・循環禁止を `arch-conformance.test.ts` で CI 必須化（ratchet 運用＝リスト縮小が改善の実測値）、R8「意味の重複禁止＝一致テスト必須」を CLAUDE.md/PR テンプレに制度化 （ADR-0031・PR #157・2026-07-18）
