@@ -5,7 +5,7 @@
  * Limitations: subgraphs, styling, click handlers not supported.
  */
 
-import * as yaml from "js-yaml";
+import { loadYaml } from "./yaml-io";
 import { DiagramSpecSchema, validateDiagramSpec, type DiagramSpec } from "./schema";
 import { parseMermaidClassDiagram, parseMermaidSequence, parseMermaidState, parseMermaidER, parseMermaidTimeline, parseMermaidQuadrant, parseMermaidPie, parseMermaidMindmap } from "./mermaid-uml-parser";
 import { parseMermaidGantt } from "./diagram-gantt";
@@ -24,7 +24,7 @@ export function validateDiagramSource(text: string, format: DiagramFormat): stri
 
   let data: unknown;
   try {
-    data = format === "json" ? JSON.parse(text) : yaml.load(text);
+    data = format === "json" ? JSON.parse(text) : loadYaml(text);
   } catch (e) {
     return `Parse error: ${e instanceof Error ? e.message : String(e)}`;
   }

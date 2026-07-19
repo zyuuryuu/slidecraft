@@ -8,6 +8,7 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import * as yaml from "js-yaml";
+import { loadYaml } from "../engine/yaml-io";
 import type { SlideIR } from "../engine/slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToMermaid, diagramSpecToYaml, validateDiagramSource, canSerializeToMermaid } from "../engine/mermaid-to-diagram";
 import EdgeStyleControls from "./EdgeStyleControls";
@@ -20,7 +21,7 @@ type DiagramMode = "mermaid" | "yaml" | "json";
 function isMermaidIncompatible(diagramYaml: string | undefined): boolean {
   if (!diagramYaml) return false;
   try {
-    const result = DiagramSpecSchema.safeParse(yaml.load(diagramYaml));
+    const result = DiagramSpecSchema.safeParse(loadYaml(diagramYaml));
     return result.success ? !canSerializeToMermaid(result.data) : false;
   } catch {
     return false;
@@ -74,7 +75,7 @@ export default function DiagramEditor({
       } else if (mode === "yaml" && newMode === "mermaid") {
         // YAML → Mermaid
         try {
-          const data = yaml.load(slide.diagram?.yaml || "");
+          const data = loadYaml(slide.diagram?.yaml || "");
           const result = DiagramSpecSchema.safeParse(data);
           if (result.success) {
             const mmd = diagramSpecToMermaid(result.data);
@@ -89,7 +90,7 @@ export default function DiagramEditor({
       } else if (mode === "yaml" && newMode === "json") {
         // YAML → JSON (raw object round-trip)
         try {
-          const data = yaml.load(slide.diagram?.yaml || "");
+          const data = loadYaml(slide.diagram?.yaml || "");
           onUpdateDiagramYaml(JSON.stringify(data, null, 2));
           applied = true;
         } catch { /* keep current */ }

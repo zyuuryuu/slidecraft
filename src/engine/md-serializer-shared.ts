@@ -45,12 +45,21 @@ function serializeSegments(segments: InlineSegment[]): string {
 
 // ── Paragraphs → Markdown lines ──
 
+/** A PLAIN paragraph's text is, trimmed, EXACTLY one complete `<!-- … -->` comment — the shape #147's
+ *  comment-only-line parser strips. Escaping only this exact shape (not "≥1 comments", not partial
+ *  text) is the #165 fix's whole scope — see the leading `\<` strip in md-slide-parser.ts. */
+const COMMENT_ONLY_TEXT_RE = /^<!--(?:(?!-->).)*-->$/;
+
 export function serializeParagraphs(paragraphs: Paragraph[]): string {
   return paragraphs
     .map((p) => {
       const text = serializeSegments(p.segments);
       if (p.heading) return `### ${text}`;
       if (p.bullet) return `${indentForLevel(p.level ?? 0)}- ${text}`;
+      // #165: a GUI-authored comment-only PLAIN paragraph would otherwise emit a line #147's parser
+      // drops on the next parse (silent text loss). Escape its leading `<` so the line survives —
+      // md-slide-parser.ts strips exactly this one leading backslash back off.
+      if (COMMENT_ONLY_TEXT_RE.test(text.trim())) return `\\${text}`;
       return text;
     })
     .join("\n");
@@ -69,6 +78,32 @@ export function getPlaceholderText(slide: SlideIR, idx: string): string | undefi
   const ph = getPlaceholder(slide, idx);
   if (!ph) return undefined;
   return serializeParagraphs(ph.paragraphs);
+}
+
+// ── Column-scoped vs. single-body table (#100) ──
+
+/** Whether `slide.table` sits in its OWN region distinct from every OTHER real body region on the
+ *  slide (another text placeholder, or a diagram/mermaid, at a DIFFERENT idx) — i.e. genuinely
+ *  column-scoped. Vs. being the slide's ONLY body content, merely (mis)pinned to a
+ *  Column/KPI/Process layout NAME — which must still serialize single-body (group-roundtrip.test.ts
+ *  #4), else the parser would re-absorb it into a manufactured column on the next round-trip. A
+ *  slide with no OTHER region is indistinguishable from that mis-pin case, so it stays single-body —
+ *  a reasonable degenerate-edge collapse, not a data loss (the table's rows survive either way).
+ *  Shared by both serializer readouts (R8: one calculation). */
+export function isColumnScopedTable(slide: SlideIR): boolean {
+  if (!slide.table) return false;
+  const tableIdx = parseInt(slide.table.placeholderIdx);
+  const diagIdx = slide.diagram ? parseInt(slide.diagram.placeholderIdx) : NaN;
+  const mermIdx = slide.mermaidBlock ? parseInt(slide.mermaidBlock.placeholderIdx) : NaN;
+  // Body-region idxs only (1-10, the same range the column loops below iterate) — a raw /^\d+$/
+  // test would also match the title/subtitle idxs ("15"/"16"/"0"), wrongly counting a plain title
+  // as an "other region" and column-scoping a table that's really the slide's only body content.
+  const isBodyIdx = (idx: string) => /^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 10;
+  return (
+    slide.placeholders.some((p) => isBodyIdx(p.idx) && parseInt(p.idx) !== tableIdx) ||
+    (!Number.isNaN(diagIdx) && diagIdx !== tableIdx) ||
+    (!Number.isNaN(mermIdx) && mermIdx !== tableIdx)
+  );
 }
 
 // ── Single-body FIGURE (table / diagram / mermaid / code) → its fenced Markdown block ──

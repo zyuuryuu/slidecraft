@@ -5,12 +5,11 @@
 CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [shipped.md](shipped.md)、決定は
 [docs/adr/](adr/)、設計仕様は [docs/design/](design/)。
 
-**現在地（2026-07-19）**：v0.3.0 タグ済み。直近マイルストーンは **BindingPlan＝束縛の単一権威化**
-（[ADR-0030](adr/0030-binding-plan-single-authority.md)・段階A/B 完了＝未束縛の warn 化＋
-serializer/GUI 全経路の写像統一。C–E は下表）、**保守性ゲート**（[ADR-0031](adr/0031-maintainability-gates.md)・
-arch-conformance が CI 必須化・R8 一致テスト規則）、**敵対 fixture 第2弾＋型×幾何の矛盾センサス**
-（実コーパスで矛盾 0＝type メタデータ信頼の実証 → 層1の梯子→融合転換は当面不要、というデータ決着）、
-**オーサリング拡張の完了**（ノート記法 #150・章タグ/目次 #151・アジェンダ再掲 #167・フッタ章名 #168＝全出荷・ADR-0032 系）、**変換レポートの完成**（パース時フォールバック計上 #148）。
+**現在地（2026-07-19）**：v0.3.0 タグ済み。直近の出荷＝ **ADR-0032 オーサリング拡張の完了**
+（ノート #150・章/目次 #151・アジェンダ再掲 #167・フッタ章名 #168）、**変換レポートの完成**（#148）、
+**ネスト箇条書き 3段**（#103）、**CJK フォント埋め込みの前半**（#192 スタック＋#193 サブセット化/Noto
+同梱・残り配線は #194）、**表の内容比例列幅**（#138/#139）、**BindingPlan 段階A–C 相当**
+（silent-drop の warn 化と診断 floor まで完了・#135 クローズ）。詳細は [shipped.md](shipped.md)。
 
 ---
 
@@ -18,9 +17,8 @@ arch-conformance が CI 必須化・R8 一致テスト規則）、**敵対 fixtu
 
 | テーマ | 中身 | Issues |
 | --- | --- | --- |
-| **束縛の一元化（ADR-0030 C–E）** | 段階C（グループ超過の根治）→ D（buildFieldMap）→ E（group 統合・着手時に起票） | #135 |
-| **オーサリング表現力（ADR-0032）** | ネスト箇条書き | #103 |
-| **パーサ / 診断** | 列内表/混在本文・グループセル見出し・GUI コメント段落（要判断）・先頭章扉の表紙誤解決 | #100 #101 #102 #165 #195 |
+| **束縛の一元化（ADR-0030 D–E）** | 段階D（buildFieldMap）→ E（group 統合）— 着手時に起票（段階C 相当の診断 floor は #135 で完了） | — |
+| **パーサ / 診断** | 列内表＋混在本文（表と本文の共存・依頼文発行済）・グループセル見出し（仕様判断待ち）・GUI コメント段落（要判断） | #100 #101 #102 #165 |
 | **任意マスター取り込み理解** | 未束縛の UI surface・複数 master・野生コーパス収集・AI ラストマイル・表紙 subtitle（証拠待ち） | [`master-intake`](https://github.com/zyuuryuu/slidecraft/labels/master-intake)（#97 #99 #116 #128 #143） |
 | **既定テンプレ品質** | 内蔵30オミット・Re-make dark ロゴ | #117 #118 |
 | **表・描画 / HTML** | 図ノード衝突/折返し・SmartArt 追随（@font-face CJK 埋め込み #115 は #192/#193/#194 で完了・shipped.md 参照） | #104 #105 |
@@ -48,8 +46,10 @@ arch-conformance が CI 必須化・R8 一致テスト規則）、**敵対 fixtu
 
 ## 依存・運用（継続追跡）
 
-- **dependabot OPEN**：#123 `serde_with` 3.21（security fix 含む・cargo）・#93 `sysinfo` 0.39・
-  #92 `gitleaks-action` v3（Node 24 移行）。js-yaml v5（メジャー）はブランチのみ＝破壊的変更の確認待ち。
+- **dependabot**：滞留分は 2026-07-19 に全件処理 — #123 `serde_with`（security fix）・#92 `gitleaks-action`
+  v3・#90 `tauri-action` v1（CI build で実走検証）・#93 `sysinfo` 0.39 をマージ、js-yaml v5（メジャー）は
+  破壊的変更（default export 廃止・空入力 throw）の移行込みで PR #204 として処理（`engine/yaml-io.ts` に
+  v4 互換を一本化）。
 - **依存脆弱性** — 残 1 件＝`glib`（medium）は gtk-rs/Tauri スタックに固定＝**Tauri の GTK バインディング
   更新待ち**（実害小）。
 - **会社 `.potx`(7) ＋ CX** — `tests/fixtures/templates/` に **gitignore**（知財・ローカル限定・skipIf のみ参照）。

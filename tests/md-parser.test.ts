@@ -25,10 +25,11 @@ describe("parseMd — image block", () => {
   });
 });
 
-// #148: a 2nd+ GFM table (or any body content around/after the first table) is completely DROPPED —
-// findTableInLines only returns the FIRST table's rows, and the table/body branches are mutually
-// exclusive (md-slide-parser.ts), so nothing besides that first table survives into SlideIR. The raw
-// dropped lines are gone the moment parseSlideBlock returns, so ONLY the parser can report this —
+// #148/#101: a 2ND+ GFM table (or another table hiding in the leftover) is still DROPPED — only
+// ONE native table survives per slide. But surrounding PROSE around a SINGLE table no longer is:
+// #101 fixed the parser to keep it (merged into idx "1", coexisting beside the table) instead of
+// discarding it, so this notice now fires ONLY for the genuine multi-table case. The raw dropped
+// lines are gone the moment parseSlideBlock returns, so ONLY the parser can report this —
 // deck-diagnostics (which only sees the parsed DeckIR) has nothing left to reconstruct from.
 describe("parseMdReport — table-dropped ParseNotice", () => {
   const TABLE_A = "| a | b |\n| --- | --- |\n| 1 | 2 |";
@@ -40,9 +41,16 @@ describe("parseMdReport — table-dropped ParseNotice", () => {
     expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
   });
 
-  it("fires when prose surrounds a single table (the prose is dropped too)", () => {
-    const { notices } = parseMdReport(`# T\n\n前置き\n\n${TABLE_A}\n\n後書き`);
-    expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
+  // #101: was "fires when prose surrounds a single table (the prose is dropped too)" — the root
+  // fix is exactly that the prose is NO LONGER dropped, so the notice must NOT fire here anymore.
+  it("does NOT fire when prose surrounds a single table — both coexist instead of dropping", () => {
+    const { deck, notices } = parseMdReport(`# T\n\n前置き\n\n${TABLE_A}\n\n後書き`);
+    expect(notices).toEqual([]);
+    const s = deck.slides[0];
+    expect(s.table?.rows).toEqual([["a", "b"], ["1", "2"]]);
+    const bodyText = JSON.stringify(s.placeholders.find((p) => p.idx === "1"));
+    expect(bodyText).toContain("前置き");
+    expect(bodyText).toContain("後書き");
   });
 
   it("does NOT fire for a slide with exactly one table and nothing else in the body", () => {
@@ -63,6 +71,74 @@ describe("parseMdReport — table-dropped ParseNotice", () => {
   it("parseMd (the thin wrapper) returns the identical deck parseMdReport does", () => {
     const md = `# T\n\n${TABLE_A}\n\n${TABLE_B}`;
     expect(parseMd(md)).toEqual(parseMdReport(md).deck);
+  });
+});
+
+// #101: リード段落＋表の混在スライド — the parser keeps BOTH (no-silent-drop) instead of discarding
+// the surrounding prose once a table is found. The table stays at its default idx "1" (byte-identical
+// for the existing solo-table case); the leftover prose merges into idx "1" text the same way plain
+// body text does, and the single-body serializer now emits both (text, then the table) instead of
+// treating them as mutually exclusive.
+describe("parseMd — lead paragraph + table coexistence (#101)", () => {
+  const TABLE = "| Metric | Value |\n| --- | --- |\n| Latency | 12ms |";
+
+  it("keeps the lead paragraph AND the table", () => {
+    const s = parseMd(`# Q3\n\n前置き\n\n${TABLE}`).slides[0];
+    expect(s.table?.rows).toEqual([["Metric", "Value"], ["Latency", "12ms"]]);
+    expect(s.table?.placeholderIdx).toBe("1");
+    const body = s.placeholders.find((p) => p.idx === "1");
+    expect(JSON.stringify(body)).toContain("前置き");
+  });
+
+  it("a solo table (no other body text) still defaults to idx 1 (byte-identical, no regression)", () => {
+    const s = parseMd(`# T\n\n${TABLE}`).slides[0];
+    expect(s.table?.placeholderIdx).toBe("1");
+    expect(s.placeholders.some((p) => p.idx === "1")).toBe(false);
+  });
+
+  it("round-trips stably: serialize → re-parse keeps both the text and the table", () => {
+    const once = parseMd(`# Q3\n\n前置き\n\n${TABLE}`).slides[0];
+    const twice = parseMd(serializeMd({ slides: [once] })).slides[0];
+    expect(twice.table?.rows).toEqual(once.table?.rows);
+    expect(JSON.stringify(twice.placeholders)).toContain("前置き");
+    // Idempotent: parsing the re-serialized form a 2nd time changes nothing further.
+    const thrice = parseMd(serializeMd({ slides: [twice] })).slides[0];
+    expect(thrice).toEqual(twice);
+  });
+});
+
+// #100: column 内の GFM テーブルがネイティブ表として列位置に出る
+describe("parseMd — column-scoped GFM table (#100)", () => {
+  it("a GFM table alone in a <!-- col --> section becomes a native table bound to that column", () => {
+    const md = `# Comparison
+
+<!-- col -->
+| A | B |
+| --- | --- |
+| 1 | 2 |
+
+<!-- col -->
+Right content`;
+    const s = parseMd(md).slides[0];
+    expect(s.table?.rows).toEqual([["A", "B"], ["1", "2"]]);
+    expect(s.table?.placeholderIdx).toBe("1"); // 1st column
+    expect(s.placeholders.find((p) => p.idx === "2")?.paragraphs[0]?.segments[0]?.text).toBe("Right content");
+  });
+
+  it("round-trips without collapsing into a single-body table (columns survive)", () => {
+    const md = `# Comparison
+
+<!-- col -->
+| A | B |
+| --- | --- |
+| 1 | 2 |
+
+<!-- col -->
+Right content`;
+    const once = parseMd(md).slides[0];
+    const back = parseMd(serializeMd({ slides: [once] })).slides[0];
+    expect(back.table?.rows).toEqual([["A", "B"], ["1", "2"]]);
+    expect(back.placeholders.find((p) => p.idx === "2")?.paragraphs[0]?.segments[0]?.text).toBe("Right content");
   });
 });
 

@@ -8,6 +8,7 @@
  */
 
 import * as yaml from "js-yaml";
+import { loadYaml } from "./yaml-io";
 
 // ── Types ──
 
@@ -209,7 +210,7 @@ function mergeNodeDefaults(base: NodeDefaults, overrides: Record<string, unknown
 // ── YAML I/O ──
 
 export function themeFromYaml(yamlStr: string): ThemeConfig {
-  const data = yaml.load(yamlStr);
+  const data = loadYaml(yamlStr);
   if (data === null || data === undefined) {
     return midnightExecutive();
   }

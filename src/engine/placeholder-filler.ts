@@ -7,7 +7,7 @@
  */
 
 import JSZip from "jszip";
-import * as yaml from "js-yaml";
+import { loadYaml } from "./yaml-io";
 import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
@@ -78,7 +78,7 @@ async function extractDiagramShapes(
   diagramYaml: string,
   region?: { x: number; y: number; w: number; h: number },
 ): Promise<string> {
-  const data = yaml.load(diagramYaml);
+  const data = loadYaml(diagramYaml);
   const result = DiagramSpecSchema.safeParse(data);
   if (!result.success) {
     throw new Error("Invalid diagram YAML: " + result.error.issues[0]?.message);

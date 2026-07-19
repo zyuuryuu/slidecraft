@@ -59,9 +59,11 @@ describe("#103 SlidePreview: nested bullet rendering (SSR)", () => {
   // Each nested-bullet paragraph renders as its OWN `<div style="margin-bottom:0.15em…">` (the
   // fixed "margin-bottom:0.15em" prefix is renderParagraph's first, always-present style — it
   // uniquely identifies a paragraph <div> vs. the placeholder's outer positioned wrapper <div>,
-  // which never carries that property).
+  // which never carries that property). #102 baked buChar "•" into this fixture's master bodyStyle,
+  // so a bullet paragraph now renders an extra `<span style="margin-right:0.4em">•</span>` glyph
+  // before the text span — optional here so a non-bullet paragraph (no glyph) still matches too.
   function paragraphStyles(html: string): { text: string; style: string }[] {
-    return [...html.matchAll(/<div style="(margin-bottom:0\.15em[^"]*)"><span>([^<]*)<\/span><\/div>/g)]
+    return [...html.matchAll(/<div style="(margin-bottom:0\.15em[^"]*)">(?:<span style="margin-right:0\.4em">[^<]*<\/span>)?<span>([^<]*)<\/span><\/div>/g)]
       .map((m) => ({ style: m[1], text: m[2] }));
   }
 

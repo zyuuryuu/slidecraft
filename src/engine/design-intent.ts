@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import * as yaml from "js-yaml";
+import { loadYaml } from "./yaml-io";
 import type { SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec, type NodeOverride } from "./schema";
 import { computeLayout, SLIDE_W, SLIDE_H, type NodePosition } from "./layout-engine";
@@ -57,7 +57,7 @@ export function parseDesignIntent(raw: string): DesignIntent | null {
 
 function specFromYaml(text: string): DiagramSpec | null {
   try {
-    const r = DiagramSpecSchema.safeParse(yaml.load(text));
+    const r = DiagramSpecSchema.safeParse(loadYaml(text));
     return r.success ? r.data : null;
   } catch {
     return null;
@@ -106,7 +106,7 @@ function loadFigureRaw(slide: SlideIR): { baseYaml: string; spec: DiagramSpec; r
   const spec = specFromYaml(baseYaml);
   if (!spec) return null;
   try {
-    return { baseYaml, spec, raw: (yaml.load(baseYaml) ?? {}) as RawDiagram };
+    return { baseYaml, spec, raw: (loadYaml(baseYaml) ?? {}) as RawDiagram };
   } catch {
     return null;
   }
