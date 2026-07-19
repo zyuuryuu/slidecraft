@@ -15,8 +15,7 @@ import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRe
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
-import { serializeMd } from "../engine/md-serializer";
-import { deckMarkdown, serializeTpl } from "./deck-markdown";
+import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
 import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
@@ -312,11 +311,13 @@ export function useDeckController() {
     // make the second stale. Awaiting keeps every buffered slide's edit landing in order.
     for (const [index, slide] of pending) {
       const resolved = slide.layout === "auto" ? autoSelectLayout(slide, index, count, catalog) : slide.layout;
-      const md = serializeMd({ slides: [{ ...slide, layout: resolved }] });
+      // Per-slide readout through the binding authority (ADR-0030 stage B, #159) — the catalog-free
+      // serialize dropped a closing-vocabulary slide's title, so the host would parse a title-less md.
+      const md = slideMarkdown({ ...slide, layout: resolved }, catalog, templateData);
       const r = await bridge.sendSlideMarkdown(index, md);
       if (!r.ok) bridge.notify(r.message ?? i18n.t("controller.slideEditSendFailed"));
     }
-  }, [catalog]);
+  }, [catalog, templateData]);
   const scheduleHostSend = useCallback(
     (index: number, slide: SlideIR, immediate: boolean) => {
       pendingSend.current.set(index, slide); // accumulate per index — no cross-slide edit is dropped
@@ -389,12 +390,12 @@ export function useDeckController() {
       const slide = cur?.slides[slideIndex];
       if (!slide) return;
       const resolved = slide.layout === "auto" ? autoSelectLayout(slide, slideIndex, cur!.slides.length, catalog) : slide.layout;
-      const fixed = visualizeKeyValueMd(serializeMd({ slides: [{ ...slide, layout: resolved }] }));
+      const fixed = visualizeKeyValueMd(slideMarkdown({ ...slide, layout: resolved }, catalog, templateData));
       if (!fixed) return;
       const newSlide = parseMd(fixed).slides[0];
       if (newSlide) handleSlideUpdate(slideIndex, newSlide, "commit");
     },
-    [catalog, handleSlideUpdate],
+    [catalog, templateData, handleSlideUpdate],
   );
 
   // Drag-to-move in the preview, or an AI diagram edit, writes the new diagram YAML
@@ -546,7 +547,7 @@ export function useDeckController() {
       // the harness-authored nudge (needs the original instruction; absent for batch/✨直す w/o one).
       const shouldRetry = hadFigure && rec.warnings.length > 0;
       return {
-        afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }),
+        afterMd: slideMarkdown({ ...rec.slide, layout: resolved }, catalog, templateData),
         warnings: figureFallbackTag(hadFigure, rec.warnings),
         ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
       };
@@ -576,7 +577,9 @@ export function useDeckController() {
     // Resolve unconditionally: a pinned name this template lacks degrades to a real layout (so the
     // cover's canonical pin doesn't leave the editor/preview layout-less on an alien master).
     const resolved = autoSelectLayout(s, activeSlide, deck!.slides.length, catalog);
-    return serializeMd({ slides: [{ ...s, layout: resolved }] });
+    // Per-slide readout through the binding authority (ADR-0030 stage B, #159): the catalog-free
+    // serialize showed a title-less md here, and one keystroke's parse-back made the loss REAL.
+    return slideMarkdown({ ...s, layout: resolved }, catalog, templateData);
   })();
 
   // Per-slide Markdown editing: the Markdown is the full source for this slide,
