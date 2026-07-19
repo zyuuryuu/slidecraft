@@ -73,6 +73,21 @@ const EMU = (inches: number) => Math.round(inches * 914400);
 const SLIDE_W = 13.333;
 const HEADER_BAR_H = 1.18; // light 系レイアウトのヘッダーバー（idx15/16 ヘッダーを覆う）
 
+// 日本語ファーストの既定: spec が majorEa/minorEa を指定しない時に theme <a:ea> へ焼く CJK フォールバック
+// フォント（#137）。Windows/Office 標準搭載で追加インストール不要なもの。
+const DEFAULT_EA_FONT = "Yu Gothic";
+
+// タイトルがサブタイトル枠と重ならないかの検査に使う行送り近似係数（実測フォントに依らない安全側の目安）。
+export const TITLE_LINE_HEIGHT_FACTOR = 1.2;
+// タイトル本文の下端とサブタイトル枠の間に最低限確保する余白（inch）。
+export const MIN_TITLE_SUBTITLE_GAP_IN = 0.15;
+
+/** タイトルが `lines` 行に折り返した時の本文下端（inch）。box は anchor="t" のため上端からテキストが
+ *  積み上がる前提（#137: 表紙のタイトル/サブタイトル衝突の検査に使う）。 */
+export function titleTextBottomIn(titleY: number, titleFontSizePt: number, lines: number): number {
+  return titleY + (lines * titleFontSizePt * TITLE_LINE_HEIGHT_FACTOR) / 72;
+}
+
 // マスター既定（canonical と同値 — lstStyle は差分のみ出力するのでここが基準）
 type MasterStyle = { sz: number; bold: boolean; font: "major" | "minor"; color: PaletteKey };
 const MASTER_TITLE: MasterStyle = { sz: 4400, bold: true, font: "major", color: "titleText" };
@@ -105,8 +120,8 @@ function themeXml(spec: TemplateSpec): string {
     `<a:hlink>${solid(c.accent)}</a:hlink><a:folHlink>${solid(c.muted)}</a:folHlink>` +
     `</a:clrScheme>` +
     `<a:fontScheme name="${escXml(spec.name)}">` +
-    `<a:majorFont><a:latin typeface="${escXml(spec.fonts.major)}"/><a:ea typeface="${escXml(spec.fonts.majorEa ?? "")}"/><a:cs typeface=""/></a:majorFont>` +
-    `<a:minorFont><a:latin typeface="${escXml(spec.fonts.minor)}"/><a:ea typeface="${escXml(spec.fonts.minorEa ?? "")}"/><a:cs typeface=""/></a:minorFont>` +
+    `<a:majorFont><a:latin typeface="${escXml(spec.fonts.major)}"/><a:ea typeface="${escXml(spec.fonts.majorEa ?? DEFAULT_EA_FONT)}"/><a:cs typeface=""/></a:majorFont>` +
+    `<a:minorFont><a:latin typeface="${escXml(spec.fonts.minor)}"/><a:ea typeface="${escXml(spec.fonts.minorEa ?? DEFAULT_EA_FONT)}"/><a:cs typeface=""/></a:minorFont>` +
     `</a:fontScheme>` +
     `<a:fmtScheme name="Office">` +
     `<a:fillStyleLst>${fill3}</a:fillStyleLst>` +
@@ -123,8 +138,16 @@ const emptySpTreeHeader =
   `<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>` +
   `<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
 
+// bodyStyle lvl1 の既定バレット（#137: 箇条書きが本文と区別できない = master に buChar/buAutoNum が
+// 無いのが根本原因）。段落間スペーシングも合わせて焼き、長文箇条書きが「壁テキスト」に見えるのを防ぐ。
+const BODY_BULLET_PPR =
+  `<a:spcBef><a:spcPts val="600"/></a:spcBef>` +
+  `<a:buFont typeface="Arial" pitchFamily="34" charset="0"/><a:buChar char="•"/>`;
+
 function masterStyleXml(tag: string, base: MasterStyle, spec: TemplateSpec): string {
-  return `<p:${tag}><a:lvl1pPr algn="l"><a:defRPr sz="${base.sz}"${base.bold ? ` b="1"` : ""}>` +
+  // タイトルは単一行想定のためバレットを明示的に抑制。本文（bodyStyle）のみ既定バレットを持つ。
+  const pPrExtra = tag === "bodyStyle" ? BODY_BULLET_PPR : `<a:buNone/>`;
+  return `<p:${tag}><a:lvl1pPr algn="l">${pPrExtra}<a:defRPr sz="${base.sz}"${base.bold ? ` b="1"` : ""}>` +
     `<a:solidFill><a:srgbClr val="${spec.palette[base.color]}"/></a:solidFill>` +
     `<a:latin typeface="${escXml(spec.fonts[base.font])}"/></a:defRPr></a:lvl1pPr></p:${tag}>`;
 }

@@ -10,7 +10,13 @@ import { describe, it, expect } from "vitest";
 import JSZip from "jszip";
 import { loadTemplate } from "../src/engine/template-loader";
 import { buildCatalog, assessTemplateHealth } from "../src/engine/template-catalog";
-import { writeTemplate, MIDNIGHT_PALETTE, type TemplateSpec } from "../src/engine/template-writer";
+import {
+  writeTemplate,
+  MIDNIGHT_PALETTE,
+  titleTextBottomIn,
+  MIN_TITLE_SUBTITLE_GAP_IN,
+  type TemplateSpec,
+} from "../src/engine/template-writer";
 import { BUILTIN_LAYOUTS } from "../src/engine/template-layout-library";
 import { parseMd } from "../src/engine/md-parser";
 import { distillDeck } from "../src/engine/distill";
@@ -110,5 +116,50 @@ describe("W4 サブセットとロール — レイアウト選択に耐える",
     const catalog = buildCatalog(await loadTemplate(await writeTemplate(midnightSpec())));
     const roles = new Set(catalog.map((e) => e.role));
     for (const r of ["title", "section", "content", "columns"]) expect(roles.has(r as never), r).toBe(true);
+  });
+});
+
+// Issue #137: create_template が日本語前提の体裁を満たさない（buChar 無し・ea 未設定・表紙ジオメトリ衝突）。
+describe("W5 日本語前提の体裁（#137）", () => {
+  it("master bodyStyle の lvl1 に bullet 定義（buChar）がある — 段落と箇条書きを区別できる", async () => {
+    const bytes = await writeTemplate(midnightSpec());
+    const z = await JSZip.loadAsync(bytes);
+    const masterXml = await z.file("ppt/slideMasters/slideMaster1.xml")!.async("string");
+    const bodyStyle = masterXml.match(/<p:bodyStyle>[\s\S]*?<\/p:bodyStyle>/)?.[0] ?? "";
+    const lvl1 = bodyStyle.match(/<a:lvl1pPr\b[\s\S]*?<\/a:lvl1pPr>/)?.[0] ?? "";
+    const buChar = lvl1.match(/<a:buChar[^>]*char="([^"]+)"/)?.[1];
+    expect(buChar).toBeTruthy();
+  });
+
+  it("theme の majorFont/minorFont に ea typeface（CJK フォールバック）が既定で入る", async () => {
+    const bytes = await writeTemplate(midnightSpec()); // spec は majorEa/minorEa を指定しない
+    const z = await JSZip.loadAsync(bytes);
+    const themeXml = await z.file("ppt/theme/theme1.xml")!.async("string");
+    for (const tag of ["majorFont", "minorFont"]) {
+      const block = themeXml.match(new RegExp(`<a:${tag}>[\\s\\S]*?<\\/a:${tag}>`))?.[0] ?? "";
+      const ea = block.match(/<a:ea typeface="([^"]*)"/)?.[1];
+      expect(ea, tag).toBeTruthy();
+    }
+  });
+
+  it("spec が majorEa/minorEa を明示した時は既定を上書きしてそのまま使う", async () => {
+    const bytes = await writeTemplate({ ...midnightSpec(), fonts: { major: "Georgia", minor: "Calibri", majorEa: "MS Mincho", minorEa: "MS Gothic" } });
+    const z = await JSZip.loadAsync(bytes);
+    const themeXml = await z.file("ppt/theme/theme1.xml")!.async("string");
+    expect(themeXml).toContain('<a:ea typeface="MS Mincho"/>');
+    expect(themeXml).toContain('<a:ea typeface="MS Gothic"/>');
+  });
+
+  it("表紙: タイトルが2行に折り返してもサブタイトル枠と重ならない（ジオメトリ計算）", () => {
+    const covers = BUILTIN_LAYOUTS.filter(
+      (l) => l.placeholders.some((p) => p.type === "ctrTitle") && l.placeholders.some((p) => p.type === "subTitle"),
+    );
+    expect(covers.length).toBeGreaterThan(0); // このアサーションが空振りしない（対象が実在する）ことを担保
+    for (const l of covers) {
+      const title = l.placeholders.find((p) => p.type === "ctrTitle")!;
+      const subtitle = l.placeholders.find((p) => p.type === "subTitle")!;
+      const titleBottom = titleTextBottomIn(title.y, title.fontSize, 2);
+      expect(subtitle.y, l.name).toBeGreaterThanOrEqual(titleBottom + MIN_TITLE_SUBTITLE_GAP_IN);
+    }
   });
 });
