@@ -23,7 +23,7 @@ arch-conformance が CI 必須化・R8 一致テスト規則）、**敵対 fixtu
 | **パーサ / 診断** | 列内表/混在本文・グループセル見出し・GUI コメント段落（要判断）・先頭章扉の表紙誤解決 | #100 #101 #102 #165 #195 |
 | **任意マスター取り込み理解** | 未束縛の UI surface・複数 master・野生コーパス収集・AI ラストマイル・表紙 subtitle（証拠待ち） | [`master-intake`](https://github.com/zyuuryuu/slidecraft/labels/master-intake)（#97 #99 #116 #128 #143） |
 | **既定テンプレ品質** | 内蔵30オミット・Re-make dark ロゴ | #117 #118 |
-| **表・描画 / HTML** | 図ノード衝突/折返し・SmartArt 追随・@font-face CJK 埋め込み（#115 分割・その1 #192 済） | #104 #105 #193 #194 |
+| **表・描画 / HTML** | 図ノード衝突/折返し・SmartArt 追随（@font-face CJK 埋め込み #115 は #192/#193/#194 で完了・shipped.md 参照） | #104 #105 |
 | **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
 | **GUI / アプリ堅牢性** | 最背面画像ドラッグ・Help 導線・.scft version ゲート | #122 #114 #121 |
 | **MCP / 連携** | スライドスクショ取得（上流 AI の視覚レビューループ） | [`mcp`](https://github.com/zyuuryuu/slidecraft/labels/mcp)（#109） |
