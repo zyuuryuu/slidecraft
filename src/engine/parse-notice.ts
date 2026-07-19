@@ -8,16 +8,18 @@
  */
 
 /**
- * `table-dropped`: a GFM table was found in a slide's body, but OTHER body content (surrounding
- * prose and/or a 2nd+ table) existed alongside it and was discarded — only the FIRST table's rows
- * survive into SlideIR (md-slide-parser #148). Fires whenever ANY leftover exists.
+ * `table-dropped`: a GFM table was found in a slide's body, but a GENUINE 2nd+ table also existed
+ * alongside it — only ONE native table survives per slide today, so that additional table (and
+ * anything around it) is discarded (md-slide-parser #148). Surrounding PROSE around a SINGLE table
+ * no longer triggers this: #101 fixed the parser to keep it (merged into idx "1", coexisting beside
+ * the table) instead of dropping it, so this notice now fires ONLY when a 2nd table is present.
  *
  * `image-dropped` / `meta-key-dropped`: sub-classifications of a table-dropped leftover — the
  * discarded content happened to be SHAPED like an image line / an unrecognized `Key: Value` line.
  * Outside a table-drop, these same shapes are RECONSTRUCTABLE from the parsed body text (they fall
  * through to a plain paragraph verbatim), so deck-diagnostics detects them there instead (R2) using
- * the SAME IMAGE_MARKDOWN_RE / unrecognizedMetaKey below — only when a table's mutually-exclusive
- * body branch swallows the raw line before it can become a paragraph does the PARSER have to report it.
+ * the SAME IMAGE_MARKDOWN_RE / unrecognizedMetaKey below — only when a 2nd table's collision
+ * swallows the raw line before it can become a paragraph does the PARSER have to report it.
  */
 export type ParseNoticeKind = "table-dropped" | "image-dropped" | "meta-key-dropped";
 

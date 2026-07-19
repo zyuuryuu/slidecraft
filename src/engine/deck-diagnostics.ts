@@ -147,11 +147,11 @@ export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseN
     const base = { slideIndex: n.slideIndex, title, levers: [] as Lever[] };
     switch (n.kind) {
       case "table-dropped":
-        return { ...base, level: "info" as const, message: "表以外の内容（2つ目以降の表や前後の本文）が変換時に失われました（ネイティブ表として保持されるのは1つのみ）" };
+        return { ...base, level: "info" as const, message: "2つ目以降の表（とその前後の内容）が変換時に失われました（ネイティブ表として保持されるのは1つのみ）" };
       case "image-dropped":
-        return { ...base, level: "info" as const, message: "画像記法（![alt](src)）を含む内容が表と衝突し変換時に失われました（2枚目以降の画像、または未対応の画像パスの可能性）" };
+        return { ...base, level: "info" as const, message: "画像記法（![alt](src)）を含む内容が2つ目以降の表と衝突し変換時に失われました" };
       case "meta-key-dropped":
-        return { ...base, level: "warn" as const, message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
+        return { ...base, level: "warn" as const, message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が2つ目以降の表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
     }
   });
 }

@@ -25,10 +25,23 @@ export function classifyCjkFont(name: string | undefined): CjkClass {
   return name.toLowerCase().includes(MINCHO_HINT) || name.includes(MINCHO_HINT_JA) ? "mincho" : "gothic";
 }
 
+// The last REAL (non-generic) entry in each fallback chain — named separately so #194's runtime
+// @font-face embed can target it by name without duplicating the literal string (R8).
+const GOTHIC_EMBED_TARGET = "Noto Sans CJK JP";
+const MINCHO_EMBED_TARGET = "Noto Serif CJK JP";
+
 // Ordered by real-world install base across Windows/macOS/Linux, ending in the CSS generic so an
 // unmatched environment still gets SOME serif/sans-serif rather than an unstyled fallback.
-const GOTHIC_FALLBACK = ["Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Meiryo", "sans-serif"];
-const MINCHO_FALLBACK = ["Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", "MS Mincho", "serif"];
+const GOTHIC_FALLBACK = ["Yu Gothic", "Hiragino Kaku Gothic ProN", GOTHIC_EMBED_TARGET, "Meiryo", "sans-serif"];
+const MINCHO_FALLBACK = ["Yu Mincho", "Hiragino Mincho ProN", MINCHO_EMBED_TARGET, "MS Mincho", "serif"];
+
+/** The fallback-chain family name a runtime CJK @font-face embed (#193/#194) should declare, so an
+ *  exported HTML's embedded subset is picked up by the EXISTING per-element font-family CSS with no
+ *  changes there: it's always the last real (non-generic) name in cjkFontFamily's chain for this
+ *  class, so it only kicks in once every higher-priority locally-installed font has been tried. */
+export function embedFallbackFamily(cjkClass: CjkClass): string {
+  return cjkClass === "mincho" ? MINCHO_EMBED_TARGET : GOTHIC_EMBED_TARGET;
+}
 
 const GENERIC_KEYWORDS = new Set(["serif", "sans-serif", "system-ui", "monospace", "cursive", "fantasy"]);
 

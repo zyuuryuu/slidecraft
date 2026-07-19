@@ -63,4 +63,22 @@ describe("#4 single-body figure on a separator-resolved layout round-trips", () 
     expect(JSON.stringify(back)).toContain("80%");
     expect(back.table).toBeUndefined();
   });
+
+  // #100: a table that's genuinely ONE of several real columns must NOT be swept into the
+  // single-body guard above (test #4's protection is for a table with NO other column content).
+  it("a column-scoped table (text col 1 + table col 2) keeps BOTH columns, not folded to single-body", () => {
+    const md = `# Comparison
+
+<!-- col -->
+左の説明
+
+<!-- col -->
+| A | B |
+| --- | --- |
+| 1 | 2 |`;
+    const src = parseMd(md).slides[0];
+    const back = rt(src);
+    expect(back.table?.rows).toEqual([["A", "B"], ["1", "2"]]);
+    expect(back.placeholders.find((p) => p.idx === "1")?.paragraphs[0]?.segments[0]?.text).toBe("左の説明");
+  });
 });
