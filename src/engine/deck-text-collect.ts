@@ -33,3 +33,31 @@ export function collectDeckText(deck: DeckIR): string {
   }
   return parts.filter((s) => s.length > 0).join("\n");
 }
+
+/** Whether any RENDERED text in the deck is bold (#194): an inline `bold` segment, a card/step group
+ *  heading paragraph (SlideCard forces fontWeight:bold on those), or a table with its header row
+ *  (SlideCard renders row 0 at fontWeight:700 when `header` is set). Drives which font weights the
+ *  HTML-export subset-embedding pipeline needs to fetch — a deck with no bold usage only needs the
+ *  smaller regular-weight subset. */
+export function deckUsesBold(deck: DeckIR): boolean {
+  const paragraphsBold = (paragraphs: Paragraph[]) =>
+    paragraphs.some((p) => p.heading || p.segments.some((s) => s.bold));
+  for (const slide of deck.slides) {
+    if (slide.table?.header) return true;
+    for (const ph of slide.placeholders) if (paragraphsBold(ph.paragraphs)) return true;
+    if (slide.notes && paragraphsBold(slide.notes)) return true;
+  }
+  return false;
+}
+
+// Hiragana/Katakana (U+3040-30FF), CJK Unified + Ext-A (U+3400-9FFF), CJK Compatibility Ideographs
+// (U+F900-FAFF), halfwidth Katakana (U+FF66-FF9F) — enough to detect "this deck's text needs a
+// CJK-capable font" without needing a full Unicode script table.
+const CJK_RANGE = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/;
+
+/** Whether `text` (as returned by collectDeckText) contains any CJK glyph. A deck with none of these
+ *  never needs the subset-embedding pipeline at all (#194 do-no-harm: zero size cost for non-CJK
+ *  decks — the existing Latin font stack already renders them correctly). */
+export function deckHasCjkText(text: string): boolean {
+  return CJK_RANGE.test(text);
+}

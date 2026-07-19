@@ -17,9 +17,13 @@ import { MERMAID_CONFIG } from "./mermaid";
 import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { mermaidToDiagramSpec } from "../engine/mermaid-to-diagram";
-import { assembleHtmlDeck, type Transition } from "../engine/html-shell";
+import { assembleHtmlDeck, type Transition, type EmbeddedFontFace } from "../engine/html-shell";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { serializeParagraphs } from "../engine/md-serializer-shared";
+import { collectDeckText, deckUsesBold, deckHasCjkText } from "../engine/deck-text-collect";
+import { resolveFontSubsetSource } from "../engine/font-subset-plan";
+import { classifyCjkFont, embedFallbackFamily, type CjkClass } from "../engine/font-stack";
+import { subsetFontToWoff2 } from "./font-subsetter";
 import type { DeckIR } from "../engine/slide-schema";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
@@ -51,6 +55,64 @@ async function preRenderNonNativeMermaid(deck: DeckIR): Promise<DeckIR> {
   return { ...deck, slides };
 }
 
+/** Fetch the bundled variable-font source for `cjkClass` (font-subset-plan's asset path, #193) and
+ *  subset it to `text` for each bold flag in `boldFlags` — the actual pinned weight always comes from
+ *  resolveFontSubsetSource itself (single source of truth for the bold→wght mapping, R8), never a
+ *  locally-duplicated 400/700 literal. Best-effort at every step (missing asset / WASM failure) —
+ *  do-no-harm (#194): embedding is purely additive, so any failure here just skips that face and
+ *  keeps the fallback stack. */
+async function subsetEmbedFaces(cjkClass: CjkClass, boldFlags: boolean[], text: string): Promise<EmbeddedFontFace[]> {
+  const { assetPath } = resolveFontSubsetSource(cjkClass, false);
+  let sourceFont: Uint8Array;
+  try {
+    const res = await fetch(assetPath);
+    if (!res.ok) return [];
+    sourceFont = new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return [];
+  }
+
+  const family = embedFallbackFamily(cjkClass);
+  const faces: EmbeddedFontFace[] = [];
+  for (const bold of boldFlags) {
+    const { wght } = resolveFontSubsetSource(cjkClass, bold);
+    try {
+      const subset = await subsetFontToWoff2(sourceFont, text, { wght });
+      faces.push({ family, weight: wght, woff2Base64: bytesToBase64(subset) });
+    } catch {
+      // harfbuzz/WASM failure for this weight — skip it, the CSS fallback stack still renders (do-no-harm)
+    }
+  }
+  return faces;
+}
+
+/** Which font classes (gothic/mincho) + weights the deck's title/body styles actually need embedded,
+ *  fetched+subsetted, then returned as @font-face-ready faces. Skips entirely (AC2) when the deck's
+ *  text has no CJK glyph at all — zero size cost for a non-CJK deck. */
+async function buildEmbeddedFonts(deck: DeckIR, template: TemplateData): Promise<EmbeddedFontFace[]> {
+  const text = collectDeckText(deck);
+  if (!deckHasCjkText(text)) return [];
+
+  const classes = new Set<CjkClass>([
+    classifyCjkFont(template.masterTitleStyle.eaFontName ?? template.masterTitleStyle.fontName),
+    classifyCjkFont(template.masterBodyStyle.eaFontName ?? template.masterBodyStyle.fontName),
+  ]);
+  const boldFlags = deckUsesBold(deck) ? [false, true] : [false];
+
+  const faces: EmbeddedFontFace[] = [];
+  for (const cjkClass of classes) faces.push(...(await subsetEmbedFaces(cjkClass, boldFlags, text)));
+  return faces;
+}
+
+/** btoa needs a binary string; chunk the conversion so a large WOFF2 buffer never blows the call
+ *  stack via `String.fromCharCode(...bytes)` on the whole array at once. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  return btoa(binary);
+}
+
 export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string; transition?: Transition } = {}): Promise<string> {
   // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）— PPTX/preview と同じ単一関数（R8）。
   const prepared = await preRenderNonNativeMermaid(materializeDerivedSlides(deck));
@@ -79,6 +141,11 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
     );
   });
 
+  // Runtime CJK subset embedding (#193/#194, default ON): collectDeckText runs on the MATERIALIZED
+  // `prepared` deck, not the raw input — derived content (TOC title "目次", section-nav recap lists)
+  // only exists post-materialize, and skipping that would leave those glyphs out of the subset.
+  const embeddedFonts = await buildEmbeddedFonts(prepared, template);
+
   return assembleHtmlDeck(slideHtmls, {
     title: opts.title,
     transition: opts.transition,
@@ -87,6 +154,7 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
     cspNonce: makeNonce(), // locks the exported .html under a CSP (ADR-0016 F2)
     // Speaker notes (#150): default-hidden panel, 'n' toggles. Plain Markdown text per slide.
     notes: prepared.slides.map((s) => (s.notes?.length ? serializeParagraphs(s.notes) : undefined)),
+    embeddedFonts,
   });
 }
 
