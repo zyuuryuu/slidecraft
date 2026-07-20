@@ -12,7 +12,7 @@ import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
-import { buildCatalog, placeholderRole } from "./template-catalog";
+import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./visual-placement";
 import { isGroupedLayout, expandGroups } from "./group-binding";
@@ -205,7 +205,7 @@ async function buildSlideXml(
     }
     let content = contentFor.get(ph.idx);
     // 章名フッタの自動注入（#168）: ftr 枠が未束縛（明示 Footer: 無し）のときだけ、所属章名を書く。
-    if (!content && sectionFooterText != null && placeholderRole(ph) === "footer") {
+    if (!content && sectionFooterText != null && isSectionFooterTarget(ph, layout.name)) {
       content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
     }
     if (!content) continue;

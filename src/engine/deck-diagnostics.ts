@@ -12,12 +12,13 @@
 
 import type { DeckIR, SlideIR, Paragraph } from "./slide-schema";
 import type { LayoutCatalog } from "./template-catalog";
-import { slideIdxRole } from "./template-catalog";
+import { slideIdxRole, isSectionFooterTarget } from "./template-catalog";
 import type { LayoutInfo } from "./template-loader";
 import { autoSelectLayout } from "./template-loader";
 import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
+import { sectionFooterFor } from "./deck-sections";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -40,7 +41,8 @@ export type ReviewRuleId =
   | "unbound-content"
   | "table-dropped"
   | "image-dropped"
-  | "meta-key-dropped";
+  | "meta-key-dropped"
+  | "section-footer-injected";
 
 export interface ReviewRule {
   id: ReviewRuleId;
@@ -60,6 +62,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "table-dropped", level: "info" },
   { id: "image-dropped", level: "info" },
   { id: "meta-key-dropped", level: "warn" },
+  { id: "section-footer-injected", level: "info" },
 ];
 
 const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
@@ -175,9 +178,31 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
     deck.slides.forEach((slide, i) => {
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
-      const n = slideBindingPlan(slide, layout).unbound.length;
-      if (n === 0) return;
-      issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
+      const plan = slideBindingPlan(slide, layout);
+      const n = plan.unbound.length;
+      if (n > 0) {
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
+      }
+
+      // #292: never-silent visibility for the section-footer auto-inject (#168) — the SAME
+      // eligibility check (isSectionFooterTarget) and the SAME "did binding leave it empty"
+      // signal (plan.unfilled) that placeholder-filler.buildSlideXml / SlideCard actually use, so
+      // this info diagnostic appears iff the injection would truly happen (R8, no 2nd judgment).
+      const sectionFooterText = sectionFooterFor(deck, i);
+      if (sectionFooterText != null) {
+        for (const u of plan.unfilled) {
+          const ph = layout.placeholders.find((p) => p.idx === u.idx);
+          if (!ph || !isSectionFooterTarget(ph, layout.name)) continue;
+          issues.push({
+            slideIndex: i,
+            title: slideTitle(slide),
+            id: "section-footer-injected",
+            level: RULE_LEVEL["section-footer-injected"],
+            message: `章名フッタ「${sectionFooterText}」がこの枠（${ph.name}）に自動注入されます（明示 Footer: 未指定）`,
+            levers: [],
+          });
+        }
+      }
     });
   }
 

@@ -26,7 +26,8 @@ import {
   type TemplateData,
   type PlaceholderInfo,
 } from "../src/engine/template-loader";
-import { buildCatalog } from "../src/engine/template-catalog";
+import { buildCatalog, isSectionFooterTarget } from "../src/engine/template-catalog";
+import { diagnoseDeck } from "../src/engine/deck-diagnostics";
 import { SlideCard } from "../src/components/SlidePreview";
 import type { DeckIR } from "../src/engine/slide-schema";
 
@@ -139,6 +140,41 @@ describe("sectionFooterFor — 純関数（deck-sections, #168）", () => {
   });
 });
 
+// ── isSectionFooterTarget — 純関数（template-catalog, #292） ──
+//
+// #292: idx-12 body（SlideCraft の idx-meta 規約で "footer" と解決される枠）は、Footer 以外の
+// 様々な意味（Date/Description/Contact 等）でも使われる（層3=#293 の根本）。章名フッタの自動注入は
+// isTitleLayout に加え、本物の footer 枠（明示 type="ftr" か枠名が Footer 系）だけに絞る。
+
+describe("isSectionFooterTarget — 純関数（template-catalog, #292）", () => {
+  const bodyPh = (idx: string, name: string): PlaceholderInfo => ({
+    idx,
+    type: "body",
+    name,
+    shapeXml: "<p:sp/>",
+    style: { x: 0, y: 0, w: 1, h: 1, fontSize: 12, fontColor: "000000", fontName: "Calibri", bold: false, align: "l", bulletChar: "" },
+  });
+
+  it("idx-12 body で枠名が Footer 系なら対象（組み込みテンプレの命名規約）", () => {
+    expect(isSectionFooterTarget(bodyPh("12", "Footer.Bottom"), "Content.1Body.Single")).toBe(true);
+  });
+
+  it("idx-12 body でも枠名が Footer 系でなければ対象外（Description/Contact/Date 等の誤爆防止）", () => {
+    expect(isSectionFooterTarget(bodyPh("12", "Description.Right"), "SectionNav.1Title.Single")).toBe(false);
+    expect(isSectionFooterTarget(bodyPh("12", "Contact.Bottom"), "Closing.1Message.Single")).toBe(false);
+    expect(isSectionFooterTarget(bodyPh("12", "Date.Bottom"), "Title.1Title.Single+1Summary")).toBe(false);
+  });
+
+  it("明示 type=\"ftr\" は枠名に関わらず対象（第三者テンプレの本物の footer）", () => {
+    expect(isSectionFooterTarget({ ...bodyPh("90", "Footer Placeholder 4"), type: "ftr" }, "Content.1Body.Single")).toBe(true);
+  });
+
+  it("Title./Closing. レイアウトは常に対象外（明示 Footer: 束縛の領分）", () => {
+    expect(isSectionFooterTarget(bodyPh("12", "Footer.Bottom"), "Title.1Title.Single")).toBe(false);
+    expect(isSectionFooterTarget({ ...bodyPh("90", "Footer"), type: "ftr" }, "Closing.1Message.Single")).toBe(false);
+  });
+});
+
 // ── PPTX 消費点（placeholder-filler.buildSlideXml） ──
 
 describe("generatePptx — ftr 枠への章名フッタ注入 (#168)", () => {
@@ -215,6 +251,50 @@ describe("generatePptx — ftr 枠への章名フッタ注入 (#168)", () => {
     expect(s2).toContain("手動フッタ");
     expect(s2).not.toContain("現状分析");
   });
+
+  // #292: idx-12 body（SlideCraft の idx-meta 規約で "footer" と解決される）だが実際には
+  // Footer ではない枠（Contact.Bottom / Description.Right）に章名が誤注入される silent な内容破損。
+  // get_deck_issues / get_slide.markdown には出ず OOXML を直接見ないと気づけない（repro #292）。
+
+  it("Closing.1Message.Single の Contact.Bottom（idx=12）には章名が注入されない（層1: isTitleLayout）", async () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          sectionBreak: true,
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "現状分析" }] }] }],
+        },
+        {
+          layout: "Closing.1Message.Single",
+          placeholders: [{ idx: "0", paragraphs: [{ segments: [{ text: "ご清聴ありがとうございました" }] }] }],
+        },
+      ],
+    };
+    const buf = await generatePptx(deck, tpl);
+    const s2 = await slideXml(buf, 2);
+    expect(s2).not.toContain("現状分析"); // Contact.Bottom (idx=12) に章名が漏れていない
+  });
+
+  it("SectionNav.1Title.Single の Description.Right（idx=12）には章名が注入されない（層2: 名前一致）", async () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          sectionBreak: true,
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "現状分析" }] }] }],
+        },
+        {
+          // SectionNav.1Title.Single は Title./Closing. どちらでもない — 層1だけでは塞げない
+          // （Description.Right は idx-12 body だが枠名が Footer 系ではない）。
+          layout: "SectionNav.1Title.Single",
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "別の話" }] }] }],
+        },
+      ],
+    };
+    const buf = await generatePptx(deck, tpl);
+    const s2 = await slideXml(buf, 2);
+    expect(s2).not.toContain("現状分析"); // Description.Right (idx=12) に章名が漏れていない
+  });
 });
 
 // ── HTML/プレビューの SSR 消費点（SlideCard — R8: PPTX と同じ導出関数を通る） ──
@@ -266,5 +346,116 @@ describe("SlideCard — 章名フッタの SSR 描画 (#168)", () => {
       />,
     );
     expect(html).not.toContain("現状分析");
+  });
+
+  it("SectionNav.1Title.Single の Description.Right には SSR でも章名が入らない (#292)", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          sectionBreak: true,
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "現状分析" }] }] }],
+        },
+        {
+          layout: "SectionNav.1Title.Single",
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "別の話" }] }] }],
+        },
+      ],
+    };
+    const i = 1;
+    const layout = findLayout(tpl, "SectionNav.1Title.Single");
+    const html = renderToStaticMarkup(
+      <SlideCard
+        slide={deck.slides[i]}
+        slideIndex={i}
+        totalSlides={deck.slides.length}
+        layout={layout}
+        masterBgColor={tpl.masterBgColor}
+        masterDecorations={tpl.masterDecorations}
+        masterStaticTexts={tpl.masterStaticTexts}
+        scale={96}
+        sectionFooterText={sectionFooterFor(deck, i)}
+        exportMode
+      />,
+    );
+    expect(html).not.toContain("現状分析");
+  });
+});
+
+// ── get_deck_issues への可視化（never-silent・#292 層4） ──
+
+describe("diagnoseDeck — 章名フッタ自動注入の info 診断 (#292)", () => {
+  it("ftr 枠へ章名フッタが自動注入されるスライドに info 診断が付く", () => {
+    const t = withFooterPlaceholder(tpl, "Content.1Body.Single");
+    const cat = buildCatalog(t);
+    const deck = parseMd(MD);
+    const issues = diagnoseDeck(deck, cat, t.layouts);
+    const hit = issues.find((x) => x.slideIndex === 2 && x.id === "section-footer-injected");
+    expect(hit).toBeTruthy();
+    expect(hit!.level).toBe("info");
+    expect(hit!.message).toContain("現状分析");
+  });
+
+  it("章扉より前のスライドには診断が付かない（注入されないため）", () => {
+    const t = withFooterPlaceholder(tpl, "Content.1Body.Single");
+    const cat = buildCatalog(t);
+    const deck = parseMd(MD);
+    const issues = diagnoseDeck(deck, cat, t.layouts);
+    expect(issues.some((x) => x.slideIndex === 0 && x.id === "section-footer-injected")).toBe(false);
+  });
+
+  it("Closing.1Message.Single / SectionNav.1Title.Single には診断が付かない（#292 修正後は注入されないため）", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          sectionBreak: true,
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "現状分析" }] }] }],
+        },
+        {
+          layout: "Closing.1Message.Single",
+          placeholders: [{ idx: "0", paragraphs: [{ segments: [{ text: "ご清聴ありがとうございました" }] }] }],
+        },
+        {
+          layout: "SectionNav.1Title.Single",
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "別の話" }] }] }],
+        },
+      ],
+    };
+    const cat = buildCatalog(tpl);
+    const issues = diagnoseDeck(deck, cat, tpl.layouts);
+    expect(issues.some((x) => x.id === "section-footer-injected")).toBe(false);
+  });
+
+  it("明示 Footer: が束縛されるスライドには診断が付かない（自動注入されないため）", () => {
+    const deck: DeckIR = {
+      slides: [
+        {
+          layout: "Content.1Body.Single",
+          sectionBreak: true,
+          placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "現状分析" }] }] }],
+        },
+        {
+          layout: "Title.1Title.Single",
+          placeholders: [
+            { idx: "0", paragraphs: [{ segments: [{ text: "クロージング" }] }] },
+            { idx: "12", paragraphs: [{ segments: [{ text: "手動フッタ" }] }] },
+          ],
+        },
+      ],
+    };
+    const cat = buildCatalog(tpl);
+    const issues = diagnoseDeck(deck, cat, tpl.layouts);
+    expect(issues.some((x) => x.id === "section-footer-injected")).toBe(false);
+  });
+
+  it("section 無しデッキは健全（新規診断が増えない）", () => {
+    const t = withFooterPlaceholder(tpl, "Content.1Body.Single");
+    const cat = buildCatalog(t);
+    const deck = parseMd("<!-- slide: Content.1Body.Single -->\n# T\n\n- body");
+    const plain = diagnoseDeck(deck, cat);
+    const withLayouts = diagnoseDeck(deck, cat, t.layouts);
+    expect(withLayouts.some((x) => x.id === "section-footer-injected")).toBe(false);
+    expect(withLayouts.length).toBe(plain.length);
   });
 });

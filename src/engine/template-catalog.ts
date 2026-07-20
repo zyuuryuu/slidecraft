@@ -14,6 +14,7 @@
 import type { LayoutInfo, PlaceholderInfo, TemplateData } from "./template-loader";
 import { detectGroups } from "./group-layout";
 import { isChromeBand } from "./master-scorer";
+import { isTitleLayout } from "./slide-roles";
 
 export type LayoutRole =
   | "title"
@@ -238,12 +239,15 @@ export function geometryRole(
 // Placeholder NAME keywords — the LAST-RESORT signal (the probe proved names are noise for
 // binding, so this sits BELOW geometry). JA + EN. Subtitle before title (so "subtitle" never
 // matches the title rule).
+// #292: a placeholder NAME that reads as "footer" (built-in convention: "Footer.Bottom" etc.) — the
+// ONE definition, shared with isSectionFooterTarget below so the two never drift (R8).
+const FOOTER_NAME_RE = /footer|フッ?ター/i;
 const PH_NAME_ROLE: Array<[RegExp, PlaceholderRole]> = [
   [/subtitle|サブ|副題/i, "subtitle"],
   [/title|見出し|タイトル|表題/i, "title"],
   [/category|カテゴリ/i, "category"],
   [/slide.?num|page.?num|ページ番号/i, "slideNumber"],
-  [/footer|フッ?ター/i, "footer"],
+  [FOOTER_NAME_RE, "footer"],
   [/date|日付/i, "date"],
   [/body|content|本文|コンテンツ|箇条/i, "body"],
 ];
@@ -336,6 +340,26 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
   if (n) return n;
   if (ph.style.w > 0 && ph.style.h > 0 && ph.style.w * ph.style.h >= 1.0) return "body"; // T5 area
   return "other";
+}
+
+/**
+ * #292: is `ph` a legitimate target for the section-footer auto-inject (#168)? placeholderRole's
+ * idx-META convention resolves idx=12 to "footer" UNCONDITIONALLY — but the SAME idx also carries
+ * Date/Description/Contact meaning on other built-in layouts (Description.Right on
+ * SectionNav.1Title.Single, Contact.Bottom on Closing.1Message.Single — see #293, the idx-convention
+ * root cause, out of scope here). Auto-injecting chapter-name text into those is silent content
+ * corruption. Restrict the injection (NOT placeholderRole itself — every other consumer of the role
+ * convention is unaffected) to:
+ *   1. layouts that aren't Title./Closing. (those bind an explicit `Footer:` meta field instead), AND
+ *   2. a placeholder that is a footer by an UNAMBIGUOUS signal: explicit type="ftr" (a third-party
+ *      master's real footer) or a name matching the "Footer" convention (a built-in layout's own
+ *      naming, e.g. "Footer.Bottom") — reusing FOOTER_NAME_RE, not a second definition (R8).
+ * A bare idx-12 body whose type/name say nothing about footer (e.g. "Description.Right") is excluded.
+ */
+export function isSectionFooterTarget(ph: PlaceholderInfo, layoutName: string): boolean {
+  if (isTitleLayout(layoutName)) return false;
+  if (placeholderRole(ph) !== "footer") return false;
+  return ph.type.toLowerCase() === "ftr" || FOOTER_NAME_RE.test(ph.name);
 }
 
 /**

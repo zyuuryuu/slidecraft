@@ -11,7 +11,7 @@ import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
 import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, PlaceholderStyle } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
-import { buildCatalog, placeholderRole } from "../engine/template-catalog";
+import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
@@ -585,7 +585,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         let content = contentFor.get(ph.idx);
         // 章名フッタの自動注入（#168）: ftr 枠が未束縛（明示 Footer: 無し）のときだけ所属章名を書く —
         // PPTX export（placeholder-filler.buildSlideXml）と同じ判定（R8）。
-        if (!content && sectionFooterText != null && placeholderRole(ph) === "footer") {
+        if (!content && sectionFooterText != null && isSectionFooterTarget(ph, layout!.name)) {
           content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
         }
         if (!content) return null;
