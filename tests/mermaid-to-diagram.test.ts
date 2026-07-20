@@ -138,6 +138,63 @@ describe("mermaidToDiagramSpec", () => {
     expect(mermaidToDiagramSpec("not a graph")).toBeNull();
     expect(mermaidToDiagramSpec("")).toBeNull();
   });
+
+  describe("arrow variants (#255)", () => {
+    it("parses the bold/thick arrow ==>", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A ==> B`);
+      expect(spec!.nodes).toHaveLength(2);
+      expect(spec!.edges).toHaveLength(1);
+      expect(spec!.edges[0]).toMatchObject({ from: "A", to: "B" });
+    });
+
+    it("parses variable-length arrows --> / ---> / ----> without mis-splitting nodes", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A ---> B\n  B -----> C`);
+      expect(spec!.nodes).toHaveLength(3);
+      expect(spec!.nodes.map(n => n.id)).toEqual(["A", "B", "C"]);
+      expect(spec!.nodes.find(n => n.id === "B")!.label).toBe("B");
+      expect(spec!.edges).toHaveLength(2);
+      expect(spec!.edges[0]).toMatchObject({ from: "A", to: "B" });
+      expect(spec!.edges[1]).toMatchObject({ from: "B", to: "C" });
+    });
+
+    it("parses the circle-endpoint arrow --o without dropping the edge", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A --o B`);
+      expect(spec!.nodes).toHaveLength(2);
+      expect(spec!.edges).toHaveLength(1);
+      expect(spec!.edges[0]).toMatchObject({ from: "A", to: "B" });
+    });
+
+    it("parses the cross-endpoint arrow --x without dropping the edge", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A --x B`);
+      expect(spec!.nodes).toHaveLength(2);
+      expect(spec!.edges).toHaveLength(1);
+      expect(spec!.edges[0]).toMatchObject({ from: "A", to: "B" });
+    });
+
+    it("parses the bidirectional arrow <--> without dropping the edge", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A <--> B`);
+      expect(spec!.nodes).toHaveLength(2);
+      expect(spec!.edges).toHaveLength(1);
+      expect(spec!.edges[0]).toMatchObject({ from: "A", to: "B" });
+    });
+
+    it("does not regress plain --> / -.-> / --- interpretation", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A --> B\n  B -.-> C\n  C --- D`);
+      expect(spec!.nodes).toHaveLength(4);
+      expect(spec!.edges).toHaveLength(3);
+      expect(spec!.edges[0]).toMatchObject({ from: "A", to: "B" });
+      expect(spec!.edges[0].style?.dash).toBeUndefined();
+      expect(spec!.edges[1]).toMatchObject({ from: "B", to: "C" });
+      expect(spec!.edges[1].style?.dash).toBe(true);
+      expect(spec!.edges[2]).toMatchObject({ from: "C", to: "D" });
+    });
+
+    it("keeps edge labels working with the thick arrow", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A ==>|urgent| B`);
+      expect(spec!.edges).toHaveLength(1);
+      expect(spec!.edges[0].label).toBe("urgent");
+    });
+  });
 });
 
 describe("diagramSpecToMermaid", () => {
