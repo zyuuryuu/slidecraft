@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { resolve } from "node:path";
 import { createServer, type Server } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -68,6 +69,55 @@ function pngInfo(bytes: Buffer): { isPng: boolean; w: number; h: number } {
   return { isPng, w: bytes.readUInt32BE(16), h: bytes.readUInt32BE(20) };
 }
 
+/** Decode a Chrome-screenshot PNG (8-bit, RGB or RGBA, non-interlaced) and count the pixels that
+ *  differ from the image's dominant color — "ink". Compressed-size heuristics proved encoder-
+ *  dependent (CI's chrome emitted a far smaller file than the local one for the same content);
+ *  counting actual non-background pixels is calibration-free. */
+function inkPixels(bytes: Buffer): number {
+  const colorType = bytes[25]; // IHDR: 2=RGB, 6=RGBA
+  const bpp = colorType === 6 ? 4 : 3;
+  const { w, h } = pngInfo(bytes);
+  // Concatenate IDAT payloads, inflate, unfilter scanlines (PNG filters 0-4).
+  const idat: Buffer[] = [];
+  for (let off = 8; off + 8 <= bytes.length; ) {
+    const len = bytes.readUInt32BE(off);
+    const type = bytes.toString("ascii", off + 4, off + 8);
+    if (type === "IDAT") idat.push(bytes.subarray(off + 8, off + 8 + len));
+    off += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = w * bpp;
+  const img = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    const filter = raw[y * (stride + 1)];
+    const src = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    const row = img.subarray(y * stride, (y + 1) * stride);
+    const prev = y > 0 ? img.subarray((y - 1) * stride, y * stride) : Buffer.alloc(stride);
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? row[x - bpp] : 0;
+      const b = prev[x];
+      const c = x >= bpp ? prev[x - bpp] : 0;
+      let v = src[x];
+      if (filter === 1) v += a;
+      else if (filter === 2) v += b;
+      else if (filter === 3) v += (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      row[x] = v & 0xff;
+    }
+  }
+  // Dominant color (sampled) → count pixels that differ from it.
+  const counts = new Map<number, number>();
+  const key = (i: number) => (img[i] << 16) | (img[i + 1] << 8) | img[i + 2];
+  for (let i = 0; i < img.length; i += stride) for (let x = 0; x < stride; x += bpp * 7) counts.set(key(i + x), (counts.get(key(i + x)) ?? 0) + 1);
+  const dominant = [...counts.entries()].sort((p, q) => q[1] - p[1])[0][0];
+  let ink = 0;
+  for (let i = 0; i < img.length; i += bpp) if (key(i) !== dominant) ink++;
+  return ink;
+}
+
 describe("browser discovery (env → system → null)", () => {
   it("an explicit SLIDECRAFT_BROWSER wins when it exists", () => {
     setEnv("SLIDECRAFT_BROWSER", process.execPath); // any existing executable path
@@ -110,8 +160,10 @@ describe.skipIf(!TEST_BROWSER)("real headless rasterization", () => {
     expect(isPng).toBe(true);
     expect(w).toBe(1280);
     expect(h).toBe(720);
-    // A blank/tofu page compresses to a few KB; a real dark-navy cover with CJK text does not.
-    expect(bytes.length).toBeGreaterThan(15_000);
+    // Real ink (decoded pixels differing from the dominant background), not compressed-size
+    // guesswork: the cover's title/subtitle/decorations paint tens of thousands of pixels; a
+    // text-less flat render stays near zero.
+    expect(inkPixels(bytes)).toBeGreaterThan(10_000);
   }, 60_000);
 
   it("the network is DEAD during rasterization: a live local listener sees zero connections", async () => {

@@ -189,8 +189,11 @@ export async function rasterizeHtml(
     // data: — all the page needs — bypass proxies by definition.
     "--proxy-server=http://127.0.0.1:9",
     "--host-resolver-rules=MAP * ~NOTFOUND",
-    // Deterministic settle for the data:-URI fonts/images before the shot.
-    "--virtual-time-budget=4000",
+    // Deterministic settle for the data:-URI fonts/images before the shot, and force every
+    // compositor stage so the screenshot can never capture a partially painted frame (CI's
+    // chrome produced a text-less shot without it).
+    "--virtual-time-budget=10000",
+    "--run-all-compositor-stages-before-draw",
     ...(env["SLIDECRAFT_BROWSER_NO_SANDBOX"] === "1" ? ["--no-sandbox"] : []),
     pathToFileURL(pagePath).href,
   ];
