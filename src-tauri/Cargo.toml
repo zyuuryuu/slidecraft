@@ -15,6 +15,9 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
 tauri-plugin-fs = "2"
+# Help/? → docs site (issue #114): opens external URLs via the OS default browser,
+# scoped to the docs host only (capabilities/default.json).
+tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Streaming model-weights download (rustls = pure-Rust TLS, no system OpenSSL) + SHA256 verify.

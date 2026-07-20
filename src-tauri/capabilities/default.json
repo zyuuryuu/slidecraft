@@ -28,6 +28,10 @@
         { "url": "http://127.0.0.1:*/*" },
         { "url": "https://**" }
       ]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://zyuuryuu.github.io/**" }]
     }
   ]
 }

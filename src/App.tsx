@@ -24,6 +24,7 @@ import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration
 import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
 import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
+import { openDocs } from "./ipc/docs";
 import { describeRepairPlan } from "./components/apply-template";
 import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
 import TemplateCreator from "./components/TemplateCreator";
@@ -149,6 +150,12 @@ export default function App() {
   // the collab bridge below can both depend on `notify` without a temporal-dead-zone reference.
   const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
   const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
+  // Help/? (issue #114) — never-silent: if opener/window.open can't actually open the docs
+  // site, surface the URL instead of failing quietly.
+  const handleHelp = useCallback(async () => {
+    const { opened, url } = await openDocs();
+    if (!opened) notify(t("app.helpUrlFallback", { url }));
+  }, [notify, t]);
   // Multi-select batch edit (apply ONE instruction to every selected slide) → proposal.
   const refine = useDeckRefine({
     deck, catalog, templateData, setDeck,
@@ -372,6 +379,7 @@ export default function App() {
           onRedo={editLocked ? handleCollabRedo : redoDeck}
           canUndo={editLocked ? true : canUndo}
           canRedo={editLocked ? true : canRedo}
+          onHelp={handleHelp}
         />
         <div className="flex items-center gap-2 px-3 py-2">
           {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
