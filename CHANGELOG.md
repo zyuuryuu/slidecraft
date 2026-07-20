@@ -7,15 +7,65 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-20
+
+早期版（0.x）。**AI 協働（MCP）の視覚レビューと単一エンドポイント化**、**既存コンテンツからの便利スライド生成**、**Mermaid 図の大幅拡張**、**CJK フォント埋め込み**、**リリース成果物の完全性シグナル**が目玉のマイナー版。（**v0.3.0 は公開を取り止め、その存続機能も本版に含む** — AI 非決定 Re-make は下記のとおり撤去済み。）
+
 ### Added
 
-- **faithful Re-make（デザインを保持して取り込む）** — テンプレートの装飾・背景・レイアウトをそのまま保持し、フォントだけ整えて取り込む新モード（[ADR-0027](docs/adr/0027-remake-source-visual-preservation.md)）。日本語（EA）ブランドフォントも保持。「テーマだけ取り込む」から「デザインを保持して取り込む」に。
-- **マスター取り込みの透明化（進捗＋結果＋レイアウトのミニプレビュー）** — 取り込み時に進捗バー、完了後に結果要約バーを表示。「詳細」で**各レイアウトのミニプレビュー（実描画＝WYSIWYG）**・抽出テーマ（フォント/配色/ロゴ）・修復件数・健全性の指摘を確認できる（従来は無言適用のみ）。テンプレ削除・再表示 ⓘ も。
-- **スライドの句読点に警告** — 句読点はスライドでは読みにくいため、レビューで**読点「、」は強い警告・句点「。」は軽い注意**を表示（「✨直す」で AI が整形）。
+**AI 協働（MCP）**
 
-### Changed / Removed
+- **スライドの見た目を画像で確認できる `get_slide_image`**（[#109](https://github.com/zyuuryuu/slidecraft/issues/109)・PR #239）— 上流 AI が「自分の編集でレイアウトが崩れていないか」を実際の描画（PNG）で確認できるツール。撮る対象は preview / HTML 書き出しと同一の共有描画（第2の描画経路を作らない＝WYSIWYG 単一源）。ラスタ化はマシンにある **Chrome / Edge だけ**を使い、ブラウザの**同梱・自動ダウンロードはしない**（陳腐化＝穴の開いたブラウザを配らないため）。未検出は never-silent（`browser-not-found`）で案内。使い捨てプロファイル・ネット遮断・ページ CSP で JS ゼロ。任意機能＝ブラウザ無しでも著作/出力は成立。
+- **ブラウザ無しでも見た目を確認できる `get_slide_html`**（[#242](https://github.com/zyuuryuu/slidecraft/issues/242)・PR #252）— `get_slide_image` と同じ共有描画を **HTML 文字列**で返すツール（script ゼロ・フォント埋め込み済）。CI などブラウザ未導入環境でも呼び出し側の任意手段でラスタ化できる。
+- **MCP の接続がコマンド1つに（adaptive front）**（[ADR-0033](docs/adr/0033-mcp-single-control-plane.md)・#222/#224）— エージェントに登録するのは `slidecraft serve` の1つだけ。GUI 稼働中は自動で相乗り（forward）、無ければ単独（solo）で動く。**管制（deck 権威＋undo）を1つに統一**し、単独モードでも**サーバ側 `undo`/`redo`** が効くように。
+- **MCP の細かな改善** — スライド分割後の旧→新 index 対応表 `indexMap`（[#243](https://github.com/zyuuryuu/slidecraft/issues/243)・PR #249）、`get_authoring_guide` の `activeReviewRules`（レビュー規則を編集前に一覧提示・[#244](https://github.com/zyuuryuu/slidecraft/issues/244)・PR #253）、成否判定の明文化＋`isOk` helper（[#246](https://github.com/zyuuryuu/slidecraft/issues/246)・PR #250）。
+- **MCP クライアント別セットアップ手順**（[#283](https://github.com/zyuuryuu/slidecraft/pull/283)）— Claude Code / Claude Desktop / Cursor / GitHub Copilot（VS Code）の登録レシピと、「HTTP エンドポイント直登録はアンチパターン（port/token が起動ごとに変わる）→ stdio コマンド1本に寄せる」勘所をユーザガイドに追記。
 
-- **AI Re-make（試験）を撤去**（[ADR-0028](docs/adr/0028-retire-ai-remake-option-c.md)）— 入力レイアウトを標準レイアウトへ「写像」する試験機能は、faithful Re-make（保つ）＋決定論 Re-make（作り直す）が明確な代替となり、"間違った AI の使い所" と判断したため削除。取り込みは「忠実 Import／faithful Re-make／決定論 Re-make」に整理。
+**便利スライドの生成・章立て**
+
+- **便利スライドの生成メニュー（目次 live/static）**（[ADR-0034](docs/adr/0034-convenience-slide-generation.md)・[#277](https://github.com/zyuuryuu/slidecraft/issues/277)・PR #280）— スライド一覧の ✨ から、既存の章立てをもとに**目次**を生成して挿入。「自動更新（章に追随・直接編集不可）」と「固定（普通に編集できる・"作り直す"で再生成）」を選べる。特殊記法（`<!-- toc -->`）の手書きは不要に（後方互換で読み続ける）。
+- **目次見出しの言語自動切替**（[#184](https://github.com/zyuuryuu/slidecraft/issues/184)・PR #234）— 章タイトルが英語だけのデッキでは目次見出しが自動で "Table of Contents" に（日本語を含めば「目次」）。
+- **スピーカーノート `<!-- note -->` ＋ 章タグ `<!-- section -->` ＋ 導出目次 `<!-- toc -->`**（[ADR-0032](docs/adr/0032-authoring-notes-and-sections.md)・#150/#151）— 「スライドは疎に・詳細はノートへ」を可能にし、章番号・目次・章扉再掲・フッタ章名を単一関数から毎回導出（本文との乖離が構造的に起きない）。
+
+**図（Mermaid / ネイティブ）**
+
+- **Mermaid 図の対応拡張** — フローチャートの太矢印 `==>`・可変長 `--->`・丸/バツ端点 `--o`/`--x`・双方向 `<-->`（[#255](https://github.com/zyuuryuu/slidecraft/issues/255)・PR #264）、クラス図の generics `List~T~`・`<<interface>>` stereotype 保持（[#256](https://github.com/zyuuryuu/slidecraft/issues/256)・PR #263）、ノード形状 **stadium `([ ])`・subroutine `[[ ]]`・parallelogram `[/ /]`・cylinder `[( )]`**（従来は四角に潰れていた・[#269](https://github.com/zyuuryuu/slidecraft/issues/269)・PR #271）、**シーケンス図の注釈 `Note over`/`Note left of`/`Note right of`**（従来は無視・[#270](https://github.com/zyuuryuu/slidecraft/issues/270)・PR #273）を正しく解釈・描画。
+- **CJK フォントの実行時サブセット化＋HTML への `@font-face` 埋め込み**（[#115](https://github.com/zyuuryuu/slidecraft/issues/115)・#192/#193/#194）— デッキの実使用文字だけの Noto Sans/Serif JP サブセットを生成して HTML に埋め込み、環境にフォントが無くても CJK が文字化けしない（CJK 無しデッキは埋め込みスキップ＝サイズ増ゼロ）。
+
+**取り込み・テンプレート**
+
+- **faithful Re-make（デザインを保持して取り込む）**（[ADR-0027](docs/adr/0027-remake-source-visual-preservation.md)）— テンプレートの装飾・背景・レイアウトをそのまま保持し、フォントだけ整えて取り込む新モード。日本語（EA）ブランドフォントも保持。
+- **マスター取り込みの透明化（進捗＋結果＋ミニプレビュー）** — 取り込み時に進捗バー、完了後に結果要約バーを表示。「詳細」で各レイアウトのミニプレビュー（実描画＝WYSIWYG）・抽出テーマ（フォント/配色/ロゴ）・修復件数・健全性の指摘を確認できる。
+
+**オーサリング・編集**
+
+- **表と本文の共存＋列内 GFM テーブルのネイティブ保持**（#100/#101・PR #207）、**グループセル内 `## 見出し` 表示**（[#102](https://github.com/zyuuryuu/slidecraft/issues/102)・PR #209）、**ネスト箇条書き（3段）**（[#103](https://github.com/zyuuryuu/slidecraft/issues/103)・PR #202）。
+- **スライドの句読点に警告** — 句読点はスライドで読みにくいため、レビューで読点「、」は強い警告・句点「。」は軽い注意を表示（「✨直す」で AI が整形）。
+- **非ディレクティブ HTML コメントの本文混入を解消＋変換レポートの完成**（#147/#148/#165）— レビュー注記・TODO を md に残したまま変換できるように。無言で起きていた drop を `get_deck_issues` に計上。
+
+**UX**
+
+- **初回起動オンボーディング**（[#259](https://github.com/zyuuryuu/slidecraft/issues/259)・PR #265）— 初回に最小の起点パネル（新規／`.pptx` を開く／サンプル＋簡単な手順とドキュメント導線）を表示。「次回以降表示しない」でスキップ。
+- **「新版あり」通知バナー**（[ADR-0021](docs/adr/0021-auto-update-strategy.md)・[#113](https://github.com/zyuuryuu/slidecraft/issues/113)・PR #236）— 公開リリースが現行版より新しいとき dismissible バナーで通知（**通知のみ・自動更新や署名は伴わない**）。CSP `connect-src` に `api.github.com` のみ追加。
+
+### Changed
+
+- **macOS の公式ビルドは Apple Silicon（arm64）のみに**（[#112](https://github.com/zyuuryuu/slidecraft/issues/112)）— Intel Mac 向けインストーラの提供を終了（Intel はソースからのビルドで利用）。Windows・Linux は従来どおり。
+- **レイアウト選出エンジンの gate 付き強化（Tier1/2）**（[ADR-0025](docs/adr/0025-placeholder-role-resolution.md)・v0.3.0 由来）— スライドの中身に合ったレイアウトが選ばれやすく（単純な箇条書きが不必要に段組へ割り当てられる問題を是正・degrade 末尾を適性ベースに）。健全テンプレは byte-identical。
+- **README を英語既定に**（[#260](https://github.com/zyuuryuu/slidecraft/issues/260)）— トップの `README.md` を英語に、日本語は `README.ja.md` に（相互リンクあり）。
+- **リリース成果物の完全性シグナル**（#257/#258・PR #266）— 各リリースに `SHA256SUMS`・ビルド来歴の証明（`attest-build-provenance`）・SBOM（CycloneDX）を添付（**コード署名は行わない**）。リリースノートは CHANGELOG の当該タグ節から自動生成。
+
+### Removed
+
+- **AI 非決定 Re-make（試験・v0.3.0 で新設）を撤去**（[ADR-0028](docs/adr/0028-retire-ai-remake-option-c.md)）— 入力レイアウトを標準レイアウトへ「写像」する試験機能は、faithful Re-make（保つ）＋決定論 Re-make（作り直す）が明確な代替となり削除。v0.3.0 が公開されなかったためユーザには未到達。取り込みは「忠実 Import／faithful Re-make／決定論 Re-make」に整理。
+
+### Fixed
+
+- **図の重なりを修正（横向きレイアウト）**（#104/#229・PR #237）— 横方向（LR/RL）で高さの違うノード（クラス図・状態図・ひし形など）が同じ段で重なることがあった問題を修正。縦向き・均一高の図は座標バイト不変。
+- **グループの反転（鏡像）指定がプレビュー/HTML で正しく反転**（[#241](https://github.com/zyuuryuu/slidecraft/issues/241)・PR #248）。PPTX 出力は不変。
+- **同梱テンプレ「Midnight Executive」で白タイトルが不可視だった不具合**（[#274](https://github.com/zyuuryuu/slidecraft/issues/274)・PR #278）— 19 レイアウトに正しい暗色下地（`TitleBackdrop`）を補って修正（回帰テスト付き）。
+- **スライド一覧のサムネイルと右プレビューの表示一致**（[#275](https://github.com/zyuuryuu/slidecraft/issues/275)・PR #279/#280）— 目次・章扉再掲が左サムネイルで空/素に見えていた不一致を、表示用 materialize を1本化して解消。一覧＝プレビュー＝書き出しが一致。
+- **先頭に置いた章扉の表紙誤解決**（[#195](https://github.com/zyuuryuu/slidecraft/issues/195)・PR #199）、**closing スライドの本文落ち**（[#153](https://github.com/zyuuryuu/slidecraft/issues/153)・PR #175）、**CRLF 入力での layout pin 無効化**（[#164](https://github.com/zyuuryuu/slidecraft/issues/164)・PR #187）、**複数ドキュメント切替時の snapshot 損失**（[#160](https://github.com/zyuuryuu/slidecraft/issues/160)・PR #173）を修正。
 
 ## [0.3.0] - 2026-07-08
 
