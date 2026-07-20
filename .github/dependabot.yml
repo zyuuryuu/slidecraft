@@ -11,6 +11,15 @@ updates:
       # one PR for the low-risk minor/patch bumps; majors stay separate for review
       npm-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # harfbuzzjs 1.x (v1.0.0 "major rewrite of the JS bindings") DROPPED the hb-subset
+      # JS API we depend on for CJK font subsetting (src/components/font-subsetter.ts). No
+      # public wasm subpath, no Subsetter in the API, and the ecosystem wrapper `subset-font`
+      # still pins harfbuzzjs@^0.10.3. Pinned to 0.10.3 until an alternative subsetter or a
+      # restored binding exists — see #218. Reaching the private dist wasm would be an R6
+      # workaround. Block majors so the red 1.x PR (#216) stops being re-proposed.
+      - dependency-name: "harfbuzzjs"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "cargo"
     directory: "/src-tauri"

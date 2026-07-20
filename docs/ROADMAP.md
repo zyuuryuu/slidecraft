@@ -52,5 +52,10 @@ CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [
   v4 互換を一本化）。
 - **依存脆弱性** — 残 1 件＝`glib`（medium）は gtk-rs/Tauri スタックに固定＝**Tauri の GTK バインディング
   更新待ち**（実害小）。
+- **`harfbuzzjs` は 0.10.3 pin（1.x へ上げない）** — v1.0.0 の JS バインディング全面書き直しで **hb-subset が削除**され、
+  CJK フォントサブセット化（`font-subsetter.ts`）の唯一経路が 1.x で断たれる（`subset-font` も 0.10.3 依存）。
+  dependabot.yml で major を ignore・PR #216 は close。放置リスクは低い（subset 対象は**自前の同梱フォントのみ**＝
+  未知フォント経路なし／`do-no-harm` で subset 失敗＝埋め込みスキップして export は成立）。代替 subsetter 調査は
+  **低優先トラッカー #218**。将来「取り込みテンプレ内の未知フォントも subset」に広げるなら CVE 面を再評価。
 - **会社 `.potx`(7) ＋ CX** — `tests/fixtures/templates/` に **gitignore**（知財・ローカル限定・skipIf のみ参照）。
   再現可能な代替は Dirty_* 合成 fixture 群＋（将来）#143 の双子。
