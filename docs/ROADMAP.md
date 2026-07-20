@@ -21,7 +21,7 @@ CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [
 | **束縛の一元化（ADR-0030 D–E）** | 段階D（buildFieldMap）→ E（group 統合）— 着手時に起票（段階C 相当の診断 floor は #135 で完了） | — |
 | **任意マスター取り込み理解** | 未束縛の UI surface・複数 master・野生コーパス収集・AI ラストマイル・表紙 subtitle（証拠待ち） | [`master-intake`](https://github.com/zyuuryuu/slidecraft/labels/master-intake)（#97 #99 #116 #128 #143） |
 | **既定テンプレ品質** | 内蔵30オミット・Re-make dark ロゴ | #117 #118 |
-| **表・描画 / HTML** | 図ノード衝突/折返し・SmartArt 追随（@font-face CJK 埋め込み #115 は #192/#193/#194 で完了・shipped.md 参照） | #104 #105 |
+| **表・描画 / HTML** | SmartArt/複雑図形のプレビュー追随（残スコープは会社テンプレ待ち・図ノード衝突/折返し #104 と slice 1–2 は完了・shipped.md 参照） | #105 |
 | **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
 | **GUI / アプリ堅牢性** | 最背面画像ドラッグ・Help 導線・.scft version ゲート | #122 #114 #121 |
 | **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・署名付き自動更新・egress hard boundary | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#112 #120）・#119 |
