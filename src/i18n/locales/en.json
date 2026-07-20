@@ -224,6 +224,10 @@
     "cancel": "Cancel",
     "commit": "✓ Make slides"
   },
+  "updateBanner": {
+    "message": "A new version (v{{version}}) is available. See GitHub Releases to update.",
+    "dismiss": "Dismiss"
+  },
   "intake": {
     "mode": {
       "import": "Import",

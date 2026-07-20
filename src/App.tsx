@@ -27,6 +27,8 @@ import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { openDocs } from "./ipc/docs";
 import { describeRepairPlan } from "./components/apply-template";
 import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
+import UpdateBanner from "./components/UpdateBanner";
+import { useUpdateBanner } from "./components/useUpdateBanner";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
@@ -57,6 +59,7 @@ export default function App() {
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
   const { t } = useTranslation();
+  const { show: showUpdateBanner, latestVersion, dismiss: dismissUpdateBanner } = useUpdateBanner();
 
   // Master registry (Slice 1a): the global set of slide masters the draft can pick from (bundled
   // sample + any imported this session). Selecting/importing applies it to the active doc (gated).
@@ -409,6 +412,10 @@ export default function App() {
           <ThemeToggle />
         </div>
       </div>
+
+      {/* "New version available" notice (notify-only — ADR-0021). Above IntakeSummaryBar so a fresh
+          intake result doesn't bury a pending update notice. */}
+      {showUpdateBanner && latestVersion && <UpdateBanner latestVersion={latestVersion} onDismiss={dismissUpdateBanner} />}
 
       {/* Intake transparency (progress + result) as a flow banner under the toolbar — never overlaps
           the panes, the master dropdown, or the bottom Assist dock. */}

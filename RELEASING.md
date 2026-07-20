@@ -3,12 +3,12 @@
 ## バージョニング方針（Semantic Versioning）
 
 - `MAJOR.MINOR.PATCH`。**0.x 系は「早期版」** — MINOR でも破壊的変更（API・`.slidecraft` ファイル形式・テンプレ契約）があり得る。安定を約束する段階で `1.0.0` に上げる。
-- **版数の単一ソースは [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json)**（インストーラ metadata を駆動する de-facto canonical）。他の5箇所 — `package.json`・`src-tauri/Cargo.toml`・`src/mcp/server.ts`・`src/ipc/collab-client.ts`・`packaging/homebrew/Casks/slidecraft.rb` — は [`scripts/bump-version.mjs`](scripts/bump-version.mjs) で自動同期し、`npm test`（[`tests/version-sync.test.ts`](tests/version-sync.test.ts)）が drift を検出する。
+- **版数の単一ソースは [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json)**（インストーラ metadata を駆動する de-facto canonical）。他の6箇所 — `package.json`・`src-tauri/Cargo.toml`・`src/mcp/server.ts`・`src/ipc/collab-client.ts`・`src/ipc/app-version.ts`・`packaging/homebrew/Casks/slidecraft.rb` — は [`scripts/bump-version.mjs`](scripts/bump-version.mjs) で自動同期し、`npm test`（[`tests/version-sync.test.ts`](tests/version-sync.test.ts)）が drift を検出する。
 - 手で個別のファイルを書き換えない。必ず bump スクリプト経由にする。
 
 ## 手順
 
-1. **バージョンを決めて伝播**（例 0.2.0）: `npm run version:set 0.2.0`（6ファイルへ反映）。`npm run version:check` で一致を確認。
+1. **バージョンを決めて伝播**（例 0.2.0）: `npm run version:set 0.2.0`（7ファイルへ反映）。`npm run version:check` で一致を確認。
 2. **CHANGELOG.md を更新**: `## [Unreleased]` の内容を `## [0.2.0] - YYYY-MM-DD` に移し、新しい空の Unreleased を作る。
 3. **ローカル検証**: `npm test`・`npm run build`・`npm run typecheck:mcp` が全緑。
 4. **コミット & タグ**: `chore(release): v0.2.0` → `git tag v0.2.0 && git push origin main --tags`。→ `release.yml` が 4-OS installer をビルドして **draft** リリースを作成する（初回は M8 で実走検証）。
