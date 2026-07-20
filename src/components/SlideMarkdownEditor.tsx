@@ -9,6 +9,7 @@
 
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { shiftBulletIndent } from "../engine/bullet-indent-shift";
 
 interface SlideMarkdownEditorProps {
   md: string;
@@ -35,10 +36,26 @@ export default function SlideMarkdownEditor({ md, onChange }: SlideMarkdownEdito
     debounce.current = setTimeout(() => onChange(v), 300);
   };
 
+  // Tab/Shift-Tab on a bullet line shift its nesting level (#201) instead of moving focus — the
+  // browser's default Tab behavior on a plain textarea. Non-bullet lines fall through untouched.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Tab") return;
+    const el = e.currentTarget;
+    const result = shiftBulletIndent(text, el.selectionStart, el.selectionEnd, e.shiftKey);
+    if (!result) return;
+    e.preventDefault();
+    handle(result.text);
+    requestAnimationFrame(() => {
+      el.selectionStart = result.selectionStart;
+      el.selectionEnd = result.selectionEnd;
+    });
+  };
+
   return (
     <textarea
       value={text}
       onChange={(e) => handle(e.target.value)}
+      onKeyDown={handleKeyDown}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       spellCheck={false}
