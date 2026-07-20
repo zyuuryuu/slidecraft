@@ -78,6 +78,8 @@
 
 ## HTML・描画
 
+- **Mermaid class 図の generics/stereotype を落とさない** — `classDiagram` のクラス名正規表現が `~` を除外していたため generics `List~T~`/`Map~K,V~` が消失、`<<interface>>` 等の stereotype 行が属性に混入していた。共有パターン `CLASS_NAME_SRC` を1本化（クラス宣言・関係両端で再利用＝R8）して generics を保持、stereotype 行は attributes/methods から除外。parser のみ＝schema/golden 不変（stereotype の専用描画は follow-up） （#256・PR #263・2026-07-20）
+- **Mermaid flowchart の矢印バリアント対応** — エッジ解析が `-->`/`-.->`/`---`/`===` しか拾えず、太矢印 `==>`・可変長 `--->`/`----->`・丸/バツ端点 `--o`/`--x`・双方向 `<-->` が誤パース/欠落していた（`-.->` の `.` 未エスケープ潜在バグも）。`arrowRe` を拡張し全バリアントを正しく検出、`ParsedEdge` に端点種別/双方向を捕捉（端点マーカー描画は follow-up）。parser のみ＝schema/golden 不変 （#255・PR #264・2026-07-20）
 - **グループの flipH/flipV をプレビュー/HTML に反映（#105 Slice 2）** — `<a:xfrm flipH/flipV>` を持つグループの子図形が鏡像化されず配置されていた（lrk-slides-velis CC0 で flip グループ 16 件がミラーずれ）。`ooxml-geom.ts` の `parseGroupXf` が flip 符号反転を読むよう修正・custGeom の子は path 座標も鏡像化。preview/HTML 限定＝PPTX golden 非影響・flip 無しテンプレの抽出はバイト不変（test-first） （#241・PR #248・2026-07-20）
 - **LR/RL 図のレイヤ内縦配置を per-node 実高セルに（可変高ノードの衝突解消・#104 slice B）** — `computeLayout` の水平分岐が固定 `node_height` 前提だったため、member 数で伸びる class/entity や 1.6×nh の diamond が同一レイヤで重なっていた（LR class 図で実測 2.50×1.12in の重なり）。セル高を `max(実高, nh)` 積み上げに変更し、均一高レイヤは旧式と数値同一に退化＝フローチャート/state 図は座標バイト不変（agreement テストでリテラル固定）。shapes golden のみ意図的変化（ユーザ承認の較正・diamond 軸ズレ由来の L 字ジョグ消失） （#104/#229・PR #237・2026-07-20）
 - **実行時 CJK フォントサブセット化＋Noto 同梱（#115 中盤）** — HarfBuzz WASM（`harfbuzzjs` hb-subset 直叩き）＋`wawoff2` で deck の実使用文字だけの WOFF2 を生成する `subsetFontToWoff2`（失敗＝埋め込みスキップの do-no-harm 契約）、純粋な `collectDeckText`／`resolveFontSubsetSource` を整備。Noto Sans/Serif JP は variable font 2本を `wght` ピン（400/700）で使い、google/fonts 上流と sha256 一致を検証してコミット（OFL 1.1 全文同梱）。HTML への配線は #194 （#193・PR #200/#203・2026-07-19）
@@ -139,12 +141,14 @@
 
 ## リリース・配布
 
+- **リリース基盤の強化（完全性・自動ノート・arm64 集約）** — (1) 各リリースに `SHA256SUMS`＋`actions/attest-build-provenance`（成果物の来歴証明）＋CycloneDX SBOM を添付＝未署名アプリの完全性シグナル（署名は不導入）。(2) リリースノートを CHANGELOG の当該タグ節から自動生成（固定文を廃止・タグで該当節が無ければハード失敗＝never-silent・`extract-changelog-section.mjs` を test-first）。(3) Intel Mac の `.dmg` ジョブを廃止し **arm64 を唯一の公式 mac ターゲット**に（Intel はソースビルド）・README/installation の Intel 記述を日英とも #112 の決定に統一 （#257/#258/#112・PR #266・2026-07-20）
 - **「新版あり」通知バナー（GitHub Releases ポーリング）** — 現行版より新しい公開リリースを検知し dismissible バナーで通知（**通知のみ・自動更新/署名なし**＝ADR-0021 の軽量方針）。`release-version.ts` の純 semver 比較（`v` prefix・prerelease 順序・不正値は `unknown`＝誤って新版扱いしない）、`release-check.ts` は dual-mode `appFetch` で `/releases/latest` をポーリングし**全失敗を `{status:"error"}` に正規化して throw しない**（never-silent）、dismiss はバージョン単位・12h ポーリング。CSP `connect-src` に **`https://api.github.com` のみ**追加（capability は不変）。`app-version.ts` を bump-version の同期対象に追加 （ADR-0021・#113・PR #236・2026-07-20）
 - **生成 PPTX の PowerPoint 実機開封チェック** — 出力 .pptx を実 PowerPoint / PowerPoint for the web で開き見た目を確認済（従来の python-pptx＋wellformed-gate に加え実機で確認・ユーザ確認 2026-07-07）
 - **v0.1.0 初回パブリックリリース＋工程化（M0–M13）** — バージョン単一ソース化（`bump-version.mjs`）・CI 軽量化（push=Linux 限定・release は tag 限定）＆再有効化・`npm audit` triage＋security ゲート required・LICENSE(Apache-2.0)＋第三者/モデル重み attribution（THIRD-PARTY-NOTICES）・セキュリティ再チェック（画像 `src` を data:image 制約・export nonce-CSP・data-URI サイズ上限）・ユーザマニュアル＋VitePress ドキュメントサイト（GitHub Pages）＋上流 AI 向け SKILL.md・`release.yml` 4-OS installer 実走・軽量自動更新方針・Homebrew tap/cask 構築 （ADR-0021・2026-07-07）
 
 ## UX・配布
 
+- **初回起動オンボーディング（最小1枚＋「次回以降表示しない」）** — 空/Draft のまま始まり初見ユーザが起点を掴めない問題に、起点パネル（新規/`.pptx` を開く/サンプルを見る＋3ステップの一言＋docs 導線）を追加。「次回以降表示しない」チェックで `localStorage` に永続してスキップ（#236 と同じ流儀の単一フラグ）。表示可否は純粋関数でテスト・i18n ja/en・engine/schema 非接触・golden 非影響 （#259・PR #265・2026-07-20）
 - **README のデフォルト言語を英語に切替** — ルート `README.md` を英語版に、旧日本語版を `README.ja.md` に退避（相互リンクは冒頭の「日本語 / English」トグルのまま維持）。Intel Mac の記述は「未提供」の旧文言を持ち込まず、**公式ビルドは arm64 のみ／Intel はソースビルド**（#112 の決定）に日英両ファイルとも統一 （#260・2026-07-20）
 - **UI 日英切替（i18n・react-i18next）— 全 UI ＋ .ts 状態文言まで** — JA\|EN トグル（テーマトグル隣・localStorage 永続・既定 ja）で UI 全体が日⇄英に切替。.tsx 25 コンポーネントに加え、フック/モジュール由来の状態・通知文言（`ai-generation-types.ts` の接続ステータス・`useCollab.ts`「未接続」・`useDeckController` notice・AI タスクラベル・修復プラン説明）まで `i18n.t()` 化し、**39 名前空間 379 キー**を `ja/en.json` に集約。`MODE_LABEL` を object→`modeLabel(mode)` 関数化して EN 時の混在を解消。型安全キー（`i18next.d.ts` で ja.json に対し `t()` を型検査）・補間 {{var}}・ハイフンキー（`aiMode.diagram-edit`）を EN/JA 両方で runtime 検証。全展開はワークフロー並列＋決定論マージ（辞書は競合回避で親がマージ） （2026-07-07）
 - **英語ドキュメント（VitePress 二言語サイト＋README＋第三者通知）** — docs サイトを VitePress ネイティブ i18n 化（root=日本語／`/en`=English・ナビ右上の言語スイッチャ自動表示）。公開13ページを `docs/en/` にミラーし、サイト内絶対リンクは `/en` 接頭辞へ書換。`README.en.md`（GitHub 慣習・`<kbd>` ボタン風言語切替）＋`THIRD-PARTY-NOTICES.en.md`（ライセンス名・数値は verbatim、説明文のみ英訳）。並列翻訳（1ファイル=1エージェント・別ファイル出力で競合なし）。`npm run docs:build` 成功（`ignoreDeadLinks` 未設定＝全 `/en` リンク検証）、本番 Pages に配信済 （2026-07-07）
