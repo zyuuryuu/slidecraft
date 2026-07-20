@@ -78,6 +78,7 @@
 
 ## HTML・描画
 
+- **LR/RL 図のレイヤ内縦配置を per-node 実高セルに（可変高ノードの衝突解消・#104 slice B）** — `computeLayout` の水平分岐が固定 `node_height` 前提だったため、member 数で伸びる class/entity や 1.6×nh の diamond が同一レイヤで重なっていた（LR class 図で実測 2.50×1.12in の重なり）。セル高を `max(実高, nh)` 積み上げに変更し、均一高レイヤは旧式と数値同一に退化＝フローチャート/state 図は座標バイト不変（agreement テストでリテラル固定）。shapes golden のみ意図的変化（ユーザ承認の較正・diamond 軸ズレ由来の L 字ジョグ消失） （#104/#229・PR #237・2026-07-20）
 - **実行時 CJK フォントサブセット化＋Noto 同梱（#115 中盤）** — HarfBuzz WASM（`harfbuzzjs` hb-subset 直叩き）＋`wawoff2` で deck の実使用文字だけの WOFF2 を生成する `subsetFontToWoff2`（失敗＝埋め込みスキップの do-no-harm 契約）、純粋な `collectDeckText`／`resolveFontSubsetSource` を整備。Noto Sans/Serif JP は variable font 2本を `wght` ピン（400/700）で使い、google/fonts 上流と sha256 一致を検証してコミット（OFL 1.1 全文同梱）。HTML への配線は #194 （#193・PR #200/#203・2026-07-19）
 - **CJK フォールバックスタック＋ea フォントの描画配線（#115 その1）** — 素の `fontName, sans-serif` 単発だった preview/SVG の font-family を、`<a:ea>` 抽出値の `PlaceholderStyle` 配線＋ゴシック/明朝分類つきフォールバック連鎖（`font-stack.ts` に一本化・SlideCard/svg-writer 両消費＝R8）に。未解決テーマ参照 `+mj-ea` はソース側でガード。PPTX 出力非影響。後続は #193（実行時サブセット化）→ #194（@font-face 埋め込み） （#192・PR #196・2026-07-19）
 - **CJK フォント実行時サブセット化＋@font-face 埋め込み配線（#115 その2/3・完了）** — WASM harfbuzz（hb-subset）でデッキ実使用文字だけのサブセットを生成する `subsetFontToTtf`（variable font の `wght` 軸ピンで Regular/Bold 両対応）と、同梱 Noto Sans/Serif JP（google/fonts 上流と sha256 照合済み・OFL 1.1）から選ぶ `resolveFontSubsetSource`（#193・PR #199/#200/#203）を、HTML 書き出しパイプラインへ配線（#194・PR #206）。`deck-html-export.tsx` が materialize 済みデッキの実使用テキストからゴシック/明朝＋bold 要否を判定してサブセット生成し、`html-shell.ts` が `font-stack.ts` の既存フォールバック名（`embedFallbackFamily`）そのままで `@font-face` 注入 — 既存の per-element CSS は無変更。デフォルト ON（トグル無し）。**WOFF2 圧縮は不採用**：当初 `wawoff2` で圧縮する設計だったが、Vite のブラウザ dep-optimizer 経由で実ブラウザから呼ぶと内部の Emscripten `onRuntimeInitialized` が発火せず永久にハングすることを実ブラウザ検証＋CI の e2e で確認（vitest/Node では発生せず、#194 が初めて実ブラウザ経路を通した）。同パッケージは2022年以降メンテなし。harfbuzz の生 sfnt(TTF) をそのまま `format("truetype")` で埋め込む方式に変更し、壊れた依存を排除（`wawoff2`/`@types/wawoff2` を削除）。do-no-harm: CJK 無しデッキは埋め込み自体スキップ（サイズ増ゼロ）・サブセット失敗時はフォールバックスタックのみで壊れない。実測: JP4スライド典型デッキで埋め込み ~43KB（Regular+Bold、生TTF）／出力 HTML 計 ~75KB。PPTX 出力非影響 （#193/#194・2026-07-19）
@@ -94,6 +95,7 @@
 
 ## スライド編集・画像
 
+- **目次タイトルの言語自動切替（目次／Table of Contents）** — `<!-- toc -->` 導出スライドの見出しが `目次` 固定だったのを、章タイトル群の文字種で切替（CJK を含めば「目次」・英語のみなら "Table of Contents"・章なしは既定「目次」）。判定は既存の `deckHasCjkText` を再利用し重複を作らない（R8）。engine 純関数で react-i18next を持ち込まず（R2）、派生タイトルは md へ書き戻さない（round-trip 不変） （#184・PR #234・2026-07-20）
 - **クロス doc 切替の snapshot データ損失を修正** — 複数ドキュメント切替時に他 doc の snapshot が現 doc の状態で上書きされ編集が失われる GUI コントローラのバグを修正 （#160・PR #173・2026-07-19）
 - **画像埋め込み＝data URI 埋め込み** — 自己完結 data-URI SlideIR image ブロック（Markdown `![alt](src)` round-trip・SlideCard `<img>`／HTML 自動・PPTX decode → media/pic）、paste＋Tauri/browser file-drop 挿入、picture 枠優先バインド、rect/fit/aspect 手動幾何＋pointer drag/resize、既存を壊さない最背面（behind）モード （ADR-0020・2026-07-06）
 - **スライドのドラッグ並べ替え** — pointer イベント方式・PowerPoint 風インジケータでスライドを並べ替え （2026-07-06）
@@ -132,6 +134,7 @@
 
 ## リリース・配布
 
+- **「新版あり」通知バナー（GitHub Releases ポーリング）** — 現行版より新しい公開リリースを検知し dismissible バナーで通知（**通知のみ・自動更新/署名なし**＝ADR-0021 の軽量方針）。`release-version.ts` の純 semver 比較（`v` prefix・prerelease 順序・不正値は `unknown`＝誤って新版扱いしない）、`release-check.ts` は dual-mode `appFetch` で `/releases/latest` をポーリングし**全失敗を `{status:"error"}` に正規化して throw しない**（never-silent）、dismiss はバージョン単位・12h ポーリング。CSP `connect-src` に **`https://api.github.com` のみ**追加（capability は不変）。`app-version.ts` を bump-version の同期対象に追加 （ADR-0021・#113・PR #236・2026-07-20）
 - **生成 PPTX の PowerPoint 実機開封チェック** — 出力 .pptx を実 PowerPoint / PowerPoint for the web で開き見た目を確認済（従来の python-pptx＋wellformed-gate に加え実機で確認・ユーザ確認 2026-07-07）
 - **v0.1.0 初回パブリックリリース＋工程化（M0–M13）** — バージョン単一ソース化（`bump-version.mjs`）・CI 軽量化（push=Linux 限定・release は tag 限定）＆再有効化・`npm audit` triage＋security ゲート required・LICENSE(Apache-2.0)＋第三者/モデル重み attribution（THIRD-PARTY-NOTICES）・セキュリティ再チェック（画像 `src` を data:image 制約・export nonce-CSP・data-URI サイズ上限）・ユーザマニュアル＋VitePress ドキュメントサイト（GitHub Pages）＋上流 AI 向け SKILL.md・`release.yml` 4-OS installer 実走・軽量自動更新方針・Homebrew tap/cask 構築 （ADR-0021・2026-07-07）
 
