@@ -74,6 +74,14 @@ export interface DecoRect {
   path?: string; // custGeom → an SVG path drawn in a viewBox stretched to w×h (preserveAspectRatio=none)
   pathViewBox?: string; // "0 0 W H" for `path` (the custGeom path space)
   gradient?: string; // CSS linear-gradient for a <a:gradFill> shape (rect divs use it; SVG shapes fall back to `color`)
+  // #241: this shape sits under a NET-flipped transform (an odd number of flipH/flipV ancestor
+  // groups). The rect (x/y/w/h above) is already mirrored by transformRect, but an ASYMMETRIC shape
+  // drawn from its own local geometry — a custGeom `path` or a DECO_POLYGONS preset — also needs its
+  // drawing mirrored, or it renders right-side-up in a mirrored box. Derived straight from the
+  // composed Xf's sign (xf.sx/sy < 0), not tracked as a separate flag, so it can't drift out of sync
+  // with the position (R8).
+  flipH?: boolean;
+  flipV?: boolean;
 }
 
 /** Static (non-placeholder) text on a layout/master — design labels like a cover's "日付 / 部署 /
@@ -507,6 +515,8 @@ function spToDeco(sp: string, theme: Record<string, string>, xf: Xf): DecoRect |
     ...(prst && prst !== "rect" && prst !== "roundRect" ? { prst } : {}),
     ...(cust ? { path: cust.path, pathViewBox: cust.viewBox } : {}),
     ...(grad ? { gradient: grad.css } : {}),
+    ...(xf.sx < 0 ? { flipH: true } : {}),
+    ...(xf.sy < 0 ? { flipV: true } : {}),
   };
 }
 
