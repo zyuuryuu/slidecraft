@@ -12,7 +12,7 @@
  * （md-serializer 側で保証・再掲は materialize 後にしか生まれないので漏れない）。
  */
 
-import type { DeckIR, Paragraph, SlideIR } from "./slide-schema";
+import type { DeckIR, Paragraph, PlaceholderContent, SlideIR } from "./slide-schema";
 import { getPlaceholderText } from "./md-serializer-shared";
 import { TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { deckHasCjkText } from "./deck-text-collect";
@@ -62,6 +62,16 @@ export function tocParagraphs(sections: SectionEntry[]): Paragraph[] {
   }));
 }
 
+/** 目次スライドのプレースホルダー（idx15=タイトル＋章があれば idx1=箇条書き）。live 導出
+ *  （materializeDerivedSlides）と static 生成（buildStaticTocSlide）の両方がここを通る単一経路
+ *  （R8・ADR-0034）。 */
+function tocPlaceholders(sections: SectionEntry[]): PlaceholderContent[] {
+  return [
+    { idx: "15", paragraphs: [{ segments: [{ text: tocTitleFor(sections) }] }] },
+    ...(sections.length > 0 ? [{ idx: "1", paragraphs: tocParagraphs(sections) }] : []),
+  ];
+}
+
 /** 目次スライドの派生タイトル（日本語デッキ・章タイトルが無い場合の既定）。導出専用スライドの
  *  見出しで、md へは書き戻されない。 */
 export const TOC_TITLE_JA = "目次";
@@ -109,13 +119,7 @@ export function materializeDerivedSlides(deck: DeckIR): DeckIR {
     ...deck,
     slides: deck.slides.map((slide, i) => {
       if (slide.derived === "toc") {
-        return {
-          ...slide,
-          placeholders: [
-            { idx: "15", paragraphs: [{ segments: [{ text: tocTitleFor(sections) }] }] },
-            ...(sections.length > 0 ? [{ idx: "1", paragraphs: tocParagraphs(sections) }] : []),
-          ],
-        };
+        return { ...slide, placeholders: tocPlaceholders(sections) };
       }
       if (slide.sectionBreak && slide.layout === "auto" && !usesBodyIdx1(slide)) {
         const current = sections.find((s) => s.slideIndex === i);
@@ -130,4 +134,21 @@ export function materializeDerivedSlides(deck: DeckIR): DeckIR {
       return slide;
     }),
   };
+}
+
+// ── GUI「便利スライドを生成」（ADR-0034・#277）: 目次を live/static の2モードで生成 ──
+
+/** live 目次スライド（挿入直後の新規スライド）。`derived: "toc"` を立てるだけ — 内容は
+ *  materializeDerivedSlides が消費点で毎回導出するので、ここでは複製状態を一切持たない（R8）。
+ *  直接編集不可・章の追加/改名/削除に自動追随＝目次生成の既定モード（ADR-0034）。 */
+export function buildLiveTocSlide(): SlideIR {
+  return { layout: "auto", placeholders: [], derived: "toc" };
+}
+
+/** static 目次スライド（挿入時点の章構成から1回生成する、普通の編集可能スライド）。live と同じ
+ *  tocPlaceholders（scanSections/tocParagraphs 経由）を再利用＝導出内容の単一経路（R8）。
+ *  `derived` を立てないので以後は普通に編集でき、章が変わっても追随しない。GUI の「作り直す」は
+ *  同じ関数を再度呼んで置き換えるだけ＝明示再生成（ADR-0034、黙って drift しない）。 */
+export function buildStaticTocSlide(deck: DeckIR): SlideIR {
+  return { layout: "auto", placeholders: tocPlaceholders(scanSections(deck)) };
 }

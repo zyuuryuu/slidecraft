@@ -208,6 +208,21 @@
     "startPosition": "Start Position",
     "resetStartPosition": "Reset start position"
   },
+  "generateSlide": {
+    "buttonTitle": "Generate a convenience slide",
+    "typeLabel": "Type",
+    "typeToc": "Table of contents",
+    "modeLabel": "Mode",
+    "modeLive": "Live (auto-updating)",
+    "modeLiveDesc": "Follows chapter additions, renames, and deletions automatically. Not directly editable.",
+    "modeStatic": "Static (editable)",
+    "modeStaticDesc": "A normal, editable slide generated once from the current chapters.",
+    "insert": "Insert",
+    "regenerate": "Recreate the selected slide as a TOC",
+    "regenerateTitle": "Replace the selected slide's content with a static TOC generated from the current chapters",
+    "regenerateConfirm": "This replaces the selected slide's content with a static TOC generated from the current chapters. You can undo, but the existing content will be lost. Continue?",
+    "regenerateConfirmTitle": "Recreate the table of contents"
+  },
   "initModal": {
     "dialogLabel": "Draft — Build slides from your draft",
     "importMarkdown": "📄 Import Markdown",
