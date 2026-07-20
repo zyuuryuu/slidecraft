@@ -62,6 +62,11 @@ export interface EmbeddedFontFace {
   weight: 400 | 700;
   /** Base64-encoded raw sfnt (TTF) bytes — no `data:` prefix, this function adds it. */
   ttfBase64: string;
+  /** Optional font-weight RANGE descriptor (e.g. "100 900") for embedding an UNSUBSETTED variable
+   *  font as one face covering every weight — used by the slide rasterizer (#109), whose temp page
+   *  never ships, so size doesn't matter and no wght pinning is needed. Absent → the single static
+   *  `weight` is emitted, so every existing export stays byte-identical (do-no-harm). */
+  weightRange?: string;
 }
 
 function esc(s: string): string {
@@ -249,8 +254,29 @@ sync();
  *  data:` unconditionally (see cspMeta below), so no CSP change is needed for these to load. */
 function fontFaceCss(fonts: EmbeddedFontFace[]): string {
   return fonts
-    .map((f) => `@font-face{font-family:"${f.family}";font-weight:${f.weight};font-display:swap;src:url(data:font/ttf;base64,${f.ttfBase64}) format("truetype")}`)
+    .map((f) => `@font-face{font-family:"${f.family}";font-weight:${f.weightRange ?? f.weight};font-display:swap;src:url(data:font/ttf;base64,${f.ttfBase64}) format("truetype")}`)
     .join("");
+}
+
+/** Assemble ONE pre-rendered slide into a minimal, SCRIPT-FREE, self-contained page for headless
+ *  rasterization (#109 / get_slide_image). Same @font-face path as the deck shell (fontFaceCss —
+ *  R8: one embedding rule), but NO nav shell, NO <script> anywhere, and a CSP that forbids script
+ *  and every network fetch outright (`default-src 'none'` + `script-src 'none'`; only inline
+ *  style and data:/blob: media, which is all a slide uses). The rasterizer wanted Chromium's
+ *  --blink-settings=scriptEnabled=false too, but that breaks the --screenshot pipeline (verified) —
+ *  a zero-script document under this CSP achieves the same confinement at the page level. */
+export function assembleSlidePage(slideHtml: string, opts: { stageW: number; stageH: number; embeddedFonts?: EmbeddedFontFace[]; title?: string }): string {
+  const title = esc(opts.title?.trim() || "SlideCraft");
+  return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'">
+<title>${title}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${opts.stageW}px;height:${opts.stageH}px;overflow:hidden;background:#fff}${fontFaceCss(opts.embeddedFonts ?? [])}</style>
+</head>
+<body>${slideHtml}</body>
+</html>`;
 }
 
 /** Assemble N pre-rendered slide HTML strings into one self-contained .html document. */

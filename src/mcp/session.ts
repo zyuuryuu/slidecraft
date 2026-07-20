@@ -48,14 +48,16 @@ interface Loaded {
   template: TemplateData;
   catalog: LayoutCatalog;
 }
-function requireLoaded(s: Session): Loaded {
+// Exported for slide-raster (#109) so its guards share the EXACT codes/messages of every other
+// tool (R8: one "not opened"/"out of range" meaning, not a re-implementation).
+export function requireLoaded(s: Session): Loaded {
   if (!s.deck || !s.template || !s.catalog) {
     throw new GuardError("プロジェクトが開かれていません（先に open_project を呼んでください）。", "project-not-opened");
   }
   return { deck: s.deck, template: s.template, catalog: s.catalog };
 }
 
-function assertIndex(deck: DeckIR, i: number): void {
+export function assertIndex(deck: DeckIR, i: number): void {
   if (!Number.isInteger(i) || i < 0 || i >= deck.slides.length) {
     throw new GuardError(`スライド番号が範囲外です（0..${deck.slides.length - 1}）: ${i}`, "index-out-of-range");
   }
