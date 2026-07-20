@@ -20,6 +20,7 @@ import {
   type TextOpts,
   type EdgeLineOpts,
 } from "./diagram-painter";
+import { PX_PER_PT, shrinkScale, wrapToWidth } from "./draw-target";
 
 // ── Constants ──
 
@@ -157,6 +158,30 @@ class PptxDrawTarget implements DrawTarget {
     if (opts.valign !== undefined) container.valign = opts.valign;
     if (opts.shrink) container.fit = "shrink";
     if (opts.wrap) container.wrap = true;
+
+    // #228 (R7): PowerPoint does NOT apply fit:"shrink" until the text is next edited — PptxGenJS
+    // writes a bare <a:normAutofit/> — so an overflowing label rendered full-size and wrapped while
+    // the SVG preview had already shrunk it. Bake the preview's EXACT shrink into the run sizes
+    // (shared shrinkScale, same px rounding, wrap-aware so wrapped blocks measure their widest
+    // line). scale == 1 (fitting text) changes nothing → those slides stay byte-identical; the
+    // normAutofit stays as belt-and-suspenders.
+    if (opts.shrink) {
+      const maxWPx = box.w * 96 - 2; // the preview's available width: box minus its 1px side pads
+      const vlines = lines.flatMap((r) => {
+        const fsPx = Math.round(r.fontSize * PX_PER_PT * 10) / 10; // SvgDrawTarget's rounding
+        return (opts.wrap ? wrapToWidth(r.text, maxWPx, fsPx) : [r.text])
+          .filter((p) => p !== "")
+          .map((p) => ({ text: p, fs: fsPx }));
+      });
+      const s = shrinkScale(vlines, maxWPx);
+      if (s < 1) {
+        lines = lines.map((r) => ({ ...r, fontSize: Math.round(r.fontSize * s * 100) / 100 }));
+        // PowerPoint's default 0.1in side insets would re-wrap the now-exactly-fitting line; pin
+        // the margin (points) to 0 for THIS already-shrunk text only. Unshrunk texts keep their
+        // default insets → byte-identical.
+        container.margin = 0;
+      }
+    }
 
     if (lines.length === 1) {
       const r = lines[0];
