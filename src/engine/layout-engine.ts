@@ -420,9 +420,16 @@ function computeLayoutV1(
 
       if (isHorizontal) {
         x = marginX + layerIdx * (nw + vg);
-        const totalH = nInLayer * nh + (nInLayer - 1) * hg;
+        // #229: stack the in-layer cells by each node's REAL height (floored at nh) — the old fixed
+        // nh step made taller nodes (class/entity sized by member count, diamond at 1.6×nh) overlap
+        // their in-layer neighbours. Uniform-height layers degenerate to the old nh step exactly
+        // (coordinates byte-identical), and a marker's short dot keeps its nh-tall cell (the
+        // centering below is unchanged).
+        const cellH = (id: string) => Math.max(nodeHMap.get(id) ?? nh, nh);
+        const totalH = nids.reduce((a, id) => a + cellH(id), 0) + (nInLayer - 1) * hg;
         const yStart = (SLIDE_H - totalH) / 2;
-        y = yStart + i * (nh + hg);
+        y = yStart;
+        for (let k = 0; k < i; k++) y += cellH(nids[k]) + hg;
         if (isReversed) {
           x = SLIDE_W - marginX - nw - layerIdx * (nw + vg);
         }
