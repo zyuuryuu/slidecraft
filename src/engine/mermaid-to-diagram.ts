@@ -67,6 +67,11 @@ interface ParsedEdge {
   to: string;
   label?: string;
   dash?: boolean;
+  // Endpoint marker at the `to` side: arrowhead / open circle / cross. `none` = open link (e.g. ---, ===).
+  // Not yet wired into rendering (drawing new endpoint markers is a follow-up) — captured for correctness only.
+  endMarker?: "arrow" | "circle" | "cross" | "none";
+  // <--> / <-.-> etc: arrowhead at both ends.
+  bidirectional?: boolean;
 }
 
 // ── Node shape detection from Mermaid syntax ──
@@ -128,19 +133,32 @@ function parseEdgeLine(line: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
   const edges: ParsedEdge[] = [];
 
   // Regex to match: nodeExpr (arrow with optional label) nodeExpr ...
-  // Arrow patterns: -->, -.->, ===>, ---
-  // Label patterns: -->|label|, ---|label|
-  const arrowRe = /\s+(-->|-.->|===|---)\s*(?:\|([^|]*)\|\s*)?/g;
+  // Line body: dotted (-.-+), plain dashes (-{2,}, any length — e.g. --->, ----->), or thick (={2,}, e.g. ==>).
+  // Optional leading `<` and trailing endpoint char (>/o/x) — e.g. <-->, --o, --x, ==>.
+  // Label patterns: -->|label|, ==>|label|
+  const arrowRe = /\s+(<)?(-\.-+|-{2,}|={2,})([>ox])?\s*(?:\|([^|]*)\|\s*)?/g;
 
   // Find all arrows and their positions
-  const arrows: { index: number; end: number; label?: string; dash?: boolean }[] = [];
+  const arrows: {
+    index: number;
+    end: number;
+    label?: string;
+    dash?: boolean;
+    endMarker: "arrow" | "circle" | "cross" | "none";
+    bidirectional: boolean;
+  }[] = [];
   let m: RegExpExecArray | null;
   while ((m = arrowRe.exec(line)) !== null) {
+    const startArrow = m[1] === "<";
+    const body = m[2];
+    const endMarker = m[3] === ">" ? "arrow" : m[3] === "o" ? "circle" : m[3] === "x" ? "cross" : "none";
     arrows.push({
       index: m.index,
       end: m.index + m[0].length,
-      label: m[2] || undefined,
-      dash: m[1].includes("."), // -.-> = a dashed/dotted edge
+      label: m[4] || undefined,
+      dash: body.includes("."), // -.-> = a dashed/dotted edge
+      endMarker,
+      bidirectional: startArrow && endMarker === "arrow",
     });
   }
 
@@ -172,7 +190,14 @@ function parseEdgeLine(line: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
     const from = parsedNodes[i];
     const to = parsedNodes[i + 1];
     if (from && to) {
-      edges.push({ from: from.id, to: to.id, label: edgeLabels[i], dash: arrows[i]?.dash });
+      edges.push({
+        from: from.id,
+        to: to.id,
+        label: edgeLabels[i],
+        dash: arrows[i]?.dash,
+        endMarker: arrows[i]?.endMarker,
+        bidirectional: arrows[i]?.bidirectional,
+      });
     }
   }
 
