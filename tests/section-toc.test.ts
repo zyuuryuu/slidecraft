@@ -17,6 +17,7 @@ import { serializeMd } from "../src/engine/md-serializer";
 import {
   scanSections,
   tocParagraphs,
+  tocTitleFor,
   sectionNavParagraphs,
   materializeDerivedSlides,
   SECTION_NAV_LIST_LAYOUT,
@@ -152,6 +153,66 @@ describe("deck-sections — 章スキャン＋採番＋目次導出 (#151)", () 
     expect(tocParagraphs([])).toEqual([]);
     const deck = materializeDerivedSlides(parseMd("<!-- toc -->"));
     expect(deck.slides[0].derived).toBe("toc");
+  });
+});
+
+// ── 目次タイトルの文字種切替 (#184) ──
+
+const MD_EN = `<!-- toc -->
+
+---
+
+<!-- section -->
+# Overview
+
+---
+
+# Details
+
+- content
+
+---
+
+<!-- section -->
+# Proposal
+`;
+
+describe("tocTitleFor — 章タイトルの文字種で目次見出しを切替 (#184)", () => {
+  it("章タイトルが CJK を含む（日本語）なら「目次」", () => {
+    expect(tocTitleFor(scanSections(parseMd(MD)))).toBe("目次");
+  });
+
+  it("章タイトルが CJK を含まない（英語のみ）なら Table of Contents", () => {
+    expect(tocTitleFor(scanSections(parseMd(MD_EN)))).toBe("Table of Contents");
+  });
+
+  it("章タイトルが 1 つでも CJK を含めば「目次」（混在は日本語優先）", () => {
+    expect(tocTitleFor([{ slideIndex: 0, number: 1, title: "Overview" }, { slideIndex: 1, number: 2, title: "解決策" }])).toBe(
+      "目次",
+    );
+  });
+
+  it("章が無い（0 章 + toc のみ）なら既定で「目次」", () => {
+    expect(tocTitleFor([])).toBe("目次");
+  });
+
+  it("materializeDerivedSlides — 日本語デッキの目次見出しは「目次」のまま", () => {
+    const toc = materializeDerivedSlides(parseMd(MD)).slides[0];
+    expect(toc.placeholders.find((p) => p.idx === "15")?.paragraphs[0].segments[0].text).toBe("目次");
+  });
+
+  it("materializeDerivedSlides — 英語のみ章タイトルのデッキの目次見出しは Table of Contents", () => {
+    const toc = materializeDerivedSlides(parseMd(MD_EN)).slides[0];
+    expect(toc.placeholders.find((p) => p.idx === "15")?.paragraphs[0].segments[0].text).toBe(
+      "Table of Contents",
+    );
+  });
+
+  it("md への書き戻しはマーカー 1 行のみ（派生タイトルは漏れない・英語デッキでも不変）", () => {
+    const round = serializeMd(materializeDerivedSlides(parseMd(MD_EN)));
+    expect(round).toContain("<!-- toc -->");
+    expect(round).not.toContain("Table of Contents");
+    expect(round).not.toContain("1. Overview");
   });
 });
 
