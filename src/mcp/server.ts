@@ -204,7 +204,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
 
   // ── template provisioning (T3/S2) ── acquire a template with no bytes: create one from a spec (or the
   // MIDNIGHT preset). Session-independent; hand the returned templateBase64 to new_project to start.
-  server.registerTool("create_template", { description: "TemplateSpec（name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し base64 で返す。欠落は MIDNIGHT preset で補完＋低コントラストは自動修正（notices で告知）。書式は get_template_spec_guide。返した templateBase64 を new_project に渡して着手", inputSchema: { spec: z.string().optional().describe("TemplateSpec JSON（部分可・省略で MIDNIGHT preset）") } }, (a) => run(() => T.createTemplate(a.spec)));
+  server.registerTool("create_template", { description: "TemplateSpec の JSON 文字列（name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し base64 で返す。欠落は MIDNIGHT preset で補完＋低コントラストは自動修正（notices で告知）。書式は get_template_spec_guide。返した templateBase64 を new_project に渡して着手", inputSchema: { spec: z.string().optional().describe("TemplateSpec の JSON 文字列（オブジェクトではなく文字列で渡す・部分可・省略で MIDNIGHT preset）。例: spec: '{}'") } }, (a) => run(() => T.createTemplate(a.spec)));
   server.registerTool("get_template_spec_guide", { description: "create_template 用 TemplateSpec の書式ガイド＋MIDNIGHT preset 値（開始点）" }, () => run(() => T.getTemplateSpecGuide()));
 
   // ── deterministic mutations ──
@@ -214,14 +214,14 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
   server.registerTool(
     "set_slide_diagram",
-    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid で設定（検証＋native YAML 化）。図/mermaid を持つスライドは置換、text スライドは body 領域へ図を追加（created で判別）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string(), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body 領域の 1-based ordinal（multi-body 用・既定 1）"), ...doc, ...cc } },
+    { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid の文字列で設定（検証＋native YAML 化）。図/mermaid を持つスライドは置換、text スライドは body 領域へ図を追加（created で判別）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string().describe("DiagramSpec の JSON/YAML 文字列、または Mermaid 記法の文字列（format で指定・オブジェクトではなく文字列で渡す）。例: source: '{\"type\":\"flowchart\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\"},{\"id\":\"b\",\"label\":\"B\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\"}]}'"), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body 領域の 1-based ordinal（multi-body 用・既定 1）"), ...doc, ...cc } },
     (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx), { opId: a.opId, expectedRev: a.expectedRev }),
   );
   server.registerTool(
     "apply_design_intent",
     {
-      description: '図を【どう配置するか】（design edit）：ops 配列の JSON で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図/mermaid を持つスライドのみ。図の中身そのものは set_slide_diagram。例: [{"op":"relayout","direction":"LR"}]',
-      inputSchema: { ...index, intent: z.string(), ...doc, ...cc },
+      description: '図を【どう配置するか】（design edit）：ops 配列の JSON 文字列で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図/mermaid を持つスライドのみ。図の中身そのものは set_slide_diagram。例: [{"op":"relayout","direction":"LR"}]',
+      inputSchema: { ...index, intent: z.string().describe('design edit ops 配列の JSON 文字列（オブジェクトではなく文字列で渡す）。例: intent: \'[{"op":"relayout","direction":"LR"}]\''), ...doc, ...cc },
     },
     (a, extra) => mutate(extra, a.docId, "apply_design_intent", (s) => S.applyDesignIntent(s, a.index, a.intent), { opId: a.opId, expectedRev: a.expectedRev }),
   );

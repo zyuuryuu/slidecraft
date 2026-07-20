@@ -42,9 +42,10 @@ rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`-
 
 1. **Acquire a template** (one of):
    - `new_project(templateBase64, markdown?)` — you bring `.pptx` bytes.
-   - `create_template(spec?)` — no bytes: author name + 2 fonts + a 9-colour palette (or `{}` for the
-     MIDNIGHT preset); the harness contrast-guards + writes the PPTX. Then `new_project(templateBase64)`.
-     Format via `get_template_spec_guide`.
+   - `create_template(spec?)` — no bytes: `spec` is a **JSON string** (not an object), e.g. `spec: '{}'`
+     for the MIDNIGHT preset, or a partial TemplateSpec string with name + 2 fonts + a 9-colour palette;
+     the harness contrast-guards + writes the PPTX. Then `new_project(templateBase64)`. Format via
+     `get_template_spec_guide`.
    - **(collab host)** `list_templates` → `use_template(id, markdown?)` — start from a registered template.
 2. **Read the contract**: `get_authoring_guide()` — this template's resolved layout names, the Markdown
    rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code, `<!-- note -->`
@@ -63,8 +64,11 @@ rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`-
      follows automatically, so the TOC can never diverge from the deck (G2).
 4. **Add figures**: `get_diagram_types()` → pick from the **12 authorable types** (flowchart, network,
    orgchart, sequence, timeline, quadrant, pie, gantt, journey, xychart, radar, kpi) → `get_diagram_guide(type)`
-   for its syntax → `set_slide_diagram(index, source, "yaml"|"json"|"mermaid")`. class/state/ER/mindmap are
-   Mermaid-only. Positioning/layout of a figure = `apply_design_intent` (regionSplit/emphasize/relayout).
+   for its syntax → `set_slide_diagram(index, source, "yaml"|"json"|"mermaid")`. `source` is a **JSON/YAML
+   or Mermaid string** (not an object), e.g. `source: '{"type":"flowchart","nodes":[...],"edges":[...]}'`.
+   class/state/ER/mindmap are Mermaid-only. Positioning/layout of a figure = `apply_design_intent(index, intent)`
+   (regionSplit/emphasize/relayout) — `intent` is also a **JSON string** of an ops array, e.g.
+   `intent: '[{"op":"relayout","direction":"LR"}]'`.
 5. **Structure ops** (figures preserved, unlike a whole-deck rewrite): `insert_slide` / `delete_slide`
    (last slide never-silent refused) / `move_slide` / `duplicate_slide`.
 6. **Feedback loop**: after edits call `get_deck_issues()` → it returns CONTENT levers (split / condense /
