@@ -228,6 +228,17 @@
     "message": "新しいバージョン（v{{version}}）が利用可能です。GitHub Releases から更新してください。",
     "dismiss": "閉じる"
   },
+  "onboarding": {
+    "dialogLabel": "初回起動ガイド",
+    "title": "SlideCraft へようこそ",
+    "howItWorks": "Markdown を書く → テンプレを選ぶ → .pptx を書き出す",
+    "actionNew": "新規（テンプレから）",
+    "actionOpenPptx": "既存の .pptx を開く",
+    "actionSample": "サンプルを見る",
+    "docsLink": "ドキュメントを見る",
+    "skipNextTime": "次回以降表示しない",
+    "close": "閉じる"
+  },
   "intake": {
     "mode": {
       "import": "取り込み",
