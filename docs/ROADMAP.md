@@ -5,12 +5,11 @@
 CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [shipped.md](shipped.md)、決定は
 [docs/adr/](adr/)、設計仕様は [docs/design/](design/)。
 
-**現在地（2026-07-19）**：v0.3.0 タグ済み。直近の出荷＝ **ADR-0032 オーサリング拡張の完了**
-（ノート #150・章/目次 #151・アジェンダ再掲 #167・フッタ章名 #168）、**変換レポートの完成**（#148）、
-**ネスト箇条書き 3段**（#103）、**CJK フォント埋め込みの完成**（#115＝#192 スタック＋#193 サブセット化/Noto
-同梱＋#194 @font-face 配線・生 TTF 埋め込み）、**パーサ round-trip の堅牢化**（表と本文の共存/列内表 #100/#101・
-セル内 `##` 見出し＋Midnight buChar #102・GUI コメント段落保全 #165）、**表の内容比例列幅**（#138/#139）、
-**BindingPlan 段階A–C 相当**（silent-drop の warn 化と診断 floor まで完了・#135 クローズ）。詳細は [shipped.md](shipped.md)。
+**現在地（2026-07-20）**：**v0.4.0 リリース済み**（3-OS installer＋SHA256SUMS/SBOM/provenance・Homebrew
+cask/tap 更新・署名なし）。目玉＝MCP 視覚レビュー（`get_slide_image`/`get_slide_html`）・接続の単一化
+（adaptive front・ADR-0033）・便利スライド生成（目次 live/static・ADR-0034）・Mermaid 図の大幅拡張
+（矢印/generics/ノード形状/シーケンス注釈）・CJK フォント埋め込み・リリース完全性シグナル。v0.3.0（公開取消）の
+存続機能を畳み、AI 非決定 Re-make は撤去（ADR-0028）。詳細は [shipped.md](shipped.md) / [CHANGELOG](../CHANGELOG.md)。
 
 ---
 
@@ -24,7 +23,7 @@ CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [
 | **表・描画 / HTML** | SmartArt/複雑図形のプレビュー追随（残スコープは会社テンプレ待ち・図ノード衝突/折返し #104 と slice 1–2 は完了・shipped.md 参照） | #105 |
 | **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
 | **GUI / アプリ堅牢性** | 最背面画像ドラッグ・Help 導線・.scft version ゲート | #122 #114 #121 |
-| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・署名付き自動更新・egress hard boundary | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#112 #120）・#119 |
+| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・署名付き自動更新・egress hard boundary／**リリース工程の自動化・堅牢化**（cask sha↔version セーフティ #287・tap ミラー自動化 #288・リリースノート ADR リンク絶対化 #289・タグ発火の摩擦 #290） | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#112 #120・#287–#290）・#119 |
 | **保守性（ADR-0031 運用）** | 凍結/許可リストの ratchet 縮小（分割は #129 型・継続運用） | — |
 
 ---
