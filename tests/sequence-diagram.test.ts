@@ -4,10 +4,10 @@
  * Milestone 1: participants, lifelines, sync/return messages, parser.
  */
 import { describe, it, expect } from "vitest";
-import { DiagramSpecSchema } from "../src/engine/schema";
+import { DiagramSpecSchema, validateDiagramSpec } from "../src/engine/schema";
 import { computeSequenceLayout } from "../src/engine/diagram-sequence";
 import { renderDiagramToSvg } from "../src/engine/svg-writer";
-import { mermaidToDiagramSpec } from "../src/engine/mermaid-to-diagram";
+import { mermaidToDiagramSpec, diagramSpecToMermaid } from "../src/engine/mermaid-to-diagram";
 import { parseMd } from "../src/engine/md-parser";
 import * as yaml from "js-yaml";
 
@@ -167,5 +167,92 @@ describe("sequence milestone 3 — else dividers / activations / async arrows", 
     expect(spec.fragments.find((f) => f.kind === "alt")?.dividers?.[0]?.label).toBe("invalid");
     expect(spec.activations.some((a) => a.participant === "A")).toBe(true);
     expect(spec.edges.find((e) => e.label === "fire-and-forget")?.style?.async).toBe(true);
+  });
+});
+
+describe("sequence notes (Note over / left of / right of) — #270", () => {
+  const MMD = `sequenceDiagram
+  participant A as User
+  participant B as API
+  Note over A,B: session starts
+  A->>B: login
+  Note left of A: waiting…
+  B-->>A: token
+  Note right of B: token cached`;
+
+  it("parses Note over A,B into a note spanning both participants, before message 0", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    expect(spec.notes).toHaveLength(3);
+    expect(spec.notes[0]).toMatchObject({ text: "session starts", placement: "over", participants: ["A", "B"], at: 0 });
+  });
+
+  it("parses Note left of / right of a single participant, at their message position", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    expect(spec.notes[1]).toMatchObject({ text: "waiting…", placement: "left_of", participants: ["A"], at: 1 });
+    expect(spec.notes[2]).toMatchObject({ text: "token cached", placement: "right_of", participants: ["B"], at: 2 });
+  });
+
+  it("an unknown participant reference is never-silent (validateDiagramSpec flags it, not dropped)", () => {
+    const spec = mermaidToDiagramSpec(`sequenceDiagram
+  participant A
+  A->>A: ping
+  Note over A,GHOST: who is this?`)!;
+    // the note is preserved (not silently discarded) even though GHOST was never declared
+    expect(spec.notes[0].participants).toEqual(["A", "GHOST"]);
+    const errors = validateDiagramSpec(spec);
+    expect(errors.some((e) => e.message.includes("unknown participant") && e.message.includes("GHOST"))).toBe(true);
+  });
+
+  it("does not regress plain sequence diagrams with no notes", () => {
+    const spec = mermaidToDiagramSpec(`sequenceDiagram
+  participant A
+  participant B
+  A->>B: hi`)!;
+    expect(spec.notes).toEqual([]);
+    expect(validateDiagramSpec(spec)).toEqual([]);
+  });
+
+  it("lays out an 'over' note spanning its participants and left_of/right_of beside a single lifeline", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const lay = computeSequenceLayout(spec, 0.8);
+    expect(lay.notes).toHaveLength(3);
+    const [over, leftOf, rightOf] = lay.notes;
+    const aCx = lay.parts.find((p) => p.id === "A")!.cx;
+    const bCx = lay.parts.find((p) => p.id === "B")!.cx;
+    // over: box spans between A and B's centre x
+    expect(over.x).toBeLessThan(Math.min(aCx, bCx));
+    expect(over.x + over.w).toBeGreaterThan(Math.max(aCx, bCx));
+    // left_of: box sits to the left of A's lifeline
+    expect(leftOf.x + leftOf.w).toBeLessThanOrEqual(aCx + 0.01);
+    // right_of: box sits to the right of B's lifeline
+    expect(rightOf.x).toBeGreaterThanOrEqual(bCx - 0.01);
+    // notes get their own vertical slot — none of them collide with a message y
+    for (const n of lay.notes) {
+      for (const m of lay.msgs) expect(n.y).not.toBeCloseTo(m.y, 2);
+    }
+  });
+
+  it("renders the note boxes + text natively (not an image)", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const svg = renderDiagramToSvg(spec, {});
+    expect(svg).toContain("session starts");
+    expect(svg).toContain("waiting…");
+    expect(svg).toContain("token cached");
+  });
+
+  it("round-trips through diagramSpecToMermaid (R8 agreement: write-back matches the parser)", () => {
+    const spec = mermaidToDiagramSpec(MMD)!;
+    const back = diagramSpecToMermaid(spec);
+    const reparsed = mermaidToDiagramSpec(back)!;
+    expect(reparsed.notes).toEqual(spec.notes);
+    expect(reparsed.edges).toEqual(spec.edges);
+  });
+
+  it("notes survive parse→conversion into the editable .diagram YAML (not dropped by serialization)", () => {
+    const s = parseMd("# N\n\n```mermaid\n" + MMD + "\n```\n").slides[0];
+    expect(s.diagram).toBeDefined();
+    const spec = DiagramSpecSchema.parse(yaml.load(s.diagram!.yaml));
+    expect(spec.notes).toHaveLength(3);
+    expect(spec.notes[0]).toMatchObject({ placement: "over", participants: ["A", "B"] });
   });
 });

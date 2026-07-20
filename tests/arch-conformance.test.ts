@@ -110,7 +110,6 @@ describe("R1: 1 ファイル 400 行以下", () => {
     "components/useAiGeneration.ts", // 444
     "components/LlmAssist.tsx", // 401
     "engine/md-slide-parser.ts", // 419
-    "engine/diagram-serialize.ts", // 409
     "mcp/session.ts", // 403
   ]);
   it("凍結リスト外の src ファイルは 400 行以下", () => {

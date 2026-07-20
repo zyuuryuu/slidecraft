@@ -297,6 +297,7 @@ export function parseMermaidSequence(lines: string[]): DiagramSpec | null {
     else if (label) labels.set(id, label);
   };
   const edges: Array<{ from: string; to: string; label?: string; dash: boolean; async: boolean }> = [];
+  const notes: Array<{ text: string; placement: "over" | "left_of" | "right_of"; participants: string[]; at: number }> = [];
   const fragments: Array<{ kind: string; label: string; from: number; to: number; dividers: Array<{ at: number; label: string }> }> = [];
   const fragStack: Array<{ kind: string; label: string; from: number; dividers: Array<{ at: number; label: string }> }> = [];
   // Activation tracking: one open span per participant (start = message index).
@@ -312,6 +313,19 @@ export function parseMermaidSequence(lines: string[]): DiagramSpec | null {
     if (!line || line.startsWith("%%")) continue;
     const p = line.match(/^(?:participant|actor)\s+(\w+)(?:\s+as\s+(.+))?$/);
     if (p) { ensure(p[1], p[2]?.trim()); continue; }
+
+    // Note over A,B: text / Note left of A: text / Note right of A: text — captured
+    // verbatim (participants NOT auto-declared via ensure()) so an unknown
+    // participant reference stays visible to validateDiagramSpec (#270 — never-silent)
+    // instead of silently minting a phantom participant.
+    const note = line.match(/^Note\s+(over|left of|right of)\s+([^:]+?)\s*:\s*(.*)$/i);
+    if (note) {
+      const kw = note[1].toLowerCase();
+      const placement = kw === "over" ? "over" : kw === "left of" ? "left_of" : "right_of";
+      const participants = note[2].split(",").map((s) => s.trim()).filter(Boolean);
+      notes.push({ text: note[3].trim(), placement, participants, at: edges.length });
+      continue;
+    }
 
     // explicit activate/deactivate (start at next message, end at last message)
     const act = line.match(/^(activate|deactivate)\s+(\w+)$/i);
@@ -364,6 +378,7 @@ export function parseMermaidSequence(lines: string[]): DiagramSpec | null {
     }),
     fragments,
     activations,
+    notes,
   });
   return r.success ? r.data : null;
 }

@@ -278,9 +278,23 @@ fragments:
     dividers:
       - at: 2
         label: ""
+notes:
+  - text: session note
+    placement: over
+    participants: [A, B]
+    at: 1
+  - text: trailing note
+    placement: left_of
+    participants: [A]
+    at: 4
 `;
   const seqSlide = (): SlideIR => ({ layout: "auto", placeholders: [{ idx: "15", paragraphs: [{ segments: [{ text: "図" }] }] }], diagram: { placeholderIdx: "1", yaml: SEQ } });
-  type Seq = { edges?: unknown[]; activations?: Array<{ participant: string; from: number; to: number }>; fragments?: Array<{ from: number; to: number; dividers?: Array<{ at: number }> }> };
+  type Seq = {
+    edges?: unknown[];
+    activations?: Array<{ participant: string; from: number; to: number }>;
+    fragments?: Array<{ from: number; to: number; dividers?: Array<{ at: number }> }>;
+    notes?: Array<{ text: string; placement: string; participants: string[]; at: number }>;
+  };
   const loadSeq = (s: SlideIR): Seq => yaml.load(s.diagram!.yaml) as Seq;
 
   it("removeEdge shifts indices → activations/fragments are re-based to the surviving messages", () => {
@@ -292,12 +306,29 @@ fragments:
     expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull(); // still valid
   });
 
+  it("removeEdge also re-bases notes' `at`, including the trailing 'after last message' sentinel (#270)", () => {
+    const { slide: out } = applyDiagramEditOps(seqSlide(), [{ op: "removeEdge", from: "A", to: "B" }]); // old index 0 removed
+    const d = loadSeq(out);
+    expect(d.notes).toEqual([
+      { text: "session note", placement: "over", participants: ["A", "B"], at: 0 }, // 1→0
+      { text: "trailing note", placement: "left_of", participants: ["A"], at: 3 }, // sentinel 4 (old edges.length) → 3 (new edges.length)
+    ]);
+    expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull();
+  });
+
   it("removeNode drops the orphan participant activation AND fragments spanning removed messages", () => {
     const { slide: out } = applyDiagramEditOps(seqSlide(), [{ op: "removeNode", id: "B" }]); // B is in every message + activation
     const d = loadSeq(out);
     expect(d.edges).toHaveLength(0);
     expect(d.activations).toEqual([]); // participant B gone
     expect(d.fragments).toEqual([]); // referenced removed messages
+    expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull();
+  });
+
+  it("removeNode drops notes referencing the removed participant, keeps the rest re-based (#270)", () => {
+    const { slide: out } = applyDiagramEditOps(seqSlide(), [{ op: "removeNode", id: "B" }]); // B is a participant of the "over A,B" note
+    const d = loadSeq(out);
+    expect(d.notes).toEqual([{ text: "trailing note", placement: "left_of", participants: ["A"], at: 0 }]); // all 4 messages removed → sentinel 4→0
     expect(validateDiagramSource(out.diagram!.yaml, "yaml")).toBeNull();
   });
 });
