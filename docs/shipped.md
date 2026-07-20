@@ -145,6 +145,7 @@
 
 ## UX・配布
 
+- **README のデフォルト言語を英語に切替** — ルート `README.md` を英語版に、旧日本語版を `README.ja.md` に退避（相互リンクは冒頭の「日本語 / English」トグルのまま維持）。Intel Mac の記述は「未提供」の旧文言を持ち込まず、**公式ビルドは arm64 のみ／Intel はソースビルド**（#112 の決定）に日英両ファイルとも統一 （#260・2026-07-20）
 - **UI 日英切替（i18n・react-i18next）— 全 UI ＋ .ts 状態文言まで** — JA\|EN トグル（テーマトグル隣・localStorage 永続・既定 ja）で UI 全体が日⇄英に切替。.tsx 25 コンポーネントに加え、フック/モジュール由来の状態・通知文言（`ai-generation-types.ts` の接続ステータス・`useCollab.ts`「未接続」・`useDeckController` notice・AI タスクラベル・修復プラン説明）まで `i18n.t()` 化し、**39 名前空間 379 キー**を `ja/en.json` に集約。`MODE_LABEL` を object→`modeLabel(mode)` 関数化して EN 時の混在を解消。型安全キー（`i18next.d.ts` で ja.json に対し `t()` を型検査）・補間 {{var}}・ハイフンキー（`aiMode.diagram-edit`）を EN/JA 両方で runtime 検証。全展開はワークフロー並列＋決定論マージ（辞書は競合回避で親がマージ） （2026-07-07）
 - **英語ドキュメント（VitePress 二言語サイト＋README＋第三者通知）** — docs サイトを VitePress ネイティブ i18n 化（root=日本語／`/en`=English・ナビ右上の言語スイッチャ自動表示）。公開13ページを `docs/en/` にミラーし、サイト内絶対リンクは `/en` 接頭辞へ書換。`README.en.md`（GitHub 慣習・`<kbd>` ボタン風言語切替）＋`THIRD-PARTY-NOTICES.en.md`（ライセンス名・数値は verbatim、説明文のみ英訳）。並列翻訳（1ファイル=1エージェント・別ファイル出力で競合なし）。`npm run docs:build` 成功（`ignoreDeadLinks` 未設定＝全 `/en` リンク検証）、本番 Pages に配信済 （2026-07-07）
 - **デフォルトのサンプル Markdown 廃止＝空起動** — 起動時に読み込んでいたサンプルデッキ（`sample-deck.ts`）を削除し、アプリは空状態で開始（既存のプレースホルダで graceful）。あわせて**空デッキで「＋ スライド追加」が no-op だった不具合を修正**（純粋 `addBlankSlide` が deck=null なら1スライドを mint）。vite preview＋Playwright で実操作確認 （2026-07-07）

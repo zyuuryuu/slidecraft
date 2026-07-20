@@ -1,113 +1,113 @@
 <p align="right">
-  <kbd><b>日本語</b></kbd>
-  <a href="README.en.md"><kbd>English</kbd></a>
+  <a href="README.ja.md"><kbd>日本語</kbd></a>
+  <kbd><b>English</b></kbd>
 </p>
 
 # SlideCraft
 
-**テンプレートは変えない。編集は変わらない。仕上がりだけ、人が作ったように。**
-あなたの会社のスライドマスターからデザインを受け継ぎ、いつものデッキ編集のまま、図も表も
-**編集可能な PPTX** として——人が一枚ずつ作り込んだと見分けのつかないスライドに仕上げます。
+**Your template stays yours. Your workflow stays yours. Only the finished slides look hand-crafted.**
+SlideCraft inherits the design from your company's slide master, keeps you in the deck-editing flow you already know, and turns diagrams and tables alike into **editable PPTX** — slides indistinguishable from ones a person built one at a time.
 
-> 📖 使い方は **[ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)** へ —
-> [インストール](https://zyuuryuu.github.io/slidecraft/guide/installation.html)・
-> [スターター](https://zyuuryuu.github.io/slidecraft/guide/getting-started.html)・
-> [Markdown](https://zyuuryuu.github.io/slidecraft/guide/markdown-authoring.html)・
-> [図](https://zyuuryuu.github.io/slidecraft/guide/diagrams.html)・
-> [AI設定](https://zyuuryuu.github.io/slidecraft/guide/ai-setup.html)・
-> [MCP](https://zyuuryuu.github.io/slidecraft/guide/mcp.html)・
-> [FAQ](https://zyuuryuu.github.io/slidecraft/guide/faq.html)
+> 📖 Learn how to use it at the **[documentation site](https://zyuuryuu.github.io/slidecraft/en/)** —
+> [Installation](https://zyuuryuu.github.io/slidecraft/en/guide/installation.html) ·
+> [Getting Started](https://zyuuryuu.github.io/slidecraft/en/guide/getting-started.html) ·
+> [Markdown](https://zyuuryuu.github.io/slidecraft/en/guide/markdown-authoring.html) ·
+> [Diagrams](https://zyuuryuu.github.io/slidecraft/en/guide/diagrams.html) ·
+> [AI setup](https://zyuuryuu.github.io/slidecraft/en/guide/ai-setup.html) ·
+> [MCP](https://zyuuryuu.github.io/slidecraft/en/guide/mcp.html) ·
+> [FAQ](https://zyuuryuu.github.io/slidecraft/en/guide/faq.html)
 
-Tauri v2 + React + TypeScript で構築。**Apache-2.0**。
+Built with Tauri v2 + React + TypeScript. **Apache-2.0**.
 
-## なぜ SlideCraft か
+## Why SlideCraft
 
-「Markdown でスライドを書く」ツールは他にもあります。SlideCraft が違うのは、**あなたの会社のスライドマスターをそのまま受け継ぎ、人が作ったと見分けのつかない仕上がりで、編集可能な本物の PowerPoint を、最小の計算量で作る**ところです。
+Plenty of tools let you "write slides in Markdown." What makes SlideCraft different: **it inherits your company's slide master as-is, produces real, editable PowerPoint that's indistinguishable from hand-built decks, and does it with the least computation possible.**
 
-- 🎯 **テンプレに流し込む、崩さない** — 既存 `.pptx` テンプレのプレースホルダに Markdown を流し込む。フォント・配色・レイアウト・マスター装飾はそのまま。
-- ✏️ **画像じゃない、編集できる図形** — 図・表・ダイアグラムは**ネイティブな PPTX シェイプ**として出力。受け取った人が PowerPoint でそのまま手直しできます。
-- 🧠 **配置は決定論エンジンが整える** — レイアウトはテンプレの役割から自動選択（**どんなマスターでも動く**）、本文は容量内に収め、あふれはフォントを縮めず自動分割、配色はコントラスト保証。
-- ⚡ **計算量は必要最小限、品質は保証** — 整形・配置・検証を決定論エンジンが担うので、AI に必要なのは Markdown を書くことだけ。**小さなローカルモデルで足り、トークンも最小**。AI 出力は適用前に採用ゲートで検証（*harness over model*）。
-- 👁 **プレビュー＝出力** — プレビュー・PPTX・HTML が**同じ描画エンジン**を共有。「プレビューと本番が違った」がありません。
-- 📊 **12 種のネイティブ図＋Mermaid** — フローチャート・ガント・KPI・レーダー…を数行の YAML から編集可能な図形で。
-- 🔒 **ローカルファースト＋AI** — デスクトップ＋内蔵オフライン AI（llamafile）。データは手元に。上流 AI に [MCP](https://zyuuryuu.github.io/slidecraft/guide/mcp.html) で駆動させることも。
+- 🎯 **Fill the template, never break it** — Pour Markdown into the placeholders of your existing `.pptx` template. Fonts, colors, layouts, and master styling stay exactly as they were.
+- ✏️ **Not images — editable shapes** — Diagrams, tables, and charts are emitted as **native PPTX shapes**. Whoever receives the deck can tweak them right inside PowerPoint.
+- 🧠 **A deterministic engine handles placement** — Layouts are chosen automatically from the template's roles (**works with any master**), body text is fit within its capacity, overflow is split automatically without shrinking fonts, and color contrast is guaranteed.
+- ⚡ **Minimal computation, guaranteed quality** — Because a deterministic engine handles formatting, placement, and validation, all the AI has to do is write Markdown. **A small local model is enough, and token use stays minimal.** AI output is checked by an adoption gate before it's applied (*harness over model*).
+- 👁 **Preview = output** — Preview, PPTX, and HTML share the **same rendering engine**. No more "the preview didn't match the real thing."
+- 📊 **12 native diagram types + Mermaid** — Flowcharts, Gantt charts, KPIs, radar charts, and more — from a few lines of YAML, as editable shapes.
+- 🔒 **Local-first + AI** — A desktop app with built-in offline AI (llamafile). Your data stays with you. You can also drive it from an upstream AI over [MCP](https://zyuuryuu.github.io/slidecraft/en/guide/mcp.html).
 
-## インストール
+## Installation
 
-### エンドユーザ（配布版）
+### End users (distributed builds)
 
-- **macOS（Apple Silicon）** — Homebrew tap 経由が最もクリーンです（`brew` が quarantine を剥がすので、ad-hoc 署名でも初回警告なしで開けます）:
+- **macOS (Apple Silicon)** — The Homebrew tap is the cleanest route (`brew` strips the quarantine attribute, so even an ad-hoc-signed build opens without a first-run warning):
 
   ```bash
   brew install --cask zyuuryuu/slidecraft/slidecraft
   ```
 
-  直接 `.dmg` を落とした場合は初回のみ Finder で右クリック →「開く」、または `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`。Intel Mac 版は現在未提供です。
-- **Windows / Linux** — [Releases](https://github.com/zyuuryuu/slidecraft/releases) から `.msi` / `.exe`（Windows）・`.AppImage` / `.deb` / `.rpm`（Linux）を取得。
+  If you downloaded the `.dmg` directly, on first launch right-click in Finder → "Open", or run `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`. Official builds target **Apple Silicon (arm64) only**; on an Intel Mac, build from source instead (see [Development](#development-from-source) below).
+- **Windows / Linux** — Grab `.msi` / `.exe` (Windows) or `.AppImage` / `.deb` / `.rpm` (Linux) from [Releases](https://github.com/zyuuryuu/slidecraft/releases).
 
-詳しくは [インストールガイド](https://zyuuryuu.github.io/slidecraft/guide/installation.html)。
+See the [installation guide](https://zyuuryuu.github.io/slidecraft/en/guide/installation.html) for details.
 
-### 開発（ソースから）
+### Development (from source)
 
-前提: Node.js 20+ ／ Rust 1.70+ ／ Linux は `libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev patchelf`。
+Prerequisites: Node.js 20+ / Rust 1.70+ / on Linux, `libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev patchelf`.
 
 ```bash
 git clone git@github.com:zyuuryuu/slidecraft.git
 cd slidecraft && npm install
-npm run tauri dev    # Tauri + Vite を同時起動（npm run dev はブラウザ demo）
+npm run tauri dev    # Launches Tauri + Vite together (npm run dev is the browser demo)
 ```
 
-## 開発コマンド
+## Development commands
 
 ```bash
-npm test             # ユニットテスト (Vitest)
-npm run typecheck:mcp # MCP レイヤの型チェック（app build は src/mcp を除外）
+npm test             # Unit tests (Vitest)
+npm run typecheck:mcp # Type-check the MCP layer (app build excludes src/mcp)
 npm run lint         # ESLint
 npm run test:e2e     # E2E (Playwright)
-npm run build        # フロントエンドビルド (tsc + vite)
-npm run tauri build  # インストーラ生成
-npm run docs:dev     # ドキュメントサイト (VitePress) をローカルで
+npm run build        # Frontend build (tsc + vite)
+npm run tauri build  # Generate installers
+npm run docs:dev     # Run the documentation site (VitePress) locally
 ```
 
-貢献方法・コーディング規約は [開発・貢献ガイド](https://zyuuryuu.github.io/slidecraft/guide/contributing.html) を参照。
+For contribution steps and coding conventions, see the [development & contribution guide](https://zyuuryuu.github.io/slidecraft/en/guide/contributing.html).
 
-## プロジェクト構成
+## Project structure
 
 ```text
 src/
-  engine/            # 純粋ロジック (DOM/Tauri API 依存なし)
-    diagram-painter.ts # 共有 painter (プレビュー SVG ＝ PPTX ネイティブ図形)
-    placeholder-filler.ts # Markdown→PPTX テンプレ流し込み
-    template-writer.ts # TemplateSpec → テンプレ PPTX 生成
+  engine/            # Pure logic (no DOM/Tauri API dependencies)
+    diagram-painter.ts # Shared painter (preview SVG = native PPTX shapes)
+    placeholder-filler.ts # Markdown → PPTX template fill
+    template-writer.ts # TemplateSpec → template PPTX generation
     …
-  components/        # React UI ／ ipc/ # Tauri IPC ／ mcp/ # MCP サーバ
-src-tauri/           # Rust バックエンド（sidecar・keychain・モデルDL）
-tests/ · tests/e2e/  # Vitest ／ Playwright
-docs/                # ドキュメントサイト (VitePress)・ADR・設計
-public/templates/    # スライドマスター (.pptx)
+  components/        # React UI / ipc/ # Tauri IPC / mcp/ # MCP server
+src-tauri/           # Rust backend (sidecar, keychain, model download)
+tests/ · tests/e2e/  # Vitest / Playwright
+docs/                # Documentation site (VitePress), ADRs, design
+public/templates/    # Slide masters (.pptx)
 ```
 
-## 技術スタック
+## Tech stack
 
-Tauri v2 (Rust) ／ React 19 + TypeScript 5.9 ／ Vite 8 ／ CodeMirror 6 ／ 共有 painter（ネイティブ図形 SVG）＋一部 Mermaid.js ／ PptxGenJS ／ Zod ／ Tailwind CSS 4 ／ Vitest + Playwright ／ 内蔵 AI = llamafile。
+Tauri v2 (Rust) / React 19 + TypeScript 5.9 / Vite 8 / CodeMirror 6 / shared painter (native-shape SVG) plus Mermaid.js in places / PptxGenJS / Zod / Tailwind CSS 4 / Vitest + Playwright / built-in AI = llamafile.
 
-## ドキュメント
+## Documentation
 
-- 📖 **[ドキュメントサイト](https://zyuuryuu.github.io/slidecraft/)** — 使い方（インストール・スターター・Markdown・図・テンプレート・AI・MCP・FAQ）
-- [SKILL.md](SKILL.md) — 上流 AI 向けの利用スキル（MCP 経由でデッキを著作する手順・契約）
-- [MCP サーバ仕様](docs/mcp-server.md) — 全ツール・リソース・エラー契約
-- [アーキテクチャ決定記録 (ADR)](docs/adr/) ／ [ロードマップ](docs/ROADMAP.md) ／ [実装済みログ](docs/shipped.md) ／ [詳細設計](docs/design/)
-- [リリース手順](RELEASING.md) — バージョニング方針とリリース手順
+- 📖 **[Documentation site](https://zyuuryuu.github.io/slidecraft/en/)** — how to use it (installation, getting started, Markdown, diagrams, templates, AI, MCP, FAQ)
+- [SKILL.md](SKILL.md) — usage skill for upstream AI (the procedure and contract for authoring decks over MCP)
+- [MCP server spec](docs/mcp-server.md) — all tools, resources, and error contracts
+- [Architecture Decision Records (ADRs)](docs/adr/) / [Roadmap](docs/ROADMAP.md) / [Shipped log](docs/shipped.md) / [Detailed design](docs/design/)
+- [Releasing](RELEASING.md) — versioning policy and release procedure
 
-## コード署名
+## Code signing
 
-Windows インストーラは、承認後 [SignPath Foundation](https://signpath.org/) の証明書で Authenticode
-署名される予定です（現状は未署名）。ビルド・署名・鍵管理の方針は
-[コード署名ポリシー](CODE_SIGNING_POLICY.md) を参照。macOS はアドホック署名＋Homebrew、Linux は未署名です。
+Windows installers will be Authenticode-signed with the [SignPath Foundation](https://signpath.org/)
+certificate once the project is approved (currently unsigned). See the
+[Code Signing Policy](CODE_SIGNING_POLICY.md) for the build, signing, and key-management approach.
+macOS uses ad-hoc signing + Homebrew; Linux is unsigned.
 
-## ライセンス
+## License
 
-**Apache License 2.0** — 全文は [LICENSE](LICENSE)。第三者コンポーネント・同梱バイナリ・
-実行時にダウンロードする AI モデル重みの帰属表示は [NOTICE](NOTICE) ／ [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) を参照。
+**Apache License 2.0** — full text in [LICENSE](LICENSE). For attribution of third-party components, bundled binaries, and
+AI model weights downloaded at runtime, see [NOTICE](NOTICE) / [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-行動規範は [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)、脆弱性報告は [SECURITY.md](SECURITY.md)、貢献は [CONTRIBUTING.md](CONTRIBUTING.md)。
+Community: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · security reports: [SECURITY.md](SECURITY.md) · contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
