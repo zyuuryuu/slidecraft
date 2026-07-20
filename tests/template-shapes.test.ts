@@ -80,3 +80,40 @@ describe.skipIf(!existsSync(VELIS))("attribute-bearing <p:spPr>/<p:grpSpPr> (#22
     expect(section.decorations.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe.skipIf(!existsSync(VELIS))("group flipH/flipV reach the preview as mirrored shapes (#241)", () => {
+  it("velis cover (layout1)'s flipH group tags its custGeom children flipH — the shape itself must mirror, not just its rect (a full-span child's rect is unchanged by a flip around its own center)", async () => {
+    const tpl = await loadTemplate(readFileSync(VELIS));
+    const cover = tpl.layouts.find((l) => l.index === 1)!;
+    const flipped = cover.decorations.filter((d) => d.flipH);
+    expect(flipped.length).toBeGreaterThan(0);
+    expect(flipped.every((d) => d.path)).toBe(true); // both flipH children are custGeom Freeforms
+    expect(flipped.every((d) => !d.flipV)).toBe(true); // this group is flipH-only
+    // still on-canvas and non-degenerate — the flip must not corrupt position/size.
+    for (const d of flipped) {
+      expect(d.x).toBeGreaterThan(-5); expect(d.x).toBeLessThan(20);
+      expect(d.w).toBeGreaterThan(0); expect(d.h).toBeGreaterThan(0);
+    }
+  });
+
+  it("velis has flipV and flipH+flipV groups too (layout13/29) — both axes are detected independently", async () => {
+    const tpl = await loadTemplate(readFileSync(VELIS));
+    const decos = tpl.layouts.flatMap((l) => l.decorations);
+    expect(decos.some((d) => d.flipV && !d.flipH)).toBe(true); // a flipV-only group's children
+    expect(decos.some((d) => d.flipH && d.flipV)).toBe(true); // a flipH+flipV group's children
+  });
+
+  it("across the whole template, every flip group's children are tagged (repro: 16 flip xfrm)", async () => {
+    const tpl = await loadTemplate(readFileSync(VELIS));
+    const decos = tpl.layouts.flatMap((l) => l.decorations).concat(tpl.masterDecorations);
+    expect(decos.filter((d) => d.flipH || d.flipV).length).toBeGreaterThan(0);
+  });
+});
+
+describe("no false-positive flip tagging on a template with no flipH/flipV anywhere", () => {
+  it("REPORT fixture (no <a:xfrm flipH/flipV> in the whole package) never sets DecoRect.flipH/flipV", async () => {
+    const tpl = await loadTemplate(readFileSync(REPORT));
+    const decos = tpl.layouts.flatMap((l) => l.decorations).concat(tpl.masterDecorations);
+    expect(decos.some((d) => d.flipH || d.flipV)).toBe(false);
+  });
+});

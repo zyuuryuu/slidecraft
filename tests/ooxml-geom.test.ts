@@ -48,6 +48,64 @@ describe("group transform (parseGroupXf / transformRect)", () => {
   });
 });
 
+// #241: <a:xfrm flipH="1">/flipV="1"> on a <p:grpSpPr> must mirror the child→parent transform, not
+// just translate it — PowerPoint draws a flipped group's children as their mirror image, not at their
+// raw (unflipped) child-space position.
+describe("group flip (parseGroupXf flipH/flipV — #241)", () => {
+  // Same group as above (slide 1in..3in, child space 0in..2in, scale 1) but flipH="1".
+  const flipHXf = `<p:grpSpPr><a:xfrm flipH="1">` +
+    `<a:off x="${EMU}" y="0"/><a:ext cx="${2 * EMU}" cy="${2 * EMU}"/>` +
+    `<a:chOff x="0" y="0"/><a:chExt cx="${2 * EMU}" cy="${2 * EMU}"/>` +
+    `</a:xfrm></p:grpSpPr>`;
+
+  it("flipH negates sx and mirrors tx: sx=-scale, tx=off+ext-chOff·sx", () => {
+    const xf = parseGroupXf(flipHXf)!;
+    // hand calc: scale=1 → sx=-1; tx = off(1in) + ext(2in) - chOff(0)·sx = 3in.
+    expect(xf.sx).toBeCloseTo(-1);
+    expect(xf.sy).toBeCloseTo(1); // flipV not set → y axis untouched
+    expect(xf.tx).toBeCloseTo(3 * EMU);
+    expect(xf.ty).toBeCloseTo(0);
+  });
+
+  it("flipH puts a child at the MIRRORED position within the group's box", () => {
+    const xf = parseGroupXf(flipHXf)!;
+    // Unflipped, child (0,0,1in,1in) lands at slide (1in,0,1in,1in) — the group's LEFT half (1in..2in
+    // of its 1in..3in span). Flipped, the same child must land at the group's RIGHT half (2in..3in):
+    // hand calc: rawX = sx·0 + tx = 3in; rawW = sx·1in = -1in → normalized x = 3in-1in = 2in, w = 1in.
+    const r = transformRect(xf, 0, 0, EMU, EMU);
+    expect(r).toEqual({ x: 2, y: 0, w: 1, h: 1 });
+  });
+
+  it("flipV mirrors the y axis the same way, independently of flipH", () => {
+    const g = `<p:grpSpPr><a:xfrm flipV="1">` +
+      `<a:off x="0" y="${EMU}"/><a:ext cx="${2 * EMU}" cy="${2 * EMU}"/>` +
+      `<a:chOff x="0" y="0"/><a:chExt cx="${2 * EMU}" cy="${2 * EMU}"/>` +
+      `</a:xfrm></p:grpSpPr>`;
+    const xf = parseGroupXf(g)!;
+    expect(xf.sx).toBeCloseTo(1); // flipH not set → x axis untouched
+    expect(xf.sy).toBeCloseTo(-1);
+    const r = transformRect(xf, 0, 0, EMU, EMU);
+    expect(r).toEqual({ x: 0, y: 2, w: 1, h: 1 }); // mirrored into the group's BOTTOM half
+  });
+
+  it("flipH+flipV together mirror both axes", () => {
+    const g = `<p:grpSpPr><a:xfrm flipH="1" flipV="1">` +
+      `<a:off x="${EMU}" y="${EMU}"/><a:ext cx="${2 * EMU}" cy="${2 * EMU}"/>` +
+      `<a:chOff x="0" y="0"/><a:chExt cx="${2 * EMU}" cy="${2 * EMU}"/>` +
+      `</a:xfrm></p:grpSpPr>`;
+    const xf = parseGroupXf(g)!;
+    expect(xf.sx).toBeCloseTo(-1); expect(xf.sy).toBeCloseTo(-1);
+    expect(transformRect(xf, 0, 0, EMU, EMU)).toEqual({ x: 2, y: 2, w: 1, h: 1 });
+  });
+
+  it("a double flip (flipped group nested in a flipped group) composes back to unflipped", () => {
+    const outer = parseGroupXf(flipHXf)!; // sx=-1
+    const inner = { sx: -1, sy: 1, tx: EMU, ty: 0 }; // another flipH-equivalent transform
+    const composed = composeXf(outer, inner);
+    expect(composed.sx).toBeCloseTo(1); // (-1)·(-1) = 1 — flips cancel out
+  });
+});
+
 describe("topLevelBlocks — depth-balanced group extraction", () => {
   it("captures a nested group as ONE outer block (not mis-split at the inner close)", () => {
     const xml = `<p:grpSp><p:sp>A</p:sp><p:grpSp><p:sp>B</p:sp></p:grpSp></p:grpSp>`;
