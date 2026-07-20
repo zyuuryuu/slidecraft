@@ -23,6 +23,7 @@ import type { SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
 import { useDeckRevise } from "./useDeckRevise";
 import { useDeckIO } from "./useDeckIO";
+import { useGenerateSlide } from "./useGenerateSlide";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 
 export type { MarkdownSubMode } from "./useDocumentStore";
@@ -387,6 +388,11 @@ export function useDeckController() {
     setEditNotice(null);
   }, [deck, setDeck, setActiveSlide, setSelected, setEditNotice]);
 
+  // 便利スライド生成（ADR-0034 / #277）: 目次 live/static の挿入・static の「作り直す」。
+  const { handleGenerateToc, handleRegenerateStaticToc } = useGenerateSlide({
+    deck, activeSlide, setDeck, setActiveSlide, setSelected, editLockedRef,
+  });
+
   // Deterministic "→表" in Edit (deck = source of truth): serialize the slide →
   // visualize key-value bullets → parse back → replace the slide (deck-op, undoable).
   // Reuses the same markdown lever as Import, so Initialize/Edit stay consistent.
@@ -677,6 +683,7 @@ export function useDeckController() {
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
+    handleGenerateToc, handleRegenerateStaticToc,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc, // multi-document collection (tabs, P0.2)

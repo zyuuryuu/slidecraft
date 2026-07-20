@@ -1,6 +1,7 @@
 import ReviewBar from "./components/ReviewBar";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
+import GenerateSlideMenu from "./components/GenerateSlideMenu";
 import SlideEditor from "./components/SlideEditor";
 import SlideMarkdownEditor from "./components/SlideMarkdownEditor";
 import ResizableSplit from "./components/ResizableSplit";
@@ -58,6 +59,7 @@ export default function App() {
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
+    handleGenerateToc, handleRegenerateStaticToc,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
@@ -462,14 +464,25 @@ export default function App() {
                 <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge flex items-center justify-between">
                   <span>{t("panel.slides")}</span>
                   {!editLocked && (
-                    <button
-                      type="button"
-                      onClick={handleAddSlide}
-                      title={t("slides.add")}
-                      className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none"
-                    >
-                      ＋
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      <GenerateSlideMenu
+                        hasActiveSlide={!!deck && deck.slides.length > 0}
+                        onInsert={handleGenerateToc}
+                        onRegenerateActive={async () => {
+                          if (await confirmDialog(t("generateSlide.regenerateConfirm"), t("generateSlide.regenerateConfirmTitle"))) {
+                            handleRegenerateStaticToc(activeSlide);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSlide}
+                        title={t("slides.add")}
+                        className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none"
+                      >
+                        ＋
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="flex-1 min-h-0 bg-void">
