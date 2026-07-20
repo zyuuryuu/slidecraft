@@ -14,6 +14,7 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import type { Session } from "./session";
 import * as S from "./session";
 import type { HostContext } from "./host-core";
+import { renderSlideHtml } from "./slide-raster";
 
 type ReadResult = { contents: { uri: string; mimeType?: string; text: string }[] };
 const asJson = (uri: URL, data: unknown): ReadResult => ({
@@ -21,6 +22,9 @@ const asJson = (uri: URL, data: unknown): ReadResult => ({
 });
 const asMd = (uri: URL, text: string): ReadResult => ({
   contents: [{ uri: uri.href, mimeType: "text/markdown", text }],
+});
+const asHtml = (uri: URL, text: string): ReadResult => ({
+  contents: [{ uri: uri.href, mimeType: "text/html", text }],
 });
 
 export function registerResources(server: McpServer, host: HostContext): void {
@@ -88,6 +92,34 @@ export function registerResources(server: McpServer, host: HostContext): void {
     (uri, { index }) => {
       const raw = Array.isArray(index) ? index[0] : index;
       return asMd(uri, S.getSlideMarkdown(session(), Number(raw)));
+    },
+  );
+
+  // #242: same self-contained HTML get_slide_html returns as a tool — mirrored as a resource
+  // (ADR-0008 dual reads), addressable by index like slide://{index}/markdown.
+  server.registerResource(
+    "slide-html",
+    new ResourceTemplate("slide://{index}/html", {
+      list: () => {
+        let count = 0;
+        try {
+          count = S.getDeck(session()).slides.length;
+        } catch {
+          /* no project open yet → nothing to list (count stays 0) */
+        }
+        return {
+          resources: Array.from({ length: count }, (_, i) => ({
+            uri: `slide://${i}/html`,
+            name: `slide ${i} html`,
+            mimeType: "text/html",
+          })),
+        };
+      },
+    }),
+    { title: "スライドの自己完結 HTML", description: "1スライドの現在の描画（get_slide_image/get_slide_html と同一の共有 HTML）。slide://{index}/html", mimeType: "text/html" },
+    (uri, { index }) => {
+      const raw = Array.isArray(index) ? index[0] : index;
+      return asHtml(uri, renderSlideHtml(session(), Number(raw)));
     },
   );
 }
