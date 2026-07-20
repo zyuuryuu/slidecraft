@@ -129,7 +129,8 @@
     "imageLoadFailed": "画像の読み込みに失敗しました",
     "draftLockedTitle": "協働接続中は編集ロック中",
     "draftButtonTitle": "原稿（テキスト）からスライドを作る・取り込む",
-    "viewForm": "フォーム"
+    "viewForm": "フォーム",
+    "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}"
   },
   "applyTemplate": {
     "templateUnusable": "このテンプレートは使用できません: {{reason}}",
@@ -494,6 +495,7 @@
     "transitionSlide": "スライド",
     "transitionFade": "フェード",
     "transitionZoom": "ズーム",
-    "transitionPush": "プッシュ"
+    "transitionPush": "プッシュ",
+    "help": "ヘルプ / ドキュメントサイトを開く"
   }
 }

@@ -30,6 +30,8 @@ interface ToolbarProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  /** Help/? → docs site (issue #114). */
+  onHelp?: () => void;
 }
 
 export default function Toolbar({
@@ -47,6 +49,7 @@ export default function Toolbar({
   onRedo,
   canUndo,
   canRedo,
+  onHelp,
 }: ToolbarProps) {
   const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
@@ -181,6 +184,12 @@ export default function Toolbar({
           </>
         )}
       </div>
+
+      {onHelp && (
+        <button onClick={onHelp} title={t("toolbar.help")} className={`${btn} px-2.5 font-medium`}>
+          ?
+        </button>
+      )}
     </div>
   );
 }

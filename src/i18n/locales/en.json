@@ -129,7 +129,8 @@
     "imageLoadFailed": "Failed to load image",
     "draftLockedTitle": "Editing is locked while collaborating",
     "draftButtonTitle": "Create or import slides from a draft (text)",
-    "viewForm": "Form"
+    "viewForm": "Form",
+    "helpUrlFallback": "Couldn't open the docs — use this URL instead: {{url}}"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",
@@ -494,6 +495,7 @@
     "transitionSlide": "Slide",
     "transitionFade": "Fade",
     "transitionZoom": "Zoom",
-    "transitionPush": "Push"
+    "transitionPush": "Push",
+    "help": "Help / open the docs site"
   }
 }
