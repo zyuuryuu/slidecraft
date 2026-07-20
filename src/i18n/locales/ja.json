@@ -208,6 +208,21 @@
     "startPosition": "始点位置",
     "resetStartPosition": "始点位置をリセット"
   },
+  "generateSlide": {
+    "buttonTitle": "便利スライドを生成",
+    "typeLabel": "タイプ",
+    "typeToc": "目次",
+    "modeLabel": "モード",
+    "modeLive": "ライブ（自動更新）",
+    "modeLiveDesc": "章の追加・改名・削除に自動追随。直接編集はできません。",
+    "modeStatic": "固定（編集可）",
+    "modeStaticDesc": "現在の章構成から1回生成する、普通の編集可能なスライドです。",
+    "insert": "挿入",
+    "regenerate": "選択中のスライドを目次で作り直す",
+    "regenerateTitle": "選択中のスライドの内容を、現在の章構成から生成した固定目次で置き換えます",
+    "regenerateConfirm": "選択中のスライドの内容を、現在の章構成から生成した固定目次で置き換えます。元に戻せますが、既存の内容は失われます。よろしいですか？",
+    "regenerateConfirmTitle": "目次を作り直す"
+  },
   "initModal": {
     "dialogLabel": "Draft — 原稿からスライドを作る",
     "importMarkdown": "📄 Markdown を取込む",

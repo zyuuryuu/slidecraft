@@ -655,6 +655,10 @@ interface SlidePreviewProps {
   onDiagramChange?: (yaml: string) => void;
   /** Enables drag/resize of the active slide's image, reporting the new rect (Edit mode). */
   onImageRectChange?: (rect: ImageRect) => void;
+  /** deck プロップが呼び出し側で既に materializeDerivedSlides 済みのとき true（#275）。App が
+   *  SlideList と共有の1本化済み deck を渡すケース向け — 内部での再 materialize を省く（二重適用の
+   *  回避）。省略時（既定 false）は従来どおり内部で materialize する（単独呼び出しの互換）。 */
+  preMaterialized?: boolean;
 }
 
 export default function SlidePreview({
@@ -669,13 +673,18 @@ export default function SlidePreview({
   scale: scaleProp,
   onDiagramChange,
   onImageRectChange,
+  preMaterialized,
 }: SlidePreviewProps) {
   const { t } = useTranslation();
   // Catalog → layout selection adapts to the template (canonical = unchanged).
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
   // 派生スライド（<!-- toc -->）は消費点で導出（#151）— export と同じ単一関数なので WYSIWYG が保たれ、
-  // 章名変更は次のレンダーで自動反映される（deck 状態には導出内容を持たない）。
-  const deck = useMemo(() => (deckProp ? materializeDerivedSlides(deckProp) : deckProp), [deckProp]);
+  // 章名変更は次のレンダーで自動反映される（deck 状態には導出内容を持たない）。呼び出し側が既に
+  // materialize 済みを渡すとき（preMaterialized）は素通しする（#275・二重 materialize の回避）。
+  const deck = useMemo(
+    () => (deckProp && !preMaterialized ? materializeDerivedSlides(deckProp) : deckProp),
+    [deckProp, preMaterialized],
+  );
 
   // Fit the slide to the available pane by default (the fixed 72-dpi render overflowed
   // narrow panes); a small zoom control lets the user scale it down/up by %.

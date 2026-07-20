@@ -65,12 +65,22 @@ function nodeToMermaid(id: string, label: string, shape?: string): string {
   const safeLabel = label.replace(/"/g, "'").replace(/\n/g, "<br>");
   switch (shape) {
     case "diamond":
+      return `${id}{"${safeLabel}"}`;
+    case "hexagon":
       return `${id}{{"${safeLabel}"}}`;
     case "rounded_rect":
       return `${id}("${safeLabel}")`;
     case "circle":
     case "oval":
       return `${id}(("${safeLabel}"))`;
+    case "stadium":
+      return `${id}(["${safeLabel}"])`;
+    case "subroutine":
+      return `${id}[["${safeLabel}"]]`;
+    case "parallelogram":
+      return `${id}[/"${safeLabel}"/]`;
+    case "cylinder":
+      return `${id}[("${safeLabel}")]`;
     default:
       return `${id}["${safeLabel}"]`;
   }

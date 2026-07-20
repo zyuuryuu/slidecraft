@@ -32,7 +32,7 @@ export const DIAGRAM_TYPES: Record<DiagramType, DiagramTypeInfo> = {
   flowchart: {
     label: "フローチャート",
     hint: "process / flow / decision logic — boxes & arrows",
-    shape: `Use "nodes" (id, label, shape ∈ rect|rounded_rect|diamond|circle|oval|hexagon, optional class/group) and "edges" (from, to, optional label, optional "style":{"dash":true}). "classDefs" + "groups" are optional.
+    shape: `Use "nodes" (id, label, shape ∈ rect|rounded_rect|diamond|circle|oval|hexagon|stadium|subroutine|parallelogram|cylinder, optional class/group) and "edges" (from, to, optional label, optional "style":{"dash":true}). "classDefs" + "groups" are optional.
 Example: {"type":"flowchart","direction":"LR","nodes":[{"id":"a","label":"開始","shape":"rounded_rect"},{"id":"b","label":"判定","shape":"diamond"},{"id":"c","label":"完了"}],"edges":[{"from":"a","to":"b"},{"from":"b","to":"c","label":"OK"}]}`,
   },
   network: {

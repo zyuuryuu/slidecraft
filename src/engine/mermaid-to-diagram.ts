@@ -86,13 +86,25 @@ function parseNodeDef(raw: string): ParsedNode | null {
   m = s.match(/^(\w+)\(\("?(.+?)"?\)\)/);
   if (m) return { id: m[1], label: m[2], shape: "circle" };
 
-  // id{{"label"}} → diamond (double brace)
-  m = s.match(/^(\w+)\{\{"?(.+?)"?\}\}/);
-  if (m) return { id: m[1], label: m[2], shape: "diamond" };
+  // id(["label"]) → stadium (pill/terminal — must be before rounded_rect)
+  m = s.match(/^(\w+)\(\["?(.+?)"?\]\)/);
+  if (m) return { id: m[1], label: m[2], shape: "stadium" };
 
-  // id[(label)] → database/cylinder → treat as rect
+  // id{{"label"}} → hexagon (double brace; #269 — was mis-mapped to diamond)
+  m = s.match(/^(\w+)\{\{"?(.+?)"?\}\}/);
+  if (m) return { id: m[1], label: m[2], shape: "hexagon" };
+
+  // id[("label")] → cylinder/database (#269 — was flattened to rect)
   m = s.match(/^(\w+)\[\("?(.+?)"?\)\]/);
-  if (m) return { id: m[1], label: m[2], shape: "rect" };
+  if (m) return { id: m[1], label: m[2], shape: "cylinder" };
+
+  // id[["label"]] → subroutine (must be before the generic rect bracket)
+  m = s.match(/^(\w+)\[\["?(.+?)"?\]\]/);
+  if (m) return { id: m[1], label: m[2], shape: "subroutine" };
+
+  // id[/"label"/] → parallelogram (must be before the generic rect bracket)
+  m = s.match(/^(\w+)\[\/"?(.+?)"?\/\]/);
+  if (m) return { id: m[1], label: m[2], shape: "parallelogram" };
 
   // id["label"] → rect
   m = s.match(/^(\w+)\["(.+?)"\]/);
@@ -110,8 +122,8 @@ function parseNodeDef(raw: string): ParsedNode | null {
   m = s.match(/^(\w+)\((.+?)\)/);
   if (m) return { id: m[1], label: m[2], shape: "rounded_rect" };
 
-  // id{label} → diamond (single brace, no quotes)
-  m = s.match(/^(\w+)\{(.+?)\}/);
+  // id{label} → diamond (single brace, quotes optional)
+  m = s.match(/^(\w+)\{"?(.+?)"?\}/);
   if (m) return { id: m[1], label: m[2], shape: "diamond" };
 
   // id>label] → asymmetric

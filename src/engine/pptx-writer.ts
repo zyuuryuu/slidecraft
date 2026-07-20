@@ -37,6 +37,12 @@ const PPTX_SHAPE_MAP: Record<ShapeType, string> = {
   start: "ellipse",
   end: "ellipse",
   entity: "rect",
+  // Mermaid flowchart shapes (#269) — PowerPoint's native flowchart presets are an
+  // exact geometric match, so these render as real editable PPTX shapes (no approximation).
+  stadium: "flowChartTerminator",
+  subroutine: "flowChartPredefinedProcess",
+  parallelogram: "flowChartInputOutput",
+  cylinder: "can",
 };
 
 function hexToRgb(hex: string): string {
