@@ -14,6 +14,9 @@ const THUMB_SCALE = 15;
 const CARD_W = SLIDE_W * THUMB_SCALE; // thumbnail px width — sizes the insertion indicator to match
 
 interface SlideListProps {
+  /** 呼び出し側（App）が materializeDerivedSlides 済みの表示用 deck を渡す（#275）— 目次/章扉の
+   *  派生内容が右プレビュー・PPTX/HTML export と一致する。materialize は 1:1（枚数不変）なので
+   *  activeIndex/selected の index はそのまま使える。 */
   deck: DeckIR | null;
   template: TemplateData | null;
   activeIndex: number;

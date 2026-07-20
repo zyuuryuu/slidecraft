@@ -1,6 +1,7 @@
 import ReviewBar from "./components/ReviewBar";
 import SlidePreview from "./components/SlidePreview";
 import SlideList from "./components/SlideList";
+import GenerateSlideMenu from "./components/GenerateSlideMenu";
 import SlideEditor from "./components/SlideEditor";
 import SlideMarkdownEditor from "./components/SlideMarkdownEditor";
 import ResizableSplit from "./components/ResizableSplit";
@@ -35,6 +36,7 @@ import { ONBOARDING_SAMPLE_MD } from "./components/onboarding-sample";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
+import { materializeDerivedSlides } from "./engine/deck-sections";
 
 /** Measure an image's intrinsic aspect (w/h) from a data URL, for aspect-lock + cover cropping (案B).
  *  Resolves undefined if it can't decode (e.g. SVG without intrinsic size) — the image still inserts. */
@@ -57,11 +59,17 @@ export default function App() {
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
+    handleGenerateToc, handleRegenerateStaticToc,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
   const { t } = useTranslation();
+  // 表示用の materialize 済み deck（#275）: 左サムネイル一覧（SlideList）と右プレビュー（SlidePreview）
+  // が同じ内容を描くよう、ここで1回だけ materializeDerivedSlides を通して両ペインへ渡す。materialize
+  // は 1:1 変換（枚数不変）なので activeSlide/selected の index はそのまま使い回せる。編集エディタ
+  // （SlideEditor/SlideMarkdownEditor）は <!-- toc --> マーカーを編集するため生の deck のまま。
+  const displayDeck = useMemo(() => (deck ? materializeDerivedSlides(deck) : deck), [deck]);
   const { show: showUpdateBanner, latestVersion, dismiss: dismissUpdateBanner } = useUpdateBanner();
   const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 
@@ -456,18 +464,29 @@ export default function App() {
                 <div className="px-3 py-1 bg-panel text-xs text-muted border-b border-edge flex items-center justify-between">
                   <span>{t("panel.slides")}</span>
                   {!editLocked && (
-                    <button
-                      type="button"
-                      onClick={handleAddSlide}
-                      title={t("slides.add")}
-                      className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none"
-                    >
-                      ＋
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      <GenerateSlideMenu
+                        hasActiveSlide={!!deck && deck.slides.length > 0}
+                        onInsert={handleGenerateToc}
+                        onRegenerateActive={async () => {
+                          if (await confirmDialog(t("generateSlide.regenerateConfirm"), t("generateSlide.regenerateConfirmTitle"))) {
+                            handleRegenerateStaticToc(activeSlide);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSlide}
+                        title={t("slides.add")}
+                        className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none"
+                      >
+                        ＋
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="flex-1 min-h-0 bg-void">
-                  <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
+                  <SlideList deck={displayDeck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
                     onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} onMove={handleMoveSlide} disabled={editLocked} />
                 </div>
               </>
@@ -516,7 +535,7 @@ export default function App() {
                   {t("panel.previewSlide", { n: activeSlide + 1 })}
                 </div>
                 <div className="flex-1 min-h-0 bg-canvas">
-                  <SlidePreview deck={deck} template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} onImageRectChange={handleImageRectChange} />
+                  <SlidePreview deck={displayDeck} preMaterialized template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} onImageRectChange={handleImageRectChange} />
                 </div>
               </>
             }
