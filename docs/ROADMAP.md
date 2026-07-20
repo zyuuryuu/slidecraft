@@ -24,8 +24,7 @@ CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [
 | **表・描画 / HTML** | 図ノード衝突/折返し・SmartArt 追随（@font-face CJK 埋め込み #115 は #192/#193/#194 で完了・shipped.md 参照） | #104 #105 |
 | **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
 | **GUI / アプリ堅牢性** | 最背面画像ドラッグ・Help 導線・.scft version ゲート | #122 #114 #121 |
-| **MCP / 連携** | スライドスクショ取得（上流 AI の視覚レビューループ） | [`mcp`](https://github.com/zyuuryuu/slidecraft/labels/mcp)（#109） |
-| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・通知/署名付き自動更新・egress hard boundary | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#113 #120）・#119 |
+| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・署名付き自動更新・egress hard boundary | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#112 #120）・#119 |
 | **保守性（ADR-0031 運用）** | 凍結/許可リストの ratchet 縮小（分割は #129 型・継続運用） | — |
 
 ---

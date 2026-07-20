@@ -162,6 +162,7 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 |---|---|
 | `get_slide(index)` | 1 スライドの**構造化 read**（解決レイアウト・図の有無・箇条書き数・budget・capacity（本文容量の実測）・predictedSplit（分割ドライラン）・当該 issues・Markdown）。1 呼び出しで編集計画が立つ |
 | `get_slide_markdown(index)` | 1 スライドの素の Markdown（レイアウト解決済み） |
+| `get_slide_image(index)` | 1 スライドの**現在の描画を PNG で返す**（AI の視覚デザインチェック）。preview / HTML 書き出しと同じ共有描画をローカルの Chrome/Edge で撮る。任意機能（後述） |
 | `set_slide_markdown(index, markdown)` | 1 スライドを差し替え（図/mermaid は自動保持・検証・不正は never-silent 拒否） |
 | `set_slide_diagram(index, source, format, ...)` | 図を DiagramSpec/Mermaid で設定。図ありは置換、テキストスライドには本文領域へ追加 |
 | `apply_design_intent(index, intent)` | 図に**空間意図**を反映（テキスト左/図右・ノード強調・向きの変更）※図を持つスライドのみ |
@@ -169,6 +170,13 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 ::: warning デッキ全体の置換に注意
 `set_deck_markdown(markdown)` は deck 全体を置換し、**図は保持されません**。
 1 枚だけ直したいときは `set_slide_markdown` や `insert_slide` を使ってください。
+:::
+
+::: tip 視覚チェック（`get_slide_image`）にはブラウザが要る
+`get_slide_image` はマシンに既にある **Chrome/Edge だけ**で撮ります（**同梱も自動ダウンロードもしません** —
+陳腐化した＝穴の開いたブラウザを配らないため）。未検出でも黙って失敗せず `{ok:false, code:"browser-not-found"}` で
+案内します（`SLIDECRAFT_BROWSER` でパス指定可）。撮影はネット遮断・使い捨てプロファイルで行い、埋め込みフォントの
+おかげで CJK でも文字化けしません。**任意機能**なので、ブラウザが無くても著作・出力は成立します。
 :::
 
 ### 構造操作（スライドの並び）
@@ -228,19 +236,22 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 
 ---
 
-## 協働ホストモード（GUI 起動 → AI が接続）
+## 協働ホストモード（GUI 起動 → AI が同じ deck へ相乗り）
 
-上の使い方は「エージェントがサーバを spawn する」headless 経路ですが、**GUI（デスクトップ版）が
-ホストになる**協働モードもあります。GUI が起動時にサーバを内包し、そこへ AI が接続して編集する形です。
+登録するコマンドは1つ（`slidecraft serve` / `slidecraft mcp`）で、**GUI が起動中かどうかを起動時に自動判定**します
+（アダプティブ・フロント・ADR-0033）。GUI が協働ホストを稼働していれば AI はそこへ**相乗り**し、人が見ている deck を
+一緒に編集できます（居なければ単独で動く）。**MCP 設定を2つ書き分ける必要はありません**。
 
-- **複数ドキュメントの lifecycle** — `list_documents` / `select_document` / `close_document` と、
-  サーバ側の `undo` / `redo` を公開します（host 専用）。
+- **複数ドキュメントの lifecycle** — `list_documents` / `select_document` / `close_document`。GUI 協働では
+  複数 doc を跨げます（単独モードでも同じツールは在りますが 1 doc なので実質 no-op）。
+- **サーバ側 `undo` / `redo`** — deck の真実を1手戻す／やり直す。**単独モードでも効きます**（管制を1つに統一した
+  ADR-0033 D1 の成果）。
 - **登録済みテンプレの活用** — GUI が `register_templates` で master レジストリを host に投入すると、
   AI は `list_templates` で一覧を見て `use_template(id, markdown?)` で**新規プロジェクトを mint** できます。
-  bytes を運ばずにテンプレを選べるため、host 経由ではこれが最短です。
+  bytes を運ばずにテンプレを選べるため、host 経由ではこれが最短です（単独モードはテンプレ bytes か `create_template`）。
 
-これにより、人が GUI で見ている deck に対して AI が接続して編集し、その結果を人が確認する、
-という協働が可能になります。GUI と AI で編集が競合した場合は楽観ロックで検出され、クライアントが再取得します。
+人が GUI で見ている deck に AI が相乗りして編集し、人が結果を確認する協働が成立します。編集が競合した場合は
+楽観ロックで検出され、クライアントが再取得します。
 
 ---
 
