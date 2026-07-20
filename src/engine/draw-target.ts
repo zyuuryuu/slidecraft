@@ -192,3 +192,72 @@ export function scaledFontSize(
   if (scale >= 1.0) return baseSize;
   return Math.max(baseSize * scale, minSize);
 }
+
+// ── Shared text-fit estimation (#228) ──
+// One implementation for BOTH backends: the SVG preview shrinks overflowing shrink-labels via this
+// estimate, and the PPTX writer bakes the SAME scale into the run font sizes — because PowerPoint's
+// fit:"shrink" autofit is not recomputed until the text is edited (R7), preview and PPTX would
+// otherwise disagree on every long label (R8: one meaning, one path).
+
+export const PX_PER_PT = 96 / 72;
+
+/** CJK/fullwidth code-point test (via code point → no literal CJK glyphs / irregular-whitespace lint). */
+export function isCjkCode(o: number): boolean {
+  return (o >= 0x3000 && o <= 0x9fff) || (o >= 0xac00 && o <= 0xd7a3) || (o >= 0xff00 && o <= 0xffef);
+}
+
+/** Estimated rendered width of a string at font size fs: CJK ≈ 1em, Latin ≈ 0.55em. Unit-agnostic
+ *  (fs px → px, fs pt → pt). Errs slightly wide so shrink/wrap never leave text overflowing its box. */
+export function estTextWidth(s: string, fs: number): number {
+  let w = 0;
+  for (const c of s) w += fs * (isCjkCode(c.charCodeAt(0)) ? 1.0 : 0.55);
+  return w;
+}
+
+/**
+ * Greedy width-based line wrap for opts.wrap labels (timeline event cards, quadrant cells,
+ * swimlane headers, journey steps). Approximates the browser: break on spaces, hard-break
+ * over-long tokens. Moved here from svg-writer so the PPTX shrink pre-computation measures the
+ * same wrapped lines the preview draws (#228).
+ */
+export function wrapToWidth(text: string, maxW: number, fs: number): string[] {
+  if (estTextWidth(text, fs) <= maxW) return [text];
+  const cw = (c: string) => fs * (isCjkCode(c.charCodeAt(0)) ? 1.0 : 0.55);
+
+  // Tokenize into words, spaces, and individual CJK chars (which may break anywhere).
+  const tokens: string[] = [];
+  let buf = "";
+  for (const c of [...text]) {
+    if (c === " ") { if (buf) { tokens.push(buf); buf = ""; } tokens.push(" "); }
+    else if (isCjkCode(c.charCodeAt(0))) { if (buf) { tokens.push(buf); buf = ""; } tokens.push(c); }
+    else buf += c;
+  }
+  if (buf) tokens.push(buf);
+
+  const lines: string[] = [];
+  let cur = "";
+  for (let tok of tokens) {
+    while (estTextWidth(tok, fs) > maxW) { // hard-break a single token wider than the line
+      const chars = [...tok];
+      let i = 0, acc = 0;
+      for (; i < chars.length; i++) { acc += cw(chars[i]); if (acc > maxW) break; }
+      i = Math.max(1, i);
+      if (cur.trim()) { lines.push(cur.trim()); cur = ""; }
+      lines.push(chars.slice(0, i).join(""));
+      tok = chars.slice(i).join("");
+    }
+    if (cur !== "" && estTextWidth(cur + tok, fs) > maxW) { lines.push(cur.trim()); cur = tok === " " ? "" : tok; }
+    else cur += tok;
+  }
+  if (cur.trim()) lines.push(cur.trim());
+  return lines.length > 0 ? lines : [text];
+}
+
+/** The single shrink-to-fit ratio for a text block: 1 when the widest line fits `maxW`, else
+ *  maxW / widest — mirrors PowerPoint fit:"shrink" scaling every line uniformly. `fs` and `maxW`
+ *  must share a unit (both px or both pt). */
+export function shrinkScale(lines: { text: string; fs: number }[], maxW: number): number {
+  let widest = 0;
+  for (const l of lines) widest = Math.max(widest, estTextWidth(l.text, l.fs));
+  return widest > maxW ? maxW / widest : 1;
+}
