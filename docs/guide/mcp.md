@@ -90,7 +90,7 @@ claude mcp add slidecraft -- slidecraft-mcp
 
 ### Claude Desktop / Cursor
 
-`claude_desktop_config.json`（Cursor は `mcp.json`）の `mcpServers` に登録します。
+`claude_desktop_config.json`（Cursor は `~/.cursor/mcp.json` またはプロジェクト直下 `.cursor/mcp.json`）の `mcpServers` に登録します。
 
 ```json
 {
@@ -102,11 +102,42 @@ claude mcp add slidecraft -- slidecraft-mcp
 }
 ```
 
+### GitHub Copilot（VS Code）
+
+Copilot だけ**設定スキーマが違います**。キーは `mcpServers` ではなく **`servers`**、そして各サーバに **`"type": "stdio"`** が要ります。ワークスペースなら `.vscode/mcp.json` に:
+
+```json
+{
+  "servers": {
+    "slidecraft": {
+      "type": "stdio",
+      "command": "slidecraft-mcp"
+    }
+  }
+}
+```
+
+ユーザ全体に入れる場合は VS Code の `settings.json` の `"mcp": { "servers": { ... } }` 配下でも同じ形です。
+
 ::: details Windows / Linux、またはソース版（B）で登録する
-`slidecraft-mcp` の PATH 登録は現状 macOS/Homebrew のみです。Windows/Linux は **同梱 node ＋ `cli.cjs` の絶対パス**（インストール先を要確認）で登録します。ソース版（B）なら `command` を `node`、`args` を `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]`（絶対パス）に。Claude Code では `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`。直接パスの詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照してください。
+`slidecraft-mcp` の PATH 登録は現状 macOS/Homebrew のみです。Windows/Linux は **同梱 node ＋ `cli.cjs` の絶対パス**（インストール先を要確認）で登録します（`command` を同梱 node、`args` を `["/絶対パス/resources/cli.cjs"]` に）。ソース版（B）なら `command` を `node`、`args` を `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]`（絶対パス）に。Claude Code では `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`。Copilot は上記いずれの場合も `"type": "stdio"` を併記します。直接パスの詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照してください。
 :::
 
 登録後、エージェントから SlideCraft のツール群（後述）が見えるようになります。
+
+::: warning HTTP エンドポイントを直接登録しないでください（アンチパターン）
+どのクライアントでも、登録するのは上記の **stdio コマンド（`slidecraft-mcp`）1本**です。GUI 協働ホストの
+**HTTP エンドポイント（`http://127.0.0.1:ポート/mcp`＋Bearer トークン）を直接**エージェントに登録しないでください。
+協働ホストの**ポートはエフェメラル・トークンは起動ごとにローテーション**する設計（セキュリティ上わざと固定しません）なので、
+直接登録すると **GUI を再起動するたびに設定を書き換える**羽目になります。
+
+`slidecraft-mcp` を登録しておけば、CLI が起動時に自動でホストを discover し、GUI 稼働中はその HTTP ホストへ
+**中継（forward）**します（ポート/トークンは CLI が内部で取得＝**あなたは触りません**）。GUI が無ければ solo で動きます。
+＝**1つの静的設定のまま、協働も単独も自動で切り替わり、port/token を追いかける作業が消えます**（アダプティブ・フロント・ADR-0033）。
+
+もし既に HTTP 直登録している場合は、その登録を削除して stdio コマンドに置き換えてください
+（Claude Code: `claude mcp remove slidecraft` → `claude mcp add slidecraft -- slidecraft-mcp`）。
+:::
 
 ---
 

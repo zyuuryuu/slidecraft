@@ -91,7 +91,7 @@ claude mcp add slidecraft -- slidecraft-mcp
 
 ### Claude Desktop / Cursor
 
-Register it under `mcpServers` in `claude_desktop_config.json` (`mcp.json` for Cursor).
+Register it under `mcpServers` in `claude_desktop_config.json` (Cursor: `~/.cursor/mcp.json`, or `.cursor/mcp.json` in the project root).
 
 ```json
 {
@@ -103,11 +103,43 @@ Register it under `mcpServers` in `claude_desktop_config.json` (`mcp.json` for C
 }
 ```
 
+### GitHub Copilot (VS Code)
+
+Copilot uses a **different config schema**. The key is **`servers`** (not `mcpServers`), and each server needs **`"type": "stdio"`**. For a workspace, put this in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "slidecraft": {
+      "type": "stdio",
+      "command": "slidecraft-mcp"
+    }
+  }
+}
+```
+
+To register it for your whole user profile, use the same shape under `"mcp": { "servers": { ... } }` in VS Code's `settings.json`.
+
 ::: details Registering on Windows / Linux, or with the source version (B)
-PATH registration of `slidecraft-mcp` is currently macOS/Homebrew only. On Windows/Linux, register with the **absolute path to the bundled node plus `cli.cjs`** (confirm the install location). For the source version (B), set `command` to `node` and `args` to `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]` (an absolute path). In Claude Code: `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`. For details on direct paths, see the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
+PATH registration of `slidecraft-mcp` is currently macOS/Homebrew only. On Windows/Linux, register with the **absolute path to the bundled node plus `cli.cjs`** (confirm the install location — set `command` to the bundled node and `args` to `["/absolute/path/resources/cli.cjs"]`). For the source version (B), set `command` to `node` and `args` to `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]` (an absolute path). In Claude Code: `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`. In all of these cases Copilot also needs `"type": "stdio"`. For details on direct paths, see the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
 :::
 
 After registration, SlideCraft's tools (described below) become visible to the agent.
+
+::: warning Don't register the HTTP endpoint directly (anti-pattern)
+For every client, register the **stdio command (`slidecraft-mcp`) only** — the single entry shown above. Do **not**
+register the collab host's **HTTP endpoint (`http://127.0.0.1:PORT/mcp` + bearer token)** with your agent directly.
+The collab host's **port is ephemeral and its token rotates on every launch** by design (deliberately not pinned, for
+security), so a direct registration forces you to **rewrite the config every time you restart the GUI**.
+
+If you register `slidecraft-mcp` instead, the CLI discovers the host at startup and **forwards** to its HTTP endpoint
+while the GUI is running (the CLI fetches the port/token internally — **you never touch them**); with no GUI it runs solo.
+So **one static config auto-switches between collab and solo, and the port/token chase disappears** (the adaptive front,
+ADR-0033).
+
+If you're already registering the HTTP endpoint directly, remove it and switch to the stdio command
+(Claude Code: `claude mcp remove slidecraft` → `claude mcp add slidecraft -- slidecraft-mcp`).
+:::
 
 ---
 
