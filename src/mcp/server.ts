@@ -27,9 +27,10 @@ import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
+import { rasterizeSlide } from "./slide-raster";
 
 interface ToolResult {
-  content: { type: "text"; text: string }[];
+  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
   isError?: boolean;
   [k: string]: unknown; // match the SDK's CallToolResult (passthrough _meta etc.)
 }
@@ -178,6 +179,22 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
   server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
   server.registerTool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
+  // #109: the AI's visual design check — screenshot the SHARED HTML rendering (SlideCard SSR,
+  // fonts embedded) in a locally installed headless Chrome/Edge, network-dead and script-free.
+  // Tool-only (no deck:// mirror): ADR-0008's dual-read rule serves STATE reads; tools/call is the
+  // one universally supported channel and binary resources have far patchier client support.
+  server.registerTool(
+    "get_slide_image",
+    { description: "1スライドの現在の描画を PNG で返す（AI の視覚デザインチェック用）。共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定", inputSchema: { ...index, ...doc } },
+    async (a, extra) => {
+      try {
+        const img = await rasterizeSlide(sessionOf(extra, a.docId), a.index);
+        return { content: [{ type: "image" as const, data: img.pngBase64, mimeType: img.mimeType }] };
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
 
   // ── authoring contract (self-describing surface; T3/S1) ── the single entry the AI reads BEFORE
   // authoring: how to write this template's slide Markdown, the body budget, and pointers to figures.
