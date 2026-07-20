@@ -14,6 +14,7 @@ import { buildFieldMap, applyFieldEdit } from "../engine/placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN } from "../engine/visual-placement";
 import { groupEditorPlan } from "../engine/group-binding";
 import { indentForLevel, levelFromIndent, measureIndent } from "../engine/paragraph-nesting";
+import { shiftBulletIndent } from "../engine/bullet-indent-shift";
 import DiagramEditor from "./DiagramEditor";
 
 interface SlideEditorProps {
@@ -342,6 +343,20 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
             <textarea
               value={currentText}
               onChange={(e) => updatePlaceholder(contentIdx, e.target.value)}
+              onKeyDown={(e) => {
+                // Tab/Shift-Tab on a bullet line shift its nesting level (#201), same as the
+                // Markdown editor, instead of moving focus off the field.
+                if (e.key !== "Tab") return;
+                const el = e.currentTarget;
+                const result = shiftBulletIndent(currentText, el.selectionStart, el.selectionEnd, e.shiftKey);
+                if (!result) return;
+                e.preventDefault();
+                updatePlaceholder(contentIdx, result.text);
+                requestAnimationFrame(() => {
+                  el.selectionStart = result.selectionStart;
+                  el.selectionEnd = result.selectionEnd;
+                });
+              }}
               rows={isGroup ? 4 : phIdx === "1" || phIdx === "2" ? 6 : 2}
               className="w-full mt-0.5 px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg font-mono resize-y"
               placeholder={isGroup ? t("slideEditor.groupPlaceholder") : label}
