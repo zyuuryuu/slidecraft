@@ -14,6 +14,7 @@ import {
   type LayoutPhDef,
   type PaletteKey,
 } from "./template-layout-library";
+import { BUILTIN_ROLE_DESCR_PREFIX } from "./template-catalog";
 
 /** A logo image lifted from a source master (Re-make). Injected onto the dark-family layouts
  *  (cover/section/closing) — where corporate templates show their logo — as a native <p:pic>. */
@@ -203,7 +204,13 @@ function phLstStyle(ph: LayoutPhDef, spec: TemplateSpec): string {
 }
 
 function phShapeXml(ph: LayoutPhDef, spec: TemplateSpec, shapeId: number): string {
-  return `<p:sp><p:nvSpPr><p:cNvPr id="${shapeId}" name="${escXml(ph.name)}"/>` +
+  // #293: stamp the LayoutPhDef's declared role (when set) onto the shape's descr — the standard
+  // OOXML alt-text attribute, invisible in PowerPoint — so template-loader.ts can recover it as
+  // PlaceholderInfo.builtinRole after a writeTemplate → loadTemplate round trip (template-preview.ts,
+  // apply-template.ts, master-remake.ts all reload what they write). BUILTIN_ROLE_DESCR_PREFIX is the
+  // ONE shared marker string (template-catalog.ts) so writer and loader can never drift (R8).
+  const descr = ph.role ? ` descr="${BUILTIN_ROLE_DESCR_PREFIX}${ph.role}"` : "";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${shapeId}" name="${escXml(ph.name)}"${descr}/>` +
     `<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>` +
     `<p:nvPr><p:ph type="${ph.type}" idx="${ph.idx}"/></p:nvPr></p:nvSpPr>` +
     `<p:spPr><a:xfrm><a:off x="${EMU(ph.x)}" y="${EMU(ph.y)}"/><a:ext cx="${EMU(ph.w)}" cy="${EMU(ph.h)}"/></a:xfrm></p:spPr>` +

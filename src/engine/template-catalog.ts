@@ -257,6 +257,14 @@ function nameRole(name: string): PlaceholderRole | null {
 }
 
 /**
+ * #293: the marker `template-writer.ts` stamps on a BUILT-IN layout's `<p:cNvPr descr>` when the
+ * LayoutPhDef declares an explicit `role` — recovered at load (template-loader.ts) into
+ * `PlaceholderInfo.builtinRole`. Exported so the writer (stamp) and loader (parse) share the exact
+ * same string (R8 — one definition, not two copies that could drift).
+ */
+export const BUILTIN_ROLE_DESCR_PREFIX = "slidecraft-role:";
+
+/**
  * The TYPE/IDX rungs of the role ladder alone — explicit <p:ph> type, then idx conventions.
  * Returns null when neither answers (a typeless ph at a non-conventional idx — the recovery
  * ladder's territory). Split out of placeholderRole so the #146 signal-conflict census can
@@ -264,6 +272,15 @@ function nameRole(name: string): PlaceholderRole | null {
  * placeholderRole composes this verbatim, so the split is byte-identical.
  */
 export function typeIdxRole(ph: PlaceholderInfo): PlaceholderRole | null {
+  // #293 root cause: the idx-META convention below (idx 10/11/12→category/date/footer) was designed
+  // for THIRD-PARTY masters (ADR-0023, usesMetaIdxConvention) but defaults ON, so it also swallowed
+  // OUR OWN built-in layouts' idx 10/11/12 slots whose REAL meaning differs per layout (Contact.Bottom/
+  // Summary.Right/Meta.Right/Description.*/PresenterName.Bottom are real body content, not
+  // footer/date — see template-layout-library.ts's LayoutPhDef.role). `builtinRole` is the author's OWN
+  // declared ground truth for that slot, stamped only on OUR generated templates — it wins over BOTH
+  // the explicit <p:ph> type and the idx convention. A third-party master never carries the marker, so
+  // this is a no-op there (byte-identical) — the ladder falls through to type/idx exactly as before.
+  if (ph.builtinRole) return ph.builtinRole;
   const t = ph.type.toLowerCase();
   const idx = ph.idx;
   // Explicit placeholder TYPE is authoritative — it must win over the idx convention (a template
@@ -343,13 +360,17 @@ export function placeholderRole(ph: PlaceholderInfo): PlaceholderRole {
 }
 
 /**
- * #292: is `ph` a legitimate target for the section-footer auto-inject (#168)? placeholderRole's
- * idx-META convention resolves idx=12 to "footer" UNCONDITIONALLY — but the SAME idx also carries
- * Date/Description/Contact meaning on other built-in layouts (Description.Right on
- * SectionNav.1Title.Single, Contact.Bottom on Closing.1Message.Single — see #293, the idx-convention
- * root cause, out of scope here). Auto-injecting chapter-name text into those is silent content
- * corruption. Restrict the injection (NOT placeholderRole itself — every other consumer of the role
- * convention is unaffected) to:
+ * #292: is `ph` a legitimate target for the section-footer auto-inject (#168)? Historically
+ * placeholderRole's idx-META convention resolved idx=12 to "footer" UNCONDITIONALLY — but the SAME
+ * idx also carries Date/Description/Contact meaning on other built-in layouts (Description.Right on
+ * SectionNav.1Title.Single, Contact.Bottom on Closing.1Message.Single). #293 fixed that root cause
+ * (built-in layouts now declare an explicit `role` — see LayoutPhDef.role / PlaceholderInfo.builtinRole
+ * — that wins over the idx-META guess), so placeholderRole itself no longer misreads those two. This
+ * gate stays as defense-in-depth: it also covers a THIRD-PARTY master (which never carries a
+ * builtinRole marker) whose idx-12 body genuinely resolves "footer" by convention but isn't confirmed
+ * as a real footer by name/type — auto-injecting chapter-name text into an unconfirmed box would still
+ * be silent content corruption. Restrict the injection (NOT placeholderRole itself — every other
+ * consumer of the role convention is unaffected) to:
  *   1. layouts that aren't Title./Closing. (those bind an explicit `Footer:` meta field instead), AND
  *   2. a placeholder that is a footer by an UNAMBIGUOUS signal: explicit type="ftr" (a third-party
  *      master's real footer) or a name matching the "Footer" convention (a built-in layout's own
