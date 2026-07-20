@@ -11,6 +11,8 @@ export const VALID_SHAPES = [
   "rect", "rounded_rect", "diamond", "circle", "oval", "hexagon", "class",
   // state-diagram pseudo-states (●/◉) + ER entity box (name + attributes)
   "start", "end", "entity",
+  // Mermaid flowchart shapes (#269): stadium ([]), subroutine [[]], parallelogram [//], cylinder [()]
+  "stadium", "subroutine", "parallelogram", "cylinder",
 ] as const;
 export type ShapeType = (typeof VALID_SHAPES)[number];
 

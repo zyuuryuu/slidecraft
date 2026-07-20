@@ -73,12 +73,78 @@ describe("mermaidToDiagramSpec", () => {
   it("detects node shapes", () => {
     const mmd = `graph TD
   A("Rounded")
-  B{{"Diamond"}}
-  C["Rect"]`;
+  B{{"Hexagon"}}
+  C["Rect"]
+  D{"Diamond"}`;
     const spec = mermaidToDiagramSpec(mmd);
     expect(spec!.nodes.find(n => n.id === "A")!.shape).toBe("rounded_rect");
-    expect(spec!.nodes.find(n => n.id === "B")!.shape).toBe("diamond");
+    expect(spec!.nodes.find(n => n.id === "B")!.shape).toBe("hexagon");
     expect(spec!.nodes.find(n => n.id === "C")!.shape).toBe("rect");
+    expect(spec!.nodes.find(n => n.id === "D")!.shape).toBe("diamond");
+  });
+
+  describe("new flowchart node shapes (#269)", () => {
+    it("stadium ([text]) → shape stadium", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A(["Start"])`);
+      expect(spec!.nodes[0].shape).toBe("stadium");
+      expect(spec!.nodes[0].label).toBe("Start");
+    });
+
+    it("stadium without quotes still parses", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A([Start])`);
+      expect(spec!.nodes[0].shape).toBe("stadium");
+      expect(spec!.nodes[0].label).toBe("Start");
+    });
+
+    it("subroutine [[text]] → shape subroutine", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A[["Process"]]`);
+      expect(spec!.nodes[0].shape).toBe("subroutine");
+      expect(spec!.nodes[0].label).toBe("Process");
+    });
+
+    it("parallelogram [/text/] → shape parallelogram", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A[/"Input"/]`);
+      expect(spec!.nodes[0].shape).toBe("parallelogram");
+      expect(spec!.nodes[0].label).toBe("Input");
+    });
+
+    it("cylinder [(text)] → shape cylinder (was mis-mapped to rect)", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A[("Database")]`);
+      expect(spec!.nodes[0].shape).toBe("cylinder");
+      expect(spec!.nodes[0].label).toBe("Database");
+    });
+
+    it("{{text}} → shape hexagon, not diamond (bug fix)", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A{{"Prepare"}}`);
+      expect(spec!.nodes[0].shape).toBe("hexagon");
+    });
+
+    it("does not regress single-brace diamond {text}", () => {
+      const spec = mermaidToDiagramSpec(`graph TD\n  A{"Decision"}`);
+      expect(spec!.nodes[0].shape).toBe("diamond");
+      expect(spec!.nodes[0].label).toBe("Decision");
+    });
+
+    it("does not regress existing shapes (rect/rounded_rect/circle/oval)", () => {
+      const mmd = `graph TD
+  A["Rect"]
+  B("Rounded")
+  C(("Circle"))`;
+      const spec = mermaidToDiagramSpec(mmd);
+      expect(spec!.nodes.find(n => n.id === "A")!.shape).toBe("rect");
+      expect(spec!.nodes.find(n => n.id === "B")!.shape).toBe("rounded_rect");
+      expect(spec!.nodes.find(n => n.id === "C")!.shape).toBe("circle");
+    });
+
+    it("new shapes work inline within edge chains", () => {
+      const spec = mermaidToDiagramSpec(
+        `graph LR\n  A(["Start"]) --> B[["Process"]] --> C[/"IO"/] --> D[("DB")]`,
+      );
+      expect(spec!.nodes.map(n => n.shape)).toEqual([
+        "stadium", "subroutine", "parallelogram", "cylinder",
+      ]);
+      expect(spec!.edges).toHaveLength(3);
+    });
   });
 
   it("parses edge labels", () => {

@@ -112,6 +112,24 @@ describe("sequence diagrams round-trip through Mermaid losslessly", () => {
   });
 });
 
+describe("new flowchart node shapes round-trip through Mermaid (#269)", () => {
+  it("stadium/subroutine/parallelogram/cylinder/hexagon/diamond survive Mermaid→spec→Mermaid→spec", () => {
+    const mmd = `graph TD
+  a(["Start"])
+  b[["Process"]]
+  c[/"Input"/]
+  d[("DB")]
+  e{{"Hex"}}
+  f{"Decision"}`;
+    const spec1 = mermaidToDiagramSpec(mmd)!;
+    const spec2 = mermaidToDiagramSpec(diagramSpecToMermaid(spec1))!;
+    expect(spec2.nodes).toEqual(spec1.nodes);
+    expect(spec1.nodes.map((n) => n.shape)).toEqual([
+      "stadium", "subroutine", "parallelogram", "cylinder", "hexagon", "diamond",
+    ]);
+  });
+});
+
 describe("class diagrams round-trip through Mermaid losslessly", () => {
   it("preserves class shapes, attributes/methods, and UML relations", () => {
     const spec1 = mermaidToDiagramSpec(CLASS_MMD)!;

@@ -32,10 +32,17 @@ export const SPECS: Record<string, DiagramSpec> = {
       { id: "c", label: "circle", shape: "circle" },
       { id: "o", label: "oval", shape: "oval" },
       { id: "h", label: "hexagon", shape: "hexagon" },
+      // #269 — new Mermaid flowchart shapes
+      { id: "st", label: "stadium", shape: "stadium" },
+      { id: "sr", label: "subroutine", shape: "subroutine" },
+      { id: "pg", label: "parallelogram", shape: "parallelogram" },
+      { id: "cy", label: "cylinder", shape: "cylinder" },
     ],
     edges: [
       { from: "r", to: "d" }, { from: "d", to: "c" },
       { from: "c", to: "o" }, { from: "o", to: "h" },
+      { from: "h", to: "st" }, { from: "st", to: "sr" },
+      { from: "sr", to: "pg" }, { from: "pg", to: "cy" },
     ],
     groups: [], lanes: [],
     layout: { node_width: 2.0, node_height: 0.7, h_gap: 0.5, v_gap: 0.8 },

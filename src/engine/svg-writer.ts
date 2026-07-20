@@ -122,6 +122,39 @@ class SvgDrawTarget implements DrawTarget {
         const rx = rectRadius !== undefined ? px(rectRadius) : Math.min(w, h) * 0.18;
         return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" ry="${rx}" fill="${fill}"${stroke}/>`;
       }
+      case "stadium": {
+        // pill: start/end terminal node — fully rounded ends
+        const r = h / 2;
+        return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" ry="${r}" fill="${fill}"${stroke}/>`;
+      }
+      case "parallelogram": {
+        const skew = Math.min(w * 0.25, h * 0.6);
+        const pts = `${x + skew},${y} ${x + w},${y} ${x + w - skew},${y + h} ${x},${y + h}`;
+        return `<polygon points="${pts}" fill="${fill}"${stroke}/>`;
+      }
+      case "subroutine": {
+        // rect + two inset vertical bars (predefined-process notation)
+        const inset = Math.min(8, w * 0.08);
+        const barColor = "rgba(255,255,255,0.35)";
+        const rect = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"${stroke}/>`;
+        const l1 = `<line x1="${x + inset}" y1="${y}" x2="${x + inset}" y2="${y + h}" stroke="${barColor}" stroke-width="1.5"/>`;
+        const l2 = `<line x1="${x + w - inset}" y1="${y}" x2="${x + w - inset}" y2="${y + h}" stroke="${barColor}" stroke-width="1.5"/>`;
+        return rect + l1 + l2;
+      }
+      case "cylinder": {
+        // database cylinder: rounded top/bottom body + a seam curve for the "lid"
+        const ry = Math.min(h * 0.18, w * 0.25);
+        const rx = w / 2;
+        const top = y + ry;
+        const bottom = y + h - ry;
+        const body =
+          `<path d="M ${x} ${top} A ${rx} ${ry} 0 0 1 ${x + w} ${top} L ${x + w} ${bottom} ` +
+          `A ${rx} ${ry} 0 0 1 ${x} ${bottom} Z" fill="${fill}"${stroke}/>`;
+        const seam =
+          `<path d="M ${x} ${top} A ${rx} ${ry} 0 0 0 ${x + w} ${top}" fill="none" ` +
+          `stroke="rgba(255,255,255,0.35)" stroke-width="1"/>`;
+        return body + seam;
+      }
       default: {
         const rx = rectRadius !== undefined ? px(rectRadius) : 0;
         const r = rx ? ` rx="${rx}" ry="${rx}"` : "";
