@@ -193,6 +193,24 @@ describe("validateDiagramSpec", () => {
     const errors = validateDiagramSpec(data);
     expect(errors.some((e) => e.message.includes("unknown lane"))).toBe(true);
   });
+
+  it("detects unknown note participant reference (#270 — never-silent)", () => {
+    const data = {
+      type: "sequence" as const,
+      direction: "TB" as const,
+      nodes: [{ id: "a", label: "A", shape: "rect" as const }],
+      edges: [],
+      classDefs: {},
+      groups: [],
+      lanes: [],
+      fragments: [],
+      activations: [],
+      notes: [{ text: "hi", placement: "over" as const, participants: ["a", "ghost"], at: 0 }],
+      layout: { node_width: 2, node_height: 0.7, h_gap: 0.5, v_gap: 0.8 },
+    };
+    const errors = validateDiagramSpec(data);
+    expect(errors.some((e) => e.message.includes("unknown participant") && e.message.includes("ghost"))).toBe(true);
+  });
 });
 
 describe("diagnoseJson", () => {

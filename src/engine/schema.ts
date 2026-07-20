@@ -154,6 +154,17 @@ export const ActivationSchema = z.object({
 });
 export type Activation = z.infer<typeof ActivationSchema>;
 
+// Sequence-diagram note (Mermaid `Note over/left of/right of`) — free text pinned at a
+// message-index position (same basis as Fragment/Activation `from`). `over` can span
+// multiple participants; `left_of`/`right_of` sit beside a single lifeline.
+export const NoteSchema = z.object({
+  text: z.string(),
+  placement: z.enum(["over", "left_of", "right_of"]),
+  participants: z.array(z.string()).min(1),
+  at: z.number(),
+});
+export type Note = z.infer<typeof NoteSchema>;
+
 // Data-viz sub-object schemas (quadrant/gantt/xychart/radar/kpi) live in
 // schema-charts.ts (R1); re-export + import them for DiagramSpecSchema below.
 export * from "./schema-charts";
@@ -176,6 +187,7 @@ export const DiagramSpecSchema = z.object({
   lanes: z.array(LaneSchema).default([]),
   fragments: z.array(FragmentSchema).default([]),
   activations: z.array(ActivationSchema).default([]),
+  notes: z.array(NoteSchema).default([]),
   quadrant: QuadrantSchema.optional(),
   gantt: GanttSchema.optional(),
   xychart: XyChartSchema.optional(),
@@ -295,6 +307,16 @@ export function validateDiagramSpec(spec: DiagramSpec): ValidationError[] {
         errors.push({
           message: `Group '${g.id}' exceeds max nesting depth ${MAX_NEST_DEPTH} (depth=${depth + 1})`,
         });
+      }
+    }
+  }
+
+  // Check note participant references (sequence diagrams; #270 — never-silent: an
+  // unknown participant must surface as an error, not be dropped or auto-created)
+  for (const nt of spec.notes ?? []) {
+    for (const pid of nt.participants) {
+      if (!nodeIds.has(pid)) {
+        errors.push({ message: `Note references unknown participant '${pid}'` });
       }
     }
   }

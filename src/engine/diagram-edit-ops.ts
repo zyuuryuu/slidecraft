@@ -58,17 +58,26 @@ const idsOf = (raw: RawDiagram): string => (raw.nodes ?? []).map((n) => String(n
 const edgesOf = (raw: RawDiagram): string => (raw.edges ?? []).map((e) => `${String(e.from)}→${String(e.to)}`).join(", ") || "なし";
 
 /**
- * Sequence figures index activations/fragments into the ORDERED message (edge) list, and activations
- * name a participant (node id). When messages are removed those indices must be RE-BASED and refs to a
- * removed message / removed participant DROPPED — otherwise the figure keeps orphan / out-of-range refs
- * that pass schema validation (schema treats them as free string/number) but corrupt the renderer.
- * `keptOldIndices[newIdx] = oldIdx` lists the surviving message positions in order. No-op unless sequence.
+ * Sequence figures index activations/fragments/notes into the ORDERED message (edge) list, and
+ * activations/notes name a participant (node id). When messages are removed those indices must be
+ * RE-BASED and refs to a removed message / removed participant DROPPED — otherwise the figure keeps
+ * orphan / out-of-range refs that pass schema validation (schema treats them as free string/number)
+ * but corrupt the renderer. `keptOldIndices[newIdx] = oldIdx` lists the surviving message positions
+ * in order; `oldEdgeCount` is the message count BEFORE removal (needed to re-base a note's `at` when
+ * it sits at the "after the last message" sentinel — `at === oldEdgeCount` — not on a real message).
+ * No-op unless sequence.
  */
-function rebaseSequenceRefs(raw: RawDiagram, keptOldIndices: number[], removedNodeIds: Set<string>): void {
+function rebaseSequenceRefs(raw: RawDiagram, keptOldIndices: number[], removedNodeIds: Set<string>, oldEdgeCount: number): void {
   if (raw.type !== "sequence") return;
   const toNew = new Map<number, number>();
   keptOldIndices.forEach((oldIdx, newIdx) => toNew.set(oldIdx, newIdx));
   const remap = (i: unknown): number | null => (typeof i === "number" && toNew.has(i) ? (toNew.get(i) as number) : null);
+  // A note's `at` may equal oldEdgeCount (the "after the last message" sentinel, #270) — always
+  // valid, tracking the new end; any other value is valid only if that message survived.
+  const remapAt = (i: unknown): number | null => {
+    if (typeof i !== "number") return null;
+    return i === oldEdgeCount ? keptOldIndices.length : remap(i);
+  };
   if (Array.isArray(raw.activations)) {
     raw.activations = (raw.activations as Array<Record<string, unknown>>).filter((a) => {
       if (removedNodeIds.has(String(a.participant))) return false; // participant gone
@@ -88,6 +97,15 @@ function rebaseSequenceRefs(raw: RawDiagram, keptOldIndices: number[], removedNo
           .map((dv) => ({ ...dv, at: remap(dv.at) as number }));
       }
       return true;
+    });
+  }
+  if (Array.isArray(raw.notes)) {
+    raw.notes = (raw.notes as Array<Record<string, unknown>>).filter((nt) => {
+      const participants = Array.isArray(nt.participants) ? (nt.participants as unknown[]) : [];
+      if (participants.some((p) => removedNodeIds.has(String(p)))) return false; // a referenced participant is gone
+      const at = remapAt(nt.at);
+      if (at === null) return false; // pinned to a removed message
+      nt.at = at; return true;
     });
   }
 }
@@ -148,7 +166,7 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
           });
           if (raw.nodes.length === before) skipped.push({ op: op.op, reason: "unknown-node", message: `ノード「${op.id}」が見つからず削除をスキップ（候補: ${idsOf(raw)}）。` });
           if (raw.nodes.length !== before || raw.edges.length !== edgesBefore) {
-            rebaseSequenceRefs(raw, keptEdgeIdx, new Set([op.id])); // sequence: drop orphan participant + rebase message indices
+            rebaseSequenceRefs(raw, keptEdgeIdx, new Set([op.id]), edgesBefore); // sequence: drop orphan participant + rebase message indices
             dirty = true;
           }
           break;
@@ -174,7 +192,7 @@ export function applyDiagramEditOps(slide: SlideIR, ops: DiagramEditOps): { slid
             return keep;
           });
           if (raw.edges.length === before) skipped.push({ op: op.op, reason: "unknown-edge", message: `エッジ「${op.from}→${op.to}」が見つからず削除をスキップ（候補: ${edgesOf(raw)}）。` });
-          else { rebaseSequenceRefs(raw, keptEdgeIdx, new Set()); dirty = true; } // sequence: rebase message indices
+          else { rebaseSequenceRefs(raw, keptEdgeIdx, new Set(), before); dirty = true; } // sequence: rebase message indices
           break;
         }
         case "setDirection": {

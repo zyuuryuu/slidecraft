@@ -13,6 +13,7 @@ import type { DiagramSpec } from "./schema";
 import { ganttSpecToMermaid } from "./diagram-gantt";
 import { journeySpecToMermaid } from "./diagram-journey";
 import { xychartSpecToMermaid } from "./diagram-xychart";
+import { sequenceSpecToMermaid } from "./diagram-sequence";
 
 // ── DiagramSpec → Mermaid (reverse) ──
 
@@ -21,7 +22,7 @@ import { xychartSpecToMermaid } from "./diagram-xychart";
  * parse with no data loss). The editor uses this to gate its MERMAID toggle so a
  * round-trip can never silently corrupt the diagram.
  *   - sequence: faithful (sequenceDiagram covers participants/messages/fragments/
- *     dividers/activations/async).
+ *     dividers/activations/async/notes).
  *   - class diagram (class shapes / UML relations): faithful only when nothing
  *     would be dropped — classDiagram uses the class name as id+label and carries
  *     no node styles/groups.
@@ -83,53 +84,6 @@ function nodeToMermaid(id: string, label: string, shape?: string): string {
     default:
       return `${id}["${safeLabel}"]`;
   }
-}
-
-// ── Sequence → Mermaid (sequenceDiagram) ──
-
-/** Mermaid message operator for a message's dash (return) + async flags. */
-function seqArrow(dash: boolean | undefined, async: boolean | undefined): string {
-  if (async) return dash ? "--)" : "-)";
-  return dash ? "-->>" : "->>";
-}
-
-function sequenceSpecToMermaid(spec: DiagramSpec): string {
-  let s = "sequenceDiagram\n";
-  for (const n of spec.nodes) {
-    s += n.label && n.label !== n.id ? `  participant ${n.id} as ${n.label}\n` : `  participant ${n.id}\n`;
-  }
-  // Walk messages in order, interleaving fragment open/divider/close and
-  // activate/deactivate so the parser reconstructs the same indices.
-  let depth = 1;
-  const pad = () => "  ".repeat(depth);
-  for (let i = 0; i < spec.edges.length; i++) {
-    // opens at i (outermost = widest span first)
-    for (const f of spec.fragments.filter((f) => f.from === i).sort((a, b) => (b.to - b.from) - (a.to - a.from))) {
-      s += `${pad()}${f.kind}${f.label ? " " + f.label : ""}\n`;
-      depth++;
-    }
-    // branch dividers at i (`else` for alt/opt/loop, `and` for par)
-    for (const f of spec.fragments) {
-      for (const d of f.dividers ?? []) {
-        if (d.at === i) {
-          const kw = f.kind === "par" ? "and" : "else";
-          s += `${"  ".repeat(Math.max(1, depth - 1))}${kw}${d.label ? " " + d.label : ""}\n`;
-        }
-      }
-    }
-    for (const a of spec.activations) if (a.from === i) s += `${pad()}activate ${a.participant}\n`;
-    const e = spec.edges[i];
-    s += `${pad()}${e.from}${seqArrow(e.style?.dash, e.style?.async)}${e.to}: ${e.label ?? ""}\n`;
-    for (const a of spec.activations) if (a.to === i) s += `${pad()}deactivate ${a.participant}\n`;
-    // closes at i — every fragment ending here emits an `end` (all identical, so
-    // only the count matters); each one closes a nesting level.
-    const closes = spec.fragments.filter((f) => f.to === i).length;
-    for (let c = 0; c < closes; c++) {
-      depth = Math.max(1, depth - 1);
-      s += `${pad()}end\n`;
-    }
-  }
-  return s;
 }
 
 // ── Class → Mermaid (classDiagram) ──
@@ -379,6 +333,12 @@ export function diagramSpecToYaml(spec: DiagramSpec): string {
     yaml += `\nactivations:\n`;
     for (const a of spec.activations) {
       yaml += `  - participant: ${a.participant}\n    from: ${a.from}\n    to: ${a.to}\n`;
+    }
+  }
+  if (spec.notes?.length) {
+    yaml += `\nnotes:\n`;
+    for (const nt of spec.notes) {
+      yaml += `  - text: ${q(nt.text)}\n    placement: ${nt.placement}\n    participants: ${JSON.stringify(nt.participants)}\n    at: ${nt.at}\n`;
     }
   }
   if (spec.quadrant) {
