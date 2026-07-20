@@ -11,6 +11,11 @@ import { DiagramSpecSchema, type DiagramSpec, type RelationType, type Cardinalit
 const ER_LEFT_CARD: Record<string, Cardinality> = { "||": "one", "|o": "zero_one", "}o": "zero_many", "}|": "one_many" };
 const ER_RIGHT_CARD: Record<string, Cardinality> = { "||": "one", "o|": "zero_one", "o{": "zero_many", "|{": "one_many" };
 
+// Class name, with an optional Mermaid generics suffix: `List~T~`, `Map~K, V~`.
+const CLASS_NAME_SRC = "[A-Za-z_]\\w*(?:~[^~]*~)?";
+// A stereotype line inside a class body, e.g. `<<interface>>`.
+const STEREOTYPE_RE = /^<<.+>>$/;
+
 /** Map a Mermaid class-relation operator to {from→to, UML relation}. Inheritance/
  *  realization keep the PARENT as `from` (parent-on-top in the layered layout). */
 function classRelation(a: string, op: string, b: string): { from: string; to: string; relation: RelationType } {
@@ -42,17 +47,18 @@ export function parseMermaidClassDiagram(lines: string[]): DiagramSpec | null {
 
     if (current) {
       if (line === "}") { current = null; continue; }
+      if (STEREOTYPE_RE.test(line)) continue; // e.g. `<<interface>>` — not an attribute/method
       (line.includes("(") ? current.methods : current.attributes).push(line);
       continue;
     }
 
-    const open = line.match(/^class\s+([A-Za-z_]\w*)\s*\{$/);
+    const open = line.match(new RegExp(`^class\\s+(${CLASS_NAME_SRC})\\s*\\{$`));
     if (open) { current = ensure(open[1]); continue; }
-    const decl = line.match(/^class\s+([A-Za-z_]\w*)\s*$/);
+    const decl = line.match(new RegExp(`^class\\s+(${CLASS_NAME_SRC})\\s*$`));
     if (decl) { ensure(decl[1]); continue; }
 
     // A <relation> B  [: label]
-    const rel = line.match(/^([A-Za-z_]\w*)\s*(<\|\.\.|\.\.\|>|<\|--|--\|>|\*--|--\*|o--|--o|<\.\.|\.\.>|-->|<--|--|\.\.)\s*([A-Za-z_]\w*)\s*(?::\s*(.+))?$/);
+    const rel = line.match(new RegExp(`^(${CLASS_NAME_SRC})\\s*(<\\|\\.\\.|\\.\\.\\|>|<\\|--|--\\|>|\\*--|--\\*|o--|--o|<\\.\\.|\\.\\.>|-->|<--|--|\\.\\.)\\s*(${CLASS_NAME_SRC})\\s*(?::\\s*(.+))?$`));
     if (rel) {
       const [, a, op, b, label] = rel;
       const { from, to, relation } = classRelation(a, op, b);
