@@ -228,6 +228,17 @@
     "message": "A new version (v{{version}}) is available. See GitHub Releases to update.",
     "dismiss": "Dismiss"
   },
+  "onboarding": {
+    "dialogLabel": "First-run guide",
+    "title": "Welcome to SlideCraft",
+    "howItWorks": "Write Markdown → pick a template → export to .pptx",
+    "actionNew": "New (from a template)",
+    "actionOpenPptx": "Open an existing .pptx",
+    "actionSample": "View a sample",
+    "docsLink": "View the docs",
+    "skipNextTime": "Don't show this again",
+    "close": "Close"
+  },
   "intake": {
     "mode": {
       "import": "Import",

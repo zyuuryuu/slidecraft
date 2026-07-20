@@ -29,6 +29,9 @@ import { describeRepairPlan } from "./components/apply-template";
 import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
 import UpdateBanner from "./components/UpdateBanner";
 import { useUpdateBanner } from "./components/useUpdateBanner";
+import Onboarding from "./components/Onboarding";
+import { useOnboarding } from "./components/useOnboarding";
+import { ONBOARDING_SAMPLE_MD } from "./components/onboarding-sample";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
@@ -60,6 +63,7 @@ export default function App() {
   } = useDeckController();
   const { t } = useTranslation();
   const { show: showUpdateBanner, latestVersion, dismiss: dismissUpdateBanner } = useUpdateBanner();
+  const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 
   // Master registry (Slice 1a): the global set of slide masters the draft can pick from (bundled
   // sample + any imported this session). Selecting/importing applies it to the active doc (gated).
@@ -591,6 +595,18 @@ export default function App() {
         onCreate={handleCreateTemplate}
         onProposeSpec={handleProposeTemplateSpec}
         aiReady={ai.connection.ok}
+      />
+
+      {/* 初回起動オンボーディング（#259）: 空/Draft のまま始まる初見ユーザに起点を示す。
+          「次回以降表示しない」を持続しない限り、リロードのたびに再表示される。「サンプルを見る」は
+          通常の Draft 経路（手入力と同じ handleEditorChange）へ見本 Markdown を流し込むだけ。 */}
+      <Onboarding
+        isOpen={showOnboarding}
+        onDismiss={dismissOnboarding}
+        onNew={handleEnterImport}
+        onOpenPptx={handleImportMaster}
+        onViewSample={() => { handleEnterImport(); handleEditorChange(ONBOARDING_SAMPLE_MD); }}
+        onOpenDocs={handleHelp}
       />
 
       <LlmAssist

@@ -1,7 +1,7 @@
 # ADR-0021: 自動更新の初回戦略 — 軽量通知・完全署名 Updater は保留
 
-- **Status**: Accepted（2026-07-07）
-- **Date**: 2026-07-07
+- **Status**: Accepted（2026-07-07）／軽量通知バナーは実装済み（#113・PR #236・2026-07-20）
+- **Date**: 2026-07-07（更新: 2026-07-20 — 通知バナー出荷を反映）
 
 ## Context
 
@@ -30,6 +30,11 @@
 ブロックしない — 実装には (1) `api.github.com` を CSP `connect-src` allowlist に追加する egress 変更（[ADR-0016](0016-security-review-theme4.md)
 のセキュリティ面に触れるため慎重に）、(2) ランタイムのアプリ版数取得の配線、(3) headless では検証できない実ポーリング、が伴うため。
 
+> **追記（2026-07-20）**：この軽量通知バナーは **#113 / PR #236 で実装・出荷済み**。純粋な semver 比較（不正値は
+> `unknown`＝誤って新版扱いしない）＋dual-mode `appFetch` で `/releases/latest` をポーリングし全失敗を
+> `{status:"error"}` に正規化（never-silent）、dismiss はバージョン単位。CSP `connect-src` に `api.github.com` のみ追加
+> （capability は不変）。**署名付き完全 Updater は引き続き保留**（本 ADR の決定は不変）。
+
 リリース手順は [RELEASING.md](../../RELEASING.md) に、更新手段（brew / 手動再DL）を明記済み。
 
 ## Consequences
@@ -40,9 +45,10 @@
 - macOS は brew cask が既に更新経路として機能する（追加実装ゼロ）。
 
 **代償・限界**
-- Windows/Linux の更新は当面**手動再DL**。軽量通知バナーが入るまで、ユーザは自発的に Releases を確認する必要がある。
-- **軽量通知バナーは未実装**（follow-up）。純粋な版数比較ロジック＋GitHub Releases 参照＋CSP egress 追加＋バナー UI で
-  構成する想定。ROADMAP のリリース後バックログで追跡。
+- Windows/Linux の更新は当面**手動再DL**。ただし軽量通知バナー（実装済み・下記）が「新版あり」を知らせるため、
+  ユーザが自発的に Releases を確認し続ける必要は薄れた。
+- **軽量通知バナーは実装済み**（#113・PR #236・2026-07-20）。純粋な版数比較＋GitHub Releases 参照＋CSP egress 追加＋
+  バナー UI で構成。当初の「follow-up」想定どおり v0.1.0 後に出荷。
 - **完全な署名付き Tauri Updater は保留**（ROADMAP バックログ）。導入時は署名鍵の生成・保管・回転不能性を扱う
   新 ADR を起こし、`latest.json` 集約と draft/publish フローの再設計を行う。
 

@@ -88,6 +88,37 @@ describe("Mermaid classDiagram parser (milestone 2)", () => {
     expect(spec.nodes.find((n) => n.id === "Animal")?.methods).toContain("+makeSound()");
     expect(spec.edges.find((e) => e.to === "Dog")?.relation).toBe("inheritance");
   });
+
+  it("preserves generics in class names (List~T~, Map~K, V~)", () => {
+    const mmd = `classDiagram
+  class List~T~ {
+    +add(T item)
+  }
+  class Map~K, V~
+  List~T~ --> Map~K, V~ : uses`;
+    const spec = mermaidToDiagramSpec(mmd)!;
+    expect(spec).not.toBeNull();
+    expect(spec.nodes.some((n) => n.id === "List~T~")).toBe(true);
+    expect(spec.nodes.some((n) => n.id === "Map~K, V~")).toBe(true);
+    const list = spec.nodes.find((n) => n.id === "List~T~")!;
+    expect(list.methods).toContain("+add(T item)");
+    const edge = spec.edges.find((e) => e.from === "List~T~");
+    expect(edge?.to).toBe("Map~K, V~");
+  });
+
+  it("keeps a <<stereotype>> line out of the attribute/method lists", () => {
+    const mmd = `classDiagram
+  class Shape {
+    <<interface>>
+    +draw()
+  }`;
+    const spec = mermaidToDiagramSpec(mmd)!;
+    expect(spec).not.toBeNull();
+    const shape = spec.nodes.find((n) => n.id === "Shape")!;
+    expect(shape.attributes ?? []).not.toContain("<<interface>>");
+    expect(shape.methods ?? []).not.toContain("<<interface>>");
+    expect(shape.methods).toContain("+draw()");
+  });
 });
 
 describe("UML relationship rendering (milestone 3)", () => {
