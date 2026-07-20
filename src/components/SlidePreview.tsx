@@ -185,16 +185,23 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   const fill = `#${d.color}`;
   const stroke = d.border ? `#${d.border}` : "none";
   const strokeWidth = d.border ? Math.max(1, 0.014 * scale) : 0;
+  // #241: a custGeom path / preset polygon is drawn from its own local geometry, which a net-flipped
+  // ancestor group's transform (already folded into x/y/w/h above) does NOT mirror — only an
+  // asymmetric shape (rightArrow, a Freeform brand mark, …) actually looks wrong un-mirrored, but
+  // scaleX/Y(-1) is a no-op on symmetric ones, so it's safe to apply unconditionally. `pos` is
+  // absolutely positioned with an explicit width/height, so the default center transform-origin
+  // mirrors the shape in place rather than shifting it off its (already-correct) rect.
+  const flipTransform = [d.flipH && "scaleX(-1)", d.flipV && "scaleY(-1)"].filter(Boolean).join(" ") || undefined;
   if (d.path && d.pathViewBox) {
     return (
-      <svg key={key} style={pos} viewBox={d.pathViewBox} preserveAspectRatio="none">
+      <svg key={key} style={{ ...pos, transform: flipTransform }} viewBox={d.pathViewBox} preserveAspectRatio="none">
         <path d={d.path} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
       </svg>
     );
   }
   if (d.prst && DECO_POLYGONS[d.prst]) {
     return (
-      <svg key={key} style={pos} viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg key={key} style={{ ...pos, transform: flipTransform }} viewBox="0 0 100 100" preserveAspectRatio="none">
         <polygon points={DECO_POLYGONS[d.prst]} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
       </svg>
     );

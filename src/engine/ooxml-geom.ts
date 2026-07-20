@@ -13,17 +13,30 @@ export interface Xf { sx: number; sy: number; tx: number; ty: number }
 export const IDENTITY_XF: Xf = { sx: 1, sy: 1, tx: 0, ty: 0 };
 
 /** The child→parent transform of a `<p:grpSp>` from its `<a:xfrm>` (off/ext + chOff/chExt): a child
- *  point in the group's CHILD space maps to parent space as off + (child − chOff)·(ext/chExt). */
+ *  point in the group's CHILD space maps to parent space as off + (child − chOff)·(ext/chExt).
+ *  `flipH`/`flipV` on the opening `<a:xfrm>` (#241) mirror that mapping about the CENTER of the
+ *  group's own off/ext box: negate the axis's scale and add `ext` to the translate — tx becomes
+ *  `off + ext − chOff·sx` (sx already negative), so a child at chOff lands at the box's FAR edge
+ *  instead of its near one. A downstream negative sx/sy is handled generically by `transformRect`
+ *  (normalizes the rect) and by `composeXf` (sign multiplication composes nested flips correctly,
+ *  including a double flip canceling back out — no separate flip-flag plumbing needed, R8). */
 export function parseGroupXf(grpSpPr: string): Xf | undefined {
   const xfrm = grpSpPr.match(/<a:xfrm[^>]*>[\s\S]*?<\/a:xfrm>/)?.[0];
   if (!xfrm) return undefined;
+  const openTag = xfrm.match(/<a:xfrm[^>]*>/)?.[0] ?? "";
   const off = xfrm.match(/<a:off x="(-?\d+)" y="(-?\d+)"/);
   const ext = xfrm.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
   const chOff = xfrm.match(/<a:chOff x="(-?\d+)" y="(-?\d+)"/);
   const chExt = xfrm.match(/<a:chExt cx="(\d+)" cy="(\d+)"/);
   if (!off || !ext || !chOff || !chExt) return undefined;
-  const sx = +ext[1] / (+chExt[1] || 1), sy = +ext[2] / (+chExt[2] || 1);
-  return { sx, sy, tx: +off[1] - +chOff[1] * sx, ty: +off[2] - +chOff[2] * sy };
+  const flipH = /\bflipH="1"/.test(openTag), flipV = /\bflipV="1"/.test(openTag);
+  const scaleX = +ext[1] / (+chExt[1] || 1), scaleY = +ext[2] / (+chExt[2] || 1);
+  const sx = flipH ? -scaleX : scaleX, sy = flipV ? -scaleY : scaleY;
+  return {
+    sx, sy,
+    tx: +off[1] + (flipH ? +ext[1] : 0) - +chOff[1] * sx,
+    ty: +off[2] + (flipV ? +ext[2] : 0) - +chOff[2] * sy,
+  };
 }
 
 /** Compose parent∘child so a nested group's children map straight to slide space. */
@@ -31,13 +44,21 @@ export function composeXf(p: Xf, g: Xf): Xf {
   return { sx: p.sx * g.sx, sy: p.sy * g.sy, tx: p.sx * g.tx + p.tx, ty: p.sy * g.ty + p.ty };
 }
 
-/** Apply an Xf to an EMU rect (off + ext) → inches. */
+/** Apply an Xf to an EMU rect (off + ext) → inches. A flipped axis (#241: negative sx/sy from
+ *  `parseGroupXf`) makes the raw scaled width/height negative — the "near" corner it's anchored to is
+ *  then the rect's right/bottom edge, not its left/top. Normalize so x/y always denote the top-left
+ *  corner and w/h stay non-negative, same as the unflipped case (a non-negative xf.sx/sy leaves this
+ *  branch a no-op, so unflipped output is unchanged). */
 export function transformRect(xf: Xf, xEmu: number, yEmu: number, cxEmu: number, cyEmu: number): { x: number; y: number; w: number; h: number } {
+  const rawX = (xf.sx * xEmu + xf.tx) / EMU_PER_INCH;
+  const rawY = (xf.sy * yEmu + xf.ty) / EMU_PER_INCH;
+  const rawW = (xf.sx * cxEmu) / EMU_PER_INCH;
+  const rawH = (xf.sy * cyEmu) / EMU_PER_INCH;
   return {
-    x: (xf.sx * xEmu + xf.tx) / EMU_PER_INCH,
-    y: (xf.sy * yEmu + xf.ty) / EMU_PER_INCH,
-    w: (xf.sx * cxEmu) / EMU_PER_INCH,
-    h: (xf.sy * cyEmu) / EMU_PER_INCH,
+    x: rawW < 0 ? rawX + rawW : rawX,
+    y: rawH < 0 ? rawY + rawH : rawY,
+    w: Math.abs(rawW),
+    h: Math.abs(rawH),
   };
 }
 
