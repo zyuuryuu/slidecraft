@@ -1,7 +1,7 @@
 name: CI — Test & Build
 
 # Lightened for CI minutes (M1): push/PR runs Linux-only (test + e2e + a compile smoke). The full
-# cross-OS INSTALLER matrix (mac arm64 + Intel, Windows, Linux) is release.yml on a `v*` tag /
+# cross-OS INSTALLER matrix (mac arm64, Windows, Linux) is release.yml on a `v*` tag /
 # workflow_dispatch — NOT per-push. The old per-push 3-OS build was the drain (macOS bills ×10, Windows ×2).
 #
 # NO workflow-level paths-ignore: `test` is a REQUIRED status check (branch ruleset on main), and a

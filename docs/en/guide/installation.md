@@ -22,7 +22,7 @@ Each version on [Releases](https://github.com/zyuuryuu/slidecraft/releases) incl
 | OS | Format | How to get / install |
 |---|---|---|
 | Windows | `.msi` (recommended) / `.exe` | Download and run |
-| macOS | Homebrew cask (recommended) / `.dmg` | Command below. `_aarch64.dmg` for Apple Silicon, `_x64.dmg` for Intel |
+| macOS | Homebrew cask (recommended) / `.dmg` | Command below. Official builds are **Apple Silicon (arm64) only** (`_aarch64.dmg`). Intel Macs build from source |
 | Linux | `.AppImage` (recommended) / `.deb` / `.rpm` | Make the AppImage executable and run it, or install the deb / rpm |
 
 ### Windows
@@ -71,6 +71,11 @@ sudo apt install libfuse2          # Debian/Ubuntu
 
 The macOS build is distributed with **ad-hoc signing (`codesign -s -`)** and is **not notarized by Apple**
 (because that would require the Apple Developer Program at $99/year). Given this policy, **going through the Homebrew cask is the cleanest option**.
+
+::: tip Using an Intel Mac
+The official installer (cask / `.dmg`) is **Apple Silicon (arm64) only** (the Intel build was retired due to CI runner constraints).
+On an Intel Mac, build from source instead — see [Running from source for development](#running-from-source-for-development).
+:::
 
 ```bash
 # Via tap (one shot)

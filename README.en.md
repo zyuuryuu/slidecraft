@@ -41,7 +41,7 @@ Plenty of tools let you "write slides in Markdown." What makes SlideCraft differ
   brew install --cask zyuuryuu/slidecraft/slidecraft
   ```
 
-  If you downloaded the `.dmg` directly, on first launch right-click in Finder → "Open", or run `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`. An Intel Mac build is not currently available.
+  If you downloaded the `.dmg` directly, on first launch right-click in Finder → "Open", or run `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`. The official installer is Apple Silicon (arm64) only. Intel Macs should build from source — see "Development (from source)" below.
 - **Windows / Linux** — Grab `.msi` / `.exe` (Windows) or `.AppImage` / `.deb` / `.rpm` (Linux) from [Releases](https://github.com/zyuuryuu/slidecraft/releases).
 
 See the [installation guide](https://zyuuryuu.github.io/slidecraft/en/guide/installation.html) for details.
