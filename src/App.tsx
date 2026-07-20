@@ -36,6 +36,7 @@ import { ONBOARDING_SAMPLE_MD } from "./components/onboarding-sample";
 import TemplateCreator from "./components/TemplateCreator";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
+import { materializeDerivedSlides } from "./engine/deck-sections";
 
 /** Measure an image's intrinsic aspect (w/h) from a data URL, for aspect-lock + cover cropping (案B).
  *  Resolves undefined if it can't decode (e.g. SVG without intrinsic size) — the image still inserts. */
@@ -64,6 +65,11 @@ export default function App() {
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
   const { t } = useTranslation();
+  // 表示用の materialize 済み deck（#275）: 左サムネイル一覧（SlideList）と右プレビュー（SlidePreview）
+  // が同じ内容を描くよう、ここで1回だけ materializeDerivedSlides を通して両ペインへ渡す。materialize
+  // は 1:1 変換（枚数不変）なので activeSlide/selected の index はそのまま使い回せる。編集エディタ
+  // （SlideEditor/SlideMarkdownEditor）は <!-- toc --> マーカーを編集するため生の deck のまま。
+  const displayDeck = useMemo(() => (deck ? materializeDerivedSlides(deck) : deck), [deck]);
   const { show: showUpdateBanner, latestVersion, dismiss: dismissUpdateBanner } = useUpdateBanner();
   const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 
@@ -480,7 +486,7 @@ export default function App() {
                   )}
                 </div>
                 <div className="flex-1 min-h-0 bg-void">
-                  <SlideList deck={deck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
+                  <SlideList deck={displayDeck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
                     onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} onMove={handleMoveSlide} disabled={editLocked} />
                 </div>
               </>
@@ -529,7 +535,7 @@ export default function App() {
                   {t("panel.previewSlide", { n: activeSlide + 1 })}
                 </div>
                 <div className="flex-1 min-h-0 bg-canvas">
-                  <SlidePreview deck={deck} template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} onImageRectChange={handleImageRectChange} />
+                  <SlidePreview deck={displayDeck} preMaterialized template={templateData} error={parseError} notice={editNotice} onNoticeDismiss={() => setEditNotice(null)} activeSlide={activeSlide} singleSlide onDiagramChange={handleDiagramChange} onImageRectChange={handleImageRectChange} />
                 </div>
               </>
             }
