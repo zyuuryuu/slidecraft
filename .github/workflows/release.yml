@@ -13,18 +13,18 @@ jobs:
   release:
     permissions:
       contents: write # create/update the GitHub Release + upload installers
+      attestations: write # actions/attest-build-provenance
+      id-token: write # OIDC token consumed by attest-build-provenance to sign attestations
     strategy:
       fail-fast: false
       matrix:
         include:
+          # macOS: Apple Silicon (arm64) only. Intel Mac installers were dropped (#112) — CI
+          # runner availability made the x64 job unreliable enough that it wasn't worth carrying;
+          # Intel users build from source instead (see README / docs/guide/installation.md).
           - platform: macos-latest # Apple Silicon (arm64 runner)
             args: "--target aarch64-apple-darwin"
             triple: aarch64-apple-darwin
-          # Intel — MUST run on an Intel runner: stage-llamafile `--assimilate`s host-native, so an
-          # arm64 runner would emit an arm64 llamafile into the x64 bundle.
-          - platform: macos-13
-            args: "--target x86_64-apple-darwin"
-            triple: x86_64-apple-darwin
           - platform: ubuntu-latest # .deb + .AppImage
             args: ""
             triple: x86_64-unknown-linux-gnu
@@ -43,7 +43,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin' || '' }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-latest'
@@ -81,6 +81,28 @@ jobs:
           codesign --verify --verbose "src-tauri/binaries/node-${{ matrix.triple }}"
           codesign --verify --verbose "src-tauri/binaries/llamafile-${{ matrix.triple }}"
 
+      # Release notes = the tagged version's own CHANGELOG.md section (Keep a Changelog headings,
+      # "## [x.y.z] - date" through the next heading), not a fixed string that never reflected the
+      # actual per-version changes (#258). On a real tag push a missing/empty section is a hard
+      # error (forces CHANGELOG.md discipline before tagging); workflow_dispatch test runs build an
+      # arbitrary ref that isn't a tagged entry, so they fall back to an explicit placeholder
+      # instead of failing the test build.
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}")"
+          else
+            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}" --allow-missing)"
+          fi
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$body"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       # tauri-action runs the tauri.conf beforeBuildCommand (npm run build && npm run build:host).
       # `--config` applies the release-only overlay (externalBin node + host.cjs resource + macOS
       # ad-hoc signing) so the PACKAGED collab + offline AI work; the overlay is kept out of the base
@@ -94,7 +116,86 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "SlideCraft v__VERSION__"
-          releaseBody: "Download the installer for your OS below. macOS is ad-hoc signed (not notarized) — install via `brew install --cask zyuuryuu/slidecraft/slidecraft` for a clean first run, or right-click → Open on a direct .dmg download. See README for details."
+          releaseBody: |
+            ${{ steps.changelog.outputs.body }}
+
+            ---
+
+            Download the installer for your OS below. macOS is ad-hoc signed (not notarized) — install via `brew install --cask zyuuryuu/slidecraft/slidecraft` for a clean first run, or right-click → Open on a direct .dmg download (Apple Silicon only; Intel Macs build from source). SHA256SUMS, SBOM, and build provenance attestations are attached below. See README for details.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json
+
+      # Provenance attestation for the installers this job just built (#257) — ties each artifact
+      # back to this workflow run/commit via the GitHub attestations API (`gh attestation verify`).
+      # Split per-OS because subject-path globs that match zero files make the action fail.
+      - name: Attest build provenance (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: src-tauri/target/**/release/bundle/dmg/*.dmg
+
+      - name: Attest build provenance (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            src-tauri/target/**/release/bundle/appimage/*.AppImage
+            src-tauri/target/**/release/bundle/deb/*.deb
+            src-tauri/target/**/release/bundle/rpm/*.rpm
+
+      - name: Attest build provenance (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            src-tauri/target/**/release/bundle/msi/*.msi
+            src-tauri/target/**/release/bundle/nsis/*.exe
+
+  checksums-and-sbom:
+    name: SHA256SUMS + SBOM
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload SHA256SUMS + SBOM as release assets
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: npm SBOM (CycloneDX)
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json
+
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2
+        with:
+          tool: cargo-cyclonedx
+      - name: cargo SBOM (CycloneDX)
+        working-directory: src-tauri
+        run: cargo cyclonedx --format json
+
+      # SHA256SUMS covers only the installers (downloaded fresh into dist/), computed BEFORE the
+      # SBOM files are added anywhere near dist/ so it stays a checksum of the shipped binaries.
+      - name: Download release installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Pattern-filtered so a re-run for the same tag doesn't fold a leftover SHA256SUMS/SBOM
+        # asset from a prior attempt back into the new checksum file.
+        run: |
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --dir dist \
+            -p '*.dmg' -p '*.msi' -p '*.exe' -p '*.AppImage' -p '*.deb' -p '*.rpm'
+
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      - name: Upload SHA256SUMS + SBOM to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            dist/SHA256SUMS sbom-npm.cdx.json src-tauri/*.cdx.json \
+            --repo "${{ github.repository }}" --clobber

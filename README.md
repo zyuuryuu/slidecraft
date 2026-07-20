@@ -42,7 +42,7 @@ Tauri v2 + React + TypeScript で構築。**Apache-2.0**。
   brew install --cask zyuuryuu/slidecraft/slidecraft
   ```
 
-  直接 `.dmg` を落とした場合は初回のみ Finder で右クリック →「開く」、または `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`。Intel Mac 版は現在未提供です。
+  直接 `.dmg` を落とした場合は初回のみ Finder で右クリック →「開く」、または `xattr -dr com.apple.quarantine /Applications/SlideCraft.app`。公式インストーラは Apple Silicon（arm64）のみです。Intel Mac は下記「開発（ソースから）」の手順でソースからビルドしてください。
 - **Windows / Linux** — [Releases](https://github.com/zyuuryuu/slidecraft/releases) から `.msi` / `.exe`（Windows）・`.AppImage` / `.deb` / `.rpm`（Linux）を取得。
 
 詳しくは [インストールガイド](https://zyuuryuu.github.io/slidecraft/guide/installation.html)。
