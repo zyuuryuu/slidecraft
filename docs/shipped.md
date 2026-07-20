@@ -54,6 +54,7 @@
 
 ## テンプレ・マスター
 
+- **Midnight Executive の白タイトル不可視を修正** — 同梱テンプレの31レイアウト中19レイアウトが白タイトル背後のダーク下地を欠き、白×白で不可視だった（パーサ/束縛は正常＝テンプレアセットのみの不備）。正常12レイアウトと同一の `TitleBackdrop`（#1E2761）を title 幾何に合わせ最背面へ冪等移植（フォント/プレースホルダ/他テンプレ非改変）。「明色タイトルには暗色下地必須」を全同梱テンプレで恒久ガードする回帰テスト付き （#274・PR #278・2026-07-20）
 - **先頭章扉の表紙誤解決を根治** — `<!-- section -->` を先頭に書いた title-only 章扉が表紙レイアウトに auto 解決され round-trip でタイトルが消える既存バグを、`slideRoleRegions` の表紙分岐に `!sectionBreak` ゲート1本で選出側から根治（マーカー無しデッキは byte-identical） （#195・PR #199・2026-07-19）
 - **staticText のグループ変換合成（census 盲点の解消）** — `extractStaticTexts` がグループ（`<p:grpSp>` chOff/chExt スケール）内の生テキスト見出しを子座標のまま返し、幾何ベースの病理検出・ロール推定が「見た目キレイだがツールだけ誤読」する盲点を解消。`walkShapes` と同じ `composeXf` 合成則を共有（R8）し、副産物として walkShapes の自己マッチ再帰でグループ内装飾が全滅していた先在バグも `groupChildren` で根治。Dirty_Grouped の GAP テストをスライド座標側へ反転 （#142・PR #181・2026-07-19）
 - **create_template の日本語ファースト体裁** — 生成マスターの bodyStyle lvl1 に buChar「•」＋段落間 spcBef を焼き（タイトルは buNone 明示）、theme の `<a:ea>` に既定 CJK フォールバック（Yu Gothic・spec 明示時は上書き）、表紙サブタイトル y を `titleTextBottomIn`（タイトル2行折返し＋gap 0.15in）と整合する 3.85in へ。幾何整合は BUILTIN_LAYOUTS 全表紙レイアウトをテストで検査 （#137・PR #180・2026-07-19）
@@ -78,6 +79,9 @@
 
 ## HTML・描画
 
+- **Mermaid sequence の Note over/left of/right of を native 対応（v0.4.0 図強化C）** — Note が今まで黙って落ちていた（サイレントなデータロス）のを、`schema.ts` に `NoteSchema`（text/placement/participants/at）を新設して native 描画（amber 箱・over は参加者範囲/left_of/right_of は片側 lifeline 脇・メッセージと衝突しない clearance）。round-trip・edit-ops の `at` 再採番・未知 participant 参照の never-silent 検出まで配線。sequence golden 再較正（視覚 sign-off 済） （#270・PR #273・2026-07-20）
+- **Mermaid flowchart のノード形状追加（stadium/subroutine/parallelogram/cylinder＋`{{}}`→hexagon 修正・v0.4.0 図強化B）** — 4形状が rect に潰れていた/`{{}}` が diamond 誤マップだったのを、`VALID_SHAPES` に4形状追加＋`parseNodeDef`/`diagramSpecToMermaid`（R8 一本化）＋SVG/PPTX ネイティブ図形（`flowChartTerminator` 等・幾何完全一致で編集可能）に描き分け。shapes golden のみ再較正・他 spec は byte-identical（視覚 sign-off 済） （#269・PR #271・2026-07-20）
+- **左サムネイルと右プレビューの描画一致（派生スライドの materialize 一本化）** — 目次/章扉の全章リスト再掲が左サムネイルだけ materialize されず空/素で出ていた不具合を、App で表示用 `displayDeck = materializeDerivedSlides(deck)` を1回作り両ペインへ渡す形に一本化（`SlidePreview` に `preMaterialized` で二重適用回避・編集エディタは生 deck 維持）。左＝右＝書き出しが一致 （#275・PR #279・2026-07-20）
 - **Mermaid class 図の generics/stereotype を落とさない** — `classDiagram` のクラス名正規表現が `~` を除外していたため generics `List~T~`/`Map~K,V~` が消失、`<<interface>>` 等の stereotype 行が属性に混入していた。共有パターン `CLASS_NAME_SRC` を1本化（クラス宣言・関係両端で再利用＝R8）して generics を保持、stereotype 行は attributes/methods から除外。parser のみ＝schema/golden 不変（stereotype の専用描画は follow-up） （#256・PR #263・2026-07-20）
 - **Mermaid flowchart の矢印バリアント対応** — エッジ解析が `-->`/`-.->`/`---`/`===` しか拾えず、太矢印 `==>`・可変長 `--->`/`----->`・丸/バツ端点 `--o`/`--x`・双方向 `<-->` が誤パース/欠落していた（`-.->` の `.` 未エスケープ潜在バグも）。`arrowRe` を拡張し全バリアントを正しく検出、`ParsedEdge` に端点種別/双方向を捕捉（端点マーカー描画は follow-up）。parser のみ＝schema/golden 不変 （#255・PR #264・2026-07-20）
 - **グループの flipH/flipV をプレビュー/HTML に反映（#105 Slice 2）** — `<a:xfrm flipH/flipV>` を持つグループの子図形が鏡像化されず配置されていた（lrk-slides-velis CC0 で flip グループ 16 件がミラーずれ）。`ooxml-geom.ts` の `parseGroupXf` が flip 符号反転を読むよう修正・custGeom の子は path 座標も鏡像化。preview/HTML 限定＝PPTX golden 非影響・flip 無しテンプレの抽出はバイト不変（test-first） （#241・PR #248・2026-07-20）
@@ -98,6 +102,7 @@
 
 ## スライド編集・画像
 
+- **便利スライド生成メニュー＝目次 live/static（ADR-0034）** — GUI から「既存コンテンツから便利スライドを生成」する枠を新設。目次を **live**（`derived:"toc"`・章に自動追随・直接編集不可）か **static**（章から1回焼いた普通の編集可能スライド・「作り直す」で明示再生成）で選んで挿入。導出は `tocPlaceholders`（scanSections/tocParagraphs）の単一経路を両モードが再利用（R8）。schema 非変更（live=既存 derived・static=通常スライド）。ADR-0032 D2 の「生成却下」をモード選択で解消（ADR-0034） （#277・PR #280・2026-07-20）
 - **目次タイトルの言語自動切替（目次／Table of Contents）** — `<!-- toc -->` 導出スライドの見出しが `目次` 固定だったのを、章タイトル群の文字種で切替（CJK を含めば「目次」・英語のみなら "Table of Contents"・章なしは既定「目次」）。判定は既存の `deckHasCjkText` を再利用し重複を作らない（R8）。engine 純関数で react-i18next を持ち込まず（R2）、派生タイトルは md へ書き戻さない（round-trip 不変） （#184・PR #234・2026-07-20）
 - **クロス doc 切替の snapshot データ損失を修正** — 複数ドキュメント切替時に他 doc の snapshot が現 doc の状態で上書きされ編集が失われる GUI コントローラのバグを修正 （#160・PR #173・2026-07-19）
 - **画像埋め込み＝data URI 埋め込み** — 自己完結 data-URI SlideIR image ブロック（Markdown `![alt](src)` round-trip・SlideCard `<img>`／HTML 自動・PPTX decode → media/pic）、paste＋Tauri/browser file-drop 挿入、picture 枠優先バインド、rect/fit/aspect 手動幾何＋pointer drag/resize、既存を壊さない最背面（behind）モード （ADR-0020・2026-07-06）
