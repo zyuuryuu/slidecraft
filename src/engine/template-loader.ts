@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
 import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
-import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, recoverLayoutSubtitle, placeholderRole, CLOSING_RE, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
+import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, recoverLayoutSubtitle, placeholderRole, CLOSING_RE, BUILTIN_ROLE_DESCR_PREFIX, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
@@ -60,6 +60,13 @@ export interface PlaceholderInfo {
   // body/title content even if its (mislabeled) role is body — the header-bug fix. Healthy chrome is
   // already a meta role, so the gate is a no-op on healthy masters (byte-identical).
   inferredFunction?: ElementFunction;
+  // #293: a BUILT-IN layout's explicitly declared role (template-layout-library.ts's LayoutPhDef.role),
+  // recovered from the `<p:cNvPr descr>` marker template-writer.ts stamps (BUILTIN_ROLE_DESCR_PREFIX).
+  // placeholderRole() (template-catalog.ts) honors it over the idx-META convention, since that
+  // convention was designed for third-party masters (ADR-0023) and otherwise misreads shared idx
+  // 10/11/12 slots whose meaning differs per built-in layout. Undefined on any third-party master
+  // (never stamped there) ⇒ byte-identical fallback to type/idx.
+  builtinRole?: PlaceholderRole;
 }
 
 export interface DecoRect {
@@ -654,8 +661,14 @@ function extractPlaceholders(
     const type = typeMatch ? typeMatch[1] : "";
     const name = nameMatch ? nameMatch[1] : "";
     const style = extractStyle(sp, masterTitle, masterBody, theme, masterGeom);
+    // #293: recover a built-in layout's declared role from its descr marker (absent on any
+    // third-party master — they never carry it, so builtinRole stays undefined there).
+    const descrMatch = sp.match(/cNvPr[^>]*descr="([^"]*)"/);
+    const builtinRole = descrMatch?.[1].startsWith(BUILTIN_ROLE_DESCR_PREFIX)
+      ? (descrMatch[1].slice(BUILTIN_ROLE_DESCR_PREFIX.length) as PlaceholderRole)
+      : undefined;
 
-    placeholders.push({ idx, type, name, shapeXml: sp, style });
+    placeholders.push({ idx, type, name, shapeXml: sp, style, ...(builtinRole ? { builtinRole } : {}) });
   }
 
   // GUARDRAIL — a defective template may reuse a placeholder idx within one layout (OOXML requires

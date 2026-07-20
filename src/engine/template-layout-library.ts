@@ -8,6 +8,8 @@
  * 設計: docs/design/template-authoring.md S3。
  */
 
+import type { PlaceholderRole } from "./template-catalog";
+
 /** 生成テンプレの配色スロット（hex・# なし）。canonical の 14 色パレットから実使用分を昇格。 */
 export const PALETTE_KEYS = [
   "background", // dark 系レイアウトの背景・light 系レイアウトのヘッダーバー
@@ -32,6 +34,15 @@ export interface LayoutPhDef {
   color: PaletteKey;
   bold: boolean;
   align: string; // "l" | "ctr" | "r"
+  // #293: this slot's REAL semantic meaning, independent of idx. SlideCraft's idx-META convention
+  // (idx 10/11/12→category/date/footer) was designed for THIRD-PARTY masters (ADR-0023) — but idx
+  // 10/11/12 are also reused across OUR OWN built-in layouts for different real content (e.g.
+  // Contact.Bottom/Summary.Right/Meta.Right/Description.*/PresenterName.Bottom hold real body text,
+  // not a footer/date meta), so the idx-META guess is wrong for those specific slots. Declared HERE
+  // (only where the convention would otherwise misread it) so template-writer.ts can stamp it onto the
+  // generated shape and placeholderRole() (template-catalog.ts) can use it as ground truth instead of
+  // guessing from idx. Undefined ⇒ the slot resolves unambiguously via type/idx already (no override).
+  role?: PlaceholderRole;
 }
 
 export interface LayoutDecoDef {
@@ -50,48 +61,58 @@ export interface LayoutDef {
 export const BUILTIN_LAYOUTS: LayoutDef[] = [
   // 0: Title.1Title.Single
   { name: "Title.1Title.Single", family: "dark", placeholders: [
-    { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.5, w: 9, h: 0.45, fontSize: 15, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.5, w: 9, h: 0.45, fontSize: 15, font: "minor", color: "accent", bold: true, align: "l", role: "category" },
     { name: "Title.Center", type: "ctrTitle", idx: 0, x: 1.2, y: 2.1, w: 10.5, h: 1.5, fontSize: 48, font: "major", color: "titleText", bold: true, align: "l" },
     // y=3.85: タイトルが2行に折り返しても本文下端（titleTextBottomIn(2.1, 48, 2)=3.7in）と
     // MIN_TITLE_SUBTITLE_GAP_IN（0.15in）分の余白を確保する（#137 — 旧 y=3.7 は密着/衝突していた）。
     { name: "Subtitle.Center", type: "subTitle", idx: 1, x: 1.2, y: 3.85, w: 9, h: 0.7, fontSize: 20, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Date.Bottom", type: "body", idx: 11, x: 1.2, y: 5.6, w: 8, h: 0.4, fontSize: 14, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Footer.Bottom", type: "body", idx: 12, x: 1.2, y: 6.1, w: 4, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l" },
+    { name: "Date.Bottom", type: "body", idx: 11, x: 1.2, y: 5.6, w: 8, h: 0.4, fontSize: 14, font: "minor", color: "subtle", bold: false, align: "l", role: "date" },
+    { name: "Footer.Bottom", type: "body", idx: 12, x: 1.2, y: 6.1, w: 4, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l", role: "footer" },
   ]},
   // 1: Title.1Title.Single+1Meta
   { name: "Title.1Title.Single+1Meta", family: "dark", placeholders: [
-    { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.2, w: 6.5, h: 0.4, fontSize: 14, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.2, w: 6.5, h: 0.4, fontSize: 14, font: "minor", color: "accent", bold: true, align: "l", role: "category" },
     { name: "Title.Left", type: "ctrTitle", idx: 0, x: 1.2, y: 1.8, w: 7.0, h: 1.8, fontSize: 44, font: "major", color: "titleText", bold: true, align: "l" },
     { name: "Subtitle.Left", type: "subTitle", idx: 1, x: 1.2, y: 3.8, w: 7.0, h: 0.6, fontSize: 18, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Meta.Right", type: "body", idx: 11, x: 9.1, y: 1.6, w: 3.2, h: 3.8, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Footer.Bottom", type: "body", idx: 12, x: 1.2, y: 6.2, w: 6, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l" },
+    // #293: idx 11 conventionally reads "date", but this is a real multi-line meta/body panel — the
+    // idx-META guess (designed for third-party masters) is wrong for this built-in slot.
+    { name: "Meta.Right", type: "body", idx: 11, x: 9.1, y: 1.6, w: 3.2, h: 3.8, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l", role: "body" },
+    { name: "Footer.Bottom", type: "body", idx: 12, x: 1.2, y: 6.2, w: 6, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l", role: "footer" },
   ]},
   // 2: Title.1Title.Single+1Summary
   { name: "Title.1Title.Single+1Summary", family: "dark", placeholders: [
-    { name: "CategoryLabel.Left", type: "body", idx: 10, x: 1.2, y: 1.5, w: 5.5, h: 0.4, fontSize: 14, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "CategoryLabel.Left", type: "body", idx: 10, x: 1.2, y: 1.5, w: 5.5, h: 0.4, fontSize: 14, font: "minor", color: "accent", bold: true, align: "l", role: "category" },
     { name: "Title.Left", type: "ctrTitle", idx: 0, x: 1.2, y: 2.1, w: 5.8, h: 2.0, fontSize: 42, font: "major", color: "titleText", bold: true, align: "l" },
     { name: "Subtitle.Left", type: "subTitle", idx: 1, x: 1.2, y: 4.3, w: 5.5, h: 0.6, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Summary.Right", type: "body", idx: 11, x: 8.0, y: 1.2, w: 4.8, h: 5.5, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
-    { name: "Date.Bottom", type: "body", idx: 12, x: 1.2, y: 6.2, w: 5, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l" },
+    // #293: idx 11 conventionally reads "date", but this is a real summary body panel.
+    { name: "Summary.Right", type: "body", idx: 11, x: 8.0, y: 1.2, w: 4.8, h: 5.5, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l", role: "body" },
+    // #293: idx 12 conventionally reads "footer", but this box is literally named/used as the date.
+    { name: "Date.Bottom", type: "body", idx: 12, x: 1.2, y: 6.2, w: 5, h: 0.3, fontSize: 11, font: "minor", color: "subtle", bold: false, align: "l", role: "date" },
   ]},
   // 3: Section.1Title.Single
   { name: "Section.1Title.Single", family: "dark", placeholders: [
-    { name: "SectionLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.1, w: 5, h: 0.4, fontSize: 13, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "SectionLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.1, w: 5, h: 0.4, fontSize: 13, font: "minor", color: "accent", bold: true, align: "l", role: "category" },
     { name: "Title.Center", type: "body", idx: 15, x: 1.2, y: 1.8, w: 10.5, h: 2.2, fontSize: 40, font: "major", color: "titleText", bold: true, align: "l" },
-    { name: "Description.Bottom", type: "body", idx: 11, x: 1.2, y: 4.5, w: 10, h: 1.5, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l" },
+    // #293: idx 11 conventionally reads "date", but this is a real description body.
+    { name: "Description.Bottom", type: "body", idx: 11, x: 1.2, y: 4.5, w: 10, h: 1.5, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l", role: "body" },
   ]},
   // 4: SectionNav.1Title.Single
   { name: "SectionNav.1Title.Single", family: "dark", placeholders: [
-    { name: "SectionNumber.Left", type: "body", idx: 10, x: 1.0, y: 1.5, w: 2.4, h: 2.5, fontSize: 80, font: "major", color: "accent", bold: true, align: "ctr" },
-    { name: "SectionLabel.Left", type: "body", idx: 11, x: 1.0, y: 4.0, w: 2.4, h: 0.4, fontSize: 12, font: "minor", color: "subtle", bold: false, align: "ctr" },
+    // #293: idx 10/11 conventionally read "category"/"date", but these are the section number + its
+    // own label — real content, not the deck's category/date meta.
+    { name: "SectionNumber.Left", type: "body", idx: 10, x: 1.0, y: 1.5, w: 2.4, h: 2.5, fontSize: 80, font: "major", color: "accent", bold: true, align: "ctr", role: "body" },
+    { name: "SectionLabel.Left", type: "body", idx: 11, x: 1.0, y: 4.0, w: 2.4, h: 0.4, fontSize: 12, font: "minor", color: "subtle", bold: false, align: "ctr", role: "body" },
     { name: "Title.Right", type: "body", idx: 15, x: 4.2, y: 1.5, w: 8.5, h: 2.0, fontSize: 38, font: "major", color: "titleText", bold: true, align: "l" },
-    { name: "Description.Right", type: "body", idx: 12, x: 4.2, y: 4.0, w: 8.5, h: 2.0, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l" },
+    // #293: idx 12 conventionally reads "footer", but this is a real description body (the injected
+    // chapter-name footer must never land here — see isSectionFooterTarget / #292).
+    { name: "Description.Right", type: "body", idx: 12, x: 4.2, y: 4.0, w: 8.5, h: 2.0, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l", role: "body" },
   ]},
   // 5: SectionBreak.1Title.Single
   { name: "SectionBreak.1Title.Single", family: "dark", placeholders: [
-    { name: "SectionLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.2, w: 10, h: 0.4, fontSize: 13, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "SectionLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.2, w: 10, h: 0.4, fontSize: 13, font: "minor", color: "accent", bold: true, align: "l", role: "category" },
     { name: "Title.Center", type: "body", idx: 15, x: 1.2, y: 3.0, w: 10.5, h: 1.5, fontSize: 44, font: "major", color: "titleText", bold: true, align: "l" },
-    { name: "Description.Bottom", type: "body", idx: 11, x: 1.2, y: 5.3, w: 10, h: 1.2, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
+    // #293: idx 11 conventionally reads "date", but this is a real description body.
+    { name: "Description.Bottom", type: "body", idx: 11, x: 1.2, y: 5.3, w: 10, h: 1.2, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l", role: "body" },
   ]},
   // 6: Content.1Body.Single
   { name: "Content.1Body.Single", family: "light", placeholders: [
@@ -271,10 +292,13 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
   ]},
   // 28: Closing.1Message.Single
   { name: "Closing.1Message.Single", family: "dark", placeholders: [
-    { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.5, w: 10, h: 0.5, fontSize: 18, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "CategoryLabel.Top", type: "body", idx: 10, x: 1.2, y: 1.5, w: 10, h: 0.5, fontSize: 18, font: "minor", color: "accent", bold: true, align: "l", role: "category" },
     { name: "Title.Center", type: "ctrTitle", idx: 0, x: 1.2, y: 2.2, w: 10.5, h: 1.6, fontSize: 42, font: "major", color: "titleText", bold: true, align: "l" },
-    { name: "PresenterName.Bottom", type: "body", idx: 11, x: 1.2, y: 5.2, w: 8, h: 0.5, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Contact.Bottom", type: "body", idx: 12, x: 1.2, y: 5.8, w: 8, h: 0.8, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l" },
+    // #293: idx 11 conventionally reads "date", but this is the presenter's name — real content.
+    { name: "PresenterName.Bottom", type: "body", idx: 11, x: 1.2, y: 5.2, w: 8, h: 0.5, fontSize: 16, font: "minor", color: "subtle", bold: false, align: "l", role: "body" },
+    // #293: idx 12 conventionally reads "footer", but this is contact info — real content (the
+    // injected chapter-name footer must never land here — see isSectionFooterTarget / #292).
+    { name: "Contact.Bottom", type: "body", idx: 12, x: 1.2, y: 5.8, w: 8, h: 0.8, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l", role: "body" },
   ]},
   // 29: Closing.1Steps.Single+1Notes
   { name: "Closing.1Steps.Single+1Notes", family: "dark", placeholders: [
