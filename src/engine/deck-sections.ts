@@ -15,6 +15,7 @@
 import type { DeckIR, Paragraph, SlideIR } from "./slide-schema";
 import { getPlaceholderText } from "./md-serializer-shared";
 import { TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { deckHasCjkText } from "./deck-text-collect";
 
 /** 章扉の全章リスト再掲（#167）を表示する専用レイアウト（idx15=タイトル/16=補足/1=章リスト）。 */
 export const SECTION_NAV_LIST_LAYOUT = "SectionNav.1TitleList.Single";
@@ -61,8 +62,20 @@ export function tocParagraphs(sections: SectionEntry[]): Paragraph[] {
   }));
 }
 
-/** 目次スライドの派生タイトル。導出専用スライドの見出しで、md へは書き戻されない。 */
-export const TOC_TITLE = "目次";
+/** 目次スライドの派生タイトル（日本語デッキ・章タイトルが無い場合の既定）。導出専用スライドの
+ *  見出しで、md へは書き戻されない。 */
+export const TOC_TITLE_JA = "目次";
+/** 目次スライドの派生タイトル（英語のみの章タイトルのデッキ用・#184）。 */
+export const TOC_TITLE_EN = "Table of Contents";
+
+/** 章タイトル群の文字種から目次スライドの見出しを決める（#184）。章タイトルに CJK を 1 つでも
+ *  含めば「目次」、全て非 CJK（英語想定）なら "Table of Contents"。章が無いデッキは「目次」
+ *  （デッキ言語の判定材料が無いので日本語を既定に据える・#151 からの既存挙動を維持）。
+ *  UI i18n には依存しない純関数（R2）— react-i18next 配線を engine に持ち込まない案 1（#184）。 */
+export function tocTitleFor(sections: SectionEntry[]): string {
+  if (sections.length === 0) return TOC_TITLE_JA;
+  return deckHasCjkText(sections.map((s) => s.title).join("")) ? TOC_TITLE_JA : TOC_TITLE_EN;
+}
 
 /** 章一覧 → 章扉の再掲用段落（`1. 章名` の箇条書き・現在章のみ bold で強調）。 */
 export function sectionNavParagraphs(sections: SectionEntry[], currentNumber: number): Paragraph[] {
@@ -99,7 +112,7 @@ export function materializeDerivedSlides(deck: DeckIR): DeckIR {
         return {
           ...slide,
           placeholders: [
-            { idx: "15", paragraphs: [{ segments: [{ text: TOC_TITLE }] }] },
+            { idx: "15", paragraphs: [{ segments: [{ text: tocTitleFor(sections) }] }] },
             ...(sections.length > 0 ? [{ idx: "1", paragraphs: tocParagraphs(sections) }] : []),
           ],
         };
