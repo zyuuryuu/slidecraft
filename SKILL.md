@@ -16,11 +16,16 @@ write slide Markdown, and follow the never-silent feedback loop until the deck i
 
 ## Connect
 
-- **Headless (stdio)**: run `slidecraft serve` and speak MCP over stdio (e.g. Claude Desktop / Claude
-  Code MCP config). Bytes cross as base64. No filesystem unless started without `--no-fs`.
-- **Collab host (GUI open)**: the desktop app launches a loopback MCP host; connect as an `ai` client.
-  The human sees your edits live. You pick the doc the GUI opened via `select_document` (or the sole
-  doc resolves automatically).
+One command — `slidecraft serve` (alias `slidecraft mcp`) — speaks MCP over stdio; register it **once**.
+At startup it discovers whether the desktop GUI is already hosting a live collab session and adapts:
+
+- **GUI running → you join it**: your edits relay to the GUI's control plane and the human sees them
+  live. Pick the doc the GUI opened via `select_document` (or the sole doc resolves automatically).
+- **No GUI → solo**: the same command runs its own single-doc control plane — full authoring, plus
+  server-side `undo` / `redo`. No second config, no second endpoint.
+
+Either way there is **one control plane** (deck authority + undo history); you don't pick the mode —
+rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`--no-fs`, the default).
 
 ## Core contracts (read once)
 
@@ -73,6 +78,12 @@ write slide Markdown, and follow the never-silent feedback loop until the deck i
 
 ## Rules of thumb
 
+- **See your work**: `get_slide_image(index)` returns a PNG of a slide's *current* shared rendering
+  (fonts embedded — the same painter as the preview / HTML export, so #105's drawing fixes apply for
+  free) so you can visually check an edit didn't break the layout. It uses a **locally installed
+  Chrome/Edge only** — never bundled or auto-downloaded (a stale bundled browser is a security risk).
+  Absent → never-silent `{ok:false, code:"browser-not-found"}` guiding you to set `SLIDECRAFT_BROWSER`.
+  Optional: authoring never depends on a screenshot.
 - Embedded images are **`data:image/…` data URIs only** (portable, XSS-safe). Other schemes become text.
 - Prefer `set_slide_markdown` (surgical, figure-preserving) over `set_deck_markdown` (whole-deck replace,
   drops figures) for single-slide edits.

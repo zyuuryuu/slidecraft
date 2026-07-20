@@ -163,6 +163,7 @@ while `class` / `state` / `ER` / `mindmap` go in ` ```mermaid `. See [Diagrams](
 |---|---|
 | `get_slide(index)` | A **structured read** of one slide (resolved layout, presence of a diagram, bullet count, budget, capacity — measured body usage, predictedSplit — a split dry-run, that slide's issues, Markdown). One call is enough to plan an edit |
 | `get_slide_markdown(index)` | The raw Markdown of one slide (layout already resolved) |
+| `get_slide_image(index)` | Returns the slide's **current rendering as a PNG** (the AI's visual design check). Screenshots the same shared rendering as the preview / HTML export, using a locally installed Chrome/Edge. Optional feature (see below) |
 | `set_slide_markdown(index, markdown)` | Replaces one slide (diagrams/mermaid are auto-preserved, validated, and invalid input is never-silent rejected) |
 | `set_slide_diagram(index, source, format, ...)` | Sets a diagram from DiagramSpec/Mermaid. Replaces an existing diagram, or adds to the body area on a text slide |
 | `apply_design_intent(index, intent)` | Applies **spatial intent** to a diagram (text left / diagram right, node emphasis, orientation change). *Only for slides that have a diagram* |
@@ -170,6 +171,14 @@ while `class` / `state` / `ER` / `mindmap` go in ` ```mermaid `. See [Diagrams](
 ::: warning Beware of replacing the whole deck
 `set_deck_markdown(markdown)` replaces the entire deck, and **diagrams are not preserved**.
 When you want to fix just one slide, use `set_slide_markdown` or `insert_slide`.
+:::
+
+::: tip The visual check (`get_slide_image`) needs a browser
+`get_slide_image` shoots with a **locally installed Chrome/Edge only** — it is **never bundled or
+auto-downloaded** (so a stale, unpatched browser is never shipped). If none is found it does not fail
+silently but returns `{ok:false, code:"browser-not-found"}` with guidance (set `SLIDECRAFT_BROWSER` to
+point at one). Capture runs network-dead in a throwaway profile, and embedded fonts keep CJK from
+tofu-ing. It is an **optional** feature — authoring and export work fine without a browser.
 :::
 
 ### Structure operations (slide order)
@@ -229,18 +238,22 @@ carry a machine-readable `code`. For the full contract, see
 
 ---
 
-## Collaborative Host Mode (GUI Launches → AI Connects)
+## Collaborative Host Mode (GUI Launches → AI Rides Along on the Same Deck)
 
-The usage above is the headless path where "the agent spawns the server," but there is also a collaborative mode where **the GUI (desktop version)
-becomes the host**. The GUI embeds the server at launch, and the AI connects to it to edit.
+You register **one command** (`slidecraft serve` / `slidecraft mcp`), and it **decides at startup whether the GUI
+is already running** (an adaptive front — ADR-0033). If the GUI is hosting a collab session, the AI **rides along**
+on it and edits the deck the human is watching (otherwise it runs solo). **You never write two MCP configs.**
 
-- **Lifecycle for multiple documents** — Exposes `list_documents` / `select_document` / `close_document`, along with
-  server-side `undo` / `redo` (host-only).
+- **Lifecycle for multiple documents** — `list_documents` / `select_document` / `close_document`. Under GUI collab
+  you can span multiple docs (the same tools exist in solo mode too, but with one doc they are effectively no-ops).
+- **Server-side `undo` / `redo`** — step the deck's truth back / forward. **These work in solo mode too** (the payoff
+  of unifying onto a single control plane — ADR-0033 D1).
 - **Using registered templates** — Once the GUI feeds a master registry into the host with `register_templates`,
   the AI can browse the list with `list_templates` and **mint a new project** with `use_template(id, markdown?)`.
-  Because it can pick a template without carrying the bytes, this is the shortest path via the host.
+  Because it can pick a template without carrying the bytes, this is the shortest path via the host (in solo mode,
+  bring the template bytes or use `create_template`).
 
-This enables collaboration where the AI connects to and edits a deck the human is viewing in the GUI, and the human reviews the result.
+This enables collaboration where the AI rides along on a deck the human is viewing in the GUI, and the human reviews the result.
 When the GUI and AI edits conflict, it is detected via optimistic locking and the client re-fetches.
 
 ---
