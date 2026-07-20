@@ -163,6 +163,7 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 | `get_slide(index)` | 1 スライドの**構造化 read**（解決レイアウト・図の有無・箇条書き数・budget・capacity（本文容量の実測）・predictedSplit（分割ドライラン）・当該 issues・Markdown）。1 呼び出しで編集計画が立つ |
 | `get_slide_markdown(index)` | 1 スライドの素の Markdown（レイアウト解決済み） |
 | `get_slide_image(index)` | 1 スライドの**現在の描画を PNG で返す**（AI の視覚デザインチェック）。preview / HTML 書き出しと同じ共有描画をローカルの Chrome/Edge で撮る。任意機能（後述） |
+| `get_slide_html(index)` | 1 スライドの**現在の描画を自己完結 HTML 文字列で返す**（`get_slide_image` と同じ共有描画・script ゼロ・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境でも、呼び出し側の任意の手段でラスタ化できる |
 | `set_slide_markdown(index, markdown)` | 1 スライドを差し替え（図/mermaid は自動保持・検証・不正は never-silent 拒否） |
 | `set_slide_diagram(index, source, format, ...)` | 図を DiagramSpec/Mermaid で設定。図ありは置換、テキストスライドには本文領域へ追加 |
 | `apply_design_intent(index, intent)` | 図に**空間意図**を反映（テキスト左/図右・ノード強調・向きの変更）※図を持つスライドのみ |

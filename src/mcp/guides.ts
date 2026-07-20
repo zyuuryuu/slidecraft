@@ -13,6 +13,7 @@ import * as S from "./session";
 import { slideSystemPrompt } from "../engine/llm-prompts";
 import { diagramSystemPrompt, DIAGRAM_TYPES, parseDiagramType } from "../engine/diagram-type-prompts";
 import { VALID_TYPES } from "../engine/schema-constants";
+import { REVIEW_RULES } from "../engine/deck-diagnostics";
 
 /** L1 + manifest — the slide-Markdown authoring contract for THIS template (catalog-resolved layout
  *  names + selection rules = alien-safe), the body budget to author WITHIN, and pointers to the
@@ -25,9 +26,14 @@ export function getAuthoringGuide(s: Session) {
     budget, // this template's body capacity (maxBullets/charsPerBullet) — keep each content slide within it
     capacity:
       "容量は get_slide(i) / get_deck_issues で実測できる：capacity.usedLines/maxLines（全角換算の保守的推定）・overBudget・predictedSplit（split_overflowing_slides の dry-run、実行せず何枚に割れるか）",
+    // #244: this deck's review rules ({id, level}), read BEFORE authoring so the first draft is already
+    // clean — a literal projection of deck-diagnostics.ts's REVIEW_RULES, the SAME registry
+    // get_deck_issues draws its DeckIssue.id/level from (R8: one source, no drift between the two).
+    activeReviewRules: REVIEW_RULES.map((r) => ({ id: r.id, level: r.level })),
     seeAlso: {
       figures: "図を入れるなら get_diagram_types で種類を選び、get_diagram_guide(type) で構文を得る",
       templateSpec: "新しいテンプレを作るなら get_template_spec_guide（→ create_template）",
+      reviewRules: "activeReviewRules の各 id の詳細は get_deck_issues の指摘メッセージで実例を確認できる",
     },
   };
 }

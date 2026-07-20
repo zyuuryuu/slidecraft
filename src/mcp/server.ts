@@ -27,7 +27,7 @@ import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
-import { rasterizeSlide } from "./slide-raster";
+import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
 
 interface ToolResult {
   content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
@@ -194,6 +194,14 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         return fail(e);
       }
     },
+  );
+  // #242: same shared rendering as get_slide_image, minus the local-browser requirement — the caller
+  // rasterizes with its own means (CI/sandboxes often have no Chrome/Edge). R8: no second render
+  // path — `renderSlideHtml` IS the exact page get_slide_image screenshots.
+  server.registerTool(
+    "get_slide_html",
+    { description: "1スライドの現在の描画を自己完結 HTML 文字列で返す（get_slide_image と同一の共有 HTML＝script ゼロ・CSP・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境向け：呼び出し側の任意の手段でラスタ化できる", inputSchema: { ...index, ...doc } },
+    (a, extra) => run(() => renderSlideHtml(sessionOf(extra, a.docId), a.index)),
   );
 
   // ── authoring contract (self-describing surface; T3/S1) ── the single entry the AI reads BEFORE

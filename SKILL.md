@@ -31,6 +31,9 @@ rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`-
 
 - **Never-silent**: a modelled precondition failure returns `{ ok:false, error, code }` (a normal
   result, not a crash). `isError:true` is reserved for genuine crashes. Never assume a no-op succeeded.
+- **Success = no `ok:false`, no `isError`**: reads (`get_deck` etc.) and `export_pptx` return their
+  payload as-is with no `ok` key at all — its absence already means success; it is not backfilled onto
+  reads, since that would break the tool↔resource mirror equality.
 - **Mutation envelope**: content mutations return `{ ok, changed, beforeMd?, afterMd?, diagnostics,
   budget?, hints, ... }`. `changed:false` = a real no-op (nothing to undo). `hints` tells you the next tool.
 - **schema is frozen**: you author *content*; you cannot change slide roles/layout names arbitrarily —
