@@ -163,3 +163,25 @@ export function distillDeckReport(deck: DeckIR, catalog: LayoutCatalog): { deck:
   }
   return { deck: { ...deck, slides }, newIndices, offsets };
 }
+
+export interface IndexMapEntry {
+  before: number;
+  after: number;
+}
+
+/** #243: old→new slide-index correspondence for split's callers, so an index-addressed follow-up
+ *  (set_slide_markdown…) doesn't have to re-`get_deck` after a split. Built from the SAME `offsets`
+ *  distillDeckReport already computes (R8: no second calc) — `offsets[k]` is where original slide k's
+ *  first resulting part landed. An entry is included when slide k is itself a split source (its span
+ *  in the post-split deck is >1 slot) OR its position shifted; an untouched slide ahead of any split
+ *  needs no entry (before === after, and it didn't split). */
+export function buildIndexMap(offsets: number[], totalSlides: number): IndexMapEntry[] {
+  const map: IndexMapEntry[] = [];
+  for (let before = 0; before < offsets.length; before++) {
+    const after = offsets[before];
+    const next = before + 1 < offsets.length ? offsets[before + 1] : totalSlides;
+    const isSplitSource = next - after > 1;
+    if (after !== before || isSplitSource) map.push({ before, after });
+  }
+  return map;
+}

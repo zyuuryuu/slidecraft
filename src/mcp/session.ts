@@ -14,7 +14,7 @@ import { buildCatalog, deckCapabilities, assessTemplateHealth, type LayoutCatalo
 import { openProject, bundleProject } from "../engine/project-io";
 import { parseMdReport } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
-import { distillDeckReport, contentBodyBox } from "../engine/distill";
+import { distillDeckReport, contentBodyBox, buildIndexMap } from "../engine/distill";
 import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue } from "../engine/deck-diagnostics";
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
@@ -267,7 +267,9 @@ export function distill(s: Session) {
   s.dirty = s.dirty || changed;
   const tail = fitTail(s, fitted, catalog, template.layouts);
   const diagnostics = [...tail.diagnostics, ...splitInfoIssues(fitted, offsets)];
-  return { ok: true as const, changed, changedSlides: newIndices, before: deck.slides.length, after: fitted.slides.length, ...tail, diagnostics };
+  // #243:旧→新 index 対応表。changed:false（分割なし）なら空 — 既存クライアント非破壊の追加フィールド。
+  const indexMap = changed ? buildIndexMap(offsets, fitted.slides.length) : [];
+  return { ok: true as const, changed, changedSlides: newIndices, indexMap, before: deck.slides.length, after: fitted.slides.length, ...tail, diagnostics };
 }
 
 /** Deterministic lever: turn a key-value bullet run on one slide into a GFM table. When there is no
