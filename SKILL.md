@@ -89,8 +89,8 @@ one be auto-generated; see [`docs/mcp-server.md`](docs/mcp-server.md) for detail
    `exportReadiness`) → `export_pptx(onUnsupportedMermaid?)`. Native-vector only; unconvertible Mermaid
    (gitGraph/sankey/C4) is `reject` (default, precise error) or `skip` (drops that slide + reports it) —
    **never silently lost**. `save_project()` returns the round-trippable `.slidecraft` bytes. Both
-   return `{dataBase64}` by default, or `{path}` (a scope-relative `file://` reference — nothing on the
-   wire) when the server has a `--root` scope configured.
+   return `{dataBase64}` by default, or `{path}` (an absolute `file://` URI under the scope — nothing
+   on the wire) when the server has a `--root` scope configured.
 
 ## Rules of thumb
 
