@@ -12,6 +12,8 @@
 2. **CHANGELOG.md を更新**: `## [Unreleased]` の内容を `## [0.2.0] - YYYY-MM-DD` に移し、新しい空の Unreleased を作る。**このセクションがそのままリリースノートになる**（`release.yml` がタグの版に一致する `## [x.y.z]` 見出しを抽出して `releaseBody` に使う。無いと release ジョブが失敗する — never-silent）。
 3. **ローカル検証**: `npm test`・`npm run build`・`npm run typecheck:mcp` が全緑。
 4. **コミット & タグ**: `chore(release): v0.2.0` → `git tag v0.2.0 && git push origin main --tags`。→ `release.yml` が **3-OS**（macOS arm64・Windows・Linux。Intel Mac インストーラは廃止済み — [#112](https://github.com/zyuuryuu/slidecraft/issues/112)）installer をビルドして **draft** リリースを作成する。続けて `SHA256SUMS`・SBOM（npm＋cargo、CycloneDX）をリリースアセットとして添付し、各インストーラに `actions/attest-build-provenance` で build provenance attestation を付与する（署名の代わりの完全性シグナル — 署名自体は導入しない）。
+
+   > **タグ push は push 権のある環境（メンテナの手元）で行う。** リリースの起点は `v*` タグ push（`release.yml` の `on: push: tags`）。Claude Code の管制セッション（GitHub App 連携）は **`refs/tags/*` の push も `workflow_dispatch` の起動も 403**（App に該当 write 権が無い）なので、**タグ push は人間が実行**する。将来 workflow_dispatch を実リリース経路に昇格する案（#290 (b)）は、セッションから叩けない以上メリットが薄く見送り。App に `actions: write` を付与できるようになったら再検討。
 5. **成果物レビュー（実機）**: draft の installer を Windows / macOS 実機で起動確認（M9）。macOS は ad-hoc 署名 `.dmg` が `killed:9` せず開くこと・keychain 往復・モデル自動DL を確認。
 6. **Homebrew cask 更新**: 公開された `.dmg`（arm64）の sha256 を計算し [`scripts/update-cask.mjs`](scripts/update-cask.mjs) で cask を更新。
 7. **publish**: draft を publish。自動更新（軽量通知）が新版を検知できる状態にする。
