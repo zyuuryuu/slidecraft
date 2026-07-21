@@ -1,16 +1,29 @@
 name: Release
 
-# Push a version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`) to build
-# installers for all OSes and attach them to a DRAFT GitHub Release for review.
-# Manual runs (workflow_dispatch) build against the current ref for testing.
+# Push a version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`) to build installers for
+# all OSes and attach them to a DRAFT GitHub Release for review. Alternatively, run
+# workflow_dispatch with a `version` input (e.g. `0.1.0`) to do the same from the Actions UI/API —
+# this creates the `v0.1.0` tag on the dispatched ref and requires a matching CHANGELOG.md section
+# (#290: lets a git-relay that blocks tag pushes still cut a release). A bare workflow_dispatch
+# (no version) builds against the current ref for testing only — no tag, no release semantics.
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version to release (e.g. 0.4.1). Creates tag v<version> and requires a matching
+          CHANGELOG.md section (never-silent). Leave empty for a test build against the current
+          ref — no tag semantics, CHANGELOG section optional.
+        required: false
+        type: string
 
 jobs:
   release:
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     permissions:
       contents: write # create/update the GitHub Release + upload installers
       attestations: write # actions/attest-build-provenance
@@ -81,21 +94,39 @@ jobs:
           codesign --verify --verbose "src-tauri/binaries/node-${{ matrix.triple }}"
           codesign --verify --verbose "src-tauri/binaries/llamafile-${{ matrix.triple }}"
 
+      # The tag this run releases under. Two real-release triggers (tag push, and
+      # workflow_dispatch with a version input — #290, CCR's git relay 403s on tag pushes) plus one
+      # test-build trigger (bare workflow_dispatch) collapse to a single TAG used everywhere below,
+      # so the tag-push path stays byte-identical to before.
+      - name: Compute release tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            tag="v${{ inputs.version }}"
+          else
+            tag="${{ github.ref_name }}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       # Release notes = the tagged version's own CHANGELOG.md section (Keep a Changelog headings,
       # "## [x.y.z] - date" through the next heading), not a fixed string that never reflected the
-      # actual per-version changes (#258). On a real tag push a missing/empty section is a hard
-      # error (forces CHANGELOG.md discipline before tagging); workflow_dispatch test runs build an
-      # arbitrary ref that isn't a tagged entry, so they fall back to an explicit placeholder
-      # instead of failing the test build.
+      # actual per-version changes (#258). On a real release (tag push, or workflow_dispatch with a
+      # version input) a missing/empty section is a hard error (forces CHANGELOG.md discipline
+      # before releasing); a bare workflow_dispatch test run builds an arbitrary ref that isn't a
+      # tagged entry, so it falls back to an explicit placeholder instead of failing the test build.
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}")"
+          if [ "${{ github.ref_type }}" = "tag" ] || [ -n "${{ inputs.version }}" ]; then
+            body="$(node scripts/extract-changelog-section.mjs "${{ steps.tag.outputs.tag }}")"
           else
-            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}" --allow-missing)"
+            body="$(node scripts/extract-changelog-section.mjs "${{ steps.tag.outputs.tag }}" --allow-missing)"
           fi
           {
             echo "body<<CHANGELOG_EOF"
@@ -114,7 +145,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
+          tagName: ${{ steps.tag.outputs.tag }}
           releaseName: "SlideCraft v__VERSION__"
           releaseBody: |
             ${{ steps.changelog.outputs.body }}
@@ -185,7 +216,7 @@ jobs:
         # Pattern-filtered so a re-run for the same tag doesn't fold a leftover SHA256SUMS/SBOM
         # asset from a prior attempt back into the new checksum file.
         run: |
-          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --dir dist \
+          gh release download "${{ needs.release.outputs.tag }}" --repo "${{ github.repository }}" --dir dist \
             -p '*.dmg' -p '*.msi' -p '*.exe' -p '*.AppImage' -p '*.deb' -p '*.rpm'
 
       - name: Generate SHA256SUMS
@@ -196,6 +227,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" \
+          gh release upload "${{ needs.release.outputs.tag }}" \
             dist/SHA256SUMS sbom-npm.cdx.json src-tauri/*.cdx.json \
             --repo "${{ github.repository }}" --clobber

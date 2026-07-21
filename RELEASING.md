@@ -16,6 +16,15 @@
 6. **Homebrew cask 更新**: 公開された `.dmg`（arm64）の sha256 を計算し [`scripts/update-cask.mjs`](scripts/update-cask.mjs) で cask を更新。
 7. **publish**: draft を publish。自動更新（軽量通知）が新版を検知できる状態にする。
 
+## タグ push が使えない場合（workflow_dispatch でのリリース）
+
+管制セッション（CCR）等、`git push origin v*`（タグ push）が経路上 403 になる環境向け（[#290](https://github.com/zyuuryuu/slidecraft/issues/290)）。手順 1〜3 は同じ。手順 4 のタグ push の代わりに：
+
+- GitHub の Actions タブ → `Release` workflow → **Run workflow** → `version` に `0.2.0` のように**`v` なし**のバージョンを入力して実行。
+- `release.yml` が `v0.2.0` タグをディスパッチ先の ref（通常 `main` HEAD）に作成し、以降はタグ push 経路と同じ（3-OS draft リリース・`## [0.2.0]` CHANGELOG 節の抽出・SHA256SUMS/SBOM/provenance）。該当 CHANGELOG 節が無ければ **fail**（タグ push と同じ never-silent 規律）。
+- `version` を**空のまま** Run workflow すると従来どおりテストビルド（タグ・CHANGELOG 必須なし、`--allow-missing`）。
+- 手順 5〜7（実機レビュー・cask 更新・publish）は変わらない。
+
 ## 自動更新について
 
 初回リリースでは **完全な署名付き Tauri Updater を導入しない**。理由＝アップデート署名鍵は一度配布すると**回転不可**（既存クライアントが孤立する不可逆判断）。v0.1.0 は GitHub Releases API のポーリングで「新版あり」を**通知するだけ**とし（ROADMAP M12）、mac は `brew upgrade`、Windows/Linux は手動再DL で更新する。完全版 Updater は出荷後に別途 ADR で判断する（ROADMAP バックログ）。
