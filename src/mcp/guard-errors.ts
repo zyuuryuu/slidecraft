@@ -20,7 +20,11 @@ export type GuardCode =
   | "raster-failed" // the browser ran but produced no screenshot (stderr excerpt in message)
   // ADR-0035 stage 1 (scoped fs output) — export_pptx / save_project:
   | "scope-violation" // filename escapes the --root scope (traversal / absolute / symlink / bad ext)
-  | "scope-not-configured"; // a filename was supplied but the server has no --root scope
+  | "scope-not-configured" // a filename/path was supplied but the server has no --root scope
+  // ADR-0035 stage 3 (scoped fs input, #299) — open_project / new_project:
+  | "scope-file-not-found" // path names no file under the --root scope
+  | "ambiguous-input" // both dataBase64/templateBase64 AND path/templatePath were supplied
+  | "missing-input"; // neither dataBase64/templateBase64 NOR path/templatePath was supplied
 
 export class GuardError extends Error {
   // Explicit field (not a `public readonly code` parameter property): parameter properties emit

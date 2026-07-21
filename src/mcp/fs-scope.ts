@@ -1,17 +1,19 @@
 /**
- * fs-scope.ts — ADR-0035 stage 1 (output side): scoped filesystem writes for export_pptx /
- * save_project when the server is started with `--root <dir>`. Confines every write to that ONE
- * directory (resolved to its canonical, symlink-free form once at startup) — no `../` traversal,
- * no absolute-path escape, no writing THROUGH a pre-existing symlink. R2: this is the ONLY module
- * under src/mcp that touches node:fs for deck bytes — src/engine/* stays fs-free.
+ * fs-scope.ts — ADR-0035: scoped filesystem I/O for the MCP tools when the server is started with
+ * `--root <dir>`. Confines every read/write to that ONE directory (resolved to its canonical,
+ * symlink-free form once at startup) — no `../` traversal, no absolute-path escape, no reading/
+ * writing THROUGH a pre-existing symlink. R2: this is the ONLY module under src/mcp that touches
+ * node:fs for deck bytes — src/engine/* stays fs-free.
  *
  * Single chokepoint (ADR-0007 residual): a target filename is NFC-normalized, restricted to a bare
  * basename (no separators → no subdirectory surface to traverse), extension-allowlisted, and opened
  * with O_NOFOLLOW so an existing symlink at the target atomically fails the open (ELOOP) instead of
- * writing through it — no stat-then-write TOCTOU window on POSIX. A pre-emptive lstat check gives a
- * clearer rejection message and backstops platforms where O_NOFOLLOW is a no-op (Windows).
+ * being written through / read through — no stat-then-open TOCTOU window on POSIX. A pre-emptive
+ * lstat check gives a clearer rejection message and backstops platforms where O_NOFOLLOW is a no-op
+ * (Windows). Stage 1 (output, #299/PR #304-305) added the write half; stage 3 (input, #299) below
+ * adds the symmetric read half for open_project/new_project.
  */
-import { closeSync, constants as fsConstants, existsSync, lstatSync, openSync, realpathSync, statSync, writeSync } from "node:fs";
+import { closeSync, constants as fsConstants, existsSync, lstatSync, openSync, readFileSync, realpathSync, statSync, writeSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { GuardError } from "./guard-errors";
@@ -88,6 +90,45 @@ export function writeScopedFile(root: string, filenameRaw: string, ext: string, 
   return { filename, absPath, uri: pathToFileURL(absPath).href };
 }
 
+/** Read a file back from under `root` (already realpath-resolved by resolveScopeRoot) by bare
+ *  `filenameRaw`. Symmetric hardening to writeScopedFile — same bare-name/extension checks, plus a
+ *  read-specific concern: a symlink at the target (pointing anywhere, in- or out-of-scope) is REJECTED
+ *  outright rather than followed, so scope can never be used to read arbitrary files by planting a
+ *  link (`lstat` first — distinguishes "missing" from "symlink" precisely — then O_NOFOLLOW open as
+ *  the atomic POSIX backstop against a TOCTOU swap). Never-silent: "scope-violation" for a bad/escaping
+ *  name, "scope-file-not-found" for a genuinely absent target. */
+export function readScopedFile(root: string, filenameRaw: string, ext: string): Uint8Array {
+  const filename = filenameRaw.normalize("NFC");
+  if (!isBareFilename(filename)) {
+    throw new GuardError(`scope 外のファイル名です（サブディレクトリ・絶対パス・"../" は不可）: ${JSON.stringify(filenameRaw)}`, "scope-violation");
+  }
+  assertScopedExt(filename, ext);
+  const absPath = join(root, filename);
+  let st;
+  try {
+    st = lstatSync(absPath);
+  } catch {
+    throw new GuardError(`scope 内にファイルが見つかりません: ${filename}`, "scope-file-not-found");
+  }
+  if (st.isSymbolicLink()) {
+    throw new GuardError(`symlink 越えは拒否されます（読み取り不可）: ${filename}`, "scope-violation");
+  }
+  let fd: number;
+  try {
+    fd = openSync(absPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ELOOP") throw new GuardError(`symlink 越えは拒否されます（読み取り不可）: ${filename}`, "scope-violation");
+    if (code === "ENOENT") throw new GuardError(`scope 内にファイルが見つかりません: ${filename}`, "scope-file-not-found");
+    throw e;
+  }
+  try {
+    return new Uint8Array(readFileSync(fd));
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function sanitizeStem(input: string): string {
   const cleaned = input
     .normalize("NFKC")
@@ -117,4 +158,24 @@ export function persistScopedOrBase64(s: Session, bytes: Uint8Array, ext: "pptx"
   }
   const name = filename ?? defaultScopedFilename(deckTitle(s.deck) ?? s.meta.templateName, ext);
   return { path: writeScopedFile(s.root, name, ext, bytes).uri };
+}
+
+/** open_project / new_project's acquire step (ADR-0035 stage 3, #299) — symmetric to
+ *  persistScopedOrBase64. `dataBase64` and `path` are MUTUALLY EXCLUSIVE (never-silent
+ *  "ambiguous-input" if both, "missing-input" if neither) — there is no default precedence to
+ *  silently pick between them. `path` (a bare filename under the scope) is only valid when the
+ *  server has a `--root` scope configured; base64 stays valid unconditionally (the byte-identical
+ *  default). Called BEFORE a Session exists — takes the server's scope root directly, not `s.root`. */
+export function acquireScopedOrBase64(root: string | null, dataBase64: string | undefined, path: string | undefined, ext: "pptx" | "scft"): Uint8Array {
+  if (dataBase64 !== undefined && path !== undefined) {
+    throw new GuardError("dataBase64 と path は同時に指定できません（どちらか一方）。", "ambiguous-input");
+  }
+  if (path !== undefined) {
+    if (!root) throw new GuardError("path は --root（scope）起動時のみ指定できます（scope 未設定では dataBase64 のみ）。", "scope-not-configured");
+    return readScopedFile(root, path, ext);
+  }
+  if (dataBase64 === undefined) {
+    throw new GuardError("dataBase64 または path のいずれかが必要です。", "missing-input");
+  }
+  return new Uint8Array(Buffer.from(dataBase64, "base64"));
 }

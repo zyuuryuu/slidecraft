@@ -26,9 +26,12 @@ At startup it discovers whether the desktop GUI is already hosting a live collab
 
 Either way there is **one control plane** (deck authority + undo history); you don't pick the mode —
 rendezvous is decided once, at startup. By default (`--no-fs`) bytes cross as base64, no filesystem
-touched. If the server was started with `--root <dir>` (ADR-0035), `export_pptx`/`save_project` instead
-write under that scoped directory and return a `{path}` reference — pass an optional `filename` or let
-one be auto-generated; see [`docs/mcp-server.md`](docs/mcp-server.md) for details.
+touched. If the server was started with `--root <dir>` (ADR-0035), both directions can use that scoped
+directory instead of base64: `export_pptx`/`save_project` write under it and return a `{path}`
+reference (pass an optional `filename` or let one be auto-generated), and `open_project`/`new_project`
+can read a file already placed there via `path`/`templatePath` (a bare filename, not the `path` you got
+back — see [`docs/mcp-server.md`](docs/mcp-server.md) for the write→read round-trip). base64 and a
+scoped path/filename are mutually exclusive on every call — passing both is a never-silent error.
 
 ## Core contracts (read once)
 
@@ -56,7 +59,9 @@ one be auto-generated; see [`docs/mcp-server.md`](docs/mcp-server.md) for detail
      call. In a collab host this lists the GUI's registered templates; solo (no GUI attached) it
      returns built-in presets (`builtin:true`, e.g. `midnight`) and mints via the same
      `create_template` harness — no bytes needed either way.
-   - `new_project(templateBase64, markdown?)` — you already have `.pptx` bytes.
+   - `new_project(templateBase64, markdown?)` — you already have `.pptx` bytes. If the server has a
+     `--root` scope, `new_project(templatePath, markdown?)` reads the template file from that
+     directory instead (and `open_project(path)` likewise for an existing `.slidecraft`) — no base64.
 2. **Read the contract**: `get_authoring_guide()` — this template's resolved layout names, the Markdown
    rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code, `<!-- note -->`
    speaker notes), body budget, and pointers. This is your single entry point; read it before authoring.

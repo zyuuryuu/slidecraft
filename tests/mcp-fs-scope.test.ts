@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, symlinkSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveScopeRoot, writeScopedFile, defaultScopedFilename } from "../src/mcp/fs-scope";
+import { resolveScopeRoot, writeScopedFile, readScopedFile, acquireScopedOrBase64, defaultScopedFilename } from "../src/mcp/fs-scope";
 import { GuardError } from "../src/mcp/guard-errors";
 
 let dir: string;
@@ -115,6 +115,116 @@ describe("writeScopedFile — never-silent rejections (ADR-0035 invariants)", ()
       expect(() => writeScopedFile(dir, "link-dir/x.pptx", "pptx", bytes)).toThrow(GuardError);
     } finally {
       rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("readScopedFile — happy path (ADR-0035 stage 3, #299)", () => {
+  it("reads back bytes written by writeScopedFile — write→read round-trip", () => {
+    const bytes = new Uint8Array([0x50, 0x4b, 3, 4, 9, 9]);
+    writeScopedFile(dir, "deck.pptx", "pptx", bytes);
+    expect(readScopedFile(dir, "deck.pptx", "pptx")).toEqual(bytes);
+  });
+
+  it("NFC-normalizes the filename the same way writeScopedFile does", () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const composed = "デッキ.pptx"; // デッキ.pptx, already NFC
+    writeScopedFile(dir, composed, "pptx", bytes);
+    const decomposed = composed.normalize("NFD");
+    expect(readScopedFile(dir, decomposed, "pptx")).toEqual(bytes);
+  });
+});
+
+describe("readScopedFile — never-silent rejections (ADR-0035 invariants)", () => {
+  it("rejects a missing file with code scope-file-not-found (not scope-violation)", () => {
+    expect(() => readScopedFile(dir, "nope.pptx", "pptx")).toThrow(GuardError);
+    try {
+      readScopedFile(dir, "nope.pptx", "pptx");
+    } catch (e) {
+      expect((e as GuardError).code).toBe("scope-file-not-found");
+    }
+  });
+
+  it("rejects ../ traversal, a nested path, an absolute path, and a bad extension — same as write", () => {
+    writeFileSync(join(dir, "real.pptx"), "x"); // exists, but every path below is malformed anyway
+    expect(() => readScopedFile(dir, "../real.pptx", "pptx")).toThrow(GuardError);
+    expect(() => readScopedFile(dir, "sub/real.pptx", "pptx")).toThrow(GuardError);
+    expect(() => readScopedFile(dir, "/etc/passwd", "pptx")).toThrow(GuardError);
+    expect(() => readScopedFile(dir, "real.txt", "pptx")).toThrow(GuardError);
+  });
+
+  it("rejects reading THROUGH a symlink that points outside the scope — no information leak", () => {
+    const outside = mkdtempSync(join(tmpdir(), "slidecraft-fs-scope-outside-"));
+    try {
+      const secretPath = join(outside, "secret.pptx");
+      writeFileSync(secretPath, "top-secret-bytes-outside-scope");
+      symlinkSync(secretPath, join(dir, "innocuous.pptx"));
+      let caught: unknown;
+      try {
+        readScopedFile(dir, "innocuous.pptx", "pptx");
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(GuardError);
+      expect((caught as GuardError).code).toBe("scope-violation");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects reading through a symlink even when it points INSIDE the scope", () => {
+    writeFileSync(join(dir, "real.pptx"), "real-bytes");
+    symlinkSync(join(dir, "real.pptx"), join(dir, "alias.pptx"));
+    expect(() => readScopedFile(dir, "alias.pptx", "pptx")).toThrow(GuardError);
+  });
+});
+
+describe("acquireScopedOrBase64 — the open_project/new_project acquire step", () => {
+  const b64 = (s: string) => Buffer.from(s).toString("base64");
+
+  it("no scope (root:null): base64 works, path is scope-not-configured", () => {
+    expect(acquireScopedOrBase64(null, b64("hello"), undefined, "pptx")).toEqual(new TextEncoder().encode("hello"));
+    expect(() => acquireScopedOrBase64(null, undefined, "deck.pptx", "pptx")).toThrow(GuardError);
+    try {
+      acquireScopedOrBase64(null, undefined, "deck.pptx", "pptx");
+    } catch (e) {
+      expect((e as GuardError).code).toBe("scope-not-configured");
+    }
+  });
+
+  it("scope configured: path reads the real scoped file", () => {
+    writeScopedFile(dir, "deck.pptx", "pptx", new Uint8Array([7, 7, 7]));
+    expect(acquireScopedOrBase64(dir, undefined, "deck.pptx", "pptx")).toEqual(new Uint8Array([7, 7, 7]));
+  });
+
+  it("scope configured: base64 still works (not scope-only)", () => {
+    expect(acquireScopedOrBase64(dir, b64("hi"), undefined, "pptx")).toEqual(new TextEncoder().encode("hi"));
+  });
+
+  it("both dataBase64 and path given — ambiguous-input, never a silent pick", () => {
+    expect(() => acquireScopedOrBase64(dir, b64("x"), "deck.pptx", "pptx")).toThrow(GuardError);
+    try {
+      acquireScopedOrBase64(dir, b64("x"), "deck.pptx", "pptx");
+    } catch (e) {
+      expect((e as GuardError).code).toBe("ambiguous-input");
+    }
+  });
+
+  it("neither given — missing-input", () => {
+    expect(() => acquireScopedOrBase64(dir, undefined, undefined, "pptx")).toThrow(GuardError);
+    try {
+      acquireScopedOrBase64(dir, undefined, undefined, "pptx");
+    } catch (e) {
+      expect((e as GuardError).code).toBe("missing-input");
+    }
+  });
+
+  it("path traversal still rejected end-to-end through acquireScopedOrBase64", () => {
+    expect(() => acquireScopedOrBase64(dir, undefined, "../escape.pptx", "pptx")).toThrow(GuardError);
+    try {
+      acquireScopedOrBase64(dir, undefined, "../escape.pptx", "pptx");
+    } catch (e) {
+      expect((e as GuardError).code).toBe("scope-violation");
     }
   });
 });
