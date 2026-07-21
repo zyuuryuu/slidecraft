@@ -9,6 +9,10 @@
 //
 // After running, copy the updated cask into the `zyuuryuu/homebrew-slidecraft` tap (see
 // packaging/homebrew/README.md) and commit.
+//
+// `parseCaskShas` and `caskMatchesSums` are exported so `verify-cask.mjs` (the release-time check
+// that catches the "version bumped, sha256 not" window — Issue #287) reads the cask's sha256 lines
+// the same way this script writes them (R8: one implementation, not two).
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
@@ -18,13 +22,44 @@ const here = dirname(fileURLToPath(import.meta.url));
 const caskPath = join(here, "..", "packaging", "homebrew", "Casks", "slidecraft.rb");
 const REPO = "zyuuryuu/slidecraft";
 
-const [version, armLocal, intelLocal] = process.argv.slice(2);
-if (!version) {
-  console.error("usage: node scripts/update-cask.mjs <version> [arm.dmg] [x64.dmg]");
-  process.exit(1);
+// File order in the cask is arm64 first, intel second (if present) — matches the on_arm/on_intel
+// convention noted in the cask's own comments.
+const CASK_SHA_RE = /sha256 "([0-9a-f]{64})"/g;
+
+/** Extract the sha256 hex strings from a cask file's text, in file order. */
+export function parseCaskShas(caskText) {
+  return [...caskText.matchAll(CASK_SHA_RE)].map((m) => m[1]);
 }
 
-async function sha256(arch, localPath) {
+/** The release asset filename SHA256SUMS uses for a given version + arch. */
+function dmgName(version, arch) {
+  return `SlideCraft_${version}_${arch}.dmg`;
+}
+
+/** Parse `sha256sum`-style output ("<hex>  <filename>" per line, "*" binary marker optional). */
+function parseSums(sumsText) {
+  const map = new Map();
+  for (const line of sumsText.split("\n")) {
+    const m = line.match(/^([0-9a-f]{64})\s+\*?(.+?)\s*$/);
+    if (m) map.set(m[2], m[1]);
+  }
+  return map;
+}
+
+/**
+ * True iff every sha256 the cask currently carries for `version` matches the corresponding
+ * SlideCraft dmg entry in `sumsText` (a SHA256SUMS file's contents). Pure — no I/O — so
+ * verify-cask.mjs and this module's unit tests share one "does the cask match?" implementation.
+ */
+export function caskMatchesSums(caskText, sumsText, version) {
+  const shas = parseCaskShas(caskText);
+  if (shas.length < 1 || shas.length > 2) return false;
+  const sums = parseSums(sumsText);
+  const archOrder = shas.length === 2 ? ["aarch64", "x64"] : ["aarch64"];
+  return archOrder.every((arch, i) => sums.get(dmgName(version, arch)) === shas[i]);
+}
+
+async function sha256(version, arch, localPath) {
   let buf;
   if (localPath) {
     if (!existsSync(localPath)) {
@@ -45,49 +80,59 @@ async function sha256(arch, localPath) {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-let cask = readFileSync(caskPath, "utf8");
-
-// Fail-closed guard: the `slidecraft-mcp` binary stanza only works on .dmgs that BUNDLE the wrapper,
-// which first ships in v0.2.0 (ADR-0022). Refuse to emit a cask that pairs that stanza with an older
-// version — otherwise `brew install` would fail on the missing binary target. Blocks the footgun of
-// re-cutting the cask for v0.1.0 while the source template already carries the stanza.
-const MIN_LAUNCHER_VERSION = [0, 2, 0];
-const hasLauncherStanza = /binary\s+["'][^"']*slidecraft-mcp["']/.test(cask);
-const semver = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10));
-// negative if a < b, 0 if equal, positive if a > b (missing components treated as 0)
-const cmpVersion = (a, b) => {
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const d = (a[i] ?? 0) - (b[i] ?? 0);
-    if (d !== 0) return d;
+async function main() {
+  const [version, armLocal, intelLocal] = process.argv.slice(2);
+  if (!version) {
+    console.error("usage: node scripts/update-cask.mjs <version> [arm.dmg] [x64.dmg]");
+    process.exit(1);
   }
-  return 0;
-};
-if (hasLauncherStanza && (semver.some(Number.isNaN) || cmpVersion(semver, MIN_LAUNCHER_VERSION) < 0)) {
-  console.error(
-    `update-cask: refusing to emit a cask with the slidecraft-mcp launcher for version "${version}". ` +
-      `That launcher first ships in v${MIN_LAUNCHER_VERSION.join(".")} (ADR-0022); an older .dmg lacks it and brew install would fail.`,
-  );
-  process.exit(1);
+
+  let cask = readFileSync(caskPath, "utf8");
+
+  // Fail-closed guard: the `slidecraft-mcp` binary stanza only works on .dmgs that BUNDLE the wrapper,
+  // which first ships in v0.2.0 (ADR-0022). Refuse to emit a cask that pairs that stanza with an older
+  // version — otherwise `brew install` would fail on the missing binary target. Blocks the footgun of
+  // re-cutting the cask for v0.1.0 while the source template already carries the stanza.
+  const MIN_LAUNCHER_VERSION = [0, 2, 0];
+  const hasLauncherStanza = /binary\s+["'][^"']*slidecraft-mcp["']/.test(cask);
+  const semver = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10));
+  // negative if a < b, 0 if equal, positive if a > b (missing components treated as 0)
+  const cmpVersion = (a, b) => {
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      const d = (a[i] ?? 0) - (b[i] ?? 0);
+      if (d !== 0) return d;
+    }
+    return 0;
+  };
+  if (hasLauncherStanza && (semver.some(Number.isNaN) || cmpVersion(semver, MIN_LAUNCHER_VERSION) < 0)) {
+    console.error(
+      `update-cask: refusing to emit a cask with the slidecraft-mcp launcher for version "${version}". ` +
+        `That launcher first ships in v${MIN_LAUNCHER_VERSION.join(".")} (ADR-0022); an older .dmg lacks it and brew install would fail.`,
+    );
+    process.exit(1);
+  }
+
+  cask = cask.replace(/version "[^"]*"/, `version "${version}"`);
+
+  // The cask may be arm64-only (1 sha256) or arm+intel (2, order: on_arm then on_intel). Match the
+  // current template so we don't download an Intel .dmg that isn't built.
+  const shaCount = parseCaskShas(cask).length;
+  if (shaCount < 1 || shaCount > 2) {
+    console.error(`update-cask: expected 1 (arm64-only) or 2 (arm+intel) sha256 lines, found ${shaCount}. Check the template.`);
+    process.exit(1);
+  }
+  const armSha = await sha256(version, "aarch64", armLocal);
+  const intelSha = shaCount === 2 ? await sha256(version, "x64", intelLocal) : null;
+
+  // Rewrite each sha256 in file order (arm first, intel second if present).
+  let seen = 0;
+  cask = cask.replace(/sha256 "[0-9a-f]{64}"( # [^\n]*)?/g, () => `sha256 "${seen++ === 0 ? armSha : intelSha}"`);
+
+  writeFileSync(caskPath, cask);
+  console.log(`Updated ${caskPath}`);
+  console.log(`  version   ${version}`);
+  console.log(`  aarch64   ${armSha}`);
+  console.log(`  x64       ${intelSha}`);
 }
 
-cask = cask.replace(/version "[^"]*"/, `version "${version}"`);
-
-// The cask may be arm64-only (1 sha256) or arm+intel (2, order: on_arm then on_intel). Match the
-// current template so we don't download an Intel .dmg that isn't built.
-const shaCount = (cask.match(/sha256 "[0-9a-f]{64}"/g) ?? []).length;
-if (shaCount < 1 || shaCount > 2) {
-  console.error(`update-cask: expected 1 (arm64-only) or 2 (arm+intel) sha256 lines, found ${shaCount}. Check the template.`);
-  process.exit(1);
-}
-const armSha = await sha256("aarch64", armLocal);
-const intelSha = shaCount === 2 ? await sha256("x64", intelLocal) : null;
-
-// Rewrite each sha256 in file order (arm first, intel second if present).
-let seen = 0;
-cask = cask.replace(/sha256 "[0-9a-f]{64}"( # [^\n]*)?/g, () => `sha256 "${seen++ === 0 ? armSha : intelSha}"`);
-
-writeFileSync(caskPath, cask);
-console.log(`Updated ${caskPath}`);
-console.log(`  version   ${version}`);
-console.log(`  aarch64   ${armSha}`);
-console.log(`  x64       ${intelSha}`);
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();

@@ -199,3 +199,12 @@ jobs:
           gh release upload "${{ github.ref_name }}" \
             dist/SHA256SUMS sbom-npm.cdx.json src-tauri/*.cdx.json \
             --repo "${{ github.repository }}" --clobber
+
+      # Never-silent gate for #287: `npm run version:set` bumps the cask's `version` but not its
+      # `sha256` (that can only be computed once the .dmg exists), leaving a window where the cask
+      # in this repo can point at the WRONG binary if update-cask.mjs was never run/committed for
+      # this tag. Only meaningful on a real tag push — workflow_dispatch test builds aren't tied to
+      # a released cask version. Runs before a human publishes the draft release.
+      - name: Verify Homebrew cask sha256 matches the published dmg
+        if: github.ref_type == 'tag'
+        run: node scripts/verify-cask.mjs "${{ github.ref_name }}" dist/SHA256SUMS
