@@ -65,11 +65,12 @@ npm run build:mcp        # → generates dist/mcp/cli.js (esbuild, Node ESM; nod
 node dist/mcp/cli.js     # waits as an MCP server over stdio (normally the agent launches it)
 ```
 
-::: warning v1 limitation (--no-fs only)
-The current version does not touch the filesystem. The bytes of `.slidecraft` / `.pptx`
+::: warning Default is --no-fs (base64)
+By default the server never touches the filesystem. The bytes of `.slidecraft` / `.pptx`
 are exchanged **as base64 over stdio** (the trust boundary is "the parent agent that launched it" = the OS user).
-A scoped fs (`--root`) limited to the project directory subtree is planned for the next version;
-for now, passing `--root` exits with an error.
+Passing `--root <dir>` enables scoped fs output: `export_pptx` / `save_project` write under `<dir>`
+instead and return a path (output side only for now — see the
+[MCP server spec](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md)).
 :::
 
 ::: details Prerequisites for running from source

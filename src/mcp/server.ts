@@ -28,6 +28,7 @@ import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
 import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
+import { persistScopedOrBase64 } from "./fs-scope";
 
 interface ToolResult {
   content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
@@ -49,7 +50,6 @@ async function run(fn: () => unknown | Promise<unknown>): Promise<ToolResult> {
     return fail(e);
   }
 }
-const b64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64");
 const unb64 = (s: string): Uint8Array => new Uint8Array(Buffer.from(s, "base64"));
 
 /** Attach deterministic next-step hints (MCP layer — references tool names) to any result carrying a
@@ -74,6 +74,10 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // ONE control plane always: an explicit host (collab) or a solo one minted around `session`
   // (stdio and any caller that doesn't bring its own multi-doc registry).
   const host: HostContext = opts.host ?? createSoloHostContext(session);
+  // ADR-0035 stage 1: the fs scope (--root) is a per-SERVER-PROCESS setting, not per-doc — every doc
+  // minted later (open/new/use_template → S.createSession below) must inherit the SAME scope the
+  // process was started with, not silently reset to --no-fs.
+  const scopeRoot = session.root;
   const index = { index: z.number().int().describe("0-based slide index") };
   const doc = { docId: z.string().optional().describe("対象ドキュメント（省略時は選択doc/唯一doc）") };
   // Optional optimistic-concurrency fields (host mode, P2.5): a client-generated opId so the
@@ -131,7 +135,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // it) — additive undo/redo for stdio without a second control plane.
   const openInHost = (tool: string, load: (s: Session) => Promise<unknown>, extra: unknown): Promise<ToolResult> =>
     run(async () => {
-      const s = S.createSession(null);
+      const s = S.createSession(scopeRoot);
       const res = await load(s);
       // Tab name: the template name if known (open_project / use_template), else derive from the deck's
       // first-slide heading (an AI's new_project brings no template name → was always "Untitled"), else fall back.
@@ -243,15 +247,27 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
 
   server.registerTool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues", inputSchema: doc }, (a, extra) => run(() => S.validate(sessionOf(extra, a.docId))));
 
-  // ── persist / export (base64 over stdio) ──
-  server.registerTool("save_project", { description: ".scft を生成し base64 で返す", inputSchema: doc }, (a, extra) => run(async () => ({ dataBase64: b64(await S.saveProjectBytes(sessionOf(extra, a.docId))) })));
+  // ── persist / export (base64 over stdio by default; scoped fs when the server has --root, ADR-0035) ──
   server.registerTool(
-    "export_pptx",
-    { description: ".pptx を native-vector で headless 生成し base64 で返す（変換不能 mermaid は default reject / skip）", inputSchema: { onUnsupportedMermaid: z.enum(["reject", "skip"]).optional(), ...doc } },
+    "save_project",
+    { description: ".scft を生成。既定は base64（{dataBase64}）。サーバが --root（scope）起動時は scope 配下へファイル出力し {path} を返す（filename 省略時は自動命名）", inputSchema: { filename: z.string().optional().describe("scope 配下のファイル名（scope 起動時のみ有効・拡張子 .scft 必須・サブディレクトリ/絶対パス不可）"), ...doc } },
     (a, extra) =>
       run(async () => {
-        const { bytes, skipped } = await S.exportPptxBytes(sessionOf(extra, a.docId), a.onUnsupportedMermaid ?? "reject");
-        return { dataBase64: b64(bytes), skipped };
+        const s = sessionOf(extra, a.docId);
+        return persistScopedOrBase64(s, await S.saveProjectBytes(s), "scft", a.filename);
+      }),
+  );
+  server.registerTool(
+    "export_pptx",
+    {
+      description: ".pptx を native-vector で headless 生成（変換不能 mermaid は default reject / skip）。既定は base64（{dataBase64, skipped}）。サーバが --root（scope）起動時は scope 配下へファイル出力し {path, skipped} を返す（filename 省略時は自動命名）",
+      inputSchema: { onUnsupportedMermaid: z.enum(["reject", "skip"]).optional(), filename: z.string().optional().describe("scope 配下のファイル名（scope 起動時のみ有効・拡張子 .pptx 必須・サブディレクトリ/絶対パス不可）"), ...doc },
+    },
+    (a, extra) =>
+      run(async () => {
+        const s = sessionOf(extra, a.docId);
+        const { bytes, skipped } = await S.exportPptxBytes(s, a.onUnsupportedMermaid ?? "reject");
+        return { ...persistScopedOrBase64(s, bytes, "pptx", a.filename), skipped };
       }),
   );
 

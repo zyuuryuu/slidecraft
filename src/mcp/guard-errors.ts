@@ -17,7 +17,10 @@ export type GuardCode =
   | "browser-not-found" // no system Chrome/Edge and no SLIDECRAFT_BROWSER (→ install / point env)
   | "browser-launch-failed" // the resolved browser binary would not start
   | "raster-timeout" // the browser hung past the deadline (killed)
-  | "raster-failed"; // the browser ran but produced no screenshot (stderr excerpt in message)
+  | "raster-failed" // the browser ran but produced no screenshot (stderr excerpt in message)
+  // ADR-0035 stage 1 (scoped fs output) — export_pptx / save_project:
+  | "scope-violation" // filename escapes the --root scope (traversal / absolute / symlink / bad ext)
+  | "scope-not-configured"; // a filename was supplied but the server has no --root scope
 
 export class GuardError extends Error {
   // Explicit field (not a `public readonly code` parameter property): parameter properties emit

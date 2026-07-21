@@ -25,7 +25,10 @@ At startup it discovers whether the desktop GUI is already hosting a live collab
   server-side `undo` / `redo`. No second config, no second endpoint.
 
 Either way there is **one control plane** (deck authority + undo history); you don't pick the mode —
-rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`--no-fs`, the default).
+rendezvous is decided once, at startup. By default (`--no-fs`) bytes cross as base64, no filesystem
+touched. If the server was started with `--root <dir>` (ADR-0035), `export_pptx`/`save_project` instead
+write under that scoped directory and return a `{path}` reference — pass an optional `filename` or let
+one be auto-generated; see [`docs/mcp-server.md`](docs/mcp-server.md) for details.
 
 ## Core contracts (read once)
 
@@ -85,7 +88,9 @@ rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`-
 7. **Validate + export**: `validate_deck()` (EXPORT gate: schema + unsupported-mermaid scan →
    `exportReadiness`) → `export_pptx(onUnsupportedMermaid?)`. Native-vector only; unconvertible Mermaid
    (gitGraph/sankey/C4) is `reject` (default, precise error) or `skip` (drops that slide + reports it) —
-   **never silently lost**. `save_project()` returns the round-trippable `.slidecraft` bytes.
+   **never silently lost**. `save_project()` returns the round-trippable `.slidecraft` bytes. Both
+   return `{dataBase64}` by default, or `{path}` (a scope-relative `file://` reference — nothing on the
+   wire) when the server has a `--root` scope configured.
 
 ## Rules of thumb
 
