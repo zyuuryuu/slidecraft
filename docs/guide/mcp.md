@@ -64,11 +64,12 @@ npm run build:mcp        # → dist/mcp/cli.js を生成（esbuild, Node ESM。n
 node dist/mcp/cli.js     # stdio で MCP サーバとして待機（通常はエージェントが起動する）
 ```
 
-::: warning v1 の制限（--no-fs のみ）
-現行版はファイルシステムに触れません。`.slidecraft` / `.pptx` のバイト列は
+::: warning 既定は --no-fs（base64）
+既定ではファイルシステムに触れません。`.slidecraft` / `.pptx` のバイト列は
 **base64 で stdio 経由**にやり取りします（信頼境界は「起動した親エージェント」＝OS ユーザー）。
-プロジェクトディレクトリ配下に限定する scoped fs（`--root`）は次バージョン予定で、
-現状 `--root` を渡すとエラー終了します。
+`--root <dir>` を渡すと、`export_pptx` / `save_project` が代わりに `<dir>` 配下へファイルを書き
+パスを返す scoped fs 出力が有効になります（現時点は出力側のみ。詳細は
+[MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md)）。
 :::
 
 ::: details ソースから動かす前提
