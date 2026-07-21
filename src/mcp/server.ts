@@ -28,7 +28,7 @@ import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
 import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
-import { persistScopedOrBase64 } from "./fs-scope";
+import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
 
 interface ToolResult {
   content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
@@ -162,16 +162,16 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     return c ? { ...r, contract: c } : r;
   };
 
-  // ── entry: open / new ──
+  // ── entry: open / new (base64 by default; scoped fs path when the server has --root, ADR-0035) ──
   server.registerTool(
     "open_project",
-    { description: "base64 の .scft を開く（新しいドキュメントとして mint）", inputSchema: { dataBase64: z.string() } },
-    (a, extra) => openInHost("open_project", withContract((s) => S.openProjectBytes(s, unb64(a.dataBase64))), extra),
+    { description: ".scft を開く（新しいドキュメントとして mint）。既定は base64（dataBase64）。--root（scope）起動時は代わりに path（scope 配下のファイル名）で渡せる（両方指定はエラー）", inputSchema: { dataBase64: z.string().optional(), path: z.string().optional().describe("scope 配下のファイル名（.scft・scope 起動時のみ有効・dataBase64 と排他）") } },
+    (a, extra) => openInHost("open_project", withContract((s) => S.openProjectBytes(s, acquireScopedOrBase64(scopeRoot, a.dataBase64, a.path, "scft"))), extra),
   );
   server.registerTool(
     "new_project",
-    { description: "base64 の .pptx テンプレートと（任意の）Markdown から新規作成（新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types。テンプレ base64 が無ければ create_template で生成できる", inputSchema: { templateBase64: z.string(), markdown: z.string().optional() } },
-    (a, extra) => openInHost("new_project", withContract((s) => S.newProject(s, unb64(a.templateBase64), a.markdown)), extra),
+    { description: ".pptx テンプレートと（任意の）Markdown から新規作成（新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types。既定は base64（templateBase64）。--root（scope）起動時は代わりに templatePath（scope 配下のファイル名）で渡せる（両方指定はエラー）。テンプレ bytes が無ければ create_template で生成できる", inputSchema: { templateBase64: z.string().optional(), templatePath: z.string().optional().describe("scope 配下のテンプレファイル名（.pptx・scope 起動時のみ有効・templateBase64 と排他）"), markdown: z.string().optional() } },
+    (a, extra) => openInHost("new_project", withContract((s) => S.newProject(s, acquireScopedOrBase64(scopeRoot, a.templateBase64, a.templatePath, "pptx"), a.markdown)), extra),
   );
 
   // ── reads ──
