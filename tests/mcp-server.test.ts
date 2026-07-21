@@ -198,3 +198,32 @@ describe("mcp server (in-memory client↔server pair)", () => {
     expect(src).not.toMatch(/await\s+fn\(session\)/);
   });
 });
+
+// #298: solo stdio (no GUI ⇒ no register_templates) is the ONLY control plane for a bare `slidecraft
+// serve` registration (e.g. Cursor). Its natural first move is "list → pick → start" — this used to
+// dead-end on `template-registry-unavailable` because `host.templates` is never wired outside collab.
+describe("solo template discovery (#298)", () => {
+  it("list_templates with no GUI registry returns built-in presets instead of erroring", async () => {
+    const client = await connect();
+    const list = (await call(client, "list_templates")).data as { templates: { id: string; name: string; builtin: boolean }[] };
+    expect(list.templates.length).toBeGreaterThan(0);
+    expect(list.templates.every((t) => t.builtin)).toBe(true);
+    expect(list.templates.map((t) => t.id)).toContain("midnight");
+  });
+
+  it("use_template(builtin id) mints a new project solo, via the create_template harness (R8: one generation path)", async () => {
+    const client = await connect();
+    const used = (await call(client, "use_template", { id: "midnight", markdown: "# 表紙\n\n---\n\n# 中身\n\n- x" })).data as { docId: string; slideCount: number };
+    expect(used.docId).toBeTruthy();
+    expect(used.slideCount).toBeGreaterThan(1);
+    const md = (await call(client, "get_slide_markdown", { index: 1 })).data as string;
+    expect(md).toContain("x");
+  });
+
+  it("use_template with an unknown id solo is never-silent (unknown-template), not template-registry-unavailable", async () => {
+    const client = await connect();
+    const r = (await call(client, "use_template", { id: "zzz" })).data as { ok: boolean; code: string };
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("unknown-template");
+  });
+});

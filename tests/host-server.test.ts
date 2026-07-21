@@ -21,7 +21,7 @@ beforeAll(() => {
   templateB64 = tBytes.toString("base64");
 });
 
-function makeHost(sharedOnly = false, templates?: TemplateStore, registry = new DocRegistry()) {
+function makeHost(sharedOnly = false, templates?: TemplateStore, registry = new DocRegistry(), solo = false) {
   let activeDocId: string | undefined;
   const opened: DocEntry[] = [];
   const closed: string[] = [];
@@ -31,6 +31,7 @@ function makeHost(sharedOnly = false, templates?: TemplateStore, registry = new 
     setActive: (_e, id) => { activeDocId = id; },
     sharedOnly,
     templates,
+    solo,
     notifyOpened: (e) => opened.push(e),
     notifyClosed: (id) => closed.push(id),
   };
@@ -167,11 +168,22 @@ describe("buildServer host mode — template selection (S2 増分2)", () => {
   });
 
   it("list_templates without a registry accessor guides to create_template (ok:false, template-registry-unavailable)", async () => {
-    const h = makeHost(false); // no templates store injected (e.g. a host that didn't wire the GUI)
+    const h = makeHost(false); // no templates store injected, NOT solo (e.g. a host that didn't wire the GUI) — #298's builtin fallback must not swallow this
     const client = await connect(h.host);
-    const r = (await call(client, "list_templates")).data as { ok: boolean; code: string };
+    const r = (await call(client, "list_templates")).data as { ok: boolean; code: string; error: string };
     expect(r.ok).toBe(false);
     expect(r.code).toBe("template-registry-unavailable");
+    expect(r.error).toContain("create_template"); // 案2: imperative pivot to the solo-safe tools
+    expect(r.error).toContain("new_project");
+  });
+
+  it("use_template without a registry accessor and NOT solo stays never-silent (ok:false, template-registry-unavailable)", async () => {
+    const h = makeHost(false); // not solo, no templates: the collab-without-registry edge case
+    const client = await connect(h.host);
+    const r = (await call(client, "use_template", { id: "midnight" })).data as { ok: boolean; code: string };
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("template-registry-unavailable");
+    expect(h.opened).toEqual([]); // no doc minted
   });
 
   it("register_templates is GUI-only; an AI client can't see it but CAN list/use what the GUI registered", async () => {
@@ -194,5 +206,26 @@ describe("buildServer host mode — template selection (S2 増分2)", () => {
     const used = (await call(aiClient, "use_template", { id: "m1", markdown: NEW_MD })).data as { docId: string; slideCount: number };
     expect(used.docId).toBeTruthy();
     expect(used.slideCount).toBeGreaterThan(1);
+  });
+
+  it("a solo HostContext (host.solo, no templates store) falls back to built-in presets, same as stdio's createSoloHostContext (#298)", async () => {
+    const h = makeHost(false, undefined, new DocRegistry(), /* solo */ true);
+    const client = await connect(h.host);
+    const list = (await call(client, "list_templates")).data as { templates: { id: string; builtin: boolean }[] };
+    expect(list.templates.length).toBeGreaterThan(0);
+    expect(list.templates.every((t) => t.builtin)).toBe(true);
+    const used = (await call(client, "use_template", { id: "midnight", markdown: NEW_MD })).data as { docId: string; slideCount: number };
+    expect(used.docId).toBeTruthy();
+    expect(used.slideCount).toBeGreaterThan(1);
+    expect(h.opened.map((e) => e.title)).toEqual(["Midnight"]); // tab named after the built-in preset
+  });
+
+  it("a registered GUI store still wins over the built-in fallback even when host.solo is (incorrectly) set — collab truth is never shadowed", async () => {
+    const store = new MemTemplateStore();
+    store.register([{ id: "m1", name: "社内テンプレ", builtin: false, bytes: new Uint8Array(Buffer.from(templateB64, "base64")) }]);
+    const h = makeHost(false, store, new DocRegistry(), true);
+    const client = await connect(h.host);
+    const list = (await call(client, "list_templates")).data as { templates: { id: string }[] };
+    expect(list.templates.map((t) => t.id)).toEqual(["m1"]); // registered store, not the builtin list
   });
 });

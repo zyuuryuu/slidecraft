@@ -306,31 +306,50 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     }),
   );
 
-  // ── template selection (T3/S2 増分2) ── the AI DISCOVERS registered templates (list_templates)
-  // and STARTS a project from one (use_template) without carrying bytes. The master registry lives
-  // in the webview (useMasterRegistry / Tauri fs); the sidecar is Node with no fs plugin, so the GUI
-  // PUSHES it in via register_templates (gui-role only), mirroring how it seeds the deck. Solo stdio
-  // has neither → list/use degrade never-silently to a create_template hint (unless a caller wires
-  // `host.templates` itself, e.g. tests).
+  // ── template selection (T3/S2 増分2, #298) ── the AI DISCOVERS templates (list_templates) and
+  // STARTS a project from one (use_template) without carrying bytes. The master registry lives in
+  // the webview (useMasterRegistry / Tauri fs); the sidecar is Node with no fs plugin, so the GUI
+  // PUSHES it in via register_templates (gui-role only), mirroring how it seeds the deck. `host.solo`
+  // (stdio, no GUI ever attaches) has no registry to push into, so list/use fall back to the
+  // BUILT-IN presets (T.BUILTIN_TEMPLATES) instead of degrading to an error — "list → pick → start"
+  // holds even with nobody on the other end of register_templates. A collab host that genuinely has
+  // no registry wired (host.templates absent AND NOT solo — e.g. a caller that skipped it) keeps the
+  // never-silent create_template hint unchanged.
   const requireTemplates = (): TemplateStore => {
-    if (!host.templates) throw new GuardError("テンプレレジストリが未接続です（create_template で新規作成するか、new_project に bytes を渡してください）", "template-registry-unavailable");
+    if (!host.templates) throw new GuardError("テンプレレジストリが利用できません。create_template でテンプレートを生成するか、new_project に .pptx を渡してください。", "template-registry-unavailable");
     return host.templates;
   };
-  server.registerTool("list_templates", { description: "登録済みテンプレの一覧（GUI の master レジストリ）＝{id,name,builtin}。id を use_template に渡して着手。bytes を持たない/stdio は create_template で生成" }, () => run(() => ({ templates: requireTemplates().list() })));
+  server.registerTool(
+    "list_templates",
+    { description: "テンプレの一覧＝{id,name,builtin}。id を use_template に渡して着手。GUI の master レジストリが接続済みならそれを、単独（GUI 未接続）は組み込みプリセット（builtin:true）を返す。bytes を自分で持っているなら create_template でも生成できる" },
+    () => run(() => ({ templates: host.templates ? host.templates.list() : host.solo ? T.BUILTIN_TEMPLATES : requireTemplates().list() })),
+  );
   server.registerTool(
     "use_template",
-    { description: "登録済みテンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id"), markdown: z.string().optional() } },
+    { description: "テンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id"), markdown: z.string().optional() } },
     (a, extra) =>
       openInHost(
         "use_template",
         withContract(async (s) => {
-          const store = requireTemplates();
-          const bytes = store.getBytes(a.id);
-          if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
-          const res = await S.newProject(s, bytes, a.markdown);
-          const name = store.list().find((t) => t.id === a.id)?.name;
-          if (name) s.meta.templateName = name; // the minted doc's tab is named after the template
-          return res;
+          if (host.templates) {
+            const store = host.templates;
+            const bytes = store.getBytes(a.id);
+            if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
+            const res = await S.newProject(s, bytes, a.markdown);
+            const name = store.list().find((t) => t.id === a.id)?.name;
+            if (name) s.meta.templateName = name; // the minted doc's tab is named after the template
+            return res;
+          }
+          if (host.solo) {
+            const builtin = T.BUILTIN_TEMPLATES.find((t) => t.id === a.id);
+            const bytes = builtin && (await T.createBuiltinTemplate(builtin.id));
+            if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
+            const res = await S.newProject(s, bytes, a.markdown);
+            s.meta.templateName = builtin!.name;
+            return res;
+          }
+          requireTemplates(); // no registry and not solo: always throws template-registry-unavailable
+          throw new Error("unreachable");
         }),
         extra,
       ),
