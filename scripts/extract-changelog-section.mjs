@@ -13,6 +13,21 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HEADING_RE = /^## \[([^\]]+)\][^\n]*$/gm;
+const REPO_BLOB_BASE = "https://github.com/zyuuryuu/slidecraft/blob/main/";
+const MARKDOWN_LINK_RE = /\]\(([^)]+)\)/g;
+
+// GitHub Release bodies have no repo file context, so CHANGELOG.md's relative doc links
+// (e.g. "docs/adr/0033-....md") break there — see extractChangelogSection's header comment
+// (Issue #289). Rewrites only markdown-link targets that are relative repo paths (no
+// scheme, not an in-page "#anchor"); absolute http(s) links (issue/PR references) and
+// anchors pass through untouched. CHANGELOG.md itself keeps relative links, which render
+// correctly on the docs site and in GitHub's own file view.
+export function absolutizeRepoLinks(markdown) {
+  return markdown.replace(MARKDOWN_LINK_RE, (full, target) => {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("#")) return full;
+    return `](${REPO_BLOB_BASE}${target})`;
+  });
+}
 
 // Returns the trimmed section body, "" if the heading exists but the section is empty, or null
 // if no heading matches `version` at all.
@@ -71,7 +86,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(body);
+  console.log(absolutizeRepoLinks(body));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

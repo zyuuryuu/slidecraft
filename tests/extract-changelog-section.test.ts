@@ -8,7 +8,7 @@
  * silently emitting an empty release body.
  */
 import { describe, it, expect } from "vitest";
-import { extractChangelogSection } from "../scripts/extract-changelog-section.mjs";
+import { extractChangelogSection, absolutizeRepoLinks } from "../scripts/extract-changelog-section.mjs";
 
 const CHANGELOG = `# Changelog
 
@@ -70,5 +70,53 @@ describe("extractChangelogSection", () => {
   it("does not confuse [Unreleased] with a version match", () => {
     expect(extractChangelogSection(CHANGELOG, "Unreleased")).toContain("something not yet released");
     expect(extractChangelogSection(CHANGELOG, "0.3.0")).not.toContain("something not yet released");
+  });
+});
+
+describe("absolutizeRepoLinks", () => {
+  it("rewrites a relative docs/ link to an absolute GitHub blob URL", () => {
+    const section =
+      "- **MCP の接続がコマンド1つに**（[ADR-0033](docs/adr/0033-mcp-single-control-plane.md)・#222/#224）";
+    const result = absolutizeRepoLinks(section);
+    expect(result).toContain(
+      "[ADR-0033](https://github.com/zyuuryuu/slidecraft/blob/main/docs/adr/0033-mcp-single-control-plane.md)",
+    );
+  });
+
+  it("leaves absolute http(s) links (issue/PR references) unchanged", () => {
+    const section =
+      "- **目次生成**（[#277](https://github.com/zyuuryuu/slidecraft/issues/277)・PR #280）";
+    expect(absolutizeRepoLinks(section)).toBe(section);
+  });
+
+  it("leaves in-page anchor links unchanged", () => {
+    const section = "See [details](#some-heading) below.";
+    expect(absolutizeRepoLinks(section)).toBe(section);
+  });
+
+  it("rewrites multiple relative links in the same section independently", () => {
+    const section =
+      "[ADR-0025](docs/adr/0025-placeholder-role-resolution.md) and [ADR-0026](docs/adr/0026-ai-remake.md)";
+    const result = absolutizeRepoLinks(section);
+    expect(result).toContain(
+      "[ADR-0025](https://github.com/zyuuryuu/slidecraft/blob/main/docs/adr/0025-placeholder-role-resolution.md)",
+    );
+    expect(result).toContain(
+      "[ADR-0026](https://github.com/zyuuryuu/slidecraft/blob/main/docs/adr/0026-ai-remake.md)",
+    );
+  });
+
+  it("rewrites a bare root-relative link like RELEASING.md", () => {
+    const section = "See [RELEASING.md](RELEASING.md) for the process.";
+    expect(absolutizeRepoLinks(section)).toBe(
+      "See [RELEASING.md](https://github.com/zyuuryuu/slidecraft/blob/main/RELEASING.md) for the process.",
+    );
+  });
+
+  it("does not modify CHANGELOG.md content itself, only the returned copy", () => {
+    const original = "[ADR-0021](docs/adr/0021-auto-update-strategy.md)";
+    const before = original;
+    absolutizeRepoLinks(original);
+    expect(original).toBe(before);
   });
 });
