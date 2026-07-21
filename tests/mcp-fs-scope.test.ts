@@ -1,10 +1,13 @@
 // fs-scope.ts — ADR-0035 stage 1 (output-side scoped fs). Guards the invariants: writes stay
 // confined to the scope root (never-silent on traversal/absolute/symlink escape), and the happy
-// path produces a real, readable file + a stable file:// reference.
+// path produces a real, readable file + an ABSOLUTE file:// reference (not a bare
+// `file:///<filename>`, which RFC 8089/`new URL()` parse as the absolute path "/<filename>" — a
+// standards-conformant client would look at the fs root instead of the scope root, #299 follow-up).
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveScopeRoot, writeScopedFile, defaultScopedFilename } from "../src/mcp/fs-scope";
 import { GuardError } from "../src/mcp/guard-errors";
 
@@ -33,12 +36,17 @@ describe("resolveScopeRoot", () => {
 });
 
 describe("writeScopedFile — happy path", () => {
-  it("writes bytes under root and returns a file:// reference relative to it", () => {
+  it("writes bytes under root and returns an ABSOLUTE file:// URI that resolves to the real file", () => {
     const bytes = new Uint8Array([0x50, 0x4b, 3, 4]); // PK.. zip magic
     const res = writeScopedFile(dir, "deck.pptx", "pptx", bytes);
-    expect(res.uri).toBe("file:///deck.pptx");
-    expect(res.absPath).toBe(join(dir, "deck.pptx"));
-    expect(readFileSync(res.absPath)).toEqual(Buffer.from(bytes));
+    const absPath = join(dir, "deck.pptx");
+    expect(res.absPath).toBe(absPath);
+    expect(res.uri).toBe(`file://${absPath}`);
+    // Standards-conformant resolution (new URL().pathname / fileURLToPath) must land on the SAME
+    // file that was actually written — not a bare-root misread of "/deck.pptx".
+    expect(new URL(res.uri).pathname).toBe(absPath);
+    expect(fileURLToPath(res.uri)).toBe(absPath);
+    expect(readFileSync(fileURLToPath(res.uri))).toEqual(Buffer.from(bytes));
   });
 
   it("auto-generated filenames (defaultScopedFilename) are themselves valid scoped filenames", () => {

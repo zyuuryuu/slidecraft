@@ -5,7 +5,8 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { readFileSync, mkdtempSync, rmSync, existsSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { loadTemplate } from "../src/engine/template-loader";
@@ -82,37 +83,42 @@ describe("no --root (default): base64 is unchanged (non-regression)", () => {
 });
 
 describe("--root <dir> configured: scoped-fs reference output", () => {
-  it("save_project writes a real .scft under the scope and returns {path}, no dataBase64", async () => {
+  it("save_project writes a real .scft under the scope and returns an ABSOLUTE {path}, no dataBase64", async () => {
     const dir = scratchDir();
     const client = await connect(dir);
     await call(client, "open_project", { dataBase64: bundleB64 });
     const res = (await call(client, "save_project", { filename: "out.scft" })).data as { path?: string; dataBase64?: string };
     expect(res.dataBase64).toBeUndefined();
-    expect(res.path).toBe("file:///out.scft");
+    expect(res.path).toBe(`file://${join(dir, "out.scft")}`);
+    // Standards-conformant resolution must land on the SAME file that was actually written — not a
+    // bare-root misread of "/out.scft" (RFC 8089 / new URL() parses file:///out.scft that way).
+    expect(fileURLToPath(res.path!)).toBe(join(dir, "out.scft"));
     expect(existsSync(join(dir, "out.scft"))).toBe(true);
     expect(readFileSync(join(dir, "out.scft")).subarray(0, 2)).toEqual(Buffer.from([0x50, 0x4b]));
   });
 
-  it("export_pptx writes a real .pptx under the scope and returns {path, skipped}", async () => {
+  it("export_pptx writes a real .pptx under the scope and returns an ABSOLUTE {path, skipped}", async () => {
     const dir = scratchDir();
     const client = await connect(dir);
     await call(client, "open_project", { dataBase64: bundleB64 });
     const res = (await call(client, "export_pptx", { filename: "deck.pptx" })).data as { path?: string; dataBase64?: string; skipped: number[] };
     expect(res.dataBase64).toBeUndefined();
-    expect(res.path).toBe("file:///deck.pptx");
+    expect(res.path).toBe(`file://${join(dir, "deck.pptx")}`);
+    expect(fileURLToPath(res.path!)).toBe(join(dir, "deck.pptx"));
     expect(res.skipped).toEqual([]);
     const onDisk = readFileSync(join(dir, "deck.pptx"));
     expect(onDisk.subarray(0, 2)).toEqual(Buffer.from([0x50, 0x4b])); // real, wellformed PK zip on disk
   });
 
-  it("omitting filename auto-generates one inside the scope", async () => {
+  it("omitting filename auto-generates one inside the scope, at an absolute path", async () => {
     const dir = scratchDir();
     const client = await connect(dir);
     await call(client, "open_project", { dataBase64: bundleB64 });
     const res = (await call(client, "export_pptx")).data as { path: string };
-    expect(res.path).toMatch(/^file:\/\/\/[^/]+\.pptx$/);
-    const name = res.path.replace("file:///", "");
-    expect(existsSync(join(dir, name))).toBe(true);
+    const resolved = fileURLToPath(res.path);
+    expect(dirname(resolved)).toBe(dir); // lands inside the scope, not at the fs root
+    expect(resolved).toMatch(/\.pptx$/);
+    expect(existsSync(resolved)).toBe(true);
   });
 
   it("a doc minted AFTER connect (new_project) still inherits the server's scope", async () => {
@@ -121,7 +127,7 @@ describe("--root <dir> configured: scoped-fs reference output", () => {
     const tBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
     await call(client, "new_project", { templateBase64: tBytes.toString("base64"), markdown: "# A" });
     const res = (await call(client, "export_pptx", { filename: "fresh.pptx" })).data as { path: string };
-    expect(res.path).toBe("file:///fresh.pptx");
+    expect(res.path).toBe(`file://${join(dir, "fresh.pptx")}`);
     expect(existsSync(join(dir, "fresh.pptx"))).toBe(true);
   });
 

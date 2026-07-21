@@ -13,6 +13,7 @@
  */
 import { closeSync, constants as fsConstants, existsSync, lstatSync, openSync, realpathSync, statSync, writeSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { GuardError } from "./guard-errors";
 import { deckTitle } from "../engine/md-serializer";
 import type { Session } from "./session";
@@ -50,8 +51,11 @@ function assertScopedExt(filename: string, ext: string): void {
 export interface ScopedWrite {
   filename: string;
   absPath: string;
-  /** A reference relative to the scope root, formatted as a file:// URI (ADR-0035: the JSON-RPC
-   *  reply carries a REFERENCE, not bytes — the caller resolves it against the same --root it knows). */
+  /** The ABSOLUTE file:// URI for `absPath` (`pathToFileURL(absPath).href` — never a bare
+   *  `file:///${filename}`, which RFC 8089 parses as the absolute path "/${filename}" and misleads
+   *  any standards-conformant client, e.g. `new URL(uri).pathname`, into looking at the fs root
+   *  instead of the scope root. `root` came from the caller's OWN `--root`, so echoing its absolute
+   *  form back is not a leak (ADR-0035 follow-up, #299). */
   uri: string;
 }
 
@@ -81,7 +85,7 @@ export function writeScopedFile(root: string, filenameRaw: string, ext: string, 
   } finally {
     closeSync(fd);
   }
-  return { filename, absPath, uri: `file:///${filename}` };
+  return { filename, absPath, uri: pathToFileURL(absPath).href };
 }
 
 function sanitizeStem(input: string): string {
