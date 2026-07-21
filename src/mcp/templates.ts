@@ -41,3 +41,24 @@ export function getTemplateSpecGuide() {
   // global default that every gap-filled createTemplate() falls back to.
   return { guide: templateSpecSystemPrompt(), presets: { midnight: { ...MIDNIGHT_PALETTE } } };
 }
+
+/** #298: the SOLO (no GUI, no `register_templates`) fallback for `list_templates`/`use_template` —
+ *  so a bare stdio AI's natural first move ("list → pick → start") closes instead of hitting
+ *  `template-registry-unavailable`. Built-in ids mirror the presets `get_template_spec_guide`
+ *  already documents (today: MIDNIGHT). Minting reuses `createTemplate` (R8: one generation path,
+ *  never a second one for the solo case). */
+export interface BuiltinTemplateInfo {
+  id: string;
+  name: string;
+  builtin: true;
+}
+export const BUILTIN_TEMPLATES: BuiltinTemplateInfo[] = [{ id: "midnight", name: "Midnight", builtin: true }];
+
+/** The built-in template's PPTX bytes (or undefined for an unknown id), built through the exact same
+ *  contrast-guard + MIDNIGHT-fallback harness as an explicit `create_template` call. */
+export async function createBuiltinTemplate(id: string): Promise<Uint8Array | undefined> {
+  if (!BUILTIN_TEMPLATES.some((t) => t.id === id)) return undefined;
+  const created = await createTemplate(); // no spec → MIDNIGHT preset (never "rejected" with the default 30 layouts)
+  if (!created.ok) throw new Error(created.error);
+  return new Uint8Array(Buffer.from(created.templateBase64, "base64"));
+}

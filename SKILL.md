@@ -44,12 +44,16 @@ rendezvous is decided once, at startup. Bytes cross as base64; no filesystem (`-
 ## The authoring loop
 
 1. **Acquire a template** (one of):
-   - `new_project(templateBase64, markdown?)` — you bring `.pptx` bytes.
-   - `create_template(spec?)` — no bytes: `spec` is a **JSON string** (not an object), e.g. `spec: '{}'`
-     for the MIDNIGHT preset, or a partial TemplateSpec string with name + 2 fonts + a 9-colour palette;
-     the harness contrast-guards + writes the PPTX. Then `new_project(templateBase64)`. Format via
+   - **Solo (no GUI) → start from `create_template`**: `create_template(spec?)` — no bytes needed:
+     `spec` is a **JSON string** (not an object), e.g. `spec: '{}'` for the MIDNIGHT preset, or a
+     partial TemplateSpec string with name + 2 fonts + a 9-colour palette; the harness
+     contrast-guards + writes the PPTX. Then `new_project(templateBase64)`. Format via
      `get_template_spec_guide`.
-   - **(collab host)** `list_templates` → `use_template(id, markdown?)` — start from a registered template.
+   - `list_templates` → `use_template(id, markdown?)` — discover a template, then start from it in one
+     call. In a collab host this lists the GUI's registered templates; solo (no GUI attached) it
+     returns built-in presets (`builtin:true`, e.g. `midnight`) and mints via the same
+     `create_template` harness — no bytes needed either way.
+   - `new_project(templateBase64, markdown?)` — you already have `.pptx` bytes.
 2. **Read the contract**: `get_authoring_guide()` — this template's resolved layout names, the Markdown
    rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code, `<!-- note -->`
    speaker notes), body budget, and pointers. This is your single entry point; read it before authoring.
