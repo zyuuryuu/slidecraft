@@ -76,6 +76,16 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test
+      # Real-Chrome rasterization smoke for get_slide_image (#109) lives HERE, in the NON-REQUIRED
+      # e2e job, not in the required `test` job: its 30s browser-render deadline is nondeterministic
+      # under CI load and would randomly redden every PR's required check (#281). Opt-in env unlocks
+      # the `describe.skipIf(!REAL_BROWSER)` blocks (they skip in `test`); retry:2 absorbs the rare
+      # timeout here. `!cancelled()` so a Playwright failure above doesn't hide this signal.
+      - name: Real-browser rasterization smoke (non-required, #281)
+        if: ${{ !cancelled() }}
+        env:
+          SLIDECRAFT_E2E_BROWSER: "1"
+        run: npx vitest run tests/mcp-slide-image.test.ts
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
