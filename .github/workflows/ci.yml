@@ -112,3 +112,28 @@ jobs:
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Real-Chrome rasterization smoke (get_slide_image #109) — NON-REQUIRED, skipped on docs-only ──
+  # These vitest blocks spawn a real browser and demand it paint within 30s; under CI-runner load
+  # that render is nondeterministic and would randomly redden the REQUIRED `test` job (#281). So they
+  # skip there (guarded by `describe.skipIf(!REAL_BROWSER)`) and run HERE instead, in a dedicated
+  # non-required job with its OWN time budget — deliberately NOT bolted onto `e2e`, whose Playwright
+  # suite already runs near its timeout ceiling. Opt-in env unlocks the blocks; retry:2 absorbs the
+  # rare transient timeout so this job stays a signal, not noise. ubuntu-latest ships
+  # /usr/bin/google-chrome, which findBrowser() discovers.
+  browser-smoke:
+    needs: [test, changes]
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Real-browser rasterization smoke (#281)
+        env:
+          SLIDECRAFT_E2E_BROWSER: "1"
+        run: npx vitest run tests/mcp-slide-image.test.ts

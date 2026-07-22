@@ -34,6 +34,15 @@ const TEST_BROWSER = findBrowser()?.path ?? (existsSync(PW_CHROMIUM) ? PW_CHROMI
 // tests as root, so opt out THERE only (never silently baked into the defaults).
 const AS_ROOT = typeof process.getuid === "function" && process.getuid() === 0;
 
+// #281: the REAL-Chrome rasterization blocks spawn a browser and demand it paint within 30s. Under
+// CI-runner load that render can miss the deadline (GuardError raster-timeout) and randomly redden
+// the REQUIRED `test` job — a nondeterministic gate on every PR. So keep them OFF the required job:
+// they run locally (dev boxes), and in CI only inside the NON-REQUIRED e2e job, opt-in via
+// SLIDECRAFT_E2E_BROWSER. The discovery / SSR-page / never-silent assertions below carry no browser
+// and stay MANDATORY. GitHub Actions sets CI=true + GITHUB_ACTIONS=true.
+const IS_CI = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+const REAL_BROWSER = !!TEST_BROWSER && (!IS_CI || process.env.SLIDECRAFT_E2E_BROWSER === "1");
+
 const savedEnv: Record<string, string | undefined> = {};
 function setEnv(k: string, v: string | undefined): void {
   if (!(k in savedEnv)) savedEnv[k] = process.env[k];
@@ -150,8 +159,8 @@ describe("single-slide page (shared rendering, JS-free)", () => {
   });
 });
 
-describe.skipIf(!TEST_BROWSER)("real headless rasterization", () => {
-  it("returns the slide as a real 1280×720 PNG with visible ink (CJK deck)", async () => {
+describe.skipIf(!REAL_BROWSER)("real headless rasterization", () => {
+  it("returns the slide as a real 1280×720 PNG with visible ink (CJK deck)", { timeout: 60_000, retry: 2 }, async () => {
     browserEnv();
     const s = await loadedSession();
     const img = await rasterizeSlide(s, 0);
@@ -164,9 +173,11 @@ describe.skipIf(!TEST_BROWSER)("real headless rasterization", () => {
     // guesswork: the cover's title/subtitle/decorations paint tens of thousands of pixels; a
     // text-less flat render stays near zero.
     expect(inkPixels(bytes)).toBeGreaterThan(10_000);
-  }, 60_000);
+    // retry: real-Chrome render can transiently miss its deadline under load (#281); a re-spawn
+    // clears it. Only reached in the non-required e2e job / locally, never the required `test`.
+  });
 
-  it("the network is DEAD during rasterization: a live local listener sees zero connections", async () => {
+  it("the network is DEAD during rasterization: a live local listener sees zero connections", { timeout: 60_000, retry: 2 }, async () => {
     browserEnv();
     const hits: string[] = [];
     const listener: Server = createServer((sock) => {
@@ -187,7 +198,7 @@ describe.skipIf(!TEST_BROWSER)("real headless rasterization", () => {
     } finally {
       await new Promise<void>((res) => listener.close(() => res()));
     }
-  }, 60_000);
+  });
 });
 
 describe("never-silent browser absence", () => {
@@ -199,8 +210,8 @@ describe("never-silent browser absence", () => {
   });
 });
 
-describe.skipIf(!TEST_BROWSER)("MCP tool get_slide_image (end to end over the protocol)", () => {
-  it("returns image content; guards surface as modeled errors", async () => {
+describe.skipIf(!REAL_BROWSER)("MCP tool get_slide_image (end to end over the protocol)", () => {
+  it("returns image content; guards surface as modeled errors", { timeout: 90_000, retry: 2 }, async () => {
     browserEnv();
     const server = buildServer(createSession(null));
     const [clientT, serverT] = InMemoryTransport.createLinkedPair();
@@ -228,5 +239,5 @@ describe.skipIf(!TEST_BROWSER)("MCP tool get_slide_image (end to end over the pr
     const parsed = JSON.parse(bad.content[0]!.text!) as { ok: boolean; code: string };
     expect(parsed.ok).toBe(false);
     expect(parsed.code).toBe("index-out-of-range");
-  }, 90_000);
+  });
 });
