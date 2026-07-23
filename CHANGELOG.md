@@ -7,6 +7,33 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-23
+
+早期版（0.x）のパッチ。**MCP の大きなデータをファイルで授受**（`--root`）、**単独モードでの組み込みテンプレ利用**、表紙まわりの描画修正、Windows での `npm install` 失敗の修正、依存の脆弱性更新が中心。
+
+### Added
+
+- **MCP のバルクデータをファイルシステム経由で授受（`slidecraft serve --root <dir>`）**（[ADR-0035](docs/adr/0035-mcp-bulk-data-exchange.md)・#299・PR #304/#306）— テンプレ `.pptx` や生成物のような大きな入出力を base64 で往復させず、`--root` で明示的に許可したディレクトリ配下の**ファイルパス**で受け渡せる。入力・出力とも `--root` 配下にスコープし、外へのアクセスは never-silent に拒否。
+- **単独（solo）モードでも組み込みテンプレートを列挙・利用できる**（[#298](https://github.com/zyuuryuu/slidecraft/issues/298)・PR #300）— GUI 非稼働の単独 MCP でも `list_templates` / `use_template` が組み込みプリセットにフォールバックする。
+
+### Fixed
+
+- **章名フッタが表紙スライドの本文枠へ誤注入される不具合**（[#292](https://github.com/zyuuryuu/slidecraft/issues/292)）— 組み込みレイアウトの idx-12 body 枠に章名フッタが入り込むのを防止。
+- **組み込みレイアウトの idx 10/11/12 に明示ロールを付与し、`idx`-META 規約の誤爆を根治**（PR #296）— テンプレ由来でない枠が meta 扱いされる問題を解消。
+- **MCP のファイル出力を絶対 `file://` URI で返す**（scoped-fs 出力・PR #305）— bare-root ではなく絶対パスにし、呼び出し側が確実に開ける。
+- **MCP 登録手順を stdio コマンド正面に**（`CollabPanel`・PR #302）— 起動ごとに port/token が変わる HTTP 直結を上級者向けの折りたたみへ降格し、既定を stdio 1 本に。
+- **Windows で `npm install` が code 1 で失敗する不具合**（[#272](https://github.com/zyuuryuu/slidecraft/issues/272)・PR #318）— POSIX シェル前提の `prepare` スクリプトを OS 非依存の Node スクリプトへ置換。
+- **リリースノート生成の堅牢化** — CHANGELOG の相対リンクをリリース本文用に絶対 URL 化（[#289](https://github.com/zyuuryuu/slidecraft/issues/289)・PR #308）、CHANGELOG 節欠落時の never-silent fail が Windows ランナーだけ効かない問題を根本修正（[#316](https://github.com/zyuuryuu/slidecraft/issues/316)・PR #319）。
+
+### Security
+
+- **fast-uri を 3.1.4 に更新**（PR #314）— host confusion（GHSA-4c8g-83qw-93j6 / GHSA-v2hh-gcrm-f6hx, high）。`@modelcontextprotocol/sdk → ajv` 経由の推移的依存。
+- **dompurify を 3.4.12 に更新**（PR #313）— `CUSTOM_ELEMENT_HANDLING` バイパス（GHSA-c2j3-45gr-mqc4, moderate）。HTML 書き出しのサニタイズに同梱。
+
+### Changed
+
+- **実ブラウザ・ラスタライズの CI テストを必須 `test` ジョブから外し、非必須の `browser-smoke` ジョブへ分離**（[#281](https://github.com/zyuuryuu/slidecraft/issues/281)・PR #312）— Chrome 描画の非決定タイムアウトが必須ゲートをランダムに落とすのを解消（利用者影響なし・開発/CI の安定化）。
+
 ## [0.4.0] - 2026-07-20
 
 早期版（0.x）。**AI 協働（MCP）の視覚レビューと単一エンドポイント化**、**既存コンテンツからの便利スライド生成**、**Mermaid 図の大幅拡張**、**CJK フォント埋め込み**、**リリース成果物の完全性シグナル**が目玉のマイナー版。（**v0.3.0 は公開を取り止め、その存続機能も本版に含む** — AI 非決定 Re-make は下記のとおり撤去済み。）

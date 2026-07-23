@@ -4,4 +4,4 @@
  * package.json / tauri.conf.json / Cargo.toml (RELEASING.md's single-source rule); drift is caught
  * by tests/version-sync.test.ts.
  */
-export const APP_VERSION = "0.4.0";
+export const APP_VERSION = "0.4.1";
