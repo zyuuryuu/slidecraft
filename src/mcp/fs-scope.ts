@@ -13,7 +13,7 @@
  * (Windows). Stage 1 (output, #299/PR #304-305) added the write half; stage 3 (input, #299) below
  * adds the symmetric read half for open_project/new_project.
  */
-import { closeSync, constants as fsConstants, existsSync, lstatSync, openSync, readFileSync, realpathSync, statSync, writeSync } from "node:fs";
+import { closeSync, constants as fsConstants, existsSync, lstatSync, openSync, readdirSync, readFileSync, realpathSync, statSync, writeSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { GuardError } from "./guard-errors";
@@ -103,7 +103,15 @@ export function readScopedFile(root: string, filenameRaw: string, ext: string): 
     throw new GuardError(`scope 外のファイル名です（サブディレクトリ・絶対パス・"../" は不可）: ${JSON.stringify(filenameRaw)}`, "scope-violation");
   }
   assertScopedExt(filename, ext);
-  const absPath = join(root, filename);
+  return readNoFollow(join(root, filename), filename);
+}
+
+/** The read core shared by readScopedFile and readScopedTemplate (R8: one no-follow read path, not
+ *  two). `absPath` is already scope-joined and `filename` already bare/extension-validated by the
+ *  caller. A symlink at the target (in- or out-of-scope) is REJECTED rather than followed — lstat
+ *  first for a precise "missing vs symlink" message, then O_NOFOLLOW open as the atomic POSIX
+ *  backstop against a TOCTOU swap. Never-silent: "scope-violation" / "scope-file-not-found". */
+function readNoFollow(absPath: string, filename: string): Uint8Array {
   let st;
   try {
     st = lstatSync(absPath);
@@ -127,6 +135,55 @@ export function readScopedFile(root: string, filenameRaw: string, ext: string): 
   } finally {
     closeSync(fd);
   }
+}
+
+/** The FIXED sub-directory under `--root` that holds AI-discoverable templates (#324 / proposal #1):
+ *  `list_templates` reflects `<root>/templates/*.{pptx,potx}` so a GUI-less stdio client (Cursor,
+ *  Claude Code CLI) can pick its OWN templates without the GUI's register_templates. A LITERAL name,
+ *  never caller-controlled, so it adds no traversal surface — only the filenames WITHIN it are user
+ *  input, and those stay bare-name + extension-allowlisted + O_NOFOLLOW like every other scoped read. */
+export const SCOPED_TEMPLATES_SUBDIR = "templates";
+/** Templates carry .pptx OR .potx (both are the same OOXML package; .potx is the PowerPoint template
+ *  content-type). Decks written back to the scope are .pptx/.scft directly under `<root>`, so the
+ *  dedicated sub-directory keeps an exported deck from masquerading as a template. */
+const TEMPLATE_EXTS = ["pptx", "potx"] as const;
+
+function hasTemplateExt(filename: string): boolean {
+  return TEMPLATE_EXTS.some((ext) => filename.toLowerCase().endsWith(`.${ext}`));
+}
+
+/** Discover bare `*.pptx` / `*.potx` filenames under `<root>/templates/`. Symlinks (Dirent.isFile()
+ *  is false for a link), sub-directories, and non-allowlisted extensions are skipped; the read half
+ *  (readScopedTemplate) re-rejects a symlink via O_NOFOLLOW even if one slips the listing. A missing
+ *  `templates/` directory is a legitimate EMPTY (returns []), never an error. Sorted for a stable
+ *  list_templates order. */
+export function listScopedTemplates(root: string): string[] {
+  let entries;
+  try {
+    entries = readdirSync(join(root, SCOPED_TEMPLATES_SUBDIR), { withFileTypes: true });
+  } catch {
+    return []; // no templates/ sub-directory → nothing to discover
+  }
+  return entries
+    .filter((e) => e.isFile()) // excludes sub-directories AND symlinks (a link's Dirent.isFile() is false)
+    .map((e) => e.name.normalize("NFC"))
+    .filter((name) => isBareFilename(name) && hasTemplateExt(name))
+    .sort();
+}
+
+/** Read a discovered template's bytes from `<root>/templates/<filename>`. Symmetric hardening to
+ *  readScopedFile (bare name, symlink rejected, O_NOFOLLOW) but with the .pptx/.potx allowlist and the
+ *  templates/ sub-directory. Never-silent: "scope-violation" for a bad/escaping name or a symlink,
+ *  "scope-file-not-found" for an absent target. */
+export function readScopedTemplate(root: string, filenameRaw: string): Uint8Array {
+  const filename = filenameRaw.normalize("NFC");
+  if (!isBareFilename(filename)) {
+    throw new GuardError(`scope 外のテンプレート名です（サブディレクトリ・絶対パス・"../" は不可）: ${JSON.stringify(filenameRaw)}`, "scope-violation");
+  }
+  if (!hasTemplateExt(filename)) {
+    throw new GuardError(`テンプレートの拡張子が不正です（.pptx / .potx のいずれか）: ${filename}`, "scope-violation");
+  }
+  return readNoFollow(join(root, SCOPED_TEMPLATES_SUBDIR, filename), filename);
 }
 
 function sanitizeStem(input: string): string {

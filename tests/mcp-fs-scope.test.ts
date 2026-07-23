@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, symlinkSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveScopeRoot, writeScopedFile, readScopedFile, acquireScopedOrBase64, defaultScopedFilename } from "../src/mcp/fs-scope";
+import { resolveScopeRoot, writeScopedFile, readScopedFile, readScopedTemplate, listScopedTemplates, SCOPED_TEMPLATES_SUBDIR, acquireScopedOrBase64, defaultScopedFilename } from "../src/mcp/fs-scope";
 import { GuardError } from "../src/mcp/guard-errors";
 
 let dir: string;
@@ -176,6 +176,107 @@ describe("readScopedFile — never-silent rejections (ADR-0035 invariants)", () 
     writeFileSync(join(dir, "real.pptx"), "real-bytes");
     symlinkSync(join(dir, "real.pptx"), join(dir, "alias.pptx"));
     expect(() => readScopedFile(dir, "alias.pptx", "pptx")).toThrow(GuardError);
+  });
+});
+
+// #324 / proposal #1: <root>/templates/*.{pptx,potx} discovery for a GUI-less stdio client. The read
+// half reuses the exact no-follow hardening as readScopedFile; the list half never follows a symlink.
+describe("listScopedTemplates — <root>/templates/ discovery", () => {
+  function templatesDir(): string {
+    const d = join(dir, SCOPED_TEMPLATES_SUBDIR);
+    mkdirSync(d);
+    return d;
+  }
+
+  it("returns bare *.pptx / *.potx names, sorted, and ignores other extensions", () => {
+    const t = templatesDir();
+    writeFileSync(join(t, "b-report.potx"), "x");
+    writeFileSync(join(t, "a-report.pptx"), "x");
+    writeFileSync(join(t, "notes.txt"), "x"); // non-template ext ignored
+    writeFileSync(join(t, "deck.scft"), "x"); // .scft is a deck, not a template — ignored
+    expect(listScopedTemplates(dir)).toEqual(["a-report.pptx", "b-report.potx"]);
+  });
+
+  it("returns [] when there is no templates/ sub-directory (a legitimate empty, never a throw)", () => {
+    expect(listScopedTemplates(dir)).toEqual([]);
+  });
+
+  it("skips sub-directories inside templates/", () => {
+    const t = templatesDir();
+    mkdirSync(join(t, "nested.pptx")); // a directory that merely looks like a template
+    writeFileSync(join(t, "real.pptx"), "x");
+    expect(listScopedTemplates(dir)).toEqual(["real.pptx"]);
+  });
+
+  it("never lists a symlink (even one pointing at a real template)", () => {
+    const t = templatesDir();
+    const outside = mkdtempSync(join(tmpdir(), "slidecraft-fs-scope-outside-"));
+    try {
+      writeFileSync(join(outside, "secret.pptx"), "x");
+      symlinkSync(join(outside, "secret.pptx"), join(t, "linked.pptx"));
+      writeFileSync(join(t, "real.pptx"), "x");
+      expect(listScopedTemplates(dir)).toEqual(["real.pptx"]);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("readScopedTemplate — reads under templates/ with the same hardening as readScopedFile", () => {
+  function templatesDir(): string {
+    const d = join(dir, SCOPED_TEMPLATES_SUBDIR);
+    mkdirSync(d);
+    return d;
+  }
+
+  it("reads a .pptx and a .potx placed under templates/", () => {
+    const t = templatesDir();
+    writeFileSync(join(t, "a.pptx"), Buffer.from([1, 2, 3]));
+    writeFileSync(join(t, "b.potx"), Buffer.from([4, 5, 6]));
+    expect(readScopedTemplate(dir, "a.pptx")).toEqual(new Uint8Array([1, 2, 3]));
+    expect(readScopedTemplate(dir, "b.potx")).toEqual(new Uint8Array([4, 5, 6]));
+  });
+
+  it("rejects a missing template with scope-file-not-found", () => {
+    templatesDir();
+    try {
+      readScopedTemplate(dir, "nope.pptx");
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(GuardError);
+      expect((e as GuardError).code).toBe("scope-file-not-found");
+    }
+  });
+
+  it("rejects ../ traversal, an absolute path, and a wrong extension (scope-violation)", () => {
+    templatesDir();
+    for (const bad of ["../deck.pptx", "sub/deck.pptx", "/etc/passwd", "deck.txt", "deck.scft"]) {
+      try {
+        readScopedTemplate(dir, bad);
+        throw new Error(`should have rejected ${bad}`);
+      } catch (e) {
+        expect(e).toBeInstanceOf(GuardError);
+        expect((e as GuardError).code).toBe("scope-violation");
+      }
+    }
+  });
+
+  it("never reads THROUGH a symlink under templates/ — no information leak (scope-violation)", () => {
+    const t = templatesDir();
+    const outside = mkdtempSync(join(tmpdir(), "slidecraft-fs-scope-outside-"));
+    try {
+      writeFileSync(join(outside, "secret.pptx"), "top-secret-outside-scope");
+      symlinkSync(join(outside, "secret.pptx"), join(t, "innocuous.pptx"));
+      try {
+        readScopedTemplate(dir, "innocuous.pptx");
+        throw new Error("should have rejected the symlink");
+      } catch (e) {
+        expect(e).toBeInstanceOf(GuardError);
+        expect((e as GuardError).code).toBe("scope-violation");
+      }
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 });
 
