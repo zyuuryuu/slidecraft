@@ -118,13 +118,24 @@ jobs:
       # version input) a missing/empty section is a hard error (forces CHANGELOG.md discipline
       # before releasing); a bare workflow_dispatch test run builds an arbitrary ref that isn't a
       # tagged entry, so it falls back to an explicit placeholder instead of failing the test build.
+      #
+      # The empty-body check below is a deliberate belt-and-suspenders re-check of extract-changelog-
+      # section.mjs's own exit code: a #290 test dispatch caught windows-latest's `bash` completing
+      # this step as "success" with an empty $body when the script's Node process should have exited
+      # 1 for a missing section (macOS/Ubuntu correctly failed on the identical script + input).
+      # Re-validating the actual content — not trusting the subprocess exit status — fails never-
+      # silently regardless of that OS-specific exit-code-propagation quirk.
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash
         run: |
           set -euo pipefail
           if [ "${{ github.ref_type }}" = "tag" ] || [ -n "${{ inputs.version }}" ]; then
-            body="$(node scripts/extract-changelog-section.mjs "${{ steps.tag.outputs.tag }}")"
+            body="$(node scripts/extract-changelog-section.mjs "${{ steps.tag.outputs.tag }}" || true)"
+            if [ -z "$body" ]; then
+              echo "::error::No CHANGELOG.md section found for ${{ steps.tag.outputs.tag }} (or extraction failed) — see RELEASING.md." >&2
+              exit 1
+            fi
           else
             body="$(node scripts/extract-changelog-section.mjs "${{ steps.tag.outputs.tag }}" --allow-missing)"
           fi
