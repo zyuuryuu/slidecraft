@@ -8,6 +8,12 @@
 // (exit 1) unless --allow-missing is passed, in which case a warning goes to stderr and a
 // placeholder body is printed instead — used only for workflow_dispatch test runs, which build
 // an arbitrary ref that isn't necessarily a tagged CHANGELOG.md entry.
+//
+// Failures set `process.exitCode` and return instead of calling `process.exit()`: on Windows Git
+// Bash (the release matrix's windows-latest runner), `process.exit()` fired right after a stderr
+// write can terminate before the async pipe flush completes, dropping BOTH the error message and
+// the non-zero code — so the never-silent guard silently passed and a draft shipped with an empty
+// releaseBody (Issue #316). Setting exitCode + returning lets Node drain stdio and exit naturally.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,7 +59,8 @@ async function main() {
   const allowMissing = flags.includes("--allow-missing");
   if (!rawRef) {
     console.error("usage: node scripts/extract-changelog-section.mjs <ref-or-version> [--allow-missing]");
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const version = rawRef.replace(/^v/, "");
 
@@ -72,7 +79,8 @@ async function main() {
     }
     console.error(message);
     console.error(`Add a "## [${version}] - YYYY-MM-DD" section to CHANGELOG.md before tagging (see RELEASING.md).`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (body === "") {
@@ -83,7 +91,8 @@ async function main() {
       return;
     }
     console.error(message);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   console.log(absolutizeRepoLinks(body));
