@@ -332,17 +332,17 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // no registry wired (host.templates absent AND NOT solo — e.g. a caller that skipped it) keeps the
   // never-silent create_template hint unchanged.
   const requireTemplates = (): TemplateStore => {
-    if (!host.templates) throw new GuardError("テンプレレジストリが利用できません。create_template でテンプレートを生成するか、new_project に .pptx を渡してください。", "template-registry-unavailable");
+    if (!host.templates) throw T.templateRegistryUnavailable();
     return host.templates;
   };
   server.registerTool(
     "list_templates",
-    { description: "テンプレの一覧＝{id,name,builtin}。id を use_template に渡して着手。GUI の master レジストリが接続済みならそれを、単独（GUI 未接続）は組み込みプリセット（builtin:true）を返す。bytes を自分で持っているなら create_template でも生成できる" },
-    () => run(() => ({ templates: host.templates ? host.templates.list() : host.solo ? T.BUILTIN_TEMPLATES : requireTemplates().list() })),
+    { description: "テンプレの一覧＝{id,name,builtin}。id を use_template に渡して着手。GUI の master レジストリが接続済みならそれを、単独（GUI 未接続）は組み込みプリセット（builtin:true）を返す。--root 起動時は <root>/templates/ 配下の .pptx/.potx（builtin:false・id は file: 始まり）も一覧に含む。bytes を自分で持っているなら create_template でも生成できる" },
+    () => run(() => T.listTemplates(host.templates, !!host.solo, scopeRoot)),
   );
   server.registerTool(
     "use_template",
-    { description: "テンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id"), markdown: z.string().optional() } },
+    { description: "テンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。builtin id は create_template と同じハーネスで生成、file: 始まりの id は --root 配下 templates/ のファイルから起票。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id（builtin または file: 始まり）"), markdown: z.string().optional() } },
     (a, extra) =>
       openInHost(
         "use_template",
@@ -357,11 +357,10 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
             return res;
           }
           if (host.solo) {
-            const builtin = T.BUILTIN_TEMPLATES.find((t) => t.id === a.id);
-            const bytes = builtin && (await T.createBuiltinTemplate(builtin.id));
-            if (!bytes) throw new GuardError(`テンプレが見つかりません: ${a.id}（list_templates で id を確認）`, "unknown-template");
+            // Built-in preset OR a `file:` id naming a template under <root>/templates/ (#324).
+            const { bytes, name } = await T.resolveSoloTemplate(a.id, scopeRoot);
             const res = await S.newProject(s, bytes, a.markdown);
-            s.meta.templateName = builtin!.name;
+            s.meta.templateName = name;
             return res;
           }
           requireTemplates(); // no registry and not solo: always throws template-registry-unavailable
