@@ -96,8 +96,8 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 入口 | `new_project(templateBase64?, templatePath?, markdown?)` | `.pptx` テンプレ＋（任意）Markdown から新規（GUI の Draft と同じ parseMd→distill）。既定は base64。`--root` scope 起動時は `templatePath` でも渡せる（両方指定はエラー）。`{slideCount, diagnostics, contract}` |
 | 調達 | `create_template(spec?)` | `spec` は `TemplateSpec` の **JSON 文字列**（オブジェクト不可・例 `spec: '{}'`。name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し `{templateBase64, health, notices}`。欠落は MIDNIGHT preset 補完＋コントラスト自動修正。返り値を `new_project` に渡す |
 | 調達 | `get_template_spec_guide()` | `create_template` 用 spec の書式ガイド＋MIDNIGHT preset 値 |
-| 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`、既定 `midnight`）を返す（#298）。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#324）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
-| 調達 | `use_template(id, markdown?)` | テンプレ（`list_templates` の id）から**新規プロジェクトを mint**（bytes 不要・GUI の Draft と同じ整形）。単独の組み込み id は `create_template` と同じハーネスで生成（R8）、**`file:` 始まりの id は `--root` 配下 `templates/` のファイルから起票**（#324）。未知 id は never-silent `{ok:false, code:"unknown-template"}`、`file:` で scope 未設定は `scope-not-configured`・不在は `scope-file-not-found`。既存 doc のテンプレ入替ではない |
+| 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`、既定 `midnight`）を返す（#298）。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#332）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
+| 調達 | `use_template(id, markdown?)` | テンプレ（`list_templates` の id）から**新規プロジェクトを mint**（bytes 不要・GUI の Draft と同じ整形）。単独の組み込み id は `create_template` と同じハーネスで生成（R8）、**`file:` 始まりの id は `--root` 配下 `templates/` のファイルから起票**（#332）。未知 id は never-silent `{ok:false, code:"unknown-template"}`、`file:` で scope 未設定は `scope-not-configured`・不在は `scope-file-not-found`。既存 doc のテンプレ入替ではない |
 | 契約 | `get_authoring_guide()` | **著作の入口**：このテンプレのレイアウト名に解決した Markdown 書式・`<!-- col/kpi/step -->`・表/コード・`<!-- note -->` スピーカーノート・本文 budget・`activeReviewRules:[{id,level}]`（`get_deck_issues` と同一レジストリ由来のレビュー規則一覧・#244）＋図/spec ガイドへのポインタ |
 | 契約 | `get_diagram_types()` | 図の種類メニュー（authorable な12種＝type/label/hint） |
 | 契約 | `get_diagram_guide(type)` | 選んだ図タイプの構文＋JSON例（`` ```diagram `` に書く DiagramSpec。他は `` ```mermaid `` で） |
@@ -267,7 +267,7 @@ save_project({filename: "deck.scft"})       → {path: "file:///path/to/scope/de
 open_project({path: "deck.scft"})           → {slideCount, diagnostics, contract, docId}
 ```
 
-### scope テンプレ discovery（`--root/templates/`・#324）
+### scope テンプレ discovery（`--root/templates/`・#332）
 
 GUI 非依存の stdio クライアント（Cursor・Claude Code CLI 単体）は `register_templates`（GUI 専用）の投入元が
 無いため、`list_templates`/`use_template` が組み込みプリセットにしか届かず、**自分の `.potx` テンプレが実質
@@ -333,10 +333,10 @@ use_template({id:"file:tech-report.potx"})    → {slideCount, diagnostics, cont
 ## v1 の制限（今後の拡張）
 
 - scoped fs（`--root`）は入出力とも実装済み（ADR-0035 段階1＝出力・PR #304/#305、段階3＝入力・#306）。
-  `--root/templates/` の template discovery（#324・ADR-0036）も実装済み。MCP `roots`（クライアント
+  `--root/templates/` の template discovery（#332・ADR-0036）も実装済み。MCP `roots`（クライアント
   advertise・`--root` の代替 scope 源）は follow-up。loopback binary 配信（②）は **不採用**（ADR-0035 addendum）。
 - `register_templates` の AI ロール公開（GUI マスターレジストリを AI からも編集）は **不採用/優先度低**：
-  `--root/templates/` discovery（#324）で「自分のテンプレを AI に選ばせる」体験は GUI 一貫性を崩さず得られる。
+  `--root/templates/` discovery（#332）で「自分のテンプレを AI に選ばせる」体験は GUI 一貫性を崩さず得られる。
 - `generate_from_plan`（DeckPlan からの新規生成）は **作らない方針**（監査結論）。DeckPlan は
   エージェントが既に書ける内容で、Markdown にして `new_project` に渡せば同じ整形パス
   （parseMd→distillDeck）を通り、しかも `autoSelectLayout` で**任意テンプレに解決される**。

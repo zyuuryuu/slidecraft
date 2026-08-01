@@ -66,7 +66,7 @@ export async function createBuiltinTemplate(id: string): Promise<Uint8Array | un
   return new Uint8Array(Buffer.from(created.templateBase64, "base64"));
 }
 
-// ── #324 / proposal #1: scope-directory template discovery ── a GUI-less stdio client (Cursor, Claude
+// ── #332 / proposal #1: scope-directory template discovery ── a GUI-less stdio client (Cursor, Claude
 // Code CLI) has no register_templates push, so list_templates/use_template used to see ONLY the
 // built-ins. When the server runs with `--root`, `<root>/templates/*.{pptx,potx}` is reflected into the
 // registry too, so "list → pick → start" reaches the user's OWN templates without a GUI. The GUI's

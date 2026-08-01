@@ -357,7 +357,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
             return res;
           }
           if (host.solo) {
-            // Built-in preset OR a `file:` id naming a template under <root>/templates/ (#324).
+            // Built-in preset OR a `file:` id naming a template under <root>/templates/ (#332).
             const { bytes, name } = await T.resolveSoloTemplate(a.id, scopeRoot);
             const res = await S.newProject(s, bytes, a.markdown);
             s.meta.templateName = name;
