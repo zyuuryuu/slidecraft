@@ -87,13 +87,24 @@ jobs:
       # error (forces CHANGELOG.md discipline before tagging); workflow_dispatch test runs build an
       # arbitrary ref that isn't a tagged entry, so they fall back to an explicit placeholder
       # instead of failing the test build.
+      #
+      # The empty-body check below is a deliberate belt-and-suspenders re-check of extract-changelog-
+      # section.mjs's own exit code: #316 caught windows-latest's `bash` completing this step as
+      # "success" with an empty $body on a missing section, while macOS/Ubuntu correctly failed on
+      # the identical script + input (an OS-specific exit-code-propagation quirk, likely Node's
+      # process.exit() racing an async stdio flush on Windows). Re-validating the actual content —
+      # not trusting the subprocess exit status — fails never-silently regardless of that quirk.
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash
         run: |
           set -euo pipefail
           if [ "${{ github.ref_type }}" = "tag" ]; then
-            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}")"
+            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}" || true)"
+            if [ -z "$body" ]; then
+              echo "::error::No CHANGELOG.md section found for ${{ github.ref_name }} (or extraction failed) — see RELEASING.md." >&2
+              exit 1
+            fi
           else
             body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}" --allow-missing)"
           fi
