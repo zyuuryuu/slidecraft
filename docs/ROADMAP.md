@@ -5,11 +5,10 @@
 CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [shipped.md](shipped.md)、決定は
 [docs/adr/](adr/)、設計仕様は [docs/design/](design/)。
 
-**現在地（2026-07-20）**：**v0.4.0 リリース済み**（3-OS installer＋SHA256SUMS/SBOM/provenance・Homebrew
-cask/tap 更新・署名なし）。目玉＝MCP 視覚レビュー（`get_slide_image`/`get_slide_html`）・接続の単一化
-（adaptive front・ADR-0033）・便利スライド生成（目次 live/static・ADR-0034）・Mermaid 図の大幅拡張
-（矢印/generics/ノード形状/シーケンス注釈）・CJK フォント埋め込み・リリース完全性シグナル。v0.3.0（公開取消）の
-存続機能を畳み、AI 非決定 Re-make は撤去（ADR-0028）。詳細は [shipped.md](shipped.md) / [CHANGELOG](../CHANGELOG.md)。
+**現在地（2026-08-01）**：**v0.4.1 リリース済み**（2026-07-23 publish・cask sha 更新済み）。目玉＝MCP の
+ファイル授受 `serve --root`（ADR-0035）・単独モードの組み込みテンプレ fallback（#298）・リリース工程の
+never-silent 堅牢化（#316 ほか）・実ブラウザ CI の非必須 `browser-smoke` 分離（#281）。v0.4.0（2026-07-20）
+の内容と合わせ、詳細は [shipped.md](shipped.md) / [CHANGELOG](../CHANGELOG.md)。
 
 ---
 
