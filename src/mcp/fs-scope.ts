@@ -137,7 +137,7 @@ function readNoFollow(absPath: string, filename: string): Uint8Array {
   }
 }
 
-/** The FIXED sub-directory under `--root` that holds AI-discoverable templates (#324 / proposal #1):
+/** The FIXED sub-directory under `--root` that holds AI-discoverable templates (#332 / proposal #1):
  *  `list_templates` reflects `<root>/templates/*.{pptx,potx}` so a GUI-less stdio client (Cursor,
  *  Claude Code CLI) can pick its OWN templates without the GUI's register_templates. A LITERAL name,
  *  never caller-controlled, so it adds no traversal surface — only the filenames WITHIN it are user

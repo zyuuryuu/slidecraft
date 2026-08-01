@@ -10,7 +10,7 @@
 `register_templates` が host プロセスへ投入する設計になっている。stdio 単体接続（Cursor・Claude Code CLI）には
 この投入元となる GUI が存在しないため、`list_templates` は**組み込みプリセット（現状 `midnight` の1件）しか
 返せない**。#298 でこれを `template-registry-unavailable` エラーから builtin フォールバックに直したが、
-**ユーザー自身の `.potx` テンプレには依然到達できない**（実機フィードバック #324・Cursor 単体接続）。
+**ユーザー自身の `.potx` テンプレには依然到達できない**（実機フィードバック #332・Cursor 単体接続）。
 
 `register_templates` の非公開（AI ロールに隠す）は、GUI マスターレジストリの一貫性・競合更新防止のための
 **意図的な設計判断**であり、覆すべきではない。一方 [ADR-0035](0035-mcp-bulk-data-exchange.md) の `--root <dir>`
@@ -67,4 +67,4 @@ scope は、`new_project(templatePath)` で **レジストリを経由せず** s
   `src/mcp/server.ts`（`list_templates`／`use_template` wiring）
 - テスト：`tests/mcp-fs-scope.test.ts`（discovery/read ハードニング）・`tests/mcp-scoped-templates.test.ts`
   （MCP 経由の list/use 統合）
-- 契機：#324（実機フィードバック・Cursor 単体でテンプレ不可視）
+- 契機：#332（実機フィードバック・Cursor 単体でテンプレ不可視）
