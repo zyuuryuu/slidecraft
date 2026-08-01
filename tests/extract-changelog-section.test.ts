@@ -8,7 +8,11 @@
  * silently emitting an empty release body.
  */
 import { describe, it, expect } from "vitest";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { extractChangelogSection, absolutizeRepoLinks } from "../scripts/extract-changelog-section.mjs";
+
+const SCRIPT = fileURLToPath(new URL("../scripts/extract-changelog-section.mjs", import.meta.url));
 
 const CHANGELOG = `# Changelog
 
@@ -70,6 +74,31 @@ describe("extractChangelogSection", () => {
   it("does not confuse [Unreleased] with a version match", () => {
     expect(extractChangelogSection(CHANGELOG, "Unreleased")).toContain("something not yet released");
     expect(extractChangelogSection(CHANGELOG, "0.3.0")).not.toContain("something not yet released");
+  });
+});
+
+// The CLI wrapper is what release.yml actually calls. #316: on windows-latest the missing-section
+// guard silently passed — `process.exit(1)` raced the stderr flush, so neither the message nor the
+// non-zero code survived, and a draft shipped with an empty releaseBody. These lock the contract
+// that BOTH the code and the message are delivered (the script now uses process.exitCode + return).
+describe("extract-changelog-section CLI (never-silent contract — #316)", () => {
+  it("a missing section fails LOUD: exit code 1 AND a stderr message", () => {
+    const r = spawnSync("node", [SCRIPT, "99.99.99"], { encoding: "utf8" });
+    expect(r.status).toBe(1); // the non-zero code survived (lost on Windows before the fix)
+    expect(r.stderr).toContain('no "## [99.99.99]" section found'); // ...and so did the guidance
+    expect(r.stdout.trim()).toBe(""); // nothing emitted as a release body
+  });
+
+  it("--allow-missing degrades to a placeholder body: exit 0, placeholder on stdout", () => {
+    const r = spawnSync("node", [SCRIPT, "99.99.99", "--allow-missing"], { encoding: "utf8" });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("No CHANGELOG.md section found");
+  });
+
+  it("prints usage and fails when no ref is given", () => {
+    const r = spawnSync("node", [SCRIPT], { encoding: "utf8" });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("usage:");
   });
 });
 

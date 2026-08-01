@@ -15,7 +15,11 @@
 
    > **タグ push は push 権のある環境（メンテナの手元）で行う。** リリースの起点は `v*` タグ push（`release.yml` の `on: push: tags`）。Claude Code の管制セッション（GitHub App 連携）は **`refs/tags/*` の push も `workflow_dispatch` の起動も 403**（App に該当 write 権が無い）なので、**タグ push は人間が実行**する。将来 workflow_dispatch を実リリース経路に昇格する案（#290 (b)）は、セッションから叩けない以上メリットが薄く見送り。App に `actions: write` を付与できるようになったら再検討。
 5. **成果物レビュー（実機）**: draft の installer を Windows / macOS 実機で起動確認（M9）。macOS は ad-hoc 署名 `.dmg` が `killed:9` せず開くこと・keychain 往復・モデル自動DL を確認。
-6. **Homebrew cask 更新**: 公開された `.dmg`（arm64）の sha256 を計算し [`scripts/update-cask.mjs`](scripts/update-cask.mjs) で cask を更新。
+6. **Homebrew cask 更新**: cask（[`packaging/homebrew/Casks/slidecraft.rb`](packaging/homebrew/Casks/slidecraft.rb)）の `sha256` を新しい arm64 `.dmg` の値へ更新する。sha256 の取得は3通り:
+   - **`SHA256SUMS` アセットの `…_aarch64.dmg` 行の値をそのまま使う**（最も簡単・`checksums` ジョブが生成した正典。GitHub の Assets 一覧に出る各資産の `sha256:` も同値）。手で `sha256 "…"` を差し替えるだけ。
+   - `node scripts/update-cask.mjs <version> <path-to-aarch64.dmg>` に **draft から落とした .dmg のローカルパス**を渡す（**publish 前でも**計算できる）。
+   - `node scripts/update-cask.mjs <version>`（引数無し）は**公開 URL から自動 DL**するので **publish 後**のみ有効（draft のうちは 404）。
+   > 引数無しを publish 前に叩くと 404 になる。draft の .dmg のバイト列は publish 後と同一なので、上の 1・2 で先に確定してよい。更新後は tap リポ `zyuuryuu/homebrew-slidecraft` にも反映（[#288](https://github.com/zyuuryuu/slidecraft/issues/288) で自動化予定）。
 7. **publish**: draft を publish。自動更新（軽量通知）が新版を検知できる状態にする。
 
 ## 自動更新について
