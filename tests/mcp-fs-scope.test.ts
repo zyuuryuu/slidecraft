@@ -179,7 +179,7 @@ describe("readScopedFile — never-silent rejections (ADR-0035 invariants)", () 
   });
 });
 
-// #324 / proposal #1: <root>/templates/*.{pptx,potx} discovery for a GUI-less stdio client. The read
+// #332 / proposal #1: <root>/templates/*.{pptx,potx} discovery for a GUI-less stdio client. The read
 // half reuses the exact no-follow hardening as readScopedFile; the list half never follows a symlink.
 describe("listScopedTemplates — <root>/templates/ discovery", () => {
   function templatesDir(): string {
