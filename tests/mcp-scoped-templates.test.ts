@@ -1,4 +1,4 @@
-// mcp-scoped-templates.test.ts — #324 / proposal #1+#2: when the server runs with `--root`,
+// mcp-scoped-templates.test.ts — #332 / proposal #1+#2: when the server runs with `--root`,
 // list_templates reflects <root>/templates/*.{pptx,potx} (id "file:<name>") on top of the built-in
 // presets, and use_template("file:...") mints a project from that file — so a GUI-less stdio client
 // (Cursor, Claude Code CLI) can pick its OWN templates without the GUI's register_templates. Drives
@@ -54,7 +54,7 @@ afterEach(() => {
 type ListRow = { id: string; name: string; builtin: boolean; path?: string };
 type ListResult = { templates: ListRow[]; note?: string };
 
-describe("list_templates discovery (#324)", () => {
+describe("list_templates discovery (#332)", () => {
   it("with --root, reflects <root>/templates/*.{pptx,potx} on top of the built-ins (no note)", async () => {
     const root = scopeWithTemplates("tech-report.potx", "gov.pptx");
     const client = await connect(root);
@@ -92,7 +92,7 @@ describe("list_templates discovery (#324)", () => {
   });
 });
 
-describe("use_template with a file: id (#324)", () => {
+describe("use_template with a file: id (#332)", () => {
   it("mints a new project from a .potx discovered in the scope", async () => {
     const root = scopeWithTemplates("tech-report.potx");
     const client = await connect(root);
