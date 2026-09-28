@@ -7,6 +7,7 @@
 import type { SlideIR, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
 import { tableToMarkdown } from "./md-table";
 import { indentForLevel } from "./paragraph-nesting";
+import { FIELD_ROWS } from "./field-rows";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -131,6 +132,22 @@ export function figureBlock(slide: SlideIR): string | null {
 export function notesLines(slide: SlideIR): string[] {
   if (!slide.notes?.length) return [];
   return ["", "<!-- note -->", serializeParagraphs(slide.notes)];
+}
+
+// ── Field rows (#397/#398) → `Takeaway: …` / `Source: …` lines ──
+// Slide-level like notes, so emitted ONCE at the dispatch point (serializeSlide) for both readouts
+// (R8). One line per paragraph — the parser stacks repeated rows back into paragraphs, so multi-line
+// rows round-trip. Blank paragraphs are skipped (`Source:` with no value would re-parse as body text).
+export function fieldRowLines(slide: SlideIR): string[] {
+  const out: string[] = [];
+  for (const { name, kind } of FIELD_ROWS) {
+    const ph = getPlaceholder(slide, kind);
+    for (const p of ph?.paragraphs ?? []) {
+      const text = serializeSegments(p.segments).trim();
+      if (text) out.push(`${name}: ${text}`);
+    }
+  }
+  return out;
 }
 
 /** The `![alt](src){…}` line for an image (shared by the body-figure and the behind-layer paths). */

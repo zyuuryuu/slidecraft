@@ -17,6 +17,7 @@
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 import { slideIdxRole, placeholderRole, type PlaceholderRole } from "./template-catalog";
+import { fieldSlotOf, isFieldIdx } from "./field-rows";
 
 /** Stable placeholder order: shorter idx first, then lexicographic (so 1 < 2 < 10 < 15). */
 export function sortByIdx<T extends { idx: string }>(a: T, b: T): number {
@@ -86,6 +87,20 @@ export function bindContentByRole(
   const out = new Map<string, PlaceholderContent>();
   const usedLayoutIdx = new Set<string>();
   const usedContent = new Set<PlaceholderContent>();
+
+  // Pass 0 — FIELD ROWS (#397/#398, field-rows.ts): a `Takeaway:` / `Source:` row ("callout"/"source"
+  // content) goes to the layout's slot of that kind, recognized by NAME (Callout.Top / Source.Bottom /
+  // 出典) since the slot's ordinary role (body / date) can't say it. Runs first so the slot is taken
+  // out of Pass 1/2 when a row claims it; fires only for row content, so a row-less slide binds
+  // byte-identically. No slot → the row stays unbound → unboundContent reports it (never-silent).
+  for (const c of slide.placeholders) {
+    if (!isFieldIdx(c.idx)) continue;
+    const slot = [...layoutPlaceholders].sort(sortByIdx).find((p) => !usedLayoutIdx.has(p.idx) && fieldSlotOf(p) === c.idx);
+    if (!slot) continue;
+    out.set(slot.idx, c);
+    usedLayoutIdx.add(slot.idx);
+    usedContent.add(c);
+  }
 
   // Pass 1 — DIRECT idx-exact bind, when unambiguous. Fires for a content idx that has a same-idx
   // layout placeholder AND either (a) its canonical role is non-semantic ("other" — a custom box the
@@ -246,6 +261,10 @@ export function contentIdxForPlaceholder(ph: PlaceholderInfo, hasCtrTitle: boole
   // canonical convention (dt=10/ftr=11/sldNum=12, or velis 14/15/16) needs redirecting to the
   // canonical meta idx so it role-binds by TYPE — never returning "1", which on a cover (ctrTitle)
   // would read as SUBTITLE and clobber it.
+  // A field-row slot (Callout.Top / Source.Bottom / 出典) writes the row's canonical idx, so what the
+  // user types there reads back as `Takeaway:` / `Source:` (Pass 0 routes it straight back).
+  const slot = fieldSlotOf(ph);
+  if (slot) return slot;
   if (slideIdxRole(ph.idx, hasCtrTitle) === role) return ph.idx;
   switch (role) {
     case "title": return "15";

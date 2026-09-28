@@ -21,6 +21,7 @@ import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from ".
 import { sectionFooterFor } from "./deck-sections";
 import { visualOccupancy } from "./visual-placement";
 import { isBlankParagraphs } from "./placeholder-binding";
+import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -185,9 +186,16 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
       const plan = slideBindingPlan(slide, layout);
-      const n = plan.unbound.length;
+      // #397/#398: a field row with no slot gets its own message naming the row, so the author knows
+      // WHICH line vanished and why (the template has no Callout/Source box on this layout).
+      const rows = plan.unbound.filter((u) => isFieldIdx(u.idx));
+      const n = plan.unbound.length - rows.length;
       if (n > 0) {
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
+      }
+      if (rows.length > 0) {
+        const names = rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ");
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `${names} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレを使ってください`, levers: [] });
       }
 
       // #390 never-silent: body text that DID bind, but to a placeholder a visual replaces (table /

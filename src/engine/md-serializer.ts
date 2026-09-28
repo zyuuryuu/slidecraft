@@ -18,7 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
@@ -99,6 +99,13 @@ function serializeSlide(
     serializeByPlan(slide, layout, layoutInfo, lines);
   } else {
     serializeLegacy(slide, layout, lines);
+  }
+
+  // Field rows (`Takeaway:` / `Source:`) — slide-level, after the body so they never split a readout.
+  const rows = fieldRowLines(slide);
+  if (rows.length > 0) {
+    if (lines[lines.length - 1] !== "") lines.push(""); // one blank line before, never two
+    lines.push(...rows);
   }
 
   // A BEHIND image is emitted last, on its own line — it's a backmost LAYER, not the body figure, so it

@@ -12,6 +12,7 @@ import { findTableInLines, extractBodyTable } from "./md-body-table";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
+import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -308,6 +309,15 @@ export function parseSlideBlock(
     if (f.diagram) diagram = f.diagram;
     else mermaidBlock = f.mermaidBlock;
   };
+  // #397/#398 field rows (`Takeaway:` / `Source:`) → their own canonical content (field-rows.ts), never
+  // body. Repeated rows of one kind stack as paragraphs (no silent drop). Namespace-neutral (unlike meta).
+  const fieldRows: { kind: FieldKind; value: string }[] = [];
+  const pushFieldRows = () => {
+    for (const { kind } of FIELD_ROWS) {
+      const rows = fieldRows.filter((r) => r.kind === kind);
+      if (rows.length) placeholders.push({ idx: kind, paragraphs: rows.map((r) => ({ segments: parseInline(r.value) })) });
+    }
+  };
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -344,8 +354,14 @@ export function parseSlideBlock(
 
     // A standalone image line (e.g. a 最背面 backdrop) can appear on a GROUPED slide too — pull it out
     // BEFORE section-splitting so it isn't absorbed into the last column's body text (round-trip).
+    // Field rows are slide-level, so they're lifted out of the columns the same way (fence-aware: a
+    // `source:` key inside a column's ```diagram YAML stays YAML).
     const groupContent: string[] = [];
+    let groupFence = false;
     for (const ln of lines.slice(cursor)) {
+      if (ln.trim().startsWith("```")) groupFence = !groupFence;
+      const row = groupFence ? null : matchFieldRow(ln.trim());
+      if (row) { fieldRows.push(row); continue; }
       const img = matchImageLine(ln.trim());
       if (img && !image) { image = img; continue; }
       groupContent.push(ln);
@@ -387,6 +403,7 @@ export function parseSlideBlock(
         }
       }
     });
+    pushFieldRows();
 
     if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !image && !notes?.length) return null;
 
@@ -476,6 +493,12 @@ export function parseSlideBlock(
       continue;
     }
 
+    const row = matchFieldRow(trimmed);
+    if (row) {
+      fieldRows.push(row);
+      continue;
+    }
+
     // Key: Value fields (for title layouts)
     const fieldMatch = trimmed.match(/^(Category|Date|Footer):\s*(.+)/i);
     if (fieldMatch) {
@@ -516,6 +539,7 @@ export function parseSlideBlock(
       if (idx) placeholders.push({ idx, paragraphs: [{ segments: parseInline(value) }] });
     }
   }
+  pushFieldRows();
 
   // Body: a GFM table becomes a NATIVE table block (fills body region 1 by default); otherwise
   // the body lines become bullet/text paragraphs (idx 1). A single table COEXISTS with any

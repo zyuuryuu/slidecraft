@@ -12,7 +12,8 @@
  *   <!-- step -->              process step separator (idx 1, 2, ...)
  *   **bold**  *italic*         inline formatting
  *   - item                     bullet list
- *   Category: / Date: / Footer: / Meta: / Summary:   title slide fields
+ *   Category: / Date: / Footer:   title slide meta fields (Meta:/Summary: are plain body)
+ *   Takeaway: / Source:        field rows → callout / source slot (field-rows.ts, #397/#398)
  *   ```diagram ... ```           embedded diagram (DiagramSpec YAML)
  */
 

@@ -11,6 +11,7 @@ import type { SlideIR } from "./slide-schema";
 import { LAYOUT_NAMES } from "./slide-schema";
 import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, recoverLayoutSubtitle, placeholderRole, CLOSING_RE, BUILTIN_ROLE_DESCR_PREFIX, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { inferFunction, type ElementFunction } from "./master-scorer";
+import { preferFieldVariant } from "./field-variant";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
@@ -938,7 +939,9 @@ export function autoSelectLayout(
       pickLayout(catalog, "columns", regions, hasImage) ??
       bestBodyBearing(catalog, regions, hasImage) ??
       catalog[0];
-    if (picked) return picked.name;
+    // #397/#398: a `Takeaway:`/`Source:` row prefers a variant with a slot for it (no row → `picked`).
+    const chosen = preferFieldVariant(catalog, picked, slide, regions, hasImage);
+    if (chosen) return chosen.name;
   }
   return fallback;
 }
