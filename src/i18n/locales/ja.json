@@ -168,6 +168,7 @@
     "liveViewing": "接続中・ホストの deck をライブ表示中",
     "documentCount": "ドキュメント: {{docCount}}",
     "coEditNotice": "協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレ・タブ切替は接続中ロック）。",
+    "followAi": "AI の変更に追随（該当スライドへ移動してハイライト）",
     "endpointLabel": "MCP エンドポイント",
     "tokenLabel": "トークン（per-launch）",
     "addToClaudeCode": "Claude Code に追加（コピペ・一度書けば不変）",

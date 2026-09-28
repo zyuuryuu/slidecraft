@@ -21,6 +21,7 @@ import ThemeToggle from "./components/ThemeToggle";
 import LanguageToggle from "./components/LanguageToggle";
 import { useTranslation } from "react-i18next";
 import { useCollab } from "./components/useCollab";
+import { useFollowAi } from "./components/useFollowAi";
 import { useAiGeneration, classifyAiFailure } from "./components/useAiGeneration";
 import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
@@ -53,7 +54,7 @@ export default function App() {
   const {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
-    filePath, activeSlide, selected, selectSlide, gotoLine, templateName,
+    filePath, activeSlide, setActiveSlide, selected, setSelected, selectSlide, gotoLine, templateName,
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
@@ -198,7 +199,10 @@ export default function App() {
   // mirror into the active deck live. A freshly adopted/seeded doc is applied 'silent' (replace the
   // view, no undo step — so seeding the user's own deck never clobbers it); subsequent AI edits are
   // 'commit' (undoable). Desktop-only.
+  // #407: follow the AI's edits (jump to + flash the changed slides); a user setting in the 協働 panel.
+  const follow = useFollowAi((i) => { setActiveSlide(i); setSelected(new Set([i])); });
   const collab = useCollab({
+    onFollow: follow.onFollow,
     applyDeck: (d, isInitial) => setDeck(d, isInitial ? "silent" : "commit"),
     deck,
     templateData,
@@ -487,7 +491,7 @@ export default function App() {
                 </div>
                 <div className="flex-1 min-h-0 bg-void">
                   <SlideList deck={displayDeck} template={templateData} activeIndex={activeSlide} selected={selected} onSelect={selectSlide}
-                    onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} onMove={handleMoveSlide} disabled={editLocked} />
+                    onDelete={handleDeleteSlide} onDuplicate={handleDuplicateSlide} onMove={handleMoveSlide} disabled={editLocked} flash={follow.flash} />
                 </div>
               </>
             }
@@ -569,6 +573,8 @@ export default function App() {
                 docCount={collab.docCount}
                 onStart={collab.start}
                 onStop={collab.stop}
+                followAi={follow.enabled}
+                onFollowAiChange={follow.setEnabled}
               />
             }
           />

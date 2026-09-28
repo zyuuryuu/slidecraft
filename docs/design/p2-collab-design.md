@@ -114,6 +114,7 @@ truth-in-webview（listener が全 tool 呼び出しを Tauri IPC で webview �
 ## ツール変更（18→ +list/select/close_document, +undo/redo, +set_presence）
 - 8 mutating tool に任意 `opId`/`expectedRev`/`docId`、結果に `{rev,opId,changedSlides}`。
 - 通知：`deckChanged{docId,rev,prevRev,opId,changedSlides,kind,canUndo,canRedo}` / `documentOpened` / `documentClosed` / `presence`。
+  - **実装済みの形（#407）**：`deckChanged{docId,rev,opId,origin,changedIndices?}`。`origin`＝発火元（`"ai"`/`"gui"`・接続ロールから host が判定）、`changedIndices`＝変更後 deck での 0-based index（split は distill の `changedSlides` をそのまま使う）。粒度が不明な変更（`set_deck_markdown`・undo/redo）では省略する。対応表は `host-core.ts` の `changedIndicesOf` の1か所だけ。GUI は AI 発の変更でだけ該当スライドへジャンプ＋ハイライトする（協働パネルでオフにできる）。
 
 ## 並行性プロトコル
 - **per-doc apply-queue**（rev は前進のみ・undo も新 rev を発行）。doc 間は並列、doc 内は直列。

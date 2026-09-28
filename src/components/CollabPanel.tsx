@@ -24,6 +24,9 @@ interface CollabPanelProps {
   docCount: number;
   onStart: () => void;
   onStop: () => void;
+  /** #407: whether the view follows (jumps to + flashes) the AI's edits. Omitted → toggle hidden. */
+  followAi?: boolean;
+  onFollowAiChange?: (v: boolean) => void;
 }
 
 function CopyButton({ value }: { value: string }) {
@@ -139,7 +142,7 @@ export function AdvancedHttp({
 }
 
 export default function CollabPanel({
-  embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop,
+  embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop, followAi, onFollowAiChange,
 }: CollabPanelProps) {
   const { t } = useTranslation();
   const connected = status === "connected";
@@ -198,6 +201,12 @@ export default function CollabPanel({
                 <p className="text-[10px] text-emerald-300/80 leading-relaxed">
                   ✍️ {t("collabPanel.coEditNotice")}
                 </p>
+                {onFollowAiChange && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-fg2 cursor-pointer select-none">
+                    <input type="checkbox" checked={!!followAi} onChange={(e) => onFollowAiChange(e.target.checked)} />
+                    {t("collabPanel.followAi")}
+                  </label>
+                )}
 
                 {/* Primary registration line — static, unconditional, never needs rewriting (#297 / ADR-0033). */}
                 <Field label={t("collabPanel.addToClaudeCode")} value={STDIO_SNIPPET} />

@@ -49,6 +49,19 @@ export interface CollabProjectionOptions {
   onDeck(p: ProjectedDeck): void;
   onStatus?(s: CollabStatus, detail?: string): void;
   onDocs?(docs: DocSummary[]): void;
+  /** #407 follow: fired AFTER the deck at the AI edit's rev was applied via onDeck, with that edit's
+   *  changed slide indices (validated against the applied deck). Only AI-origin changes with known
+   *  indices; never the human's own edits, and not within `followQuietMs` of one. */
+  onFollow?(f: FollowTarget): void;
+  /** Suppress follow for this long (ms) after the human sent an edit, so an AI change landing while
+   *  they type doesn't yank their view. Default 3000. */
+  followQuietMs?: number;
+}
+
+export interface FollowTarget {
+  docId: string;
+  rev: number;
+  indices: number[];
 }
 
 /** Result of a P2.5 human edit round-trip. `stale` = the doc moved on under us (someone edited first);
@@ -88,6 +101,11 @@ export class CollabProjection {
   private sending = false;
   private readonly recentSelfOpIds = new Set<string>();
   private opSeq = 0;
+  // #407 follow: the latest AI change's indices, held until the deck at ITS rev is applied (push and
+  // pull race; indices are only meaningful against that exact rev's deck).
+  private pendingFollow: FollowTarget | null = null;
+  private lastSlideCount = 0;
+  private lastSelfSendAt = -Infinity;
 
   constructor(opts: CollabProjectionOptions) {
     this.opts = opts;
@@ -132,6 +150,7 @@ export class CollabProjection {
     }
     this.mirrorPaused = false;
     this.targetDocId = docId;
+    this.pendingFollow = null; // a tab switch is a human navigation — don't jump on a stale hint
     this.scheduleTick();
   }
 
@@ -144,6 +163,7 @@ export class CollabProjection {
     if (!docId) return { ok: false, message: "ドキュメントが選択されていません" };
     const opId = this.mintOpId();
     this.recentSelfOpIds.add(opId);
+    this.lastSelfSendAt = Date.now();
     if (this.recentSelfOpIds.size > 64) this.recentSelfOpIds.delete(this.recentSelfOpIds.values().next().value as string);
     this.sending = true;
     let reconcile = false; // re-pull AFTER `sending` clears (a scheduleTick now would bail in tick())
@@ -211,7 +231,28 @@ export class CollabProjection {
       if (e.docId === this.targetDocId && e.rev > this.lastRev) this.lastRev = e.rev;
       return;
     }
+    const quiet = Date.now() - this.lastSelfSendAt < (this.opts.followQuietMs ?? 3000);
+    if (e.origin === "ai" && e.changedIndices?.length && !quiet) {
+      this.pendingFollow = { docId: e.docId, rev: e.rev, indices: [...e.changedIndices] };
+      this.maybeFollow(); // the poll may have applied this rev already
+    }
     this.scheduleTick();
+  }
+
+  /** Fire the pending follow once the mirrored deck is exactly at its rev; drop it once superseded
+   *  (a later rev's deck may have shifted the indices) or aimed at a doc we don't mirror. */
+  private maybeFollow(): void {
+    const f = this.pendingFollow;
+    if (!f || this.lastDocId === null) return;
+    if (f.docId !== this.lastDocId) {
+      if (this.targetDocId !== null && this.targetDocId !== f.docId) this.pendingFollow = null;
+      return;
+    }
+    if (this.lastRev < f.rev) return; // not pulled yet — the tick will call back
+    this.pendingFollow = null;
+    if (this.lastRev > f.rev) return;
+    const indices = f.indices.filter((i) => Number.isInteger(i) && i >= 0 && i < this.lastSlideCount);
+    if (indices.length) this.opts.onFollow?.({ docId: f.docId, rev: f.rev, indices });
   }
 
   async stop(): Promise<void> {
@@ -300,7 +341,9 @@ export class CollabProjection {
     if (this.closed || this.mirrorPaused || (this.targetDocId !== null && this.targetDocId !== target.docId)) return;
     this.lastDocId = target.docId;
     this.lastRev = target.rev;
+    this.lastSlideCount = deck?.slides.length ?? 0;
     this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title, isInitial });
+    this.maybeFollow(); // after onDeck, so the GUI's jump lands on the freshly-applied deck
   }
 }
 
