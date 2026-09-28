@@ -113,7 +113,9 @@ export function paintDiagram(
   // "Second engines": non node-edge layouts (temporal / chart / matrix). Each
   // computes its own layout + bbox, then paints inside a single fitted group.
   if (spec.type === "sequence") {
-    const seq = computeSequenceLayout(spec, contentTop);
+    // #388: hand the layout the region size so it compacts itself (fonts scale with the fit).
+    const fit = options.layoutFit ?? (options.region ? { w: options.region.w, h: options.region.h } : undefined);
+    const seq = computeSequenceLayout(spec, contentTop, fit);
     paintFitted(t, options, seq.bbox, (dt) => paintSequence(dt, seq, theme));
     return;
   }
