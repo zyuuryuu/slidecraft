@@ -56,11 +56,14 @@ export default function SequenceDragOverlay({ diagramYaml, editable = false, onC
     return nodes.length === spec.nodes.length ? { ...spec, nodes } : spec;
   }, [spec, order]);
 
-  // Region→pixels transform from the COMMITTED spec (stable during a drag).
+  // Region→pixels transform from the COMMITTED spec (stable during a drag). The layout gets the
+  // region size so it compacts exactly like the exporter's region path (#388) — and the SVG below
+  // receives the same `layoutFit`, since it renders via a fixed `transform`, not `region`.
+  const layoutFit = useMemo(() => (region ? { w: region.w, h: region.h } : undefined), [region]);
   const baseTf = useMemo(() => {
     if (!region || !spec) return { scale: 1, offsetX: 0, offsetY: 0 };
-    return fitTransform(computeSequenceLayout(spec, CONTENT_TOP).bbox, region);
-  }, [spec, region]);
+    return fitTransform(computeSequenceLayout(spec, CONTENT_TOP, layoutFit).bbox, region);
+  }, [spec, region, layoutFit]);
 
   const svg = useMemo(
     () =>
@@ -69,13 +72,14 @@ export default function SequenceDragOverlay({ diagramYaml, editable = false, onC
             transparent: true,
             omitTitle: true,
             transform: region ? baseTf : undefined,
+            layoutFit,
           })
         : "",
-    [draftSpec, region, baseTf],
+    [draftSpec, region, baseTf, layoutFit],
   );
 
   // Participant layout (in draft order) for hit-testing + the selection box.
-  const seq = useMemo(() => (draftSpec ? computeSequenceLayout(draftSpec, CONTENT_TOP) : null), [draftSpec]);
+  const seq = useMemo(() => (draftSpec ? computeSequenceLayout(draftSpec, CONTENT_TOP, layoutFit) : null), [draftSpec, layoutFit]);
 
   // Cursor → diagram inches (inverse of the region transform).
   function toInches(e: React.PointerEvent) {
