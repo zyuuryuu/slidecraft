@@ -120,3 +120,29 @@ describe("Midnight export — body text AND the table/code both render (#390)", 
     expect(issues).toHaveLength(1);
   });
 });
+
+describe("slideRoleRegions — every visual's ordinal counts (#390 fix 2)", () => {
+  // col 1 = a table, col 2 = a diagram, NO body text. Reading only the FIRST visual's ordinal (the old
+  // `??` chain picked the diagram's "2") missed the table at "1" → hasBody false → misread as a
+  // SECTION slide. Counting all ordinals classifies it as 2 columns.
+  const MD = "# 表と図\n\n<!-- col -->\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<!-- col -->\n```diagram\ntype: flowchart\nnodes:\n  - id: n1\n    label: N1\n```";
+
+  it("parses as table@1 + diagram@2 with no body text", () => {
+    const s = parseMd(MD).slides[0];
+    expect(s.table?.placeholderIdx).toBe("1");
+    expect(s.diagram?.placeholderIdx).toBe("2");
+    expect(s.placeholders.some((p) => p.idx === "1" || p.idx === "2")).toBe(false);
+  });
+
+  it("no catalog → the canonical 2-column fallback, not the section layout", () => {
+    expect(autoSelectLayout(parseMd(MD).slides[0], 1, 3)).toBe("Column.2Body.Equal");
+  });
+
+  it("Midnight → a layout with 2 body regions (both visuals get a home)", async () => {
+    const tpl = await loadTemplate(readFileSync(MIDNIGHT));
+    const name = autoSelectLayout(parseMd(MD).slides[0], 1, 3, buildCatalog(tpl));
+    expect(name).toBe("Column.2Body.Equal");
+    const layout = tpl.layouts.find((l) => l.name === name)!;
+    expect(bodyPlaceholders(layout.placeholders).length).toBeGreaterThanOrEqual(2);
+  });
+});
