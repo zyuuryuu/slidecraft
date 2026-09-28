@@ -21,7 +21,13 @@
  * the SAME IMAGE_MARKDOWN_RE / unrecognizedMetaKey below — only when a 2nd table's collision
  * swallows the raw line before it can become a paragraph does the PARSER have to report it.
  */
-export type ParseNoticeKind = "table-dropped" | "image-dropped" | "meta-key-dropped";
+/*
+ * `figure-dropped` (#391): a 2nd+ figure of the SAME kind (```diagram, or a flowchart ```mermaid that
+ * graduates to a diagram / a non-flowchart ```mermaid image) replaced an earlier one on the slide —
+ * only ONE diagram and ONE mermaid image survive per slide today ("last wins"), so the earlier
+ * figure is discarded. Only the parser sees the replaced block, hence a notice (same as table-dropped).
+ */
+export type ParseNoticeKind = "table-dropped" | "image-dropped" | "meta-key-dropped" | "figure-dropped";
 
 export interface ParseNotice {
   kind: ParseNoticeKind;

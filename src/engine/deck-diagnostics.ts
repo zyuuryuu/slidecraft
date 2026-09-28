@@ -19,6 +19,8 @@ import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
+import { visualOccupancy } from "./visual-placement";
+import { isBlankParagraphs } from "./placeholder-binding";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -39,9 +41,11 @@ export type ReviewRuleId =
   | "long-bullet"
   | "key-value-table"
   | "unbound-content"
+  | "visual-shadowed-content"
   | "table-dropped"
   | "image-dropped"
   | "meta-key-dropped"
+  | "figure-dropped"
   | "section-footer-injected";
 
 export interface ReviewRule {
@@ -59,9 +63,11 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "long-bullet", level: "info" },
   { id: "key-value-table", level: "info" },
   { id: "unbound-content", level: "warn" },
+  { id: "visual-shadowed-content", level: "warn" },
   { id: "table-dropped", level: "info" },
   { id: "image-dropped", level: "info" },
   { id: "meta-key-dropped", level: "warn" },
+  { id: "figure-dropped", level: "info" },
   { id: "section-footer-injected", level: "info" },
 ];
 
@@ -184,6 +190,17 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
       }
 
+      // #390 never-silent: body text that DID bind, but to a placeholder a visual replaces (table /
+      // figure / image) or overwrites (code) — export never draws it. Reads the SAME occupancy map the
+      // export skips by (visualOccupancy, R8). The parser keeps table/code beside body text at ordinal
+      // 2, so this stays silent on parsed Markdown; it guards hand-built / legacy IR and future paths.
+      const occupied = visualOccupancy(slide, layout.placeholders);
+      const hidden = plan.assignments.filter((a) => occupied.has(a.placeholder.idx) && !isBlankParagraphs(a.content.content.paragraphs));
+      if (hidden.length > 0) {
+        const kinds = [...new Set(hidden.map((a) => occupied.get(a.placeholder.idx)))].join("/");
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "visual-shadowed-content", level: RULE_LEVEL["visual-shadowed-content"], message: `本文 ${hidden.length} 件がビジュアル（${kinds}）と同じ枠に入り出力時に表示されません（${layout.name}）`, levers: [] });
+      }
+
       // #292: never-silent visibility for the section-footer auto-inject (#168) — the SAME
       // eligibility check (isSectionFooterTarget) and the SAME "did binding leave it empty"
       // signal (plan.unfilled) that placeholder-filler.buildSlideXml / SlideCard actually use, so
@@ -225,6 +242,8 @@ export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseN
         return { ...base, id: "image-dropped" as const, level: RULE_LEVEL["image-dropped"], message: "画像記法（![alt](src)）を含む内容が2つ目以降の表と衝突し変換時に失われました" };
       case "meta-key-dropped":
         return { ...base, id: "meta-key-dropped" as const, level: RULE_LEVEL["meta-key-dropped"], message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が2つ目以降の表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
+      case "figure-dropped":
+        return { ...base, id: "figure-dropped" as const, level: RULE_LEVEL["figure-dropped"], message: "同じスライドの先行する図（```diagram / ```mermaid）が後続の図に上書きされ変換時に失われました（1スライドに保持される図は最後の1つのみ）" };
     }
   });
 }
