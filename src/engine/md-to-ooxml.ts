@@ -6,7 +6,8 @@
 
 import type { Paragraph, InlineSegment } from "./slide-schema";
 
-function escXml(s: string): string {
+/** XML text/attribute escape (& < > ") — shared by every OOXML writer that inlines user text. */
+export function escXml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

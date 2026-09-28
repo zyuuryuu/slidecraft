@@ -151,6 +151,7 @@ Points to remember:
 - An `![alt](src)` with attributes omitted takes the default size that fills its allotted body frame.
 - You can **drag to move and resize in the visual editor**, and the result is saved back into the Markdown as these `{...}` attributes (a round trip). Rather than writing by hand, it's easier to place first and then export.
 - `behind=1` lays the image on the backmost layer. This suits placing body text over a background photo or watermark pattern.
+- The **alt text in `![alt]` is drawn as a one-line caption directly under the image** (a description or source note), and becomes the picture's alt text in the PPTX. To omit the caption, leave the alt empty: `![](...)`. A backmost (`behind=1`) image gets alt text only, no caption.
 
 ::: details Background images work on column-split slides too
 Even on a slide split with `<!-- col -->` and the like, a standalone image line (especially a `behind=1` background) is not taken into each column's body but is treated as the background of the whole slide.

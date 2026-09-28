@@ -15,6 +15,7 @@ import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox, visualOccupancy } from "./visual-placement";
+import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
 import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
@@ -180,7 +181,7 @@ async function buildSlideXml(
       ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`
       : "";
     return `<p:pic>`
-      + `<p:nvPicPr><p:cNvPr id="${shapeId}" name="Image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
+      + `<p:nvPicPr><p:cNvPr id="${shapeId}" name="Image"${imageDescrAttr(slide.image!.alt)}/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
       + `<p:blipFill><a:blip r:embed="${imageRId}"/>${srcRectXml}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
       + `<p:spPr><a:xfrm><a:off x="${EMU(r.x)}" y="${EMU(r.y)}"/><a:ext cx="${EMU(r.w)}" cy="${EMU(r.h)}"/></a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
       + `</p:pic>`;
@@ -236,6 +237,11 @@ async function buildSlideXml(
 
   // A NON-behind image paints LAST (in front) in its picture/body frame.
   if (!imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
+  // Its alt as a caption line directly under the drawn image (#399 — same geometry as the preview).
+  const caption = !imageBehind && imageRId
+    ? imageCaption(slide.image!, imageBox!, imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx)?.style.fontColor)
+    : undefined;
+  if (caption) { shapes += imageCaptionShapeXml(id, caption); id++; }
 
   // Add diagram shapes if present
   // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is confined to its placeholder
