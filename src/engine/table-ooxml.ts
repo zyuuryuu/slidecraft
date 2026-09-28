@@ -6,10 +6,10 @@
  */
 
 import { computeColumnWidthsEmu, computeNumericColumns } from "./table-layout";
+import { parseInline } from "./md-inline";
+import { segmentToRun, type LinkResolver } from "./md-to-ooxml";
 
 const EMU = (inches: number) => Math.round(inches * 914400);
-const xmlEscape = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // Hex colours (no #). Header = navy fill / white bold; body = white or banded / dark text.
 const HEADER_FILL = "1E2761";
@@ -22,13 +22,21 @@ function border(tag: string): string {
   return `<a:${tag} w="6350" cap="flat"><a:solidFill><a:srgbClr val="${BORDER}"/></a:solidFill></a:${tag}>`;
 }
 
-function cellXml(text: string, isHeader: boolean, band: boolean, rightAlign: boolean): string {
+/** A cell's text runs through the shared inline parser (#395, R8 — md-inline.ts): `rows` keep the
+ *  markdown source, formatting is applied here at render time, so no schema change and a trivially
+ *  stable round-trip. A markup-free cell yields ONE plain segment → the same single run as before. */
+function cellXml(text: string, isHeader: boolean, band: boolean, rightAlign: boolean, link?: LinkResolver): string {
   const color = isHeader ? HEADER_TEXT : BODY_TEXT;
   const fill = isHeader ? HEADER_FILL : band ? BAND_FILL : "FFFFFF";
-  const bold = isHeader ? ` b="1"` : "";
   const pPr = rightAlign ? `<a:pPr algn="r"/>` : "";
+  const style = {
+    baseAttrs: [`lang="en-US"`, `sz="1100"`],
+    bold: isHeader,
+    fillXml: `<a:solidFill><a:srgbClr val="${color}"/></a:solidFill>`,
+    link,
+  };
   const run = text
-    ? `<a:r><a:rPr lang="en-US" sz="1100"${bold}><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr><a:t>${xmlEscape(text)}</a:t></a:r>`
+    ? parseInline(text).map((seg) => segmentToRun(seg, style)).join("")
     : `<a:endParaRPr lang="en-US" sz="1100"/>`;
   return (
     `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p>${pPr}${run}</a:p></a:txBody>` +
@@ -38,12 +46,14 @@ function cellXml(text: string, isHeader: boolean, band: boolean, rightAlign: boo
   );
 }
 
-/** A native table graphicFrame for `rows` at `box` (inches), with shape id `id`. */
+/** A native table graphicFrame for `rows` at `box` (inches), with shape id `id`. `link` wires cell
+ *  hyperlinks to the slide's rels (hyperlink-rels.ts). */
 export function tableGraphicFrameXml(
   rows: string[][],
   header: boolean,
   box: { x: number; y: number; w: number; h: number },
   id: number,
+  link?: LinkResolver,
 ): string {
   const ncol = Math.max(1, ...rows.map((r) => r.length));
   const colWidths = computeColumnWidthsEmu(rows, box.w);
@@ -54,7 +64,7 @@ export function tableGraphicFrameXml(
     .map((r, ri) => {
       const isHeader = header && ri === 0;
       const cells = Array.from({ length: ncol }, (_, ci) =>
-        cellXml(r[ci] ?? "", isHeader, !isHeader && ri % 2 === 0, numericCols[ci]),
+        cellXml(r[ci] ?? "", isHeader, !isHeader && ri % 2 === 0, numericCols[ci], link),
       ).join("");
       return `<a:tr h="${rowH}">${cells}</a:tr>`;
     })

@@ -46,12 +46,15 @@ export const LAYOUT_NAMES = [
 
 export type LayoutName = (typeof LAYOUT_NAMES)[number];
 
-// ── Inline text segment (supports bold/italic) ──
+// ── Inline text segment (bold/italic; code/strike/link since #393 — parsed by md-inline.ts) ──
 
 export const InlineSegmentSchema = z.object({
   text: z.string(),
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
+  code: z.boolean().optional(), // `x` — markers dropped; rendered as plain text (no pinned font)
+  strike: z.boolean().optional(), // ~~x~~
+  href: z.string().optional(), // [text](url) — http(s)/mailto only; exported as <a:hlinkClick>
 });
 
 export type InlineSegment = z.infer<typeof InlineSegmentSchema>;

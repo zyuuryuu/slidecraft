@@ -5,6 +5,8 @@
  * and numeric right-align never drift between what's shown and what's exported.
  */
 
+import { inlinePlainText } from "./md-inline";
+
 const EMU_PER_INCH = 914400;
 
 // East-Asian wide ranges (CJK ideographs, kana, hangul, fullwidth forms, …) count as 2
@@ -30,8 +32,10 @@ function displayWidth(text: string): number {
 
 const NUMERIC_RE = /^[+-]?[¥$€£]?[\d,]+(\.\d+)?%?$/;
 
+// Cells are measured by their VISIBLE text (#395): inline markers (`**`, `` ` ``, `[…](url)` …) are
+// not drawn, so they must not widen a column or break numeric detection. Markup-free → unchanged.
 function isNumericCell(cell: string): boolean {
-  const t = cell.trim();
+  const t = inlinePlainText(cell).trim();
   return t === "" || NUMERIC_RE.test(t);
 }
 
@@ -63,7 +67,7 @@ const MAX_FRACTION = 0.5;
 export function computeColumnWidthsEmu(rows: string[][], boxWidthIn: number): number[] {
   const ncol = colCount(rows);
   const weights = Array.from({ length: ncol }, (_, c) =>
-    Math.max(1, ...rows.map((r) => displayWidth(r[c] ?? ""))),
+    Math.max(1, ...rows.map((r) => displayWidth(inlinePlainText(r[c] ?? "")))),
   );
   const total = weights.reduce((a, b) => a + b, 0);
   const clamped = weights.map((w) => Math.min(MAX_FRACTION, Math.max(MIN_FRACTION, w / total)));

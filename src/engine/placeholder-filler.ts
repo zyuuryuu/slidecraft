@@ -17,11 +17,12 @@ import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox, visualOccupancy } from "./visual-placement";
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
 import { isGroupedLayout, expandGroups } from "./group-binding";
-import { paragraphsToOoxml } from "./md-to-ooxml";
+import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
+import { createLinkRegistry } from "./hyperlink-rels";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
-import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT } from "./notes-ooxml";
+import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT, NOTES_FIRST_LINK_RID } from "./notes-ooxml";
 import { materializeDerivedSlides, sectionFooterFor } from "./deck-sections";
 import { midnightExecutive } from "./theme";
 
@@ -42,8 +43,9 @@ function codeToParagraphs(content: string): PlaceholderContent["paragraphs"] {
 function replaceTextInShape(
   shapeXml: string,
   content: PlaceholderContent,
+  link?: LinkResolver,
 ): string {
-  const newParagraphs = paragraphsToOoxml(content.paragraphs);
+  const newParagraphs = paragraphsToOoxml(content.paragraphs, link);
 
   const txStart = shapeXml.indexOf("<p:txBody>");
   const txEnd = shapeXml.indexOf("</p:txBody>");
@@ -130,7 +132,7 @@ async function buildSlideXml(
   // 所属章名（#168・案A）。null＝章扉より前 or section 無しデッキ＝注入なし。chrome 経路（sldNum と
   // 同じ「テンプレに枠が無ければテンプレの意思」扱い）— 明示 Footer: が束縛済みの ftr 枠には触れない。
   sectionFooterText: string | null = null,
-): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined }> {
+): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined; linkRels: string }> {
   // A Mermaid block whose content is a NATIVE diagram type exports as native,
   // editable shapes (not a rasterised mermaid.js image) — matching the preview.
   if (slide.mermaidBlock && !slide.diagram) {
@@ -187,6 +189,9 @@ async function buildSlideXml(
       + `</p:pic>`;
   };
 
+  // Hyperlinks (#393) in body text / table cells → External rels after the fixed ones (see buildSlideRels).
+  const links = createLinkRegistry(FIRST_LINK_RID);
+
   let shapes = "";
   let id = 2;
   // Backmost: the behind backdrop paints FIRST — before the placeholder shapes — never as <p:bg>.
@@ -211,7 +216,7 @@ async function buildSlideXml(
     }
     if (!content) continue;
 
-    let shapeXml = replaceTextInShape(ph.shapeXml, content);
+    let shapeXml = replaceTextInShape(ph.shapeXml, content, links.rIdFor);
     // Update shape ID to be unique within the slide
     shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
     shapes += shapeXml;
@@ -271,7 +276,7 @@ async function buildSlideXml(
   if (slide.table) {
     const tablePh = visualBody(slide.table.placeholderIdx);
     if (tablePh) {
-      shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id);
+      shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id, links.rIdFor);
     }
   }
 
@@ -288,10 +293,13 @@ async function buildSlideXml(
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
     `</p:sld>`;
 
-  return { xml, mermaidImageRId, imageRId };
+  return { xml, mermaidImageRId, imageRId, linkRels: links.relsXml() };
 }
 
-function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: string }[] = [], notesSlideNum?: number): string {
+/** Fixed slide rels: rId1 layout, rId2/rId3 images, rId4 notesSlide — hyperlinks (#393) start after. */
+const FIRST_LINK_RID = 5;
+
+function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: string }[] = [], notesSlideNum?: number, linkRels = ""): string {
   let rels =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
@@ -312,7 +320,7 @@ function buildSlideRels(layoutIndex: number, imageRels: { rId: string; target: s
       ` Target="../notesSlides/notesSlide${notesSlideNum}.xml"/>`;
   }
 
-  rels += `</Relationships>`;
+  rels += `${linkRels}</Relationships>`;
   return rels;
 }
 
@@ -413,7 +421,7 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const { xml: slideXml, mermaidImageRId, imageRId } = await buildSlideXml(layout, slide, sectionFooterFor(deck, i));
+    const { xml: slideXml, mermaidImageRId, imageRId, linkRels } = await buildSlideXml(layout, slide, sectionFooterFor(deck, i));
 
     // Embed each referenced image with its OWN rId (a behind backdrop can coexist with a mermaid PNG,
     // so they no longer share one slot). Mermaid SVG→PNG is rasterized by the injected UI-layer canvas.
@@ -436,17 +444,18 @@ export async function generatePptx(
     // notes 付きスライドだけ notesSlide パートを生成（番号はスライド番号に一致させる）。
     const notesSlideNum = slide.notes?.length ? slideNum : undefined;
     if (notesSlideNum !== undefined) {
-      zip.file(`ppt/notesSlides/notesSlide${notesSlideNum}.xml`, notesSlideXml(slide.notes!));
+      const noteLinks = createLinkRegistry(NOTES_FIRST_LINK_RID);
+      zip.file(`ppt/notesSlides/notesSlide${notesSlideNum}.xml`, notesSlideXml(slide.notes!, noteLinks.rIdFor));
       zip.file(
         `ppt/notesSlides/_rels/notesSlide${notesSlideNum}.xml.rels`,
-        notesSlideRels(slideNum, notesMasterNum),
+        notesSlideRels(slideNum, notesMasterNum, noteLinks.relsXml()),
       );
       ctEntries.push(
         `<Override PartName="/ppt/notesSlides/notesSlide${notesSlideNum}.xml" ContentType="${NOTES_SLIDE_CT}"/>`,
       );
     }
 
-    const slideRels = buildSlideRels(layout.index, imageRels, notesSlideNum);
+    const slideRels = buildSlideRels(layout.index, imageRels, notesSlideNum, linkRels);
 
     zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
     zip.file(
