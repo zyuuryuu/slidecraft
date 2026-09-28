@@ -2,7 +2,7 @@
  * SlideList.tsx — Slide thumbnail list using the same SlideCard as the preview.
  */
 
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
@@ -30,6 +30,8 @@ interface SlideListProps {
   /** Drag-reorder: move slide `from` → position `to`. Omitted / disabled → drag off (e.g. collab). */
   onMove?: (from: number, to: number) => void;
   disabled?: boolean;
+  /** #407: slides the AI just changed — briefly ringed, and the first is scrolled into view. */
+  flash?: ReadonlySet<number>;
 }
 
 export default function SlideList({
@@ -42,6 +44,7 @@ export default function SlideList({
   onDuplicate,
   onMove,
   disabled,
+  flash,
 }: SlideListProps) {
   const { t } = useTranslation();
   const catalog = useMemo(() => (template ? buildCatalog(template) : undefined), [template]);
@@ -55,6 +58,12 @@ export default function SlideList({
   const dragRef = useRef<{ from: number; ins: number; active: boolean } | null>(null);
   const justDragged = useRef(false); // swallow the click that follows a real drag (else it re-selects a stale idx)
   const canDrag = !disabled && !!onMove;
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const first = flash ? Math.min(...flash) : undefined;
+    if (first === undefined) return;
+    listRef.current?.querySelector(`[data-slide-idx="${first}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [flash]);
 
   const startDrag = (e: React.PointerEvent, from: number) => {
     if (!canDrag || e.button !== 0) return;
@@ -113,7 +122,7 @@ export default function SlideList({
   return (
     // select-none: thumbnails aren't selectable text, so Shift/⌘-click multi-select
     // doesn't drag a blue text-selection highlight along with it.
-    <div className={`h-full overflow-auto p-2 flex flex-col gap-2 items-center select-none ${dragIdx !== null ? "cursor-grabbing" : ""}`}>
+    <div ref={listRef} className={`h-full overflow-auto p-2 flex flex-col gap-2 items-center select-none ${dragIdx !== null ? "cursor-grabbing" : ""}`}>
       {deck.slides.map((slide, i) => {
         // ALWAYS via autoSelectLayout — it honors a valid pinned name but degrades one this template
         // lacks to a real layout (else a canonical-pinned cover on an alien master = blank thumbnail).
@@ -131,7 +140,7 @@ export default function SlideList({
               onPointerDown={canDrag ? (e) => startDrag(e, i) : undefined}
               onClickCapture={(e) => { if (justDragged.current) { justDragged.current = false; e.stopPropagation(); } }} // swallow the post-drag click
             >
-              <div className="relative group rounded">
+              <div className={`relative group rounded transition-shadow duration-300 ${flash?.has(i) ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-void" : ""}`}>
                 <SlideCard
                 slide={slide}
                 slideIndex={i}

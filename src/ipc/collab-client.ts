@@ -15,7 +15,9 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const NOTIFY = "notifications/slidecraft/";
 
-export interface DeckChangedEvent { docId: string; rev: number; opId?: string; }
+/** `origin` / `changedIndices` are ADDITIVE (#407): who caused it (host's view of the connection role)
+ *  and which slides changed (0-based, post-change deck; absent = granularity unknown). */
+export interface DeckChangedEvent { docId: string; rev: number; opId?: string; origin?: "ai" | "gui"; changedIndices?: number[]; }
 export interface DocumentOpenedEvent { docId: string; title: string; slideCount: number; }
 export interface DocumentClosedEvent { docId: string; }
 

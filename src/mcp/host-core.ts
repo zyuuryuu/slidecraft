@@ -57,8 +57,9 @@ export interface HostContext {
   /** A deck-changing op committed on `entry` (its docId/rev are current) — the host fans out
    *  deckChanged to every connected client (incl. undo/redo, which mint a new rev). `opId` (when the
    *  caller supplied one) rides along on the notification so the ORIGINATOR can suppress its own echo
-   *  (P2.5 round-trip); undo/redo and AI edits pass none → everyone re-pulls. */
-  onMutated?(entry: DocEntry, tool: string, opId?: string): void;
+   *  (P2.5 round-trip); undo/redo and AI edits pass none → everyone re-pulls. `changedIndices` (#407)
+   *  = changedIndicesOf(...) for this op; undefined when the granularity is unknown. */
+  onMutated?(entry: DocEntry, tool: string, opId?: string, changedIndices?: number[]): void;
   notifyOpened?(entry: DocEntry): void;
   notifyClosed?(docId: string): void;
 }
@@ -164,6 +165,45 @@ export class DocRegistry {
     }
     return out;
   }
+}
+
+/** Which slides a committed mutation changed, as 0-based indices into the POST-mutation deck (#407:
+ *  lets a live GUI jump to + flash the AI's edit). ONE place for the tool → indices mapping; split
+ *  reuses distill's own `changedSlides` (R8 — never re-derived). `[]` = known: no surviving slide
+ *  changed (delete); `undefined` = granularity unknown (whole-deck replace, undo/redo, unknown tool) —
+ *  omitted from the payload rather than faked. `index` is the tool's `index` argument, if any. */
+export function changedIndicesOf(tool: string, index: number | undefined, result: unknown): number[] | undefined {
+  const r = (result ?? {}) as { insertedIndex?: unknown; newIndex?: unknown; toIndex?: unknown; changedSlides?: unknown };
+  const one = (v: unknown): number[] | undefined => (typeof v === "number" ? [v] : undefined);
+  switch (tool) {
+    case "set_slide_markdown":
+    case "convert_bullets_to_table":
+    case "set_slide_diagram":
+    case "apply_design_intent":
+      return one(index);
+    case "insert_slide":
+      return one(r.insertedIndex);
+    case "duplicate_slide":
+      return one(r.newIndex);
+    case "move_slide":
+      return one(r.toIndex);
+    case "delete_slide":
+      return [];
+    case "split_overflowing_slides":
+      return Array.isArray(r.changedSlides) ? [...(r.changedSlides as number[])] : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** Who caused a deck change, from the host's view of the connection role (x-slidecraft-role). */
+export type ChangeOrigin = "ai" | "gui";
+
+/** The deckChanged notification params. ADDITIVE over the original {docId, rev, opId} (#407): `origin`
+ *  lets the GUI follow only AI edits (never yank the human's view on their own edit), and
+ *  `changedIndices` is present only when known. */
+export function deckChangedPayload(entry: Pick<DocEntry, "docId" | "rev">, opId: string | undefined, origin: ChangeOrigin, changedIndices: number[] | undefined): Record<string, unknown> {
+  return { docId: entry.docId, rev: entry.rev, opId, origin, ...(changedIndices ? { changedIndices } : {}) };
 }
 
 export interface CommitResult {

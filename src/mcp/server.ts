@@ -25,7 +25,7 @@ import * as R from "./reads";
 import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
-import { type HostContext, type DocEntry, type TemplateStore, commitMutation, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
+import { type HostContext, type DocEntry, type TemplateStore, commitMutation, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
 import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
 import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
@@ -107,7 +107,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     docId: string | undefined,
     tool: string,
     fn: (s: Session) => unknown | Promise<unknown>,
-    cc?: { opId?: string; expectedRev?: number },
+    cc?: { opId?: string; expectedRev?: number; index?: number }, // index: the tool's slide arg → changedIndices (#407)
   ): Promise<ToolResult> => {
     try {
       const entry = entryOf(extra, docId);
@@ -120,7 +120,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       const { result, changed, rev } = await commitMutation(entry, fn);
       if (changed) {
         opts.onMutate?.(tool);
-        host.onMutated?.(entry, tool, cc?.opId); // fan out deckChanged (opId lets the originator suppress its echo); no-op in solo
+        host.onMutated?.(entry, tool, cc?.opId, changedIndicesOf(tool, cc?.index, result)); // fan out deckChanged (opId: echo suppression; changedIndices: GUI follow #407); no-op in solo
       }
       if (changed && result && typeof result === "object") return ok(withHints({ ...(result as object), rev, docId: entry.docId, opId: cc?.opId }));
       return ok(withHints(result));
@@ -220,14 +220,14 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   server.registerTool("get_template_spec_guide", { description: "create_template 用 TemplateSpec の書式ガイド＋MIDNIGHT preset 値（開始点）" }, () => run(() => T.getTemplateSpecGuide()));
 
   // ── deterministic mutations ──
-  server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否。書式は get_authoring_guide（区切り・表/コード）", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否。書式は get_authoring_guide（区切り・表/コード）", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
   server.registerTool("set_deck_markdown", { description: "⚠️ deck 全体を置換（スライド数が変わりうる・図は自動保持されない）。1枚だけ直すなら set_slide_markdown を使うこと", inputSchema: { markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_deck_markdown", (s) => S.applyDeckMarkdown(s, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
   server.registerTool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割", inputSchema: { ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "split_overflowing_slides", (s) => S.distill(s), { opId: a.opId, expectedRev: a.expectedRev }));
-  server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
+  server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
   server.registerTool(
     "set_slide_diagram",
     { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid の文字列で設定（検証＋native YAML 化）。図/mermaid を持つスライドは置換、text スライドは body 領域へ図を追加（created で判別）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string().describe("DiagramSpec の JSON/YAML 文字列、または Mermaid 記法の文字列（format で指定・オブジェクトではなく文字列で渡す）。例: source: '{\"type\":\"flowchart\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\"},{\"id\":\"b\",\"label\":\"B\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\"}]}'"), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body 領域の 1-based ordinal（multi-body 用・既定 1）"), ...doc, ...cc } },
-    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx), { opId: a.opId, expectedRev: a.expectedRev }),
+    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }),
   );
   server.registerTool(
     "apply_design_intent",
@@ -235,7 +235,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       description: '図を【どう配置するか】（design edit）：ops 配列の JSON 文字列で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図/mermaid を持つスライドのみ。図の中身そのものは set_slide_diagram。例: [{"op":"relayout","direction":"LR"}]',
       inputSchema: { ...index, intent: z.string().describe('design edit ops 配列の JSON 文字列（オブジェクトではなく文字列で渡す）。例: intent: \'[{"op":"relayout","direction":"LR"}]\''), ...doc, ...cc },
     },
-    (a, extra) => mutate(extra, a.docId, "apply_design_intent", (s) => S.applyDesignIntent(s, a.index, a.intent), { opId: a.opId, expectedRev: a.expectedRev }),
+    (a, extra) => mutate(extra, a.docId, "apply_design_intent", (s) => S.applyDesignIntent(s, a.index, a.intent), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }),
   );
   // ── structure ops (T2/S4) ── surgical add/remove/reorder/duplicate a slide; the SURVIVING slides'
   // figures/layouts stay byte-identical (set_deck_markdown drops them). Prefix insert_/delete_/move_/

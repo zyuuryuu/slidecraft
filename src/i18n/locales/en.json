@@ -168,6 +168,7 @@
     "liveViewing": "Connected — showing the host's deck live",
     "documentCount": "Documents: {{docCount}}",
     "coEditNotice": "Co-editing: your edits are sent to the host (the single source of truth) and shared live with the AI. The AI's edits appear here too. Undo (⌘Z) runs against the host's history (structure changes, templates, and tab switching are locked while connected).",
+    "followAi": "Follow the AI's edits (jump to and highlight changed slides)",
     "endpointLabel": "MCP endpoint",
     "tokenLabel": "Token (per-launch)",
     "addToClaudeCode": "Add to Claude Code (copy & paste — write once, never changes)",

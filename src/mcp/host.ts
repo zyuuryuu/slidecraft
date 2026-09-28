@@ -15,7 +15,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createSession } from "./session";
 import { buildServer } from "./server";
-import { DocRegistry, MemTemplateStore, type HostContext } from "./host-core";
+import { DocRegistry, MemTemplateStore, deckChangedPayload, type HostContext } from "./host-core";
 import { mintToken, checkRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type SecurityConfig } from "./host-security";
 import { writeHostJson, clearHostJson, type HostHandshake } from "./host-json";
 
@@ -77,7 +77,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
     setActive: (extra, docId) => { const s = sidOf(extra); if (s) activeByConn.set(s, docId); },
     sharedOnly: aiClient,
     templates,
-    onMutated: (entry, _tool, opId) => broadcast("deckChanged", { docId: entry.docId, rev: entry.rev, opId }),
+    onMutated: (entry, _tool, opId, changedIndices) => broadcast("deckChanged", deckChangedPayload(entry, opId, aiClient ? "ai" : "gui", changedIndices)),
     notifyOpened: (entry) => broadcast("documentOpened", { docId: entry.docId, title: entry.title, slideCount: entry.session.deck?.slides.length ?? 0 }),
     notifyClosed: (docId) => broadcast("documentClosed", { docId }),
   });

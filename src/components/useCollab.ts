@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import i18n from "../i18n";
 import { runningInTauri } from "../ipc/commands";
-import { CollabProjection, type CollabStatus, type DocSummary } from "../ipc/collab-projection";
+import { CollabProjection, type CollabStatus, type DocSummary, type FollowTarget } from "../ipc/collab-projection";
 import { bundleProject } from "../engine/project-io";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
@@ -55,9 +55,11 @@ export interface UseCollabArgs {
   /** A NEW host doc appeared (the AI ran new_project). App opens it as a BACKGROUND tab — mode (b):
    *  a tab shows up but the view doesn't switch. `dataBase64` is the full .scft (deck+template). */
   onNewHostDoc?: (docId: string, title: string, dataBase64: string) => void;
+  /** #407: an AI edit's changed slides, after its deck was applied (useFollowAi jumps + flashes). */
+  onFollow?: (f: FollowTarget) => void;
 }
 
-export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes, onSeedDoc, onNewHostDoc }: UseCollabArgs) {
+export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes, onSeedDoc, onNewHostDoc, onFollow }: UseCollabArgs) {
   const available = runningInTauri();
   const [status, setStatus] = useState<CollabStatus>("idle");
   const [info, setInfo] = useState<CollabInfo | undefined>(undefined);
@@ -74,6 +76,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   const getBytesRef = useRef(getMasterBytes);
   const onSeedDocRef = useRef(onSeedDoc);
   const onNewHostDocRef = useRef(onNewHostDoc);
+  const onFollowRef = useRef(onFollow);
   // Collab multi-doc bookkeeping: which host docs we've already surfaced as tabs, the seeded doc, and
   // whether the seed is resolved (until then we don't classify docs — avoids a duplicate seed tab).
   const knownDocsRef = useRef<Set<string>>(new Set());
@@ -90,6 +93,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     getBytesRef.current = getMasterBytes;
     onSeedDocRef.current = onSeedDoc;
     onNewHostDocRef.current = onNewHostDoc;
+    onFollowRef.current = onFollow;
   });
 
   const start = useCallback(async () => {
@@ -107,6 +111,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
         fetch,
         // pollMs defaults on → the reliable floor if the SSE push stream doesn't deliver over plugin-http.
         onDeck: (p) => applyRef.current(p.deck, p.isInitial),
+        onFollow: (f) => onFollowRef.current?.(f),
         onStatus: (s, detail) => {
           setStatus(s);
           if (s === "error") {
