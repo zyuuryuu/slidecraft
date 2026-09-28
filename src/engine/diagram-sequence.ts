@@ -31,14 +31,28 @@ export interface SeqLayout {
   bbox: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
-export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): SeqLayout {
+/** The fit target (region w×h, inches) a region-embedded sequence layout compacts itself toward
+ *  (#388). Omitted → the historical full-slide layout (solo slides stay byte-identical). */
+export interface SeqFit {
+  w: number;
+  h: number;
+}
+
+/** Columns never get narrower than this (inches): a narrower column would push long message
+ *  labels into the per-label shrink path (#228) and trade one tiny-font failure for another. */
+const MIN_COL_W = 1.8;
+
+export function computeSequenceLayout(spec: DiagramSpec, contentTop: number, fit?: SeqFit): SeqLayout {
   const parts = spec.nodes;
   const n = Math.max(parts.length, 1);
-  const margin = 0.6;
-  const colW = (SLIDE_W - 2 * margin) / n;
-  const boxW = Math.min(colW * 0.78, 2.2);
-  const boxH = 0.5;
-  const gap = 0.5;
+  // #388: everything drawn here is later scaled UNIFORMLY into the region (fonts included, no
+  // floor), so whitespace in the natural layout directly costs font size. With a fit target the
+  // layout tightens its vertical constants and narrows the column spread toward the region's
+  // aspect ratio; without one, the historical constants apply unchanged.
+  const margin = fit ? 0.3 : 0.6;
+  const boxH = fit ? 0.42 : 0.5;
+  const gap = fit ? 0.34 : 0.5;
+  const headGap = 0.45; // participant box → first message row
   const noteH = 0.4;
   const noteStack = 0.12; // gap between stacked notes (or a note and whatever follows in the same slot)
   // A message's label is drawn 0.28in ABOVE its line (see the msgs loop below) — a
@@ -47,11 +61,46 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
   const noteToMsgClearance = 0.3;
   const noteW = 1.8;
   const notePad = 0.15;
+
+  // The slot walk (notes then message per slot) computed once as pure y-advances, so the fit
+  // branch can measure the content height without duplicating the walk (R8). `start` is the y of
+  // the first message row; the no-fit call sites see the exact historical arithmetic.
+  function walkYs(start: number): { noteYs: number[]; msgYs: number[]; lifelineBottom: number } {
+    const noteYs: number[] = [];
+    const msgYs: number[] = [];
+    let cursorY = start;
+    for (let k = 0; k <= spec.edges.length; k++) {
+      const notesHere = spec.notes.filter((x) => x.at === k);
+      for (let j = 0; j < notesHere.length; j++) {
+        noteYs.push(cursorY);
+        cursorY += noteH + noteStack;
+      }
+      if (k < spec.edges.length) {
+        if (notesHere.length) cursorY += noteToMsgClearance;
+        msgYs.push(cursorY);
+        cursorY += gap;
+      }
+    }
+    return { noteYs, msgYs, lifelineBottom: cursorY + 0.3 };
+  }
+
+  let colW = (SLIDE_W - 2 * margin) / n;
+  if (fit && fit.h > 0.05) {
+    // The uniform fit scale is min(availW/bw, availH/bh); it is maximised when the layout's
+    // aspect matches the region's. bh is fixed by the message/note count (probe walk below), so
+    // pick the column width that brings bw down to bh × regionAspect — clamped to MIN_COL_W so
+    // long labels keep room, and never wider than the full-slide spread.
+    const probe = walkYs(0);
+    const bh = boxH + headGap + probe.lifelineBottom + 0.2; // + the ±0.1 bbox pads
+    const desiredW = bh * (fit.w / fit.h);
+    colW = Math.min(colW, Math.max((desiredW - 2 * margin) / n, MIN_COL_W));
+  }
+  const boxW = Math.min(colW * 0.78, 2.2);
   // Centre the block vertically in the available space so it clears the slide's
   // title/subtitle (top-aligning at contentTop overlapped them). Conservatively
   // assumes every note precedes a message (worst case) — at most under-centres.
   const naturalH =
-    boxH + 0.45 + spec.edges.length * gap + spec.notes.length * (noteH + noteStack + noteToMsgClearance) + 0.3;
+    boxH + headGap + spec.edges.length * gap + spec.notes.length * (noteH + noteStack + noteToMsgClearance) + 0.3;
   const avail = SLIDE_H - contentTop - 0.4;
   const boxY = naturalH < avail ? contentTop + (avail - naturalH) / 2 : contentTop;
   const cx = (i: number) => margin + colW * i + colW / 2;
@@ -64,45 +113,39 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
   // Walk message slots 0..edges.length; any note pinned "at" a slot claims its own
   // row just before that slot's message (or, for `at === edges.length`, after the
   // last message), so notes never collide with message arrows/labels.
-  const firstMsgY = boxY + boxH + 0.45;
-  const msgs: SeqLayout["msgs"] = [];
-  const notes: SeqLayout["notes"] = [];
-  let cursorY = firstMsgY;
-  for (let k = 0; k <= spec.edges.length; k++) {
-    const notesHere = spec.notes.filter((x) => x.at === k);
-    for (const nt of notesHere) {
-      const cxs = nt.participants.map((pid) => cxById.get(pid)).filter((v): v is number => v !== undefined);
-      const spanLo = cxs.length ? Math.min(...cxs) : leftmostCx;
-      const spanHi = cxs.length ? Math.max(...cxs) : leftmostCx;
-      let x: number, w: number;
-      if (nt.placement === "over") {
-        w = Math.max(spanHi - spanLo + noteW * 0.6, noteW * 0.7);
-        x = (spanLo + spanHi) / 2 - w / 2;
-      } else {
-        w = noteW;
-        x = nt.placement === "left_of" ? spanLo - w - notePad : spanHi + notePad;
-      }
-      notes.push({ x, y: cursorY, w, h: noteH, text: nt.text });
-      cursorY += noteH + noteStack;
+  const firstMsgY = boxY + boxH + headGap;
+  const walked = walkYs(firstMsgY);
+  const msgs: SeqLayout["msgs"] = spec.edges.map((e, k) => {
+    const fi = idx.get(e.from) ?? 0;
+    const ti = idx.get(e.to) ?? 0;
+    return {
+      fromX: cx(fi),
+      toX: cx(ti),
+      y: walked.msgYs[k],
+      label: e.label,
+      dash: e.style?.dash ?? false,
+      self: e.from === e.to,
+      async: e.style?.async ?? false,
+    };
+  });
+  // Notes in walk order (slot by slot) so each pairs with its y from the walk.
+  const notesInWalkOrder: DiagramSpec["notes"] = [];
+  for (let k = 0; k <= spec.edges.length; k++) notesInWalkOrder.push(...spec.notes.filter((x) => x.at === k));
+  const notes: SeqLayout["notes"] = notesInWalkOrder.map((nt, j) => {
+    const cxs = nt.participants.map((pid) => cxById.get(pid)).filter((v): v is number => v !== undefined);
+    const spanLo = cxs.length ? Math.min(...cxs) : leftmostCx;
+    const spanHi = cxs.length ? Math.max(...cxs) : leftmostCx;
+    let x: number, w: number;
+    if (nt.placement === "over") {
+      w = Math.max(spanHi - spanLo + noteW * 0.6, noteW * 0.7);
+      x = (spanLo + spanHi) / 2 - w / 2;
+    } else {
+      w = noteW;
+      x = nt.placement === "left_of" ? spanLo - w - notePad : spanHi + notePad;
     }
-    if (k < spec.edges.length) {
-      if (notesHere.length) cursorY += noteToMsgClearance;
-      const e = spec.edges[k];
-      const fi = idx.get(e.from) ?? 0;
-      const ti = idx.get(e.to) ?? 0;
-      msgs.push({
-        fromX: cx(fi),
-        toX: cx(ti),
-        y: cursorY,
-        label: e.label,
-        dash: e.style?.dash ?? false,
-        self: e.from === e.to,
-        async: e.style?.async ?? false,
-      });
-      cursorY += gap;
-    }
-  }
-  const lifelineBottom = cursorY + 0.3;
+    return { x, y: walked.noteYs[j], w, h: noteH, text: nt.text };
+  });
+  const lifelineBottom = walked.lifelineBottom;
 
   // combined-fragment boxes (alt/loop/opt/par) over their message range, plus
   // `else`/`and` branch divider lines at their message positions.
@@ -129,7 +172,10 @@ export function computeSequenceLayout(spec: DiagramSpec, contentTop: number): Se
   });
 
   let minX = margin - 0.1;
-  let maxX = SLIDE_W - margin + 0.1;
+  // The historical bbox right edge assumed the full-slide spread; a fit-compacted layout ends at
+  // the last column's right edge instead (otherwise the compaction would never reach the fit
+  // scale). The no-fit expression is kept verbatim for float-exactness.
+  let maxX = fit ? margin + n * colW + 0.1 : SLIDE_W - margin + 0.1;
   for (const f of frags) { minX = Math.min(minX, f.x); maxX = Math.max(maxX, f.x + f.w); }
   for (const nt of notes) { minX = Math.min(minX, nt.x); maxX = Math.max(maxX, nt.x + nt.w); }
   return {
