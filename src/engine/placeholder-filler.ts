@@ -14,7 +14,7 @@ import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox } from "./visual-placement";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox, visualOccupancy } from "./visual-placement";
 import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml } from "./md-to-ooxml";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
@@ -154,10 +154,9 @@ async function buildSlideXml(
   // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
   const bodyPhs = bodyPlaceholders(layout.placeholders);
   const visualBody = (pi?: string) => nthBody(bodyPhs, pi);
-  const diagBodyIdx = slide.diagram ? visualBody(slide.diagram.placeholderIdx)?.idx : undefined;
-  const mermBodyIdx = slide.mermaidBlock ? visualBody(slide.mermaidBlock.placeholderIdx)?.idx : undefined;
-  const tableBodyIdx = slide.table ? visualBody(slide.table.placeholderIdx)?.idx : undefined;
-  const codeBodyIdx = slide.code ? visualBody(slide.code.placeholderIdx)?.idx : undefined;
+  // Which placeholders a visual replaces (skipped below) or a code block fills — the SAME map
+  // deck-diagnostics reads to report body text that would vanish under a visual (#390, R8).
+  const occupied = visualOccupancy(slide, layout.placeholders);
   // A BEHIND image is a backmost LAYER — not bound to a placeholder, so imageBodyIdx is undefined and
   // NO placeholder is skipped (existing content stays on top). A normal image prefers a PICTURE frame.
   const imageBehind = !!slide.image?.behind;
@@ -193,10 +192,11 @@ async function buildSlideXml(
   if (imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
 
   for (const ph of layout.placeholders) {
-    if (ph.idx === diagBodyIdx || ph.idx === mermBodyIdx || ph.idx === tableBodyIdx || ph.idx === imageBodyIdx) continue; // replaced by the visual
+    const occ = occupied.get(ph.idx);
+    if (occ && occ !== "code") continue; // replaced by the visual
     // A code/log block FILLS its body placeholder with monospace text (the placeholder's own
     // lstStyle supplies the monospace font / code-box styling — we only swap the text).
-    if (ph.idx === codeBodyIdx) {
+    if (occ === "code") {
       let shapeXml = replaceTextInShape(ph.shapeXml, { idx: ph.idx, paragraphs: codeToParagraphs(slide.code!.content) });
       shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
       shapes += shapeXml;

@@ -838,10 +838,14 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   const hasTitle = idxs.has("15");
   const hasCtrTitle = idxs.has("0");
   // A diagram/mermaid/table/code/image occupies a body placeholder even though it isn't in `placeholders`.
-  const visualIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx ?? slide.table?.placeholderIdx ?? slide.code?.placeholderIdx ?? slide.image?.placeholderIdx;
-  const hasBody = idxs.has("1") || visualIdx === "1";
-  const hasIdx2 = idxs.has("2") || visualIdx === "2";
-  const hasIdx3 = idxs.has("3") || visualIdx === "3";
+  // EVERY visual's ordinal counts (#390) — a slide can carry more than one (e.g. col 1 table + col 2
+  // diagram), and reading only the first would miss the region the others need.
+  const visualIdxs = [slide.diagram, slide.mermaidBlock, slide.table, slide.code, slide.image]
+    .flatMap((v) => (v ? [v.placeholderIdx] : []));
+  const hasVisual = visualIdxs.length > 0;
+  const hasBody = idxs.has("1") || visualIdxs.includes("1");
+  const hasIdx2 = idxs.has("2") || visualIdxs.includes("2");
+  const hasIdx3 = idxs.has("3") || visualIdxs.includes("3");
   // Closing intent lives in the HEADING (idx 15/0), not a stray body mention — so scope to the title
   // and use the SHARED closing vocabulary (CLOSING_RE) the layout classifier uses. This fixes both the
   // miss (まとめ/おわりに/ご清聴/Next steps were never routed to a Closing layout) and the false-positive
@@ -870,7 +874,7 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   // (idx0/ctrTitle) can't carry the idx15 title serializeSlide reads, so the title silently vanishes
   // on round-trip. sectionBreak is only ever set by the explicit marker (md-slide-parser.ts), so
   // unmarked decks are unaffected — byte-identical.
-  if (slideIndex === 0 && !visualIdx && !slide.sectionBreak && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  if (slideIndex === 0 && !hasVisual && !slide.sectionBreak && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
   // #153: a closing slide with body content (bullets) needs the body-bearing closing layout
   // (Closing.1Steps.Single+1Notes), not the ctrTitle-only one — pickLayout's closing-role filter
   // does the actual routing/degrade; regions:1 just signals "this closing has body content".
@@ -879,7 +883,9 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
       ? { role: "closing", regions: 1, fallback: LAYOUT_NAMES[29] }
       : { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
   }
-  if (slide.code) return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
+  // A code block beside body text (#390: moved to ordinal 2) needs a 2-region layout, not the 1-body
+  // code layout — fall through to the columns classification below, the same way a diagram does.
+  if (slide.code && slide.code.placeholderIdx === "1") return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
   if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };
   if (hasTitle && hasBody && hasIdx2) return { role: "columns", regions: 2, fallback: LAYOUT_NAMES[10] };
   if ((hasTitle || hasCtrTitle) && hasBody) return { role: "content", regions: 1, fallback: LAYOUT_NAMES[6] };
