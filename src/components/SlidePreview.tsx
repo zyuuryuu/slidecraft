@@ -16,6 +16,7 @@ import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups } from "../engine/group-binding";
+import { imageCaption } from "../engine/image-caption";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { cjkFontFamily } from "../engine/font-stack";
 import { MERMAID_CONFIG } from "./mermaid";
@@ -322,6 +323,35 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
     );
   };
 
+  // The alt caption under a BODY-FIGURE image (#399) — the SAME imageCaption geometry the PPTX export
+  // uses (R8), following the live drag box so it stays under the image while it moves.
+  const renderImageCaption = (resolved: ImageRect, textColor: string) => {
+    const cap = imageCaption(slide.image!, dragRect ?? resolved, textColor);
+    if (!cap) return null;
+    const r = cap.rect;
+    return (
+      <div
+        key="image-caption"
+        data-image-caption="true"
+        style={{
+          position: "absolute",
+          left: `${(r.x / SLIDE_W) * 100}%`,
+          top: `${(r.y / SLIDE_H) * 100}%`,
+          width: `${(r.w / SLIDE_W) * 100}%`,
+          height: `${(r.h / SLIDE_H) * 100}%`,
+          fontSize: cap.fontPt * (scale / 72),
+          color: `#${cap.color}`,
+          textAlign: "center",
+          lineHeight: 1.2,
+          overflow: "hidden",
+          pointerEvents: "none",
+        }}
+      >
+        {cap.text}
+      </div>
+    );
+  };
+
   // Background = the LAYOUT's own <p:bg> fill if it declares one (a full-bleed cover panel — solid
   // color, brand IMAGE, or GRADIENT), else the master's. A <p:bg> is exactly one fill, so a layout
   // that declares ANY background overrides the master's entirely (native slide→layout inheritance).
@@ -579,7 +609,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         // A BEHIND image is NOT rendered here (imageBodyIdx is undefined for it) — it's drawn as a
         // backmost layer BEFORE this map so existing content stays on top.
         if (slide.image && ph.idx === imageBodyIdx) {
-          return renderImageBox(imageRect(slide.image, ph) ?? s);
+          const resolved = imageRect(slide.image, ph) ?? s;
+          return [renderImageBox(resolved), renderImageCaption(resolved, s.fontColor)];
         }
 
         let content = contentFor.get(ph.idx);

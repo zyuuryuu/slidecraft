@@ -109,7 +109,10 @@ describe("最背面: PPTX places the behind image at the BACKMOST z-order", () =
     const zip = await JSZip.loadAsync(await generatePptx(deck, tpl));
     const s1 = await zip.file("ppt/slides/slide1.xml")!.async("string");
     const picIdx = s1.indexOf('name="Image"');
-    const lastSp = s1.lastIndexOf("<p:sp>");
-    expect(picIdx).toBeGreaterThan(lastSp); // body figure paints last = in front
+    // #399 でプレースホルダ以外の <p:sp>（alt キャプション）が増えたため、比較対象を「<p:ph を含む最後の <p:sp>」に明示化。
+    const lastPh = Math.max(...[...s1.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].filter((m) => m[0].includes("<p:ph")).map((m) => m.index!));
+    expect(lastPh).toBeGreaterThan(-1);
+    expect(picIdx).toBeGreaterThan(lastPh); // body figure paints after every placeholder = in front
+    expect(s1.indexOf('name="ImageCaption"')).toBeGreaterThan(picIdx); // its caption paints in front of it too
   });
 });
