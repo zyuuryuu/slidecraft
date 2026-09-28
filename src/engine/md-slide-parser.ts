@@ -301,6 +301,13 @@ export function parseSlideBlock(
   // Declared here (not just in the standard-parse path below) so the separator branch can ALSO
   // bind a column-scoped GFM table (#100) — mirroring how diagram/mermaidBlock are shared.
   let table: TableBlock | undefined;
+  // #391: only ONE diagram / ONE mermaid image survives per slide — a later one of the same kind
+  // replaces the earlier ("last wins", unchanged until side-by-side placement lands). Report it.
+  const setFigure = (f: { diagram?: DiagramBlock; mermaidBlock?: MermaidBlock }) => {
+    if ((f.diagram && diagram) || (f.mermaidBlock && mermaidBlock)) notices?.push({ kind: "figure-dropped" });
+    if (f.diagram) diagram = f.diagram;
+    else mermaidBlock = f.mermaidBlock;
+  };
   let cursor = 0;
 
   // Skip leading blank lines — a "---" split leaves one at the top of each block,
@@ -367,11 +374,9 @@ export function parseSlideBlock(
       // of text — bind it to THIS column's idx so the figure coexists beside the other columns.
       const fig = extractFencedBlock(sl);
       if (fig && (fig.lang === "diagram" || fig.lang === "mermaid-shapes")) {
-        diagram = { yaml: fig.content, placeholderIdx: colIdx };
+        setFigure({ diagram: { yaml: fig.content, placeholderIdx: colIdx } });
       } else if (fig && fig.lang === "mermaid") {
-        const f = mermaidToFigure(fig.content, colIdx);
-        if (f.diagram) diagram = f.diagram;
-        else mermaidBlock = f.mermaidBlock;
+        setFigure(mermaidToFigure(fig.content, colIdx));
       } else {
         const found = findTableInLines(sl);
         if (found) {
@@ -411,11 +416,9 @@ export function parseSlideBlock(
   // branch AND the EOF flush (#89) so an UNCLOSED fence's content isn't silently dropped.
   const commitCodeBlock = () => {
     if (codeBlockLang === "diagram" || codeBlockLang === "mermaid-shapes") {
-      diagram = { yaml: codeBlockLines.join("\n"), placeholderIdx: "1" };
+      setFigure({ diagram: { yaml: codeBlockLines.join("\n"), placeholderIdx: "1" } });
     } else if (codeBlockLang === "mermaid") {
-      const f = mermaidToFigure(codeBlockLines.join("\n"), "1");
-      if (f.diagram) diagram = f.diagram;
-      else mermaidBlock = f.mermaidBlock;
+      setFigure(mermaidToFigure(codeBlockLines.join("\n"), "1"));
     } else if (codeBlockLines.length > 0) {
       // Any OTHER fence (```yaml / ```python / ```log / ```) is CODE/LOG — a monospace body.
       code = { content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" };
@@ -538,6 +541,13 @@ export function parseSlideBlock(
     diagram = { ...diagram, placeholderIdx: "2" };
   } else if (hasBodyText && mermaidBlock) {
     mermaidBlock = { ...mermaidBlock, placeholderIdx: "2" };
+  }
+  // #390: a table / code block beside body text gets the same treatment — at idx 1 it would share the
+  // bullets' region, where export skips (table) or overwrites (code) the text silently. Content
+  // namespace only: in the title namespace idx 1 is the SUBTITLE, not a body region to sit beside.
+  if (hasBodyText && !isTitle) {
+    if (table) table = { ...table, placeholderIdx: "2" };
+    if (code) code = { ...code, placeholderIdx: "2" };
   }
 
   return {

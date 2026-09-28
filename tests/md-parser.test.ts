@@ -85,7 +85,9 @@ describe("parseMd — lead paragraph + table coexistence (#101)", () => {
   it("keeps the lead paragraph AND the table", () => {
     const s = parseMd(`# Q3\n\n前置き\n\n${TABLE}`).slides[0];
     expect(s.table?.rows).toEqual([["Metric", "Value"], ["Latency", "12ms"]]);
-    expect(s.table?.placeholderIdx).toBe("1");
+    // #101 fixed "1" here, but at export the table then took the bullets' region and 前置き vanished
+    // (= pinned the #390 bug). #390: a table beside body text sits in the 2nd body region.
+    expect(s.table?.placeholderIdx).toBe("2");
     const body = s.placeholders.find((p) => p.idx === "1");
     expect(JSON.stringify(body)).toContain("前置き");
   });
