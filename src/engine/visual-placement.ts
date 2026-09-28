@@ -200,3 +200,26 @@ export function unboundVisuals(
     out.push({ kind: "image", placeholderIdx: slide.image.placeholderIdx });
   return out;
 }
+
+/**
+ * #390: the layout placeholders a visual TAKES OVER (idx → kind). A diagram / mermaid / table /
+ * non-behind image REPLACES its placeholder (the shape is skipped); a code block FILLS it with the
+ * code text. Either way, body text bound to that placeholder is not drawn. Shared by the export
+ * (placeholder-filler skips/fills exactly these) and deck-diagnostics (which reports body text bound
+ * to one) — R8, one calculation. A replacing visual wins over code on the same placeholder, as in
+ * the export. Pure (R2).
+ */
+export function visualOccupancy(
+  slide: SlideIR,
+  layoutPlaceholders: readonly PlaceholderInfo[],
+): Map<string, VisualKind> {
+  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
+  const occ = new Map<string, VisualKind>();
+  const put = (kind: VisualKind, ph: PlaceholderInfo | undefined) => { if (ph) occ.set(ph.idx, kind); };
+  if (slide.code) put("code", nthBody(bodyPhs, slide.code.placeholderIdx));
+  if (slide.diagram) put("diagram", nthBody(bodyPhs, slide.diagram.placeholderIdx));
+  if (slide.mermaidBlock) put("mermaid", nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx));
+  if (slide.table) put("table", nthBody(bodyPhs, slide.table.placeholderIdx));
+  if (slide.image && !slide.image.behind) put("image", imagePlaceholder(layoutPlaceholders, slide.image.placeholderIdx));
+  return occ;
+}
