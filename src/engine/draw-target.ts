@@ -98,6 +98,14 @@ export interface PaintOptions {
    * whole diagram doesn't rescale as the dragged node's bbox changes.
    */
   transform?: { scale: number; offsetX: number; offsetY: number };
+  /**
+   * The region SIZE the layout may compact itself toward before the uniform fit
+   * (#388 — sequence diagrams tighten gaps/column spread so fonts stay legible).
+   * Derived automatically from `region`; pass it explicitly when using a fixed
+   * `transform` for a region-fitted diagram (the drag overlays), or the painter
+   * would lay out full-slide while the transform expects the compacted layout.
+   */
+  layoutFit?: { w: number; h: number };
 }
 
 /**
