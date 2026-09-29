@@ -8,7 +8,7 @@
  */
 
 import type { Paragraph } from "./slide-schema";
-import { paragraphsToOoxml } from "./md-to-ooxml";
+import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
 
 const NS =
   `xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"` +
@@ -23,8 +23,9 @@ export const NOTES_SLIDE_CT =
 export const NOTES_MASTER_CT =
   "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml";
 
-/** notesSlideN.xml — ノート本文（body placeholder idx=1）のみの最小 notes パート。 */
-export function notesSlideXml(notes: Paragraph[]): string {
+/** notesSlideN.xml — ノート本文（body placeholder idx=1）のみの最小 notes パート。
+ *  `link`: ノート内リンク（#393）の rId 解決（hyperlink-rels — rId は NOTES_FIRST_LINK_RID から）。 */
+export function notesSlideXml(notes: Paragraph[], link?: LinkResolver): string {
   return (
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<p:notes ${NS}>` +
@@ -36,7 +37,7 @@ export function notesSlideXml(notes: Paragraph[]): string {
     `<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>` +
     `<p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>` +
     `<p:spPr/>` +
-    `<p:txBody><a:bodyPr/><a:lstStyle/>${paragraphsToOoxml(notes)}</p:txBody>` +
+    `<p:txBody><a:bodyPr/><a:lstStyle/>${paragraphsToOoxml(notes, link)}</p:txBody>` +
     `</p:sp>` +
     `</p:spTree></p:cSld>` +
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
@@ -44,8 +45,12 @@ export function notesSlideXml(notes: Paragraph[]): string {
   );
 }
 
-/** notesSlideN.xml.rels — notesMaster と親スライドの両方を参照（PowerPoint 実出力と同型）。 */
-export function notesSlideRels(slideNum: number, notesMasterNum: number): string {
+/** notesSlide rels の固定枠（rId1 notesMaster・rId2 親スライド）の次＝ノート内ハイパーリンクの先頭 rId。 */
+export const NOTES_FIRST_LINK_RID = 3;
+
+/** notesSlideN.xml.rels — notesMaster と親スライドの両方を参照（PowerPoint 実出力と同型）。
+ *  `linkRels`: ノート内リンクの External hyperlink rels（無ければ空＝出力不変）。 */
+export function notesSlideRels(slideNum: number, notesMasterNum: number, linkRels = ""): string {
   return (
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +
     `<Relationships ${REL_NS}>` +
@@ -53,6 +58,7 @@ export function notesSlideRels(slideNum: number, notesMasterNum: number): string
     ` Target="../notesMasters/notesMaster${notesMasterNum}.xml"/>` +
     `<Relationship Id="rId2" Type="${REL_T}/slide"` +
     ` Target="../slides/slide${slideNum}.xml"/>` +
+    linkRels +
     `</Relationships>`
   );
 }

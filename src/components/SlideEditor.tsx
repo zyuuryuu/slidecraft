@@ -15,6 +15,7 @@ import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRati
 import { groupEditorPlan } from "../engine/group-binding";
 import { indentForLevel, levelFromIndent, measureIndent } from "../engine/paragraph-nesting";
 import { shiftBulletIndent } from "../engine/bullet-indent-shift";
+import { parseInline, serializeInline } from "../engine/md-inline";
 import DiagramEditor from "./DiagramEditor";
 
 interface SlideEditorProps {
@@ -60,12 +61,7 @@ function getLabel(idx: string, layoutPh: LayoutInfo | undefined): string {
 function paragraphsToText(paragraphs: Paragraph[]): string {
   return paragraphs
     .map((p) => {
-      const text = p.segments.map((s) => {
-        let t = s.text;
-        if (s.bold) t = `**${t}**`;
-        if (s.italic) t = `*${t}*`;
-        return t;
-      }).join("");
+      const text = serializeInline(p.segments);
       if (p.heading) return `### ${text}`;
       // Preserve nesting (#103) so opening/saving an unrelated field never flattens an
       // already-nested bullet — the field editor doesn't add Tab/Shift-Tab controls (out of
@@ -84,16 +80,8 @@ function textToParagraphs(text: string): Paragraph[] {
     const content = headingMatch ? headingMatch[1] : bulletMatch ? bulletMatch[1] : line;
     const level = bulletMatch ? levelFromIndent(measureIndent(line)) : 0;
 
-    // Parse inline formatting
-    const segments: { text: string; bold?: boolean; italic?: boolean }[] = [];
-    const re = /(\*\*(.+?)\*\*|\*(.+?)\*|([^*]+))/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(content)) !== null) {
-      if (m[2]) segments.push({ text: m[2], bold: true });
-      else if (m[3]) segments.push({ text: m[3], italic: true });
-      else if (m[4]) segments.push({ text: m[4] });
-    }
-    if (segments.length === 0) segments.push({ text: content });
+    // Inline formatting via the engine's single inline parser (R8 — md-inline.ts, #393).
+    const segments = parseInline(content);
 
     return {
       segments,

@@ -4,7 +4,8 @@
  * template-less one (md-serializer.ts). Split from md-serializer.ts for R1. Pure logic (R2).
  */
 
-import type { SlideIR, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
+import { serializeInline } from "./md-inline";
 import { tableToMarkdown } from "./md-table";
 import { indentForLevel } from "./paragraph-nesting";
 
@@ -30,19 +31,6 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   return null;
 }
 
-// ── Inline segments → Markdown text ──
-
-function serializeSegments(segments: InlineSegment[]): string {
-  return segments
-    .map((seg) => {
-      let text = seg.text;
-      if (seg.bold) text = `**${text}**`;
-      if (seg.italic) text = `*${text}*`;
-      return text;
-    })
-    .join("");
-}
-
 // ── Paragraphs → Markdown lines ──
 
 /** A PLAIN paragraph's text is, trimmed, EXACTLY one complete `<!-- … -->` comment — the shape #147's
@@ -53,7 +41,7 @@ const COMMENT_ONLY_TEXT_RE = /^<!--(?:(?!-->).)*-->$/;
 export function serializeParagraphs(paragraphs: Paragraph[]): string {
   return paragraphs
     .map((p) => {
-      const text = serializeSegments(p.segments);
+      const text = serializeInline(p.segments);
       if (p.heading) return `### ${text}`;
       if (p.bullet) return `${indentForLevel(p.level ?? 0)}- ${text}`;
       // #165: a GUI-authored comment-only PLAIN paragraph would otherwise emit a line #147's parser
