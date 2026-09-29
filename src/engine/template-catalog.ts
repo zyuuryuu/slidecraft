@@ -15,6 +15,7 @@ import type { LayoutInfo, PlaceholderInfo, TemplateData } from "./template-loade
 import { detectGroups } from "./group-layout";
 import { isChromeBand } from "./master-scorer";
 import { isTitleLayout } from "./slide-roles";
+import { fieldSlotOf, isFieldIdx, type FieldKind } from "./field-rows";
 
 export type LayoutRole =
   | "title"
@@ -42,6 +43,11 @@ export type PlaceholderRole =
   | "picture"
   | "chart"
   | "table"
+  // Field-row CONTENT roles (#397/#398, field-rows.ts): only slideIdxRole returns these (for the
+  // canonical "callout"/"source" idx). placeholderRole never does — a layout's slot is recognized by
+  // name (fieldSlotOf) on top of its ordinary role, and binding matches the two in Pass 0.
+  | "callout"
+  | "source"
   | "other";
 
 export interface CatalogPlaceholder {
@@ -65,6 +71,10 @@ export interface CatalogEntry {
   // does NOT affect role/bodyCount/placeholders, so buildFieldMap / the 1:1 bijection are untouched.
   groupKind?: "card" | "step" | "kpi" | "compare";
   groupCount?: number; // number of groups (columns)
+  // Field-row slots this layout offers (#397/#398) — for the auto pick's variant preference. Additive
+  // (absent when none). bodyOrdinal = the slot's 1-based position among the content bodies, when the
+  // slot is itself a content body (Midnight Callout.Top) — a visual at that ordinal would share it.
+  fieldSlots?: Array<{ kind: FieldKind; bodyOrdinal?: number }>;
 }
 
 export type LayoutCatalog = CatalogEntry[];
@@ -507,6 +517,7 @@ export function placeholderCapacity(style: { w: number; h: number; fontSize: num
  * 12=footer, 50=slideNumber. Lets injection bind by ROLE into any template.
  */
 export function slideIdxRole(idx: string, hasCtrTitle: boolean): PlaceholderRole {
+  if (isFieldIdx(idx)) return idx; // field-row content ("callout"/"source") — its own role (field-rows.ts)
   switch (idx) {
     case "0":
     case "15":
@@ -559,6 +570,14 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
   // or 1-body content layout (only matters on the name-less/degraded path).
   const bodyBoxes = bodyPhs.map((ph) => ({ x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h }));
   const shape = detectGroups(layout); // geometric group detection (on-demand; never mutates the above)
+  // Ordinal in idx order — the SAME order visual-placement.bodyPlaceholders rides (sortByIdx), so this
+  // agrees with where a figure at that ordinal would land (field-rows.test locks the agreement, R8).
+  const bodyByIdx = [...bodyPhs].sort((a, b) => a.idx.length - b.idx.length || a.idx.localeCompare(b.idx));
+  const fieldSlots = layout.placeholders.flatMap((ph) => {
+    const kind = fieldSlotOf(ph);
+    const ord = bodyByIdx.indexOf(ph) + 1;
+    return kind ? [{ kind, ...(ord > 0 ? { bodyOrdinal: ord } : {}) }] : [];
+  });
   return {
     name: layout.name,
     role: classifyLayout(layout.name, { hasTitle, hasSubtitle, bodyCount, bodyBoxes }),
@@ -567,6 +586,7 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     hasSubtitle,
     placeholders,
     ...(shape ? { groupKind: shape.kind, groupCount: shape.groups.length } : {}),
+    ...(fieldSlots.length > 0 ? { fieldSlots } : {}),
   };
 }
 

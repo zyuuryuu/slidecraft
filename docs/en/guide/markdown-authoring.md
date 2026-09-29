@@ -93,6 +93,35 @@ Points to remember:
 
 ---
 
+## Conclusion band `Takeaway:` / source line `Source:`
+
+Content slides can carry two **field rows** (a one-line `Key: value`) besides the body. When the template has a dedicated box for one, a layout with that box is chosen automatically and the row is flowed into it.
+
+- `Takeaway:` — **the slide's conclusion in one line**. To keep "one slide, one message", write one on every content slide; the body then only supports it. Goes into the callout box (e.g. Midnight's `Content.1Body.Single+1Callout`).
+- `Source:` — **where the data comes from**. Always write one on slides that show numbers, tables or charts. Goes into the source box (e.g. Midnight's `Content.1Body.Single+1Source`, or `Table.1Table.Single+1Source` for a table; the `出典` box of the 公文書 template).
+
+```markdown
+# 地域別人口
+
+| 地域 | 人口 |
+|---|---|
+| 東京 | 1400万 |
+
+Takeaway: 人口は首都圏へ一極集中が続く
+Source: 総務省 2025
+```
+
+Points to remember:
+
+- The keys are `Takeaway` / `Source` (case-insensitive). They may appear anywhere in the slide (on export they are gathered after the slide body).
+- Repeating a key adds one paragraph per line to its box (e.g. two sources).
+- Unlike `Category:` and the other meta keys, a field row does not turn the slide into a title-type slide.
+- They also work on slides with region separators (`<!-- col -->` / `<!-- card -->` …): the row belongs to the whole slide, not to the last region.
+- A `Source:` line inside a code fence stays code.
+- If the template (or the pinned layout) has no box for the row, the row is **not exported**. MCP `get_deck_issues` warns that the layout has no box for the `Takeaway:` row (showing it in the app's diagnostics panel is tracked in #419). Move it into the body, or use a template that has the box.
+
+---
+
 ## GFM tables
 
 A standard GFM (GitHub Flavored Markdown) table becomes a **native PPTX table** (cells editable in PowerPoint), not an image. It enters the body area as a table with a header row.
