@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
+import { parseInline } from "../engine/md-inline";
 import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, PlaceholderStyle } from "../engine/template-loader";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
@@ -88,12 +89,23 @@ function renderSegments(segments: InlineSegment[]) {
     const style: React.CSSProperties = {};
     if (seg.bold) style.fontWeight = "bold";
     if (seg.italic) style.fontStyle = "italic";
+    // #393: strike / link mirror the export's strike="sngStrike" / hlinkClick (underlined, not
+    // navigable in the preview). Code carries no font pin — the export doesn't either (master fonts).
+    const deco = [seg.href && "underline", seg.strike && "line-through"].filter(Boolean).join(" ");
+    if (deco) style.textDecoration = deco;
     return (
       <span key={i} style={style}>
         {seg.text}
       </span>
     );
   });
+}
+
+/** A table cell's inline markdown (#395 — same parser as the export's table-ooxml). A markup-free
+ *  cell stays a bare text node, so existing tables' preview/HTML export markup is unchanged. */
+function renderCell(cell: string) {
+  const segs = parseInline(cell);
+  return segs.length === 1 && Object.keys(segs[0]).length === 1 ? cell : renderSegments(segs);
 }
 
 // Nested-bullet indent step (#103), in points — scaled the same way font sizes are (pt × scale/72) so
@@ -569,7 +581,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                               wordBreak: "break-word",
                             }}
                           >
-                            {cell}
+                            {renderCell(cell)}
                           </td>
                         ))}
                       </tr>

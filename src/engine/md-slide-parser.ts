@@ -1,10 +1,10 @@
 /**
  * md-slide-parser.ts — Parse ONE slide block (between `---` separators) into a
  * SlideIR: title/subtitle/fields, columns/KPI/step separators, bullet paragraphs,
- * inline bold/italic runs, and embedded diagram/mermaid figures. Split out
+ * inline runs (md-inline), and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph, InlineSegment } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph } from "./slide-schema";
 import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
@@ -13,6 +13,7 @@ import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-ro
 import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
+import { parseInline } from "./md-inline";
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -34,24 +35,6 @@ function mermaidToFigure(
 // Title-slide metadata (Category/Date/Footer) → idx is defined in slide-roles (metaFieldIdx), the
 // single source of truth. (Meta/Summary were previously mapped to "11" too — colliding with Date and
 // dropping one — so they're no longer special-cased; "Meta:"/"Summary:" lines fall through to body.)
-
-// ── Inline text parsing ──
-
-function parseInline(text: string): InlineSegment[] {
-  const segments: InlineSegment[] = [];
-  const re = /(\*\*(.+?)\*\*|\*(.+?)\*|([^*]+))/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m[2]) {
-      segments.push({ text: m[2], bold: true });
-    } else if (m[3]) {
-      segments.push({ text: m[3], italic: true });
-    } else if (m[4]) {
-      segments.push({ text: m[4] });
-    }
-  }
-  return segments.length > 0 ? segments : [{ text }];
-}
 
 // ── Parse lines into paragraphs ──
 
