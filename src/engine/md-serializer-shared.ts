@@ -131,7 +131,7 @@ export function fieldRowLines(slide: SlideIR): string[] {
   for (const { name, kind } of FIELD_ROWS) {
     const ph = getPlaceholder(slide, kind);
     for (const p of ph?.paragraphs ?? []) {
-      const text = serializeSegments(p.segments).trim();
+      const text = serializeInline(p.segments).trim();
       if (text) out.push(`${name}: ${text}`);
     }
   }
