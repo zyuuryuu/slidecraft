@@ -1,7 +1,7 @@
 /**
  * md-to-ooxml.ts — Convert SlideIR paragraphs to OOXML <a:p> elements.
  *
- * Handles inline formatting (bold, italic, strike, hyperlink — #393) and bullet lists.
+ * Handles inline formatting (bold, italic, strike, hyperlink — #393) and bullet / numbered (#394) lists.
  */
 
 import type { Paragraph, InlineSegment } from "./slide-schema";
@@ -51,9 +51,16 @@ export function paragraphToOoxml(para: Paragraph, link?: LinkResolver): string {
   // Nesting (#103): lvl="1..3" selects the master's lvl2pPr..lvl4pPr list style — PowerPoint
   // resolves the glyph/font/indent from there, so nothing else is pinned here (R7/master-font-inherit).
   // level 0 (the default) omits the attribute entirely — byte-identical with pre-#103 output.
-  const pPr = para.bullet
-    ? (para.level ? `<a:pPr lvl="${para.level}"/>` : "")
-    : "<a:pPr><a:buNone/></a:pPr>";
+  // Numbered (#394): buAutoNum lets PowerPoint number the items (re-numbers on edit); indent/size/color
+  // still come from the master's lvlNpPr. buFontTx draws the number in the TEXT font — without it the
+  // number inherits the master's bullet font (lstStyle buFont), which a template may set to a symbol
+  // font such as Wingdings for its `•` glyph.
+  const lvl = para.level ? ` lvl="${para.level}"` : "";
+  const pPr = !para.bullet
+    ? "<a:pPr><a:buNone/></a:pPr>"
+    : para.ordered
+      ? `<a:pPr${lvl}><a:buFontTx/><a:buAutoNum type="arabicPeriod"/></a:pPr>`
+      : lvl ? `<a:pPr${lvl}/>` : "";
   return `<a:p>${pPr}${runs}</a:p>`;
 }
 
