@@ -18,7 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable, groupMarkerLine } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
@@ -169,8 +169,8 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
     if (subtitle) lines.push(`> ${subtitle}`);
     lines.push("");
 
-    // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
-    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
+    // Prefer the slide's own group kind (card/step/kpi/compare/beforeAfter) over inferring from the
+    // layout name, so a `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
     // single-body code/image is NEVER column-scoped: a figure slide that merely RESOLVED to a
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
     // trailing figure into the last column). A table is the SAME — UNLESS it's genuinely
@@ -199,7 +199,7 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
       if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
 
       for (let col = 1; col <= maxCol; col++) {
-        lines.push(`<!-- ${sepType} -->`);
+        lines.push(groupMarkerLine(sepType, col));
         if (col === diagIdx) {
           lines.push("```diagram");
           lines.push(slide.diagram!.yaml);

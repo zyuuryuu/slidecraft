@@ -1,16 +1,28 @@
 /**
  * md-separators.ts — Column / KPI / step separator detection + line trimming for
- * a slide body (`<!-- col -->` / `<!-- kpi -->` / `<!-- step -->`). Split from
- * md-slide-parser.ts for R1. Pure string utilities, no imports.
+ * a slide body (`<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` / `<!-- card -->` / `<!-- compare -->`,
+ * and the `<!-- before -->` / `<!-- after -->` pair). Split from md-slide-parser.ts for R1. Pure string
+ * utilities, no imports.
  */
 // ── Detect separator type in lines ──
 
-export type SeparatorType = "col" | "kpi" | "step" | "card";
+export type SeparatorType = "col" | "kpi" | "step" | "card" | "compare" | "beforeAfter";
+
+/** #402: `<!-- before -->` and `<!-- after -->` are ONE separator family (beforeAfter) — either word
+ *  opens a region. Meaning is POSITIONAL (beforeAfterRole): the serializer writes the words back in that
+ *  order (groupMarkerLine) and the overlay labels the regions with it (before-after.ts). */
+const BEFORE_AFTER = "(?:before|after)";
+
+/** The role of region `ordinal` (1-based) in a before/after group — region 1 is Before, every later one
+ *  After. The ONE definition of that mapping (R8): marker write-back and role labels both read it. */
+export function beforeAfterRole(ordinal: number): "before" | "after" {
+  return ordinal === 1 ? "before" : "after";
+}
 
 export function detectSeparator(lines: string[]): SeparatorType | null {
   for (const line of lines) {
-    const m = line.trim().match(/^<!--\s*(col|kpi|step|card)\s*-->$/);
-    if (m) return m[1] as SeparatorType;
+    const m = line.trim().match(/^<!--\s*(col|kpi|step|card|compare|before|after)\s*-->$/);
+    if (m) return m[1] === "before" || m[1] === "after" ? "beforeAfter" : (m[1] as SeparatorType);
   }
   return null;
 }
@@ -21,7 +33,7 @@ export function splitBySeparator(
   lines: string[],
   sepType: SeparatorType,
 ): string[][] {
-  const pattern = new RegExp(`^<!--\\s*${sepType}\\s*-->$`);
+  const pattern = new RegExp(`^<!--\\s*${sepType === "beforeAfter" ? BEFORE_AFTER : sepType}\\s*-->$`);
   const sections: string[][] = [];
   let current: string[] = [];
   let inSection = false;

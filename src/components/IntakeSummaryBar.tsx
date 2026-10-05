@@ -41,6 +41,7 @@ function LayoutThumb({ template, sample, name }: { template: TemplateData; sampl
           masterDecorations={template.masterDecorations}
           masterImages={template.masterImages}
           masterStaticTexts={template.masterStaticTexts}
+          themeColors={template.themeColors}
           scale={THUMB_SCALE}
           isActive={false}
           exportMode

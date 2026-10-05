@@ -23,6 +23,7 @@ import { cjkFontFamily } from "../engine/font-stack";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
+import BeforeAfterOverlay from "./BeforeAfterOverlay";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -164,6 +165,9 @@ interface SlideCardProps {
    *  で導出して渡す — PPTX export（placeholder-filler.buildSlideXml）と同じ導出関数（R8）。
    *  null＝章扉より前 or section 無しデッキ＝注入なし。 */
   sectionFooterText?: string | null;
+  /** The template's resolved scheme colors (TemplateData.themeColors) — the #402 Before/After overlay
+   *  paints in accent1/lt1 like the export's schemeClr. Omitted → neutral fallbacks. */
+  themeColors?: Record<string, string>;
 }
 
 // PowerPoint preset shapes → SVG polygon points (in a 0–100 box, stretched to the shape's rect).
@@ -234,7 +238,7 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   );
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText, themeColors }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -661,6 +665,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         );
       })}
 
+      {/* #402 Before/After arrow + role labels — frontmost, the export's geometry (renders null otherwise) */}
+      <BeforeAfterOverlay slide={slide} layout={layout} themeColors={themeColors} scale={scale} slideW={SLIDE_W} slideH={SLIDE_H} />
+
       {/* Slide number — preview only; the standalone-HTML shell provides its own counter */}
       {!exportMode && (
         <div
@@ -774,6 +781,7 @@ export default function SlidePreview({
         masterDecorations={template?.masterDecorations}
         masterImages={template?.masterImages}
         masterStaticTexts={template?.masterStaticTexts}
+        themeColors={template?.themeColors}
         scale={scale}
         isActive={active}
         sectionFooterText={sectionFooterFor(deck!, i)}

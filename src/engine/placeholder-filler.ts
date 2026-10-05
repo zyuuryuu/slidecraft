@@ -17,6 +17,7 @@ import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, drawnImage, visualOccupancy } from "./visual-placement";
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
 import { isGroupedLayout, expandGroups } from "./group-binding";
+import { beforeAfterOverlay, beforeAfterShapesXml } from "./before-after";
 import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
 import { createLinkRegistry } from "./hyperlink-rels";
 import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
@@ -277,8 +278,14 @@ async function buildSlideXml(
     const tablePh = visualBody(slide.table.placeholderIdx);
     if (tablePh) {
       shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id, links.rIdFor);
+      id++;
     }
   }
+
+  // #402: a Before/After pair's direction arrow + role labels, frontmost — the SAME geometry the preview
+  // draws (before-after.ts). Undefined for every other slide → nothing added.
+  const ba = beforeAfterOverlay(slide, layout);
+  if (ba) shapes += beforeAfterShapesXml(id, ba).xml;
 
   const xml =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +

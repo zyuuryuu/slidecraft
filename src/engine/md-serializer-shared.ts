@@ -9,6 +9,7 @@ import { serializeInline } from "./md-inline";
 import { tableToMarkdown } from "./md-table";
 import { indentForLevel } from "./paragraph-nesting";
 import { FIELD_ROWS } from "./field-rows";
+import { beforeAfterRole } from "./md-separators";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -30,6 +31,14 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   if (isKpiLayout(layout)) return "kpi";
   if (isProcessLayout(layout)) return "step";
   return null;
+}
+
+/** The separator line opening region `col` (1-based) of a `sepType` group. Every family repeats its own
+ *  word, except the #402 before/after pair, whose word is the region's positional role (beforeAfterRole —
+ *  the same mapping the overlay labels draw). */
+export function groupMarkerLine(sepType: string, col: number): string {
+  const word = sepType === "beforeAfter" ? beforeAfterRole(col) : sepType;
+  return `<!-- ${word} -->`;
 }
 
 // ── Paragraphs → Markdown lines ──

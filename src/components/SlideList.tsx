@@ -151,6 +151,7 @@ export default function SlideList({
                 masterBackgroundGradient={template?.masterBackgroundGradient}
                 masterDecorations={template?.masterDecorations}
                 masterStaticTexts={template?.masterStaticTexts}
+                themeColors={template?.themeColors}
                 scale={THUMB_SCALE}
                 isActive={activeIndex === i}
                 selected={selected?.has(i)}
