@@ -11,7 +11,8 @@ import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt } fr
 import { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, type DiagramType } from "./diagram-type-prompts";
 import { templateSpecSystemPrompt } from "./template-spec-prompts";
 import type { LayoutCatalog, LayoutRole } from "./template-catalog";
-import type { FieldKind } from "./field-rows";
+import { fieldSlotOf, type FieldKind } from "./field-rows";
+import { BUILTIN_LAYOUTS } from "./template-layout-library";
 import { ICON_NAMES } from "./icon-catalog";
 
 // The diagram prompt surface moved to diagram-type-prompts.ts (two-stage per-type design); re-export so
@@ -62,6 +63,11 @@ function compareRules(catalog?: LayoutCatalog): string[] {
   ];
 }
 
+/** The field rows the canonical built-in layouts have a slot for (the no-template default). */
+const CANONICAL_FIELD_KINDS: ReadonlySet<FieldKind> = new Set(
+  BUILTIN_LAYOUTS.flatMap((l) => l.placeholders.flatMap((p) => fieldSlotOf(p) ?? [])),
+);
+
 export function slideSystemPrompt(catalog?: LayoutCatalog): string {
   // Advertise the ACTUAL template's layouts when we have a catalog (alien-safe); else the canonical set
   // (manual copy with no template loaded). Same rule for the role-based selection guidance below.
@@ -83,12 +89,15 @@ export function slideSystemPrompt(catalog?: LayoutCatalog): string {
     rule("closing", "Closing.1Message.Single", "Last slide (closing)"),
   ].filter(Boolean).join("\n");
 
-  // #397/#398 field rows — advertised only when THIS template has a slot for them (no catalog → the
-  // canonical set, which has both). A template without the slot gets the prompt unchanged.
-  const hasSlot = (k: FieldKind) => !catalog || !catalog.length || catalog.some((e) => e.fieldSlots?.some((s) => s.kind === k));
+  // #397/#398/#404 field rows — advertised only when THIS template has a slot for them (no catalog → the
+  // canonical built-in set, read off its own layout defs by the same fieldSlotOf binding uses). A
+  // template without the slot gets the prompt unchanged.
+  const hasSlot = (k: FieldKind) =>
+    catalog && catalog.length ? catalog.some((e) => e.fieldSlots?.some((s) => s.kind === k)) : CANONICAL_FIELD_KINDS.has(k);
   const fieldRows = [
     hasSlot("callout") ? "Takeaway: the slide's ONE message as one line (content slides — one per slide; shown in the callout band)" : undefined,
     hasSlot("source") ? "Source: where the data comes from (data/table slides — always cite; shown as the source line)" : undefined,
+    hasSlot("kicker") ? "Kicker: a short category label shown above the title (content slides, e.g. \"SECTION 02 · Cost\"; title slides use Category:)" : undefined,
   ].filter(Boolean).map((l) => `\n${l}`).join("");
 
   return `You are a presentation assistant. Generate a slide deck in SlideCraft Markdown format based on the user's request.
