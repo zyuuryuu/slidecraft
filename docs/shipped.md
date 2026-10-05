@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **番号付きリスト `1.`（自動番号）** — `1.` / `1)` 行が番号込みの地の文（buNone）だった問題を解消。`Paragraph.ordered`（optional）を追加し、行頭マーカーの読み書きを `list-markers.ts` に一本化（parser・GUI フィールドエディタ・serializer・プレビュー、R8）。PPTX は `buFontTx`＋`buAutoNum arabicPeriod`（lvl は #103 と同じ）、serializer は段ごとの `1.` 連番へ正規化（空行は継続）。`-`/`*`・地の文は全経路 byte-identical （#394・PR #450・2026-10-05）
 - **比較スライド `<!-- compare -->`＋Before/After `<!-- before -->`/`<!-- after -->`** — テンプレに元からある比較レイアウト（Compare.2Option.Versus・12_課題と対策）へ auto 選択から到達可能に。before/after は位置で役割が決まる 1 族（beforeAfterRole に一本化・R8）、方向矢印と役割ラベルは PPTX/プレビュー共有（テンプレ自身の矢印があれば重ねない）。canonical 名レイアウトは名前でグループ判定し章扉の compare 誤判定を根治。マーカーなしデッキ byte-identical （#396/#402・PR #442・2026-10-05）
 - **カード見出しアイコン `:name:`＋現在ステップ `<!-- step * -->`** — グループセル見出しの先頭 `:server:` 等を ICON_CATALOG のアイコンとして描画（トークンは IR に温存＝round-trip 自明・未知名はリテラル）。`<!-- step * -->` で現在ステップの見出し bold＋列枠強調。セル内容とオーバーレイは planGroupCells の 1 パスから導出（R8）、アイコン描画は図と同じ paintIcon・PptxGenJS 往復は paintToShapeXml に一本化（既存図出力 byte-identical） （#400/#401・PR #440・2026-10-05）
 - **プレビュー忠実度 2 件（WYSIWYG）** — (1) Midnight の 19 レイアウトで装飾（パネル・帯・カード 68 枚）がプレビューに出ない問題を根治（normalizeNs が xmlns:nsN 除去時に空白を残し完全一致正規表現が外れていた）。(2) ar 無し画像の「PPTX は引き伸ばし・プレビューは letterbox」乖離を、data URI ヘッダから実寸を読む image-intrinsic.ts＋resolvedImageAspect への一本化（R8）で letterbox に統一（寸法不明の SVG 等は両経路とも引き伸ばし） （#416/#417・PR #439・2026-10-05）

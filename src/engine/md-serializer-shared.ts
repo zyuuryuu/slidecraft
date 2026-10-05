@@ -7,7 +7,7 @@
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { serializeInline } from "./md-inline";
 import { tableToMarkdown } from "./md-table";
-import { indentForLevel } from "./paragraph-nesting";
+import { orderedNumbers, listItemLine } from "./list-markers";
 import { FIELD_ROWS } from "./field-rows";
 import { beforeAfterRole } from "./md-separators";
 
@@ -58,11 +58,12 @@ export function maxCurrentStepCol(sepType: string, slide: SlideIR): number {
 const COMMENT_ONLY_TEXT_RE = /^<!--(?:(?!-->).)*-->$/;
 
 export function serializeParagraphs(paragraphs: Paragraph[]): string {
+  const numbers = orderedNumbers(paragraphs); // `1.` items renumbered per run (#394)
   return paragraphs
-    .map((p) => {
+    .map((p, i) => {
       const text = serializeInline(p.segments);
       if (p.heading) return `### ${text}`;
-      if (p.bullet) return `${indentForLevel(p.level ?? 0)}- ${text}`;
+      if (p.bullet) return listItemLine(p, numbers[i], text);
       // #165: a GUI-authored comment-only PLAIN paragraph would otherwise emit a line #147's parser
       // drops on the next parse (silent text loss). Escape its leading `<` so the line survives —
       // md-slide-parser.ts strips exactly this one leading backslash back off.

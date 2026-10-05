@@ -26,6 +26,7 @@ import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
 import BeforeAfterOverlay from "./BeforeAfterOverlay";
+import { orderedNumbers } from "../engine/list-markers";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -115,7 +116,10 @@ function renderCell(cell: string) {
 // it stays proportional at every zoom level. ~0.25in/level, matching a typical PowerPoint list indent.
 const NEST_INDENT_PT = 18;
 
-function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number) {
+/** `num` — the item's number when it is an ordered (#394) bullet (list-markers.orderedNumbers, the same
+ *  count the serializer writes), else 0. A numbered item shows `N.` even when the master has no glyph,
+ *  matching the export's buAutoNum, which overrides the master's bullet (or its absence). */
+function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number, num = 0) {
   const level = para.bullet ? (para.level ?? 0) : 0;
   // Font size for a nested level: the layout/master's own lvl2-4 style when extractStyle found one,
   // else its computed step-down fallback (template-loader.nestedFallbackFontSize) — level 0 is
@@ -131,7 +135,11 @@ function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scal
         ...(para.heading ? { fontWeight: "bold" } : {}),
       }}
     >
-      {para.bullet && s.bulletChar && <span style={{ marginRight: "0.4em" }}>{s.bulletChar}</span>}
+      {num > 0 ? (
+        <span style={{ marginRight: "0.4em" }}>{num}.</span>
+      ) : (
+        para.bullet && s.bulletChar && <span style={{ marginRight: "0.4em" }}>{s.bulletChar}</span>
+      )}
       {renderSegments(para.segments)}
     </div>
   );
@@ -641,6 +649,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
         }
         if (!content) return null;
+        const nums = orderedNumbers(content.paragraphs); // `1.` items (#394)
 
         return (
           <div
@@ -666,7 +675,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               ...(overlay?.insets.has(ph.idx) ? { paddingLeft: overlay.insets.get(ph.idx)! * scale, boxSizing: "border-box" as const } : {}),
             }}
           >
-            {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale))}
+            {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale, nums[i]))}
           </div>
         );
       })}

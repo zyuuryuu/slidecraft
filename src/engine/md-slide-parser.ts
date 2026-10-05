@@ -14,6 +14,7 @@ import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
 import { parseInline } from "./md-inline";
+import { matchListItem } from "./list-markers";
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -76,16 +77,17 @@ function linesToParagraphs(lines: string[], opts?: { cellHeading?: boolean }): P
       paragraphs.push({ segments: parseInline(headingMatch[1] || " "), heading: true });
       continue;
     }
-    const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
-    if (bulletMatch) {
+    const item = matchListItem(trimmed); // `-`/`*`, or `1.`/`1)` = ordered (#394, list-markers)
+    if (item) {
       // Nesting depth from the ORIGINAL line's leading whitespace (#103) — clamped to
       // MAX_NEST_LEVEL rather than dropped (no-silent-drop), 0 stays field-absent (byte-identical
       // for existing flat decks).
       const level = levelFromIndent(measureIndent(line));
       paragraphs.push({
-        segments: parseInline(bulletMatch[1]),
+        segments: parseInline(item.content),
         bullet: true,
         ...(level > 0 ? { level } : {}),
+        ...(item.ordered ? { ordered: true } : {}),
       });
     } else {
       paragraphs.push({ segments: parseInline(unescapeCommentLead(trimmed)) });
