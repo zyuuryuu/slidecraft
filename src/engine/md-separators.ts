@@ -36,13 +36,17 @@ export function detectSeparator(lines: string[]): SeparatorType | null {
 // ── Split lines by separator comment ──
 
 /** Sections between `sepType` separators, plus the 1-based ordinals of the sections whose separator
- *  carried the current-step `*` (#401; always empty for non-step kinds). */
+ *  carried the current-step `*` (#401; always empty for non-step kinds). `leading` is the lines
+ *  BEFORE the first separator: they are still dropped (title/subtitle were consumed upstream, and
+ *  treating the rest as section 1 is a separate call, #451 案 2), but the caller can now see them —
+ *  a non-blank leading line means body text the author will lose (#451). */
 export function splitBySeparator(
   lines: string[],
   sepType: SeparatorType,
-): { sections: string[][]; currentSections: number[] } {
+): { sections: string[][]; currentSections: number[]; leading: string[] } {
   const sections: string[][] = [];
   const currentSections: number[] = [];
+  const leading: string[] = [];
   let current: string[] = [];
   let inSection = false;
 
@@ -57,15 +61,16 @@ export function splitBySeparator(
       if (sep.current) currentSections.push(sections.length + 1);
     } else if (inSection) {
       current.push(line);
+    } else {
+      leading.push(line); // before the first separator — dropped, but reported via `leading` (#451)
     }
-    // Lines before the first separator are skipped (already parsed as title/subtitle)
   }
 
   if (inSection) {
     sections.push(current);
   }
 
-  return { sections, currentSections };
+  return { sections, currentSections, leading };
 }
 
 // ── Trim leading/trailing empty lines from body ──

@@ -353,7 +353,11 @@ export function parseSlideBlock(
     }
 
     // Split remaining content by separator
-    const { sections, currentSections } = splitBySeparator(groupContent, separatorType);
+    const { sections, currentSections, leading } = splitBySeparator(groupContent, separatorType);
+    // #451: body before the FIRST separator is dropped (each section starts at its marker) — title/
+    // subtitle/field rows/backdrop are already consumed above, so any non-blank line left here is
+    // author text that silently vanishes. Only the parser sees these raw lines, hence a notice.
+    if (leading.some((l) => l.trim() !== "")) notices?.push({ kind: "pre-separator-dropped", detail: separatorType });
 
     if (title) {
       placeholders.push({
