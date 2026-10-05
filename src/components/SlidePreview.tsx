@@ -14,7 +14,7 @@ import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, Placeho
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
-import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
+import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL, TABLE_CELL_IN } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, imageObjectFit, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
 import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
@@ -573,7 +573,18 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                 overflow: "hidden",
               }}
             >
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 * (scale / 72), tableLayout: "fixed" }}>
+              {/* #443: font size / line height / cell padding all derive from TABLE_CELL (table-layout)
+                  so a row is the same height here and in the export's overflow estimate (R8).
+                  pt → px is pt × scale/72 (NEST_INDENT_PT's convention); in → px is in × scale. */}
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: TABLE_CELL.fontPt * (scale / 72),
+                  lineHeight: TABLE_CELL_IN.lineSpacing,
+                  tableLayout: "fixed",
+                }}
+              >
                 <colgroup>
                   {colWidthsEmu.map((w, ci) => (
                     <col key={ci} style={{ width: `${(w / totalEmu) * 100}%` }} />
@@ -590,7 +601,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                             key={ci}
                             style={{
                               border: "1px solid #C8D0DC",
-                              padding: "1px 6px",
+                              padding: `${TABLE_CELL_IN.padTB * scale}px ${TABLE_CELL_IN.padLR * scale}px`,
                               background: isHeader ? "#1E2761" : band ? "#F1F4F9" : "#FFFFFF",
                               color: isHeader ? "#FFFFFF" : "#1E293B",
                               fontWeight: isHeader ? 700 : 400,

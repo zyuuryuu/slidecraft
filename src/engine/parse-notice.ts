@@ -29,11 +29,24 @@
  * only ONE diagram and ONE mermaid image survive per slide today ("last wins"), so the earlier
  * figure is discarded. Only the parser sees the replaced block, hence a notice (same as table-dropped).
  */
-export type ParseNoticeKind = "table-dropped" | "image-dropped" | "meta-key-dropped" | "figure-dropped";
+/*
+ * `pre-separator-dropped` (#451): on a grouped slide (`<!-- col -->` / kpi / step / card / compare /
+ * before-after), body written BEFORE the first separator is discarded — each section starts at its
+ * marker, so column 1 needs a marker of its own. Only the parser sees those raw leading lines
+ * (splitBySeparator's `leading`), hence a notice. The drop itself is unchanged (treating that text
+ * as section 1 is a separate oversight call, #451 案 2).
+ */
+export type ParseNoticeKind =
+  | "table-dropped"
+  | "image-dropped"
+  | "meta-key-dropped"
+  | "figure-dropped"
+  | "pre-separator-dropped";
 
 export interface ParseNotice {
   kind: ParseNoticeKind;
-  /** meta-key-dropped only: the unrecognized key (e.g. "Meta"). */
+  /** meta-key-dropped: the unrecognized key (e.g. "Meta").
+   *  pre-separator-dropped: the slide's SeparatorType (e.g. "col", "beforeAfter"). */
   detail?: string;
 }
 

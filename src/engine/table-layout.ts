@@ -87,6 +87,15 @@ export const TABLE_CELL = { fontPt: 11, marLREmu: 91440, marTBEmu: 45720 } as co
 const LINE_SPACING = 1.2;
 const PT_PER_INCH = 72;
 
+/** TABLE_CELL's margins in INCHES plus the line spacing the row-height estimate assumes — the
+ *  preview derives its td padding / line-height from these (#443, R8: same numbers table-ooxml
+ *  writes in EMU, so a table row is the same height on screen and in the export's estimate). */
+export const TABLE_CELL_IN = {
+  padLR: TABLE_CELL.marLREmu / EMU_PER_INCH,
+  padTB: TABLE_CELL.marTBEmu / EMU_PER_INCH,
+  lineSpacing: LINE_SPACING,
+} as const;
+
 /**
  * #436: each row's ESTIMATED rendered height (inches) in a table `boxWidthIn` wide. PowerPoint grows a
  * row to fit its text (table-ooxml's nominal `box.h / rows` is only a floor), so the real height is the

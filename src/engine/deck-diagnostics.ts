@@ -51,6 +51,7 @@ export type ReviewRuleId =
   | "image-dropped"
   | "meta-key-dropped"
   | "figure-dropped"
+  | "pre-separator-dropped"
   | "section-footer-injected";
 
 export interface ReviewRule {
@@ -76,6 +77,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "image-dropped", level: "info" },
   { id: "meta-key-dropped", level: "warn" },
   { id: "figure-dropped", level: "info" },
+  { id: "pre-separator-dropped", level: "warn" },
   { id: "section-footer-injected", level: "info" },
 ];
 
@@ -301,6 +303,11 @@ export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseN
         return { ...base, id: "meta-key-dropped" as const, level: RULE_LEVEL["meta-key-dropped"], message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が2つ目以降の表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
       case "figure-dropped":
         return { ...base, id: "figure-dropped" as const, level: RULE_LEVEL["figure-dropped"], message: "同じスライドの先行する図（```diagram / ```mermaid）が後続の図に上書きされ変換時に失われました（1スライドに保持される図は最後の1つのみ）" };
+      case "pre-separator-dropped": {
+        // detail is the parser's SeparatorType — the before/after family's first marker is `<!-- before -->`.
+        const marker = `<!-- ${n.detail === "beforeAfter" ? "before" : n.detail ?? "col"} -->`;
+        return { ...base, id: "pre-separator-dropped" as const, level: RULE_LEVEL["pre-separator-dropped"], message: `最初の ${marker} より前に書かれた本文が変換時に失われました（各区切りの内容はその区切りコメントの後に書きます。1つ目の内容の前にも ${marker} を置いてください）` };
+      }
     }
   });
 }
