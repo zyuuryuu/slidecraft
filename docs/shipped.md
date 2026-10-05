@@ -4,6 +4,11 @@
 
 ## 基盤・アーキテクチャ
 
+- **比較スライド `<!-- compare -->`＋Before/After `<!-- before -->`/`<!-- after -->`** — テンプレに元からある比較レイアウト（Compare.2Option.Versus・12_課題と対策）へ auto 選択から到達可能に。before/after は位置で役割が決まる 1 族（beforeAfterRole に一本化・R8）、方向矢印と役割ラベルは PPTX/プレビュー共有（テンプレ自身の矢印があれば重ねない）。canonical 名レイアウトは名前でグループ判定し章扉の compare 誤判定を根治。マーカーなしデッキ byte-identical （#396/#402・PR #442・2026-10-05）
+- **カード見出しアイコン `:name:`＋現在ステップ `<!-- step * -->`** — グループセル見出しの先頭 `:server:` 等を ICON_CATALOG のアイコンとして描画（トークンは IR に温存＝round-trip 自明・未知名はリテラル）。`<!-- step * -->` で現在ステップの見出し bold＋列枠強調。セル内容とオーバーレイは planGroupCells の 1 パスから導出（R8）、アイコン描画は図と同じ paintIcon・PptxGenJS 往復は paintToShapeXml に一本化（既存図出力 byte-identical） （#400/#401・PR #440・2026-10-05）
+- **プレビュー忠実度 2 件（WYSIWYG）** — (1) Midnight の 19 レイアウトで装飾（パネル・帯・カード 68 枚）がプレビューに出ない問題を根治（normalizeNs が xmlns:nsN 除去時に空白を残し完全一致正規表現が外れていた）。(2) ar 無し画像の「PPTX は引き伸ばし・プレビューは letterbox」乖離を、data URI ヘッダから実寸を読む image-intrinsic.ts＋resolvedImageAspect への一本化（R8）で letterbox に統一（寸法不明の SVG 等は両経路とも引き伸ばし） （#416/#417・PR #439・2026-10-05）
+- **never-silent 診断 3 件** — col 経路の表上書き（table-dropped notice・#412）・表と図が同一枠に重なる衝突（visual-collision warn・#434・構造解消は #392）・長い表の下端溢れ（table-overflow warn・推定行高は export と同じ列幅計算と TABLE_CELL から導出＝R8・#436）。いずれも配置・出力は不変、黙殺を報告に変えるのみ （#412/#434/#436・PR #438・2026-10-05）
+
 - **フィールド行 `Takeaway:`（結論帯）/ `Source:`（出典行）** — スライドの結論 1 行とデータの出典を Markdown の 1 行（`キー: 値`）で書けるように。定義表 `field-rows.ts` に一本化（R8）し、content idx は非数値 "callout"/"source"（テンプレ独自の数値 idx と衝突しない）・束縛は Pass 0（行があるときだけ発火＝行なしデッキは byte-identical）・auto 選択は枠を持つ変種レイアウト（Midnight `+1Callout`/`+1Source`、表は `Table.*` 優先）を選好・枠のないテンプレは行名入り unbound-content 診断（never-silent）。catalog の fieldSlots⇄実束縛⇄図表 ordinal の一致テストで固定 （#397/#398・PR #421・2026-09-29）
 - **インラインコード・リンク・取消線＋表セル内書式** — `` `code` `` / `[t](url)` / `~~x~~` が記法ごと印字されていた問題を解消。インライン記法⇄InlineSegment の写像を新設 `md-inline.ts` に一本化（R8・SlideEditor の複製パーサも撤去）。リンクは http/https/mailto のみ `<a:hlinkClick>`＋part 別 External hyperlink rels（同一 URL は 1 本）、表セルは rows を文字列のまま描画時パース（列幅・数値列判定は表示テキストで測定）。記法なしデッキは PPTX byte-identical（対にならない `*` の silent drop のみ是正＝リテラル温存） （#393/#395・PR #420・2026-09-29）
 - **画像 alt → キャプション＋代替テキスト** — `![alt](…)` の alt を図版直下の 1 行キャプション（解決済み placeholder fontColor・fallback #595959）と `<p:pic>` の `descr`（アクセシビリティ代替テキスト）として PPTX・プレビュー両方に同一配置で描画（WYSIWYG・R8）。alt 空は byte-identical （#399・PR #418・2026-09-28）
