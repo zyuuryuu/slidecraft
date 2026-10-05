@@ -69,7 +69,8 @@ export interface RefineResult {
  *  before-md by the name-based namespace fork. */
 function slideToMd(deck: DeckIR, idx: number, catalog: LayoutCatalog, tpl?: SerializeTemplate): string {
   const s = deck.slides[idx];
-  const layout = s.layout === "auto" ? autoSelectLayout(s, idx, deck.slides.length, catalog) : s.layout;
+  // Unconditional (#435): a pin this template has is returned as-is; one it lacks degrades exactly as export does.
+  const layout = autoSelectLayout(s, idx, deck.slides.length, catalog);
   return serializeMd({ slides: [{ ...s, layout }] }, tpl);
 }
 
