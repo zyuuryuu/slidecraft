@@ -13,6 +13,8 @@
  * anything around it) is discarded (md-slide-parser #148). Surrounding PROSE around a SINGLE table
  * no longer triggers this: #101 fixed the parser to keep it (merged into idx "1", coexisting beside
  * the table) instead of dropping it, so this notice now fires ONLY when a 2nd table is present.
+ * #412: the `<!-- col -->` path reports the same kind when a later column's table replaces an earlier
+ * column's ("last wins" there — the earlier table and the rest of its column are what's lost).
  *
  * `image-dropped` / `meta-key-dropped`: sub-classifications of a table-dropped leftover — the
  * discarded content happened to be SHAPED like an image line / an unrecognized `Key: Value` line.
