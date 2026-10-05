@@ -379,6 +379,7 @@ export function parseSlideBlock(
       } else {
         const found = findTableInLines(sl);
         if (found) {
+          if (table) notices?.push({ kind: "table-dropped" }); // #412: one table per slide — the earlier column's is replaced
           table = { rows: found.rows, header: true, placeholderIdx: colIdx };
         } else {
           const paras = linesToParagraphs(sl, { cellHeading: true });
