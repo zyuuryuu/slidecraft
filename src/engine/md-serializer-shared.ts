@@ -32,6 +32,19 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   return null;
 }
 
+/** The separator line opening column `col` (1-based) — `<!-- step * -->` for a current step (#401),
+ *  else `<!-- sepType -->`. Shared by both readouts (R8). */
+export function separatorLine(sepType: string, slide: SlideIR, col: number): string {
+  return sepType === "step" && slide.currentSteps?.includes(col) ? "<!-- step * -->" : `<!-- ${sepType} -->`;
+}
+
+/** The highest current-step column to keep when emitting a step band — so a starred EMPTY trailing
+ *  step still round-trips (#401). 0 when nothing applies; capped at the 1..10 body-region range. */
+export function maxCurrentStepCol(sepType: string, slide: SlideIR): number {
+  if (sepType !== "step") return 0;
+  return Math.max(0, ...(slide.currentSteps ?? []).filter((n) => n <= 10));
+}
+
 // ── Paragraphs → Markdown lines ──
 
 /** A PLAIN paragraph's text is, trimmed, EXACTLY one complete `<!-- … -->` comment — the shape #147's
