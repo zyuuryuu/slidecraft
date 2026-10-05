@@ -14,7 +14,7 @@ import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox, visualOccupancy } from "./visual-placement";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, drawnImage, visualOccupancy } from "./visual-placement";
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
 import { isGroupedLayout, expandGroups } from "./group-binding";
 import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
@@ -177,7 +177,7 @@ async function buildSlideXml(
   const buildImagePic = (shapeId: number): string => {
     // Fit the image into its box the same way the browser preview does (contain/cover) so preview and
     // export agree — the manual rect / full-slide backdrop / placeholder box, then the aspect math.
-    const { rect: r, srcRect: cr } = fitImageInBox(imageBox!, slide.image!.fit, slide.image!.aspect);
+    const { rect: r, srcRect: cr } = drawnImage(slide.image!, imageBox!);
     const EMU = (inches: number) => Math.round(inches * 914400);
     const srcRectXml = cr
       ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`

@@ -13,7 +13,7 @@ import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, autoSelectLayout, type TemplateData, type LayoutInfo } from "../src/engine/template-loader";
 import { placeholderRole, buildCatalog } from "../src/engine/template-catalog";
-import { imagePlaceholder, bodyPlaceholders, nthBody } from "../src/engine/visual-placement";
+import { imagePlaceholder, bodyPlaceholders, nthBody, drawnImage } from "../src/engine/visual-placement";
 import { parseMd } from "../src/engine/md-parser";
 import { generatePptx } from "../src/engine/placeholder-filler";
 
@@ -75,10 +75,14 @@ describe("B: image binds to a picture placeholder when present", () => {
     const m = s1.match(/name="Image"[\s\S]*?<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"/);
     expect(m, "an Image <p:pic> with explicit xfrm must be present").toBeTruthy();
     const [, x, y, cx, cy] = m!;
-    expect(Number(x)).toBe(EMU(expected.style.x));
-    expect(Number(y)).toBe(EMU(expected.style.y));
-    expect(Number(cx)).toBe(EMU(expected.style.w));
-    expect(Number(cy)).toBe(EMU(expected.style.h));
+    // The frame's box, with the 1×1 PNG letterboxed inside it by its own (header-read) aspect (#417).
+    const frame = { x: expected.style.x, y: expected.style.y, w: expected.style.w, h: expected.style.h };
+    const drawn = drawnImage(deck.slides[0].image!, frame).rect;
+    expect(drawn.w).toBeCloseTo(drawn.h, 9); // square: the 1×1 image's aspect, not the frame's
+    expect(Number(x)).toBe(EMU(drawn.x));
+    expect(Number(y)).toBe(EMU(drawn.y));
+    expect(Number(cx)).toBe(EMU(drawn.w));
+    expect(Number(cy)).toBe(EMU(drawn.h));
     expect(Number(cx)).toBeGreaterThan(0); // guards the inherited-xfrm collapse-to-0×0 risk
     expect(Number(cy)).toBeGreaterThan(0);
   });

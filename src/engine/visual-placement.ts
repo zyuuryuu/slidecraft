@@ -18,6 +18,7 @@ import type { SlideIR, ImageBlock, ImageRect } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 import { placeholderRole, isContentBody } from "./template-catalog";
 import { sortByIdx } from "./placeholder-binding";
+import { intrinsicImageSize } from "./image-intrinsic";
 
 /**
  * The layout's BODY placeholders in stable order — a figure/table rides the Nth of these.
@@ -84,6 +85,30 @@ export function imageRect(image: ImageBlock, ph: PlaceholderInfo | undefined): I
   if (ph) return { x: ph.style.x, y: ph.style.y, w: ph.style.w, h: ph.style.h };
   if (image.behind) return { x: SLIDE_IN.w * 0.15, y: SLIDE_IN.h * 0.15, w: SLIDE_IN.w * 0.7, h: SLIDE_IN.h * 0.7 };
   return undefined;
+}
+
+/** The image's own aspect (w/h): the `ar` measured at insert, else the natural size read from the data
+ *  URI header, else undefined (SVG / unreadable → the image is stretched to its box). ONE resolver for
+ *  the PPTX pic, its caption and the preview's object-fit (#417 — an `ar`-less image used to stretch in
+ *  the export but letterbox in the preview). Pure. */
+export function resolvedImageAspect(image: ImageBlock): number | undefined {
+  if (image.aspect && image.aspect > 0) return image.aspect;
+  const size = intrinsicImageSize(image.src);
+  return size ? size.w / size.h : undefined;
+}
+
+/** The image as DRAWN in `box`: fitImageInBox with the resolved aspect. Shared by the PPTX export and
+ *  the caption (which sits under the drawn image). Pure. */
+export function drawnImage(image: ImageBlock, box: ImageRect): ReturnType<typeof fitImageInBox> {
+  return fitImageInBox(box, image.fit, resolvedImageAspect(image));
+}
+
+/** The preview's CSS object-fit — the browser twin of fitImageInBox: a known aspect letterboxes
+ *  (contain) or crops (cover) exactly as the PPTX math does; an unknown one fills the box (stretch),
+ *  as `<a:stretch>` does in the export. Pure. */
+export function imageObjectFit(image: ImageBlock): "contain" | "cover" | "fill" {
+  if (resolvedImageAspect(image) === undefined) return "fill";
+  return image.fit === "cover" ? "cover" : "contain";
 }
 
 /** The aspect ratio (w/h) to preserve when resizing an image: the measured intrinsic aspect, else the

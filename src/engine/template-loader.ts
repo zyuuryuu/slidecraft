@@ -177,6 +177,13 @@ function extractThemeFonts(themeXml: string): ThemeFonts {
 
 // ── Namespace normalization ──
 
+/** A `xmlns:<prefix>="…"` declaration INCLUDING its leading whitespace — leaving the space behind
+ *  turned `<a:solidFill xmlns:ns4="…">` into `<a:solidFill >`, which the exact-tag regexes below
+ *  (`/<a:solidFill>/`, `/<a:prstGeom prst="/`) never match, so such shapes were silently dropped (#416). */
+function nsDeclRe(prefix: string): RegExp {
+  return new RegExp(`\\s+xmlns:${prefix}="[^"]*"`, "g");
+}
+
 function normalizeNs(xml: string): string {
   let r = xml;
   // Map all ns0-ns9 prefixes. Detect which maps to which namespace.
@@ -188,19 +195,13 @@ function normalizeNs(xml: string): string {
     if (r.includes(`xmlns:${prefix}="http://schemas.openxmlformats.org/presentationml`)) {
       r = r.split(`<${prefix}:`).join("<p:");
       r = r.split(`</${prefix}:`).join("</p:");
-      r = r.replace(
-        new RegExp(`xmlns:${prefix}="[^"]*"`, "g"),
-        "",
-      );
+      r = r.replace(nsDeclRe(prefix), "");
     }
     // Check if this prefix is used for drawingml
     if (r.includes(`xmlns:${prefix}="http://schemas.openxmlformats.org/drawingml`)) {
       r = r.split(`<${prefix}:`).join("<a:");
       r = r.split(`</${prefix}:`).join("</a:");
-      r = r.replace(
-        new RegExp(`xmlns:${prefix}="[^"]*"`, "g"),
-        "",
-      );
+      r = r.replace(nsDeclRe(prefix), "");
     }
   }
   // Fallback: if still has ns0-ns4, apply common mapping
