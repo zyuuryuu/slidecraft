@@ -3,13 +3,15 @@
  * Design: docs/design/grouped-layout-binding.md.
  *
  * Split from group-binding.ts so template-catalog (buildCatalog) can import detectGroups WITHOUT a
- * runtime import cycle: this module has TYPE-ONLY imports (erased at runtime), whereas group-binding
- * value-imports bindContentByRole → placeholder-binding → template-catalog (which would cycle).
+ * runtime import cycle: this module has TYPE-ONLY imports (erased at runtime) apart from the leaf
+ * slide-schema (zod only), whereas group-binding value-imports bindContentByRole → placeholder-binding
+ * → template-catalog (which would cycle).
  *
  * Never touches slideIdxRole / placeholderRole / buildFieldMap — detection is pure geometry (idx15/16
  * group cells are read by TYPE + position, not the canonical role convention). Pure logic (R2).
  */
 import type { LayoutInfo, PlaceholderInfo } from "./template-loader";
+import { LAYOUT_NAMES } from "./slide-schema";
 
 const SLIDE_W = 13.333;
 const TITLE_BAND = 0.9; // y above this = title band (drop page-meta)
@@ -71,7 +73,15 @@ const CANONICAL_NAME_HINTS: Array<{ re: RegExp; kind: GroupLayoutShape["kind"] }
   { re: /^Process\.(\d+)Step\./, kind: "step" },
   { re: /^KPI\.(\d+)Value\./, kind: "kpi" },
   { re: /^Summary\.(\d+)Block\./, kind: "card" },
+  { re: /^Compare\.(\d+)Option\./, kind: "compare" },
 ];
+
+/** SlideCraft's own layout names. For these the NAME decides group-ness: a non-group family (Section /
+ *  SectionNav / Content / Column / …) is never a group layout, whatever its geometry. #396: the
+ *  generated SectionNav.1Title.Single (big section number + title, two [heading, body]-shaped columns)
+ *  read as a 2-group compare layout and sat before Compare.2Option.Versus in the catalog, so
+ *  `<!-- compare -->` would have routed a comparison onto the chapter divider. */
+const CANONICAL_NAMES: ReadonlySet<string> = new Set(LAYOUT_NAMES);
 
 /** Build a GroupLayoutShape straight from the canonical name's group count, chunking candidate cells by
  *  idx order (our own idx assignment is always in group/reading order) instead of x-position clustering.
@@ -121,6 +131,9 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
   // geometric clustering below can't shape correctly). No-op (returns null) for any non-canonical name.
   const hinted = nameHintedGroups(layout.name, cands);
   if (hinted) return hinted;
+  // A canonical name outside the group families → not grouped. (A group-family name whose hint failed —
+  // a hand-edited layout — still falls through to geometry, as before.)
+  if (CANONICAL_NAMES.has(layout.name) && !CANONICAL_NAME_HINTS.some((h) => h.re.test(layout.name))) return null;
 
   if (cands.length < 4) return null; // need at least 2 columns × 2 slots
 

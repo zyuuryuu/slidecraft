@@ -46,6 +46,22 @@ export function systemPromptForMode(
 
 // ── Slide deck prompt ──
 
+/** #396/#402: the compare markers, advertised only when THIS template has a compare layout that holds 2
+ *  regions — no catalog → the canonical set, which has Compare.2Option.Versus. The name is the one auto
+ *  selection lands on for 2 regions (GROUP_MATCH: smallest groupCount ≥ 2, catalog order on ties —
+ *  compare-guide.test locks the agreement, R8), so the guide tells the AI what it will actually get. */
+function compareRules(catalog?: LayoutCatalog): string[] {
+  const fits = (catalog ?? []).filter((e) => e.groupKind === "compare" && (e.groupCount ?? 0) >= 2);
+  const name = catalog && catalog.length
+    ? [...fits].sort((a, b) => a.groupCount! - b.groupCount!)[0]?.name
+    : "Compare.2Option.Versus";
+  if (!name) return [];
+  return [
+    `- Two-option comparison (A vs B): \`${name}\` — put one \`<!-- compare -->\` before EACH of the 2 regions (\`### option name\` + bullets)`,
+    `- Before → After change (As-is → To-be): \`<!-- before -->\` before the first region, \`<!-- after -->\` before the second — same layout plus an arrow and Before/After labels (the first region is always Before)`,
+  ];
+}
+
 export function slideSystemPrompt(catalog?: LayoutCatalog): string {
   // Advertise the ACTUAL template's layouts when we have a catalog (alien-safe); else the canonical set
   // (manual copy with no template loaded). Same rule for the role-based selection guidance below.
@@ -63,6 +79,7 @@ export function slideSystemPrompt(catalog?: LayoutCatalog): string {
     rule("columns", "Column.2Body.Equal", "Two/three-column comparison", "<!-- col -->"),
     rule("kpi", "KPI.*", "KPI / metrics", "<!-- kpi -->"),
     rule("process", "Process.*", "Process steps", "<!-- step -->"),
+    ...compareRules(catalog),
     rule("closing", "Closing.1Message.Single", "Last slide (closing)"),
   ].filter(Boolean).join("\n");
 

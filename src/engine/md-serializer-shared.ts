@@ -9,6 +9,7 @@ import { serializeInline } from "./md-inline";
 import { tableToMarkdown } from "./md-table";
 import { indentForLevel } from "./paragraph-nesting";
 import { FIELD_ROWS } from "./field-rows";
+import { beforeAfterRole } from "./md-separators";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -32,10 +33,14 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   return null;
 }
 
-/** The separator line opening column `col` (1-based) — `<!-- step * -->` for a current step (#401),
- *  else `<!-- sepType -->`. Shared by both readouts (R8). */
+/** The separator line opening region `col` (1-based) — the ONE marker writer for both readouts (R8):
+ *  `<!-- step * -->` for a current step (#401); the #402 before/after pair writes the region's
+ *  positional role (beforeAfterRole — the same mapping the overlay labels draw); every other family
+ *  repeats its own word. */
 export function separatorLine(sepType: string, slide: SlideIR, col: number): string {
-  return sepType === "step" && slide.currentSteps?.includes(col) ? "<!-- step * -->" : `<!-- ${sepType} -->`;
+  if (sepType === "step" && slide.currentSteps?.includes(col)) return "<!-- step * -->";
+  const word = sepType === "beforeAfter" ? beforeAfterRole(col) : sepType;
+  return `<!-- ${word} -->`;
 }
 
 /** The highest current-step column to keep when emitting a step band — so a starred EMPTY trailing

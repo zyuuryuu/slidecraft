@@ -169,8 +169,8 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
     if (subtitle) lines.push(`> ${subtitle}`);
     lines.push("");
 
-    // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
-    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
+    // Prefer the slide's own group kind (card/step/kpi/compare/beforeAfter) over inferring from the
+    // layout name, so a `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
     // single-body code/image is NEVER column-scoped: a figure slide that merely RESOLVED to a
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
     // trailing figure into the last column). A table is the SAME — UNLESS it's genuinely

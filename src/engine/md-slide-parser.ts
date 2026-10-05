@@ -158,7 +158,7 @@ const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
  *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
  *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
  *  drop class — only the bare markers survive. */
-const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note|section|toc|step\s*\*)\s*-->$)/; // `step *` = #401
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|compare|before|after|note|section|toc|step\s*\*)\s*-->$)/; // `step *` = #401
 
 // ── Speaker notes (#150 / ADR-0032 D1) ──
 

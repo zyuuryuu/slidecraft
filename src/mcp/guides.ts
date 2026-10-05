@@ -50,7 +50,7 @@ export function contractDigest(s: Session) {
     budget,
     capacity: "容量は get_slide(i) で実測できる（capacity.usedLines/maxLines・overBudget・predictedSplit）",
     separators:
-      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）",
+      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）。2 案の対比は `<!-- compare -->` を 2 つ、変化の前後（As-is→To-be）は `<!-- before -->` → `<!-- after -->` の順に 1 つずつ（比較レイアウト＋矢印＋Before/After ラベル）",
     notes:
       "スピーカーノートは `<!-- note -->` を単独行で置き、以降スライド末尾（次の `---`）までが素の Markdown のノート本文（#150）。スライドは疎に・詳細はノートへ",
     sections:

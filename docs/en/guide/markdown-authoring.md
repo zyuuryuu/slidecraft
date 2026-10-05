@@ -188,7 +188,7 @@ Even on a slide split with `<!-- col -->` and the like, a standalone image line 
 
 ---
 
-## Multi-column / KPI / Steps / Cards
+## Multi-column / KPI / Steps / Cards / Comparison
 
 When you want to split a slide's body into **multiple regions**, use separator comments. Place separator comments of the same kind after `# タイトル` and write the content of each region between them.
 
@@ -198,6 +198,8 @@ When you want to split a slide's body into **multiple regions**, use separator c
 | `<!-- kpi -->` | KPI (big-number) tiles |
 | `<!-- step -->` | Process / procedure steps |
 | `<!-- card -->` | Cards |
+| `<!-- compare -->` | Two options side by side (Option A vs Option B) |
+| `<!-- before -->` / `<!-- after -->` | A change from Before to After (As-is → To-be), with an arrow and Before/After labels |
 
 ```markdown
 # 3本柱
@@ -220,7 +222,50 @@ Usage notes:
 - A separator comment must be **on a line of its own** (do not write body before or after it, as in `<!-- col -->`).
 - Content written **before** the first separator comment does not go into any region, apart from the title/subtitle. The title (`#`) and subtitle (`>`) become the heading for the whole slide, and each region's content is written **between** the separators.
 - In each region, `### 小見出し` becomes the region's header, and bullets or paragraphs go beneath it.
-- Aside from `col` (a plain column), `kpi` / `step` / `card` act as hints to choose the corresponding layout (KPI tiles, process, cards). `col` is a plain side-by-side layout with no hint.
+- Aside from `col` (a plain column), `kpi` / `step` / `card` / `compare` / `before`·`after` act as hints to choose the corresponding layout (KPI tiles, process, cards, comparison). `col` is a plain side-by-side layout with no hint.
+
+### Comparing two options `<!-- compare -->`
+
+Use `<!-- compare -->` to put **two equal options side by side**, such as Option A and Option B. The template's comparison layout (e.g. `Compare.2Option.Versus`, or `12_課題と対策` in the report templates) is chosen automatically; each region's `### heading` names the option and the content goes below it.
+
+```markdown
+# Option A or Option B
+
+<!-- compare -->
+### A: build in-house
+- Lower upfront cost
+- Six months to launch
+
+<!-- compare -->
+### B: outsource
+- Higher upfront cost
+- Live in one month
+```
+
+- The comparison layout holds two regions. With three or more, the slide is laid out as ordinary columns (`<!-- col -->` or a table suits a comparison of three or more).
+- If the template has no comparison layout, the slide is also shown as ordinary columns.
+
+### Before and after `<!-- before -->` / `<!-- after -->`
+
+To show a **change from the left (current state) to the right (target state)**, such as an improvement proposal or a migration, use one `<!-- before -->` and one `<!-- after -->`. The slide uses the same layout as a comparison, plus an **arrow between the two sides** and a **Before / After label** above each side.
+
+```markdown
+# Revising the approval flow
+
+<!-- before -->
+### Today
+- Paper forms passed around
+- 5 days to approval on average
+
+<!-- after -->
+### After the change
+- Electronic approval in a workflow tool
+- 1 day to approval on average
+```
+
+- The meaning comes from **position**: the first region is Before, the second is After. If you write them in the other order, the left side is still drawn as Before (and on export the markers are written back as `before` then `after`, matching what is drawn).
+- The arrow and the labels use the template's theme accent color. If the template's layout already draws its own arrow (as `12_課題と対策` in the report templates does), that arrow is used and no second arrow is drawn.
+- Regions after the second are also treated as After. This is a two-sided structure, so keep it to two regions.
 
 ### Adding an icon to a heading
 

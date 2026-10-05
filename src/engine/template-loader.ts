@@ -822,12 +822,14 @@ export async function loadTemplate(
 
 // ── Auto layout selection ──
 
-// Which catalog group kinds a slide.groupKind may fill. card→card only (compare/課題対策 stays
-// pin-only to avoid surprising routing; a future `<!-- compare -->` can add it here).
+// Which catalog group kinds a slide.groupKind may fill. Each kind fills only its own family — card never
+// lands on a compare/課題対策 layout; that family is reached only by the explicit `<!-- compare -->` (#396).
 const GROUP_MATCH: Record<NonNullable<SlideIR["groupKind"]>, Array<"card" | "step" | "kpi" | "compare">> = {
   card: ["card"],
   step: ["step"],
   kpi: ["kpi"],
+  compare: ["compare"],
+  beforeAfter: ["compare"], // #402: the directed 2-face pair shares the compare layouts (+ arrow/labels overlay)
 };
 
 interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
@@ -911,7 +913,7 @@ export function autoSelectLayout(
   }
 
   // Group-aware: a `slide.groupKind` slide routes to the matching GROUP layout (card→card, step→step,
-  // kpi→kpi), preferring the group-count that fits (exact, then smallest overshoot). Only fires on
+  // kpi→kpi, compare→compare), preferring the group-count that fits (exact, then smallest overshoot). Only fires on
   // groupKind — non-grouped selection is byte-identical. Falls through when the template has no such
   // layout (degrades to columns-with-headings via the normal path below).
   if (slide.groupKind && catalog && catalog.length > 0) {
