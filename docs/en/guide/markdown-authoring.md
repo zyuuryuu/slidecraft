@@ -114,12 +114,31 @@ Source: 総務省 2025
 
 Points to remember:
 
-- The keys are `Takeaway` / `Source` (case-insensitive). They may appear anywhere in the slide (on export they are gathered after the slide body).
+- The keys are `Takeaway` / `Source` (case-insensitive; `Kicker` below works the same way). They may appear anywhere in the slide (on export they are gathered after the slide body).
 - Repeating a key adds one paragraph per line to its box (e.g. two sources).
 - Unlike `Category:` and the other meta keys, a field row does not turn the slide into a title-type slide.
 - They also work on slides with region separators (`<!-- col -->` / `<!-- card -->` …): the row belongs to the whole slide, not to the last region.
 - A `Source:` line inside a code fence stays code.
 - If the template (or the pinned layout) has no box for the row, the row is **not exported**. MCP `get_deck_issues` warns that the layout has no box for the `Takeaway:` row (showing it in the app's diagnostics panel is tracked in #419). Move it into the body, or use a template that has the box.
+
+## Category line `Kicker:`
+
+`Kicker:` is the **small category line above a content slide's title** (e.g. `SECTION 02 · Cost analysis`). It is a field row like `Takeaway:` / `Source:`: if the template has a box whose name starts with `Kicker` / `Eyebrow`, a layout with that box is picked automatically and the row goes into it.
+
+```markdown
+# コスト構造の内訳
+
+- 人件費が 6 割
+- 外注費が増加
+
+Kicker: SECTION 02 · コスト分析
+```
+
+Things to know:
+
+- **The bundled templates do not have a Kicker box for content slides yet** (checked on every template, Midnight included). Without the box the row is not exported, as above, and `get_deck_issues` warns that the layout has no box for the `Kicker:` row. The AI guide (`get_authoring_guide`) mentions `Kicker:` only for templates that have the box.
+- **The category line of a title slide is still `Category:`.** Writing `Kicker:` does not turn a slide into a title slide, and `Category:` keeps its meaning.
+- **To show which chapter a slide belongs to, use a chapter cover's `<!-- section -->` (below)**: on templates with a footer box, each slide from a chapter cover onward gets its chapter's name in the footer automatically. Use `Kicker:` for a label other than the chapter name.
 
 ---
 
