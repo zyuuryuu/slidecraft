@@ -222,6 +222,38 @@ Usage notes:
 - In each region, `### 小見出し` becomes the region's header, and bullets or paragraphs go beneath it.
 - Aside from `col` (a plain column), `kpi` / `step` / `card` act as hints to choose the corresponding layout (KPI tiles, process, cards). `col` is a plain side-by-side layout with no hint.
 
+### Adding an icon to a heading
+
+In a card / step / KPI region, start the `### heading` with `:icon-name:` to place a built-in icon (the same set as diagram nodes) to the left of the heading. The `:server:` token itself is not printed.
+
+```markdown
+<!-- card -->
+### :server: Availability
+- Redundant setup
+```
+
+- Icon names: `router` `switch` `server` `database` `cloud` `firewall` `client` `internet` `load_balancer` `wireless_ap` `storage` `printer` `phone` `vpn` `monitor` (aliases such as `db`→database and any letter case are accepted).
+- An unknown name (e.g. `:nosuch:`) does not become an icon and **stays as text** (a typo never makes content disappear).
+- It only becomes an icon at the **start** of the heading and **without formatting** (`**:server:**` stays as bold text).
+- It is drawn when the slide lands on a group layout (cards, process, …); on other layouts it stays as text.
+
+### Highlighting the current step
+
+To show "where we are" in a process band, write that step's separator as `<!-- step * -->`. Its heading becomes bold and its column gets a thin frame.
+
+```markdown
+<!-- step -->
+### Requirements
+
+<!-- step * -->
+### Design
+
+<!-- step -->
+### Build
+```
+
+- Only `step` accepts the `*` (not `card` / `kpi`).
+
 ### Placing a figure in a region
 
 Each region can hold a **figure** instead of body text. Writing a ` ```diagram ` or ` ```mermaid ` fence inside a region turns that region into a figure, which sits side by side with the other columns.

@@ -12,6 +12,7 @@ import { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, type 
 import { templateSpecSystemPrompt } from "./template-spec-prompts";
 import type { LayoutCatalog, LayoutRole } from "./template-catalog";
 import type { FieldKind } from "./field-rows";
+import { ICON_NAMES } from "./icon-catalog";
 
 // The diagram prompt surface moved to diagram-type-prompts.ts (two-stage per-type design); re-export so
 // existing importers of these names keep resolving them from here.
@@ -106,6 +107,23 @@ ${layoutList}
 ## Layout Selection Rules
 
 ${layoutRules}
+
+## Group Cells (steps / cards / KPI)
+
+Inside a region, a \`### heading\` may lead with a built-in icon \`:name:\` — drawn left of the heading
+(an unknown name stays as text). Mark the CURRENT step with \`<!-- step * -->\` (its heading is emphasized):
+
+\`\`\`
+<!-- step -->
+### :client: 要件
+- 現状整理
+
+<!-- step * -->
+### :server: 設計
+- 方式決定
+\`\`\`
+
+Icons: ${ICON_NAMES.join(", ")}
 
 ## Embedded Diagrams
 

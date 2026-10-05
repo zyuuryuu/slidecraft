@@ -158,7 +158,7 @@ const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
  *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
  *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
  *  drop class — only the bare markers survive. */
-const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note|section|toc)\s*-->$)/;
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note|section|toc|step\s*\*)\s*-->$)/; // `step *` = #401
 
 // ── Speaker notes (#150 / ADR-0032 D1) ──
 
@@ -351,7 +351,7 @@ export function parseSlideBlock(
     }
 
     // Split remaining content by separator
-    const sections = splitBySeparator(groupContent, separatorType);
+    const { sections, currentSections } = splitBySeparator(groupContent, separatorType);
 
     if (title) {
       placeholders.push({
@@ -403,6 +403,7 @@ export function parseSlideBlock(
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
+      ...(currentSections.length ? { currentSteps: currentSections } : {}), // `<!-- step * -->` (#401)
       sourceLineStart: startLine,
       sourceLineEnd: startLine + sourceLen - 1,
     };

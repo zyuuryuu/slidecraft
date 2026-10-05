@@ -16,7 +16,9 @@ import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog"
 import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
-import { isGroupedLayout, expandGroups } from "../engine/group-binding";
+import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
+import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
+import { renderPaintToSvg } from "../engine/svg-writer";
 import { imageCaption } from "../engine/image-caption";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { cjkFontFamily } from "../engine/font-stack";
@@ -243,6 +245,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   const contentFor = slide.groupKind && layout && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layoutPhs);
+  // Group-cell decorations (#400 icons / #401 current-step frame) — the export's same overlay + painter.
+  const overlay = slide.groupKind && layout && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
   const bodyPhs = bodyPlaceholders(layoutPhs);
   const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
@@ -653,12 +657,21 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                   : "left",
               overflow: "hidden",
               lineHeight: 1.3,
+              // #400: an icon cell's text starts past the icon (the export's lIns, in px = in × scale)
+              ...(overlay?.insets.has(ph.idx) ? { paddingLeft: overlay.insets.get(ph.idx)! * scale, boxSizing: "border-box" as const } : {}),
             }}
           >
             {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale))}
           </div>
         );
       })}
+
+      {overlay && !isEmptyOverlay(overlay) && (
+        <div
+          style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+          dangerouslySetInnerHTML={{ __html: renderPaintToSvg((t) => paintGroupOverlay(t, overlay)) }}
+        />
+      )}
 
       {/* Slide number — preview only; the standalone-HTML shell provides its own counter */}
       {!exportMode && (

@@ -16,10 +16,12 @@ import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox, visualOccupancy } from "./visual-placement";
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
-import { isGroupedLayout, expandGroups } from "./group-binding";
+import { isGroupedLayout, expandGroups, groupCellOverlay } from "./group-binding";
+import { isEmptyOverlay, paintGroupOverlay, withLeftInset } from "./group-overlay";
 import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
 import { createLinkRegistry } from "./hyperlink-rels";
-import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
+import { paintToShapeXml, renumberShapeIds } from "./pptx-writer";
+import { paintDiagram } from "./diagram-painter";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
 import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT, NOTES_FIRST_LINK_RID } from "./notes-ooxml";
@@ -91,19 +93,9 @@ async function extractDiagramShapes(
   // Embedded in a titled slide → the diagram omits its own title bar so it
   // doesn't duplicate / overlap the slide's title placeholder. When `region` is
   // given (diagram beside body text), confine the shapes to that placeholder box.
-  const { buffer, groups } = await renderToBufferWithGroups(spec, {
-    theme,
-    omitTitle: true,
-    region,
-  });
-
-  // Open the PptxGenJS-generated PPTX and pull slide1's shapes, then nest them
-  // into PowerPoint sub-groups (figure = one object; node/edge = grabbable parts)
-  // per the painter's group tree.
-  const diagZip = await JSZip.loadAsync(buffer);
-  const slideXml = await diagZip.file("ppt/slides/slide1.xml")?.async("string");
-  if (!slideXml) return "";
-  return nestShapeXml(slideXml, groups);
+  // The PptxGenJS slide's shapes, nested into PowerPoint sub-groups (figure = one object; node/edge =
+  // grabbable parts) per the painter's group tree.
+  return paintToShapeXml((t) => paintDiagram(t, spec, { theme, omitTitle: true, region }));
 }
 
 /** Parse a base64 image data URI → bytes + ext + mime for OOXML media embedding. Returns null for a
@@ -153,6 +145,8 @@ async function buildSlideXml(
   const contentFor = slide.groupKind && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layout.placeholders);
+  // Group-cell decorations (#400 heading icons / #401 current-step frame) from the same pass.
+  const overlay = slide.groupKind && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
 
   // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
   const bodyPhs = bodyPlaceholders(layout.placeholders);
@@ -217,6 +211,8 @@ async function buildSlideXml(
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content, links.rIdFor);
+    const inset = overlay?.insets.get(ph.idx);
+    if (inset !== undefined) shapeXml = withLeftInset(shapeXml, inset); // room for the #400 icon
     // Update shape ID to be unique within the slide
     shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
     shapes += shapeXml;
@@ -247,6 +243,12 @@ async function buildSlideXml(
     ? imageCaption(slide.image!, imageBox!, imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx)?.style.fontColor)
     : undefined;
   if (caption) { shapes += imageCaptionShapeXml(id, caption); id++; }
+
+  if (overlay && !isEmptyOverlay(overlay)) {
+    const r = renumberShapeIds(await paintToShapeXml((t) => paintGroupOverlay(t, overlay)), id);
+    shapes += r.xml;
+    id = r.next;
+  }
 
   // Add diagram shapes if present
   // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is confined to its placeholder
