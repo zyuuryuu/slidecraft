@@ -7,15 +7,14 @@
 
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SlideIR, Paragraph } from "../engine/slide-schema";
+import type { SlideIR } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 import { buildFieldMap, applyFieldEdit } from "../engine/placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN } from "../engine/visual-placement";
 import { groupEditorPlan } from "../engine/group-binding";
-import { indentForLevel, levelFromIndent, measureIndent } from "../engine/paragraph-nesting";
+import { paragraphsToText, textToParagraphs } from "../engine/field-text";
 import { shiftBulletIndent } from "../engine/bullet-indent-shift";
-import { parseInline, serializeInline } from "../engine/md-inline";
 import DiagramEditor from "./DiagramEditor";
 
 interface SlideEditorProps {
@@ -54,44 +53,6 @@ function getLabel(idx: string, layoutPh: LayoutInfo | undefined): string {
   const phInfo = layoutPh?.placeholders.find((p) => p.idx === idx);
   if (phInfo?.name) return phInfo.name;
   return PH_LABELS[idx] || `Placeholder ${idx}`;
-}
-
-// ── Convert paragraphs to plain text for textarea ──
-
-function paragraphsToText(paragraphs: Paragraph[]): string {
-  return paragraphs
-    .map((p) => {
-      const text = serializeInline(p.segments);
-      if (p.heading) return `### ${text}`;
-      // Preserve nesting (#103) so opening/saving an unrelated field never flattens an
-      // already-nested bullet — the field editor doesn't add Tab/Shift-Tab controls (out of
-      // scope, tracked separately), but a plain re-save must still be a no-op round-trip.
-      return p.bullet ? `${indentForLevel(p.level ?? 0)}- ${text}` : text;
-    })
-    .join("\n");
-}
-
-// ── Convert plain text back to paragraphs ──
-
-function textToParagraphs(text: string): Paragraph[] {
-  return text.split("\n").map((line) => {
-    const headingMatch = line.match(/^###\s+(.*)/);
-    const bulletMatch = headingMatch ? null : line.match(/^[ \t]*[-*]\s+(.*)/);
-    const content = headingMatch ? headingMatch[1] : bulletMatch ? bulletMatch[1] : line;
-    const level = bulletMatch ? levelFromIndent(measureIndent(line)) : 0;
-
-    // Inline formatting via the engine's single inline parser (R8 — md-inline.ts, #393).
-    const segments = parseInline(content);
-
-    return {
-      segments,
-      ...(headingMatch
-        ? { heading: true }
-        : bulletMatch
-          ? { bullet: true, ...(level > 0 ? { level } : {}) }
-          : {}),
-    };
-  });
 }
 
 export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout, suggestions, onChange }: SlideEditorProps) {

@@ -44,6 +44,7 @@ Within a single slide, the role of each line is determined by its heading level 
 | `# 見出し` | The slide's **title** |
 | `## 見出し` or `> 引用` | **Subtitle** |
 | `- ` / `* ` bullets, paragraphs | **Body** |
+| `1. ` / `1) ` numbered lists | **Body** (auto-numbered; saved back as a `1.` `2.` … sequence) |
 | `### 見出し` | A **subheading** inside a group (column/card/step) |
 | `**太字**` / `*斜体*` | Inline styling |
 

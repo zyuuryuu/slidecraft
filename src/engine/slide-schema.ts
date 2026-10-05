@@ -68,6 +68,9 @@ export const ParagraphSchema = z.object({
   // Nested-bullet depth (#103): 0-3, omitted = 0 (flat — existing decks stay byte-identical since
   // the field is simply absent). Only meaningful on a `bullet` paragraph.
   level: z.number().int().min(0).max(3).optional(),
+  // Numbered list item (#394): `1.` / `1)` in Markdown → buAutoNum in PPTX. Omitted = unordered, so
+  // existing decks stay byte-identical. Only meaningful on a `bullet` paragraph (like `level`).
+  ordered: z.boolean().optional(),
 });
 
 export type Paragraph = z.infer<typeof ParagraphSchema>;

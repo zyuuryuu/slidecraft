@@ -68,7 +68,8 @@ export function assertIndex(deck: DeckIR, i: number): void {
  *  serializer the binding authority (slideBindingPlan) so the readout can't diverge from export. */
 function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undefined, layouts?: TemplateData["layouts"]): string {
   const sl = deck.slides[i];
-  const resolved = sl.layout === "auto" ? autoSelectLayout(sl, i, deck.slides.length, catalog) : sl.layout;
+  // Unconditional (#435): a pin this template has is returned as-is; one it lacks degrades exactly as export does.
+  const resolved = autoSelectLayout(sl, i, deck.slides.length, catalog);
   const tpl = catalog && layouts ? { catalog, layouts } : undefined;
   return serializeMd({ slides: [{ ...sl, layout: resolved }] }, tpl);
 }
@@ -313,7 +314,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   // (role-based = alien-safe) and remember whether the body already holds text.
   let ord = "1", hasBodyText = false;
   if (created) {
-    const layoutName = slide.layout === "auto" ? autoSelectLayout(slide, i, deck.slides.length, catalog) : slide.layout;
+    const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog); // = export's layout, unknown pins included (#435)
     const bodyCount = catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0;
     const n = Number(placeholderIdxArg ?? "1");
     if (bodyCount < 1 || !Number.isInteger(n) || n < 1 || n > bodyCount) {
