@@ -317,7 +317,7 @@ export function useDeckController() {
     // Sequentially (not concurrently): each send advances the doc's rev, so concurrent sends would
     // make the second stale. Awaiting keeps every buffered slide's edit landing in order.
     for (const [index, slide] of pending) {
-      const resolved = slide.layout === "auto" ? autoSelectLayout(slide, index, count, catalog) : slide.layout;
+      const resolved = autoSelectLayout(slide, index, count, catalog); // = export's layout, unknown pins included (#435)
       // Per-slide readout through the binding authority (ADR-0030 stage B, #159) — the catalog-free
       // serialize dropped a closing-vocabulary slide's title, so the host would parse a title-less md.
       const md = slideMarkdown({ ...slide, layout: resolved }, catalog, templateData);
@@ -401,7 +401,7 @@ export function useDeckController() {
       const cur = deckRef.current;
       const slide = cur?.slides[slideIndex];
       if (!slide) return;
-      const resolved = slide.layout === "auto" ? autoSelectLayout(slide, slideIndex, cur!.slides.length, catalog) : slide.layout;
+      const resolved = autoSelectLayout(slide, slideIndex, cur!.slides.length, catalog); // = export's layout (#435)
       const fixed = visualizeKeyValueMd(slideMarkdown({ ...slide, layout: resolved }, catalog, templateData));
       if (!fixed) return;
       const newSlide = parseMd(fixed).slides[0];

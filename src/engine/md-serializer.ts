@@ -71,10 +71,12 @@ function serializeSlide(
     }
   }
 
-  const layout =
-    slide.layout === "auto"
-      ? autoSelectLayout(slide, slideIndex, totalSlides, tpl?.catalog)
-      : slide.layout;
+  // ALWAYS via autoSelectLayout (#435, R8): it honors a pin THIS template has and degrades one it
+  // lacks to the layout export actually draws — so the format/binding readout below matches export.
+  // (A `layout === "auto" ? … : slide.layout` fork kept an unknown name: a 2-column slide pinned to
+  // it was read as single-body and lost its `<!-- col -->` split.) Without a catalog the pin is
+  // returned as-is, so catalog-free serialization is unchanged.
+  const layout = autoSelectLayout(slide, slideIndex, totalSlides, tpl?.catalog);
 
   // `<!-- section -->` chapter declaration rides FIRST (the ADR-0032 D2 taught form); the
   // parser strips it before the layout-pin check, so ordering stays round-trip-safe.
@@ -85,9 +87,11 @@ function serializeSlide(
   // Emit the layout directive only when it was explicitly set. "auto" slides stay
   // directive-free so they round-trip as "auto" (re-resolved deterministically on
   // import) instead of being pinned to a concrete layout. `layout` (resolved) is
-  // still used below to choose the serialization format.
+  // still used below to choose the serialization format. The directive carries the AUTHORED
+  // name (identical to `layout` for a pin this template has): an unknown pin is kept verbatim so
+  // re-opening on a template that HAS it restores the pin (do-no-harm; diagnoseDeck warns, #435).
   if (slide.layout !== "auto") {
-    lines.push(`<!-- slide: ${layout} -->`);
+    lines.push(`<!-- slide: ${slide.layout} -->`);
   }
 
   // ADR-0030 stage B: with the template at hand, read a NON-group slide back out through the binding
