@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **区切り前本文の黙殺通知＋表セル余白のプレビュー/PPTX 一致** — (1) 最初の `<!-- col -->`（kpi/step/card/compare/before も同様）より前に書いた本文が無警告で消えていたのを、新 ParseNotice `pre-separator-dropped`（warn・#148 と同じ側路）で報告（配置は不変・「1 列目として扱う」案は統括判断へ）。(2) プレビュー表 td の `1px 6px` リテラル余白を `TABLE_CELL` 由来（`TABLE_CELL_IN`）へ導出し、1 行高がプレビューと export 推定で一致（R8 一致テスト・PPTX は byte-identical） （#451/#443・PR #456・2026-10-05）
 - **フィールド行 `Kicker:`（タイトル上のカテゴリ行）** — #421 の汎用機構（field-rows.ts）への 1 エントリ追加として実装（R8・パースは定義表の外に作らない）。22 テンプレ実測でコンテンツ系に kicker 枠が 0 件のため、現状は枠のあるテンプレでのみ描画され、無ければ行名入り unbound-content 診断（never-silent）。合成注入は Midnight の空き 0.10in で不成立と実測棄却、内蔵テンプレへの枠追加は #447（#403 と同じ内蔵レイアウト設計判断）へ分離。プロンプト案内は枠のあるテンプレ限定・テンプレ未指定時の既定も BUILTIN_LAYOUTS から fieldSlotOf で導出 （#404・PR #448・2026-10-05）
 - **番号付きリスト `1.`（自動番号）** — `1.` / `1)` 行が番号込みの地の文（buNone）だった問題を解消。`Paragraph.ordered`（optional）を追加し、行頭マーカーの読み書きを `list-markers.ts` に一本化（parser・GUI フィールドエディタ・serializer・プレビュー、R8）。PPTX は `buFontTx`＋`buAutoNum arabicPeriod`（lvl は #103 と同じ）、serializer は段ごとの `1.` 連番へ正規化（空行は継続）。`-`/`*`・地の文は全経路 byte-identical （#394・PR #450・2026-10-05）
 - **比較スライド `<!-- compare -->`＋Before/After `<!-- before -->`/`<!-- after -->`** — テンプレに元からある比較レイアウト（Compare.2Option.Versus・12_課題と対策）へ auto 選択から到達可能に。before/after は位置で役割が決まる 1 族（beforeAfterRole に一本化・R8）、方向矢印と役割ラベルは PPTX/プレビュー共有（テンプレ自身の矢印があれば重ねない）。canonical 名レイアウトは名前でグループ判定し章扉の compare 誤判定を根治。マーカーなしデッキ byte-identical （#396/#402・PR #442・2026-10-05）
