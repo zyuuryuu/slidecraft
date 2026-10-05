@@ -15,7 +15,7 @@ import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, imageObjectFit, dragImageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
 import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
 import { renderPaintToSvg } from "../engine/svg-writer";
@@ -296,7 +296,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   };
   // The image box (drag-move + corner-resize when editable). Shared by the inline body-figure render and
   // the behind (backmost) layer so both look/behave identically. `resolved` = the committed rect (live
-  // drag overrides it). object-fit mirrors the PPTX aspect math (fitImageInBox) so preview == export.
+  // drag overrides it). object-fit comes from the SAME aspect resolver as the PPTX math (imageObjectFit ↔
+  // drawnImage) so preview == export — incl. an `ar`-less image (#417).
   const renderImageBox = (resolved: ImageRect) => {
     const img = slide.image!;
     const box = dragRect ?? resolved;
@@ -325,7 +326,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         }}
       >
         <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-          <img src={img.src} alt={img.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: img.fit === "cover" ? "cover" : "contain", pointerEvents: "none" }} />
+          <img src={img.src} alt={img.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: imageObjectFit(img), pointerEvents: "none" }} />
         </div>
         {imgEditable && HANDLES.map((h) => (
           <div

@@ -8,7 +8,7 @@
  *
  * Rules:
  *   - alt empty (or whitespace) → no caption and no descr, so existing decks stay byte-identical;
- *   - the caption sits under the DRAWN image (fitImageInBox — a letterboxed `contain` image's real
+ *   - the caption sits under the DRAWN image (drawnImage — a letterboxed `contain` image's real
  *     bottom, not its box's), spanning the box width, text centered;
  *   - a caption that would run off the slide bottom is pulled up to end at the bottom edge;
  *   - its color is the TEMPLATE's text color for the image's region (the placeholder's resolved body
@@ -19,7 +19,7 @@
  * Pure logic (R2).
  */
 import type { ImageBlock, ImageRect } from "./slide-schema";
-import { fitImageInBox, SLIDE_IN } from "./visual-placement";
+import { drawnImage, SLIDE_IN } from "./visual-placement";
 import { escXml } from "./md-to-ooxml";
 
 /** Caption box height (inches) — one line at CAPTION_FONT_PT with room for descenders. */
@@ -46,7 +46,7 @@ export function imageCaption(
 ): ImageCaption | undefined {
   const text = image.alt.trim();
   if (!text || image.behind) return undefined;
-  const drawn = fitImageInBox(box, image.fit, image.aspect).rect;
+  const drawn = drawnImage(image, box).rect;
   const y = Math.max(0, Math.min(drawn.y + drawn.h, slideH - CAPTION_H));
   return { text, rect: { x: box.x, y, w: box.w, h: CAPTION_H }, fontPt: CAPTION_FONT_PT, color: textColor || CAPTION_COLOR };
 }
