@@ -226,6 +226,28 @@ export function unboundVisuals(
   return out;
 }
 
+/** One visual's claim on a layout placeholder (resolved by the SAME resolvers the renderers use). */
+interface VisualClaim {
+  kind: VisualKind;
+  idx: string;
+}
+
+/** Every bound visual's resolved placeholder, in export precedence order (code first, so a replacing
+ *  visual wins over it below). A behind image is a backmost layer, not a claim; an unresolved visual
+ *  claims nothing (unboundVisuals reports it). The ONE resolution visualOccupancy and visualCollisions
+ *  both read (R8). Pure (R2). */
+function visualClaims(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): VisualClaim[] {
+  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
+  const claims: VisualClaim[] = [];
+  const put = (kind: VisualKind, ph: PlaceholderInfo | undefined) => { if (ph) claims.push({ kind, idx: ph.idx }); };
+  if (slide.code) put("code", nthBody(bodyPhs, slide.code.placeholderIdx));
+  if (slide.diagram) put("diagram", nthBody(bodyPhs, slide.diagram.placeholderIdx));
+  if (slide.mermaidBlock) put("mermaid", nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx));
+  if (slide.table) put("table", nthBody(bodyPhs, slide.table.placeholderIdx));
+  if (slide.image && !slide.image.behind) put("image", imagePlaceholder(layoutPlaceholders, slide.image.placeholderIdx));
+  return claims;
+}
+
 /**
  * #390: the layout placeholders a visual TAKES OVER (idx → kind). A diagram / mermaid / table /
  * non-behind image REPLACES its placeholder (the shape is skipped); a code block FILLS it with the
@@ -238,13 +260,30 @@ export function visualOccupancy(
   slide: SlideIR,
   layoutPlaceholders: readonly PlaceholderInfo[],
 ): Map<string, VisualKind> {
-  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
   const occ = new Map<string, VisualKind>();
-  const put = (kind: VisualKind, ph: PlaceholderInfo | undefined) => { if (ph) occ.set(ph.idx, kind); };
-  if (slide.code) put("code", nthBody(bodyPhs, slide.code.placeholderIdx));
-  if (slide.diagram) put("diagram", nthBody(bodyPhs, slide.diagram.placeholderIdx));
-  if (slide.mermaidBlock) put("mermaid", nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx));
-  if (slide.table) put("table", nthBody(bodyPhs, slide.table.placeholderIdx));
-  if (slide.image && !slide.image.behind) put("image", imagePlaceholder(layoutPlaceholders, slide.image.placeholderIdx));
+  for (const c of visualClaims(slide, layoutPlaceholders)) occ.set(c.idx, c.kind);
   return occ;
+}
+
+/** A placeholder that 2+ visuals resolve to, with the kinds involved (in claim order). */
+export interface VisualCollision {
+  idx: string;
+  kinds: VisualKind[];
+}
+
+/**
+ * #434 never-silent: placeholders that 2+ visuals claim at once (e.g. 本文＋表＋図 — #390 moves the
+ * table AND the figure beside the text to ordinal 2 independently). The export draws every one of
+ * them over that placeholder (on top of each other — a solo ordinal-1 diagram spans the whole slide;
+ * code is filled into the placeholder under the rest), while the preview draws only one per placeholder. Placement is NOT changed here (#392 resolves it
+ * structurally); deck-diagnostics reports it. Read off the SAME claims as visualOccupancy (R8), so a
+ * reported collision is always an occupied placeholder. Pure (R2).
+ */
+export function visualCollisions(
+  slide: SlideIR,
+  layoutPlaceholders: readonly PlaceholderInfo[],
+): VisualCollision[] {
+  const byIdx = new Map<string, VisualKind[]>();
+  for (const c of visualClaims(slide, layoutPlaceholders)) byIdx.set(c.idx, [...(byIdx.get(c.idx) ?? []), c.kind]);
+  return [...byIdx].filter(([, kinds]) => kinds.length > 1).map(([idx, kinds]) => ({ idx, kinds }));
 }
