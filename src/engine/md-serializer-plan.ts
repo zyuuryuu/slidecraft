@@ -17,7 +17,7 @@ import type { LayoutCatalog, PlaceholderRole } from "./template-catalog";
 import { slideBindingPlan } from "./group-binding";
 import { sortByIdx } from "./placeholder-binding";
 import { TITLE_NS, META_FIELDS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, getSeparatorType, isColumnScopedTable, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
 
 /**
@@ -86,9 +86,10 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
     if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
     if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
     if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
+    maxCol = Math.max(maxCol, maxCurrentStepCol(sepType, slide));
 
     for (let col = 1; col <= maxCol; col++) {
-      lines.push(`<!-- ${sepType} -->`);
+      lines.push(separatorLine(sepType, slide, col));
       if (col === diagIdx) {
         lines.push("```diagram");
         lines.push(slide.diagram!.yaml);

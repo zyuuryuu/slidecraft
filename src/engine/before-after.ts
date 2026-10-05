@@ -11,7 +11,7 @@
  *   - only a groupKind "beforeAfter" slide gets an overlay — every other slide returns undefined, so
  *     compare / card / step / kpi / unmarked slides are byte-identical;
  *   - meaning is POSITIONAL: region 1 is Before, every later region After — beforeAfterRole, the same
- *     mapping the serializer writes the markers back with (groupMarkerLine);
+ *     mapping the serializer writes the markers back with (separatorLine);
  *   - a region is where the cell's content is actually bound: on a group layout the column of slots
  *     expandGroups fills (detectGroups), else the placeholder the binding plan assigns (a figure cell →
  *     its Nth body, like the figure itself);

@@ -170,6 +170,8 @@ export const SlideIRSchema = z.object({
   image: ImageBlockSchema.optional(), // embedded image (![alt](data URI) → <img> / PPTX pic)
   // `<!-- card/step/kpi/compare -->` groups → layout hint。compare（#396）・beforeAfter（#402: `<!-- before -->`/`<!-- after -->`）は optional の enum 追加
   groupKind: z.enum(["card", "step", "kpi", "compare", "beforeAfter"]).optional(),
+  // `<!-- step * -->` 現在ステップ（#401）: 1 始まりのグループ序数（昇順）。step のみ・無印なら欠落＝byte-identical
+  currentSteps: z.array(z.number().int().min(1)).optional(),
   notes: z.array(ParagraphSchema).optional(), // `<!-- note -->` 以降のスピーカーノート（ADR-0032 D1、R4 承認済み）
   sectionBreak: z.boolean().optional(), // `<!-- section -->` 章境界の宣言（ADR-0032 D2、R4 承認済み）— 章一覧は毎回スキャン導出（R8）
   derived: z.literal("toc").optional(), // `<!-- toc -->` 派生スライド。内容は常に再導出し md へはマーカー 1 行のみ書き戻す

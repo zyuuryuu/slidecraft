@@ -18,7 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable, groupMarkerLine } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
@@ -197,9 +197,10 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
       if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
       if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
       if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
+      maxCol = Math.max(maxCol, maxCurrentStepCol(sepType, slide));
 
       for (let col = 1; col <= maxCol; col++) {
-        lines.push(groupMarkerLine(sepType, col));
+        lines.push(separatorLine(sepType, slide, col));
         if (col === diagIdx) {
           lines.push("```diagram");
           lines.push(slide.diagram!.yaml);

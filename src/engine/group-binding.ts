@@ -13,6 +13,7 @@ import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { bindContentByRole, resolveBinding, isBlankParagraphs, type BindingPlan, type ContentRef, type PlaceholderRef } from "./placeholder-binding";
 import { slideIdxRole, placeholderRole } from "./template-catalog";
 import { detectGroups, bakedText } from "./group-layout";
+import { splitHeadingIcon, headingIconGeometry, frameAround, unionBox, emptyOverlay, type GroupOverlay } from "./group-overlay";
 
 export { detectGroups, isGroupedLayout } from "./group-layout";
 export type { GroupSlot, GroupSlotRole, GroupLayoutShape } from "./group-layout";
@@ -41,9 +42,26 @@ export function groupEditorPlan(slide: SlideIR, layout: LayoutInfo): { metaPhs: 
  * never encounters a group cell (idx13-24) nor group content, and runs byte-identical.
  */
 export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, PlaceholderContent> {
+  return planGroupCells(slide, layout).content;
+}
+
+/**
+ * The decorations drawn beside the grouped cells (#400 heading icons / #401 current-step frame) — from
+ * the SAME single pass as expandGroups (planGroupCells), so an icon is placed exactly where its token
+ * was stripped. Empty for a slide with neither (→ those decks take no new path, byte-identical).
+ */
+export function groupCellOverlay(slide: SlideIR, layout: LayoutInfo): GroupOverlay {
+  return planGroupCells(slide, layout).overlay;
+}
+
+/** Bold every run of a current step's heading (#401 — sectionNavParagraphs' "current = bold"). */
+const boldRuns = (p: Paragraph): Paragraph => ({ ...p, segments: p.segments.map((s) => ({ ...s, bold: true })) });
+
+function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<string, PlaceholderContent>; overlay: GroupOverlay } {
   const out = new Map<string, PlaceholderContent>();
+  const overlay = emptyOverlay();
   const shape = detectGroups(layout);
-  if (!shape || !slide.groupKind) return out;
+  if (!shape || !slide.groupKind) return { content: out, overlay };
 
   const isGroupIdx = (i: string) => /^[1-9]$/.test(i);
   const groupPhIdxs = new Set(shape.groups.flat().map((s) => s.phIdx));
@@ -57,10 +75,21 @@ export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, Pl
   const contentGroups = slide.placeholders.filter((c) => isGroupIdx(c.idx)).sort((a, b) => parseInt(a.idx) - parseInt(b.idx));
   const phByIdx = new Map(layout.placeholders.map((p) => [p.idx, p] as const));
   const n = Math.min(shape.groups.length, contentGroups.length); // overflow → extras dropped (decision ②)
+  // #401 frame geometry: each column's slot union (slots are detectGroups' picks from this layout).
+  const unions = shape.groups.map((g) => unionBox(g.map((sl) => phByIdx.get(sl.phIdx)!.style)));
   for (let i = 0; i < n; i++) {
     const col = shape.groups[i];
     const c = contentGroups[i];
-    const headParas = c.paragraphs.filter((p) => p.heading);
+    // #401: c.idx is the step's ordinal in the markdown (its separator's position), which is what
+    // currentSteps records — the column it lands in can differ when an earlier step is empty.
+    const isCurrent = slide.groupKind === "step" && !!slide.currentSteps?.includes(parseInt(c.idx));
+    let icon: string | undefined;
+    const headParas = c.paragraphs.filter((p) => p.heading).map((p, k) => {
+      const split = k === 0 ? splitHeadingIcon(p) : null; // #400: the cell's first heading may lead with :icon:
+      if (split) icon = split.icon;
+      const para = split ? split.paragraph : p;
+      return isCurrent ? boldRuns(para) : para;
+    });
     const bodyParas = c.paragraphs.filter((p) => !p.heading);
     const headSlot = col.find((s) => s.role === "heading");
     const bodySlots = col.filter((s) => s.role === "body");
@@ -74,6 +103,17 @@ export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, Pl
       if (allParas.length) out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: allParas });
     } else if (headSlot && headParas.length) {
       out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: headParas.map((p) => ({ ...p, heading: false })) });
+    }
+    // #400: the icon goes where the heading actually landed (both branches above put it in headSlot).
+    const headPh = headSlot && out.has(headSlot.phIdx) ? phByIdx.get(headSlot.phIdx) : undefined;
+    if (icon && headPh) {
+      const g = headingIconGeometry(headPh);
+      overlay.icons.push({ name: icon, phIdx: headPh.idx, ...g.box, color: headPh.style.fontColor });
+      overlay.insets.set(headPh.idx, g.lIns);
+    }
+    if (isCurrent) {
+      const colorPh = headPh ?? phByIdx.get(col.find((sl) => sl.role !== "picture")?.phIdx ?? "");
+      if (colorPh) overlay.frames.push(frameAround(unions, i, colorPh.style.fontColor));
     }
 
     if (bodySlots.length === 1) {
@@ -95,7 +135,7 @@ export function expandGroups(slide: SlideIR, layout: LayoutInfo): Map<string, Pl
     }
     // picture slots: no entry → inherited (a Markdown deck can't fill an image).
   }
-  return out;
+  return { content: out, overlay };
 }
 
 /**

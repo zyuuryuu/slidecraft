@@ -306,6 +306,14 @@ export interface SvgRenderOptions extends PaintOptions {
   transparent?: boolean;
 }
 
+/** Run ANY draw commands into a transparent full-slide SVG (preview) — the SVG twin of
+ *  pptx-writer.paintToShapeXml, used for the group-cell overlay (#400/#401). */
+export function renderPaintToSvg(paint: (target: DrawTarget) => void): string {
+  const target = new SvgDrawTarget(true);
+  paint(target);
+  return target.toSvg();
+}
+
 /** Render a DiagramSpec to an SVG string (preview), matching the PPTX export. */
 export function renderDiagramToSvg(spec: DiagramSpec, options: SvgRenderOptions = {}): string {
   const target = new SvgDrawTarget(options.transparent);

@@ -33,12 +33,21 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   return null;
 }
 
-/** The separator line opening region `col` (1-based) of a `sepType` group. Every family repeats its own
- *  word, except the #402 before/after pair, whose word is the region's positional role (beforeAfterRole —
- *  the same mapping the overlay labels draw). */
-export function groupMarkerLine(sepType: string, col: number): string {
+/** The separator line opening region `col` (1-based) — the ONE marker writer for both readouts (R8):
+ *  `<!-- step * -->` for a current step (#401); the #402 before/after pair writes the region's
+ *  positional role (beforeAfterRole — the same mapping the overlay labels draw); every other family
+ *  repeats its own word. */
+export function separatorLine(sepType: string, slide: SlideIR, col: number): string {
+  if (sepType === "step" && slide.currentSteps?.includes(col)) return "<!-- step * -->";
   const word = sepType === "beforeAfter" ? beforeAfterRole(col) : sepType;
   return `<!-- ${word} -->`;
+}
+
+/** The highest current-step column to keep when emitting a step band — so a starred EMPTY trailing
+ *  step still round-trips (#401). 0 when nothing applies; capped at the 1..10 body-region range. */
+export function maxCurrentStepCol(sepType: string, slide: SlideIR): number {
+  if (sepType !== "step") return 0;
+  return Math.max(0, ...(slide.currentSteps ?? []).filter((n) => n <= 10));
 }
 
 // ── Paragraphs → Markdown lines ──
