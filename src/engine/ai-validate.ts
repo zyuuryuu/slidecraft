@@ -17,7 +17,7 @@
 import type { FitBox } from "./distill";
 import type { SlideIR } from "./slide-schema";
 import { parseMd } from "./md-parser";
-import { META_IDXS, titleSubtitleIdx } from "./slide-roles";
+import { META_IDXS, titleSubtitleIdx, type LayoutRoleLookup } from "./slide-roles";
 
 export type CondenseViolation = {
   kind: "parse" | "language" | "fact" | "budget" | "structure";
@@ -159,9 +159,9 @@ function phPlainText(s: SlideIR, idx: string): string {
 /** A slide's title lives at its OWN namespace idx (0 for title-namespace, 15 for content) — judged by
  *  the same rule the parser uses (slide-roles), so unrelated text in the other idx isn't mistaken for
  *  a surviving title across a namespace boundary. */
-function titleText(s: SlideIR): string {
+function titleText(s: SlideIR, catalog?: LayoutRoleLookup): string {
   const hasMeta = META_IDXS.some((idx) => phPlainText(s, idx).length > 0);
-  return phPlainText(s, titleSubtitleIdx(s.layout, hasMeta).title);
+  return phPlainText(s, titleSubtitleIdx(s.layout, hasMeta, catalog).title);
 }
 function hasFigure(s: SlideIR): boolean {
   return !!(s.diagram || s.mermaidBlock || s.table || s.code);
@@ -171,7 +171,8 @@ function groupColCount(s: SlideIR): number {
   return s.placeholders.filter((p) => /^[1-9]$/.test(p.idx) && p.paragraphs.some((pp) => pp.segments.some((x) => x.text.trim()))).length;
 }
 
-export function validateStructure(before: SlideIR, after: SlideIR, kind: "condense" | "edit"): CondenseVerdict {
+/** `catalog`（任意, #453）: title idx の判定を parser と同じ catalog-aware 規則で行う（slide-roles）。 */
+export function validateStructure(before: SlideIR, after: SlideIR, kind: "condense" | "edit", catalog?: LayoutRoleLookup): CondenseVerdict {
   const v: CondenseViolation[] = [];
   const sev = (): "hard" | "soft" => (kind === "condense" ? "hard" : "soft");
   const push = (severity: "hard" | "soft", detail: string) => v.push({ kind: "structure", severity, detail });
@@ -179,7 +180,7 @@ export function validateStructure(before: SlideIR, after: SlideIR, kind: "conden
   // layout pin loss — ALWAYS hard: dropping the `<!-- slide: ... -->` header re-selects the layout.
   if (before.layout !== "auto" && after.layout === "auto") push("hard", "レイアウト指定(ヘッダー)が失われた");
   // title loss — the slide had a title, the edit returned none.
-  if (titleText(before) && !titleText(after)) push(sev(), "タイトルが失われた");
+  if (titleText(before, catalog) && !titleText(after, catalog)) push(sev(), "タイトルが失われた");
   // figure loss — flagged only for a `condense` (which returns the FULL slide and must not drop it).
   // A free-form `edit` that returns text-only is NORMAL: reconcileEdit carries the figure, so flagging
   // it would announce a "restore" on every routine text edit of a figure-bearing slide. Kept silent.

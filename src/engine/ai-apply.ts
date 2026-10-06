@@ -118,12 +118,14 @@ export interface SlideEditReconcile {
  * fact-check — without it a number lost from that title went undetected.
  */
 export function reconcileSlideEdit(old: SlideIR, rawMd: string, tpl?: SerializeTemplate): SlideEditReconcile | null {
-  const newSlide = parseMd(rawMd).slides[0];
+  // tpl.catalog rides into parse/reconcile/validate so a REAL-name title pin keeps its namespace
+  // across the whole edit round (#453) — without tpl, all three fall back to the name rule as before.
+  const newSlide = parseMd(rawMd, tpl?.catalog).slides[0];
   if (!newSlide) return null;
   const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
   const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
-  const reconciled = reconcileEdit(old, edited);
-  const verdict = validateStructure(old, edited, "edit");
+  const reconciled = reconcileEdit(old, edited, tpl?.catalog);
+  const verdict = validateStructure(old, edited, "edit", tpl?.catalog);
   // C: a text-only edit that drops the ```diagram fence still keeps the figure — reconcileEdit carries
   // the OLD figure (and its numbers) back into `reconciled`. So don't let the condense fact-check count
   // the figure's numbers as "lost" when the output has no figure — strip the figure from the before-side

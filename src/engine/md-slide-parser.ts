@@ -9,7 +9,7 @@ import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { findTableInLines, extractBodyTable } from "./md-body-table";
-import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS, type LayoutRoleLookup } from "./slide-roles";
 import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
@@ -249,6 +249,7 @@ export function parseSlideBlock(
   lines: string[],
   startLine: number,
   notices?: ParseNotice[],
+  catalog?: LayoutRoleLookup,
 ): SlideIR | null {
   // sourceLineStart/End must span the ORIGINAL block — useDeckRevise slices the raw
   // Markdown by these — so capture the length before comment lines are stripped.
@@ -516,8 +517,9 @@ export function parseSlideBlock(
   if (inCodeBlock) commitCodeBlock();
 
   // Determine the placeholder namespace (title vs content) — the SINGLE shared rule (slide-roles):
-  // a Title/Closing layout OR the presence of any meta field promotes the slide to the title namespace.
-  const isTitle = isTitleNamespace(layout, Object.keys(titleFields).length > 0);
+  // a Title/Closing layout OR the presence of any meta field promotes the slide to the title
+  // namespace; with a catalog, so does a pin whose resolved layout ROLE is title/closing (#453).
+  const isTitle = isTitleNamespace(layout, Object.keys(titleFields).length > 0, catalog);
   const ns = isTitle ? TITLE_NS : CONTENT_NS;
 
   // Build placeholders: # → title idx, ## / > → subtitle idx (namespace-dependent).

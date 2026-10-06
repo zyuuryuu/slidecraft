@@ -127,7 +127,7 @@ export async function refineDeck(
       const pureKeyValue = slideIssues.some((d) => d.levers.includes("visualize") && !d.levers.includes("split"));
       if (pureKeyValue) {
         const after = visualizeKeyValueMd(before);
-        const newSlide = after ? parseMd(after).slides[0] : undefined;
+        const newSlide = after ? parseMd(after, catalog).slides[0] : undefined;
         if (after && newSlide) {
           current = replaceSlide(current, idx, newSlide);
           changes.push({ slideIndex: idx, lever: "visualize", kind: "deterministic", beforeMd: before, afterMd: after });
@@ -157,13 +157,13 @@ export async function refineDeck(
             if (!outcome) continue; // threw → unknown, drop this candidate
             if (!outcome.ok) { if (outcome.cancelled) sawCancelled = true; else if (outcome.retryable) sawRetryable = true; continue; }
             const after = outcome.markdown.trim();
-            const afterSlide = after ? parseMd(after).slides[0] : undefined;
+            const afterSlide = after ? parseMd(after, catalog).slides[0] : undefined;
             // GUARDRAIL: a small model occasionally drops a fact / drifts language / returns the wrong
             // format — AND it can drop the slide's structure (title/figure/group). A condense returns the
             // FULL slide and must preserve both, so merge the fact/language guard with the structure guard
             // ('condense' strictness = every structural loss is HARD).
             const verdict = afterSlide
-              ? mergeVerdicts(validateCondense(before, after, box), validateStructure(current.slides[idx], afterSlide, "condense"))
+              ? mergeVerdicts(validateCondense(before, after, box), validateStructure(current.slides[idx], afterSlide, "condense", catalog))
               : validateCondense(before, after, box);
             const score = (verdict.hasHard ? 1e6 : 0) + verdict.violations.length;
             if (!best || score < best.score) best = { after, afterSlide, verdict, score };
@@ -232,7 +232,7 @@ export async function batchEditDeck(
       if (!outcome || !outcome.ok) continue; // threw / cancelled / failed
       const after = outcome.markdown.trim();
       if (!after || after === before) continue; // no-op → the edit wasn't applied, not a real candidate
-      const afterSlide = parseMd(after).slides[0];
+      const afterSlide = parseMd(after, catalog).slides[0];
       if (!afterSlide) continue;
       const cond = validateCondense(before, after);
       const factDrift = cond.violations.filter((w) => w.kind === "fact").length;

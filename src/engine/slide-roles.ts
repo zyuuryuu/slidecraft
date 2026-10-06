@@ -41,15 +41,34 @@ export function metaIdxToField(idx: string): string | undefined {
 }
 
 /**
- * A slide is in the TITLE namespace when its layout is a Title/Closing layout OR it carries meta
- * fields (Category/Date/Footer). This is the EXACT rule the parser applies at parse time — reconcile
- * must mirror it so it restores a dropped title into the same idx the parser would have used.
+ * The minimal catalog surface this module reads (#453). STRUCTURAL on purpose: template-catalog
+ * imports slide-roles, so importing its LayoutCatalog type here would be an import cycle —
+ * CatalogEntry satisfies this shape as-is.
  */
-export function isTitleNamespace(layout: string, hasMetaFields: boolean): boolean {
-  return isTitleLayout(layout) || hasMetaFields;
+export type LayoutRoleLookup = ReadonlyArray<{ name: string; role: string }>;
+
+/** A pinned layout name the catalog resolves to a title-family role — the same two families
+ *  isTitleLayout names by prefix (Title.→title / Closing.→closing). "auto" and names the catalog
+ *  lacks never match: auto covers keep the meta-promotion rule, unknown pins the name rule. */
+function isTitleRolePin(layout: string, catalog?: LayoutRoleLookup): boolean {
+  if (!catalog || layout === "auto") return false;
+  const role = catalog.find((e) => e.name === layout)?.role;
+  return role === "title" || role === "closing";
+}
+
+/**
+ * A slide is in the TITLE namespace when its layout is a Title/Closing layout OR it carries meta
+ * fields (Category/Date/Footer) OR — with a catalog at hand (#453) — its pin resolves to a layout
+ * whose ROLE is title/closing (a template's REAL cover name like 公文書系 "00_表紙", which the
+ * canonical-prefix check can't see). This is the EXACT rule the parser applies at parse time —
+ * reconcile/validate must mirror it (same catalog) so a dropped title is restored into the same
+ * idx the parser would have used. Without a catalog the rule is unchanged (template-less default).
+ */
+export function isTitleNamespace(layout: string, hasMetaFields: boolean, catalog?: LayoutRoleLookup): boolean {
+  return isTitleLayout(layout) || hasMetaFields || isTitleRolePin(layout, catalog);
 }
 
 /** The title/subtitle placeholder idx for a slide, given its layout and whether it has meta fields. */
-export function titleSubtitleIdx(layout: string, hasMetaFields: boolean): { title: string; subtitle: string } {
-  return isTitleNamespace(layout, hasMetaFields) ? TITLE_NS : CONTENT_NS;
+export function titleSubtitleIdx(layout: string, hasMetaFields: boolean, catalog?: LayoutRoleLookup): { title: string; subtitle: string } {
+  return isTitleNamespace(layout, hasMetaFields, catalog) ? TITLE_NS : CONTENT_NS;
 }
