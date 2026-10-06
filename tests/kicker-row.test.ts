@@ -4,9 +4,10 @@
  *   `Kicker: …` → canonical content idx "kicker" → the auto pick prefers a variant with a Kicker/Eyebrow
  *   slot (field-variant.ts) → binding Pass 0 puts it there (by the slot's NAME).
  *
- * Measured on every committed template (built-in 30, the 13-layout report family, lrk, Dirty fixtures):
- * NO content layout has a kicker slot — kicker-like boxes exist only on title/section/closing layouts
- * (Midnight CategoryLabel.Top / SectionLabel.Top = idx 10 = the existing `Category:`). So:
+ * Slots on committed templates: since #447 the built-in set carries Content.1Body.Single+1Kicker
+ * (Midnight + BUILTIN_LAYOUTS — see the #447 section below). The other committed families (the
+ * 13-layout report family, lrk, Dirty fixtures) still have NO content-layout kicker slot — their
+ * kicker-like boxes exist only on title/section/closing layouts (idx 10 = the existing `Category:`). So:
  *   - with no slot the row degrades NEVER-SILENTLY (unbound-content naming `Kicker:`), like #421;
  *   - a template that has the slot is synthesized here (a `Kicker.Top` placeholder injected into a real
  *     layout's XML) to prove the row lands above the title end to end.
@@ -27,6 +28,8 @@ import { diagnoseDeck } from "../src/engine/deck-diagnostics";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { fieldSlotOf } from "../src/engine/field-rows";
 import { slideSystemPrompt } from "../src/engine/llm-prompts";
+import { BUILTIN_LAYOUTS } from "../src/engine/template-layout-library";
+import { writeTemplate, MIDNIGHT_PALETTE } from "../src/engine/template-writer";
 import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
 
 const MIDNIGHT = resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx");
@@ -168,15 +171,20 @@ describe("a template WITH a kicker slot — the row is drawn above the title", (
 });
 
 describe("variant preference — the auto pick moves to the variant that has the slot", () => {
-  it("Midnight with Kicker.Top only on +1Notes: a kicker slide picks +1Notes, a row-less one stays", async () => {
-    const tpl = await loadTemplate(await withKickerSlot(MIDNIGHT, "Content.1Body.Single+1Notes", { x: 10.9, y: 0.1, w: 2.2, h: 0.3 }));
-    expect(pick(tpl, parseMd(KICKER_MD).slides[0])).toBe("Content.1Body.Single+1Notes");
-    expect(pick(tpl, parseMd(ROWLESS_MD).slides[0])).toBe("Content.1Body.Single");
+  // #447: Midnight now ships its own +1Kicker variant, so isolating the MECHANISM (the pick moving
+  // off the ordinary layout only because of the slot) needs a committed template without one — the
+  // 13-layout report family. 08_目次 is a content-role, 1-body layout like the ordinary pick.
+  it("技術報告 with Kicker.Top only on 08_目次: a kicker slide picks 08_目次, a row-less one stays", async () => {
+    const tpl = await loadTemplate(await withKickerSlot(GIJUTSU, "08_目次", { x: 0.6, y: 0.1, w: 6, h: 0.3 }));
+    expect(pick(tpl, parseMd(KICKER_MD).slides[0])).toBe("08_目次");
+    expect(pick(tpl, parseMd(ROWLESS_MD).slides[0])).toBe(GIJUTSU_BODY);
   });
 });
 
-describe("never-silent degrade — no kicker slot (every committed template today)", () => {
-  for (const [label, file] of [["Midnight", MIDNIGHT], ["技術報告", GIJUTSU]] as const) {
+// #447: Midnight left this list — its +1Kicker variant means the row no longer degrades there
+// (covered by the #447 section). The report family remains slot-less, so the degrade path stays locked.
+describe("never-silent degrade — no kicker slot (committed templates without one)", () => {
+  for (const [label, file] of [["技術報告", GIJUTSU]] as const) {
     it(`${label}: the pick is unchanged and the row is reported by name, not dropped silently`, async () => {
       const tpl = await loadTemplate(readFileSync(file));
       const catalog = buildCatalog(tpl);
@@ -198,19 +206,92 @@ describe("never-silent degrade — no kicker slot (every committed template toda
 });
 
 describe("authoring contract — Kicker: is advertised only where it takes effect", () => {
-  it("templates without the slot (Midnight, 技術報告) do not advertise it; Takeaway/Source unchanged", async () => {
-    const mid = slideSystemPrompt(buildCatalog(await loadTemplate(readFileSync(MIDNIGHT))));
-    expect(mid).not.toContain("Kicker:");
-    expect(mid).toContain("Takeaway:");
-    expect(mid).toContain("Source:");
+  // #447: Midnight moved to the advertised side; a slot-less template still must NOT hear about Kicker:.
+  it("a template without the slot (技術報告) does not advertise it", async () => {
     expect(slideSystemPrompt(buildCatalog(await loadTemplate(readFileSync(GIJUTSU))))).not.toContain("Kicker:");
   });
 
-  it("no template loaded (the canonical built-in set, which has no kicker slot) → not advertised", () => {
+  it("Midnight (with the slot since #447): Kicker: joins Takeaway:/Source: — those two unchanged", async () => {
+    const mid = slideSystemPrompt(buildCatalog(await loadTemplate(readFileSync(MIDNIGHT))));
+    expect(mid).toContain("Kicker:");
+    expect(mid).toContain("Takeaway:");
+    expect(mid).toContain("Source:");
+  });
+
+  it("no template loaded (the canonical built-in set, which HAS the slot since #447) → advertised", () => {
     const p = slideSystemPrompt();
-    expect(p).not.toContain("Kicker:");
+    expect(p).toContain("Kicker:");
     expect(p).toContain("Takeaway:");
     expect(p).toContain("Source:");
+  });
+});
+
+describe("#447 — the built-in set has a +1Kicker variant, so the row draws on Midnight", () => {
+  const VARIANT = "Content.1Body.Single+1Kicker";
+  const HEADER_BAND_H = 1.15; // Midnight content layouts' header-bar height (in)
+  let tpl: TemplateData;
+  beforeAll(async () => {
+    tpl = await loadTemplate(readFileSync(MIDNIGHT));
+  });
+
+  it("BUILTIN_LAYOUTS: the variant exists; its slot sits ABOVE the lowered title, all inside the header band", () => {
+    const def = BUILTIN_LAYOUTS.find((l) => l.name === VARIANT)!;
+    expect(def).toBeDefined();
+    const kicker = def.placeholders.find((p) => fieldSlotOf(p) === "kicker")!;
+    expect(kicker).toBeDefined();
+    const title = def.placeholders.find((p) => p.idx === 15)!;
+    const subtitle = def.placeholders.find((p) => p.idx === 16)!;
+    expect(kicker.y + kicker.h).toBeLessThanOrEqual(title.y);
+    expect(subtitle.y + subtitle.h).toBeLessThanOrEqual(HEADER_BAND_H);
+    // like Callout.Top, the slot is a COUNTED content body (fs>12 — ≤12 would read as a chrome band
+    // and break the #127 healthy-template invariant); the bodyOrdinal guard keeps regions out of it.
+    expect(kicker.fontSize).toBeGreaterThan(12);
+  });
+
+  it("committed Midnight: a Kicker: slide picks the variant; a row-less slide stays on Content.1Body.Single", () => {
+    expect(pick(tpl, parseMd(KICKER_MD).slides[0])).toBe(VARIANT);
+    expect(pick(tpl, parseMd(ROWLESS_MD).slides[0])).toBe("Content.1Body.Single");
+  });
+
+  it("the catalog advertises the slot the same way as +1Callout: a 2nd content body with its ordinal", () => {
+    const entry = buildCatalog(tpl).find((e) => e.name === VARIANT)!;
+    expect(entry.fieldSlots).toEqual([{ kind: "kicker", bodyOrdinal: 2 }]);
+    expect(entry.role).toBe("content");
+    // same shape as Content.1Body.Single+1Callout (Callout.Top counts as body #2)
+    const callout = buildCatalog(tpl).find((e) => e.name === "Content.1Body.Single+1Callout")!;
+    expect(entry.bodyCount).toBe(callout.bodyCount);
+  });
+
+  it("binding puts the row into the kicker slot and the bullets into the body; nothing unbound", () => {
+    const s = parseMd(KICKER_MD).slides[0];
+    const layout = findLayout(tpl, VARIANT)!;
+    const slot = layout.placeholders.find((p) => fieldSlotOf(p) === "kicker")!;
+    const bound = bindContentByRole(s, layout.placeholders);
+    expect(boundText(bound, slot.idx)).toBe("SECTION 02 · コスト分析");
+    expect(resolveBinding(s, layout.placeholders).unbound).toEqual([]);
+    expect(diagnoseDeck(asMiddle(s), buildCatalog(tpl), tpl.layouts).filter((i) => i.id === "unbound-content")).toEqual([]);
+  });
+
+  it("the exported PPTX draws the kicker ABOVE the title", async () => {
+    const zip = await JSZip.loadAsync(await generatePptx(asMiddle(parseMd(KICKER_MD).slides[0]), tpl));
+    const xml = await zip.file("ppt/slides/slide2.xml")!.async("string");
+    expect(xml).toContain("SECTION 02 · コスト分析");
+    const layout = findLayout(tpl, VARIANT)!;
+    const slot = layout.placeholders.find((p) => fieldSlotOf(p) === "kicker")!;
+    const title = layout.placeholders.find((p) => p.idx === "15")!;
+    expect(slot.style.y + slot.style.h).toBeLessThanOrEqual(title.style.y);
+  });
+
+  it("a generated template (writeTemplate, BUILTIN_LAYOUTS default) offers the slot too", async () => {
+    const gen = await loadTemplate(await writeTemplate({
+      name: "Generated Midnight", fonts: { major: "Georgia", minor: "Calibri" }, palette: { ...MIDNIGHT_PALETTE },
+    }));
+    expect(pick(gen, parseMd(KICKER_MD).slides[0])).toBe(VARIANT);
+    expect(pick(gen, parseMd(ROWLESS_MD).slides[0])).toBe("Content.1Body.Single");
+  });
+
+  it("the AI is told about Kicker: on the committed Midnight", () => {
+    expect(slideSystemPrompt(buildCatalog(tpl))).toContain("Kicker:");
   });
 });
 
