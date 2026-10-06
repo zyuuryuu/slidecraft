@@ -124,8 +124,8 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 検証 | `validate_deck` | deck 検証＋`exportReadiness`（変換不能 mermaid スキャン） |
 | 保存 | `save_project(filename?)` | `.scft` を生成。既定 `{dataBase64}`。`--root` scope 起動時は scope 配下へ書き出し `{path}`（下記「scoped fs 出力」） |
 | 出力 | `export_pptx(onUnsupportedMermaid?, filename?)` | `.pptx` を **native-vector で headless 生成**。既定 `{dataBase64, skipped}`。`--root` scope 起動時は `{path, skipped}` |
-| lifecycle | `list_documents` / `select_document` / `close_document` / `undo` / `redo` | 複数ドキュメント lifecycle＋サーバ側 undo/redo。各ドキュメント行/戻りに `contract` 同梱。**solo stdio でも additive に有効**（1 doc なので list/select/close は実質 no-op・**undo/redo は solo でも本当に効く**＝ADR-0033 D1）。collab では複数 doc を跨ぐ |
-| host 専用(GUI) | `register_templates(templates[])` | GUI のみ：webview の master レジストリを host へ投入（`{id,name,builtin,bytesBase64}` の配列・呼ぶ度に全置換）。AI ロールには非公開。これで AI が `list_templates`/`use_template` で選べる |
+| lifecycle | `list_documents` / `select_document` / `close_document` / `undo` / `redo` | 複数ドキュメント lifecycle＋サーバ側 undo/redo。各ドキュメント行/戻りに `contract` 同梱。**doc 切替 3 本（list/select/close）は collab 専用** — solo（stdio 単独）は常に 1 doc なので登録されない（プロファイル別登録・ADR-0037 D2／#465）。**`undo`/`redo` は solo でも登録され本当に効く**（ADR-0033 D1）。collab では複数 doc を跨ぐ |
+| host 専用(GUI) | `register_templates(templates[])` | GUI のみ：webview の master レジストリを host へ投入（`{id,name,builtin,bytesBase64}` の配列・呼ぶ度に全置換）。AI ロール・solo には非公開（solo は GUI が繋がらずレジストリの投入元が無い）。これで AI が `list_templates`/`use_template` で選べる |
 
 ### mutation の戻り（統一 envelope）
 

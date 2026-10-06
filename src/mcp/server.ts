@@ -7,9 +7,9 @@
  *  - stdio (cli.ts): a SOLO HostContext (`createSoloHostContext`, host-core.ts) — exactly one doc,
  *    resolved via `soleDocId()`, no fan-out/notify, no token (OS-user trust boundary, ADR-0007).
  *  - host (host.ts, P2 collab): a DocRegistry of many docs; each tool resolves the connection's
- *    target doc (explicit docId → active doc → sole doc), and the doc-lifecycle tools
- *    (list/select/close/undo/redo + new/open mint-new-doc) come online. The same 18 deck tools work
- *    in both.
+ *    target doc (explicit docId → active doc → sole doc). The same deck tools work in both; WHICH
+ *    tools each profile (solo / collab GUI / collab AI) sees is tool-profiles.ts's ONE table
+ *    (ADR-0037 D2, #465 — doc-switching + register_templates stay collab-only).
  * Read-only deck state is ALSO exposed as MCP resources (deck://…) — a per-transport config flag
  * (`registerResources`), on by default (stdio), opt-out in collab (the GUI is the read surface there).
  */
@@ -28,6 +28,7 @@ import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError, guardEnvelope } from "./guard-errors";
 import { getBootstrap } from "./bootstrap";
+import { gatedToolRegistrar } from "./tool-profiles";
 import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
 import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
 
@@ -75,6 +76,8 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // ONE control plane always: an explicit host (collab) or a solo one minted around `session`
   // (stdio and any caller that doesn't bring its own multi-doc registry).
   const host: HostContext = opts.host ?? createSoloHostContext(session);
+  // ADR-0037 D2 (#465): どのプロファイルに見せるかは tool-profiles.ts の表 1 箇所が決める（R8）— 以下の全登録はこのゲートを通る。
+  const tool = gatedToolRegistrar(server, host);
   // ADR-0035 stage 1: the fs scope (--root) is a per-SERVER-PROCESS setting, not per-doc — every doc
   // minted later (open/new/use_template → S.createSession below) must inherit the SAME scope the
   // process was started with, not silently reset to --no-fs.
@@ -164,31 +167,31 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   };
 
   // ── entry: open / new (base64 by default; scoped fs path when the server has --root, ADR-0035) ──
-  server.registerTool(
+  tool(
     "open_project",
     { description: ".scft を開く（新しいドキュメントとして mint）。既定は base64（dataBase64）。--root（scope）起動時は代わりに path（scope 配下のファイル名）で渡せる（両方指定はエラー）", inputSchema: { dataBase64: z.string().optional(), path: z.string().optional().describe("scope 配下のファイル名（.scft・scope 起動時のみ有効・dataBase64 と排他）") } },
     (a, extra) => openInHost("open_project", withContract((s) => S.openProjectBytes(s, acquireScopedOrBase64(scopeRoot, a.dataBase64, a.path, "scft"))), extra),
   );
-  server.registerTool(
+  tool(
     "new_project",
     { description: ".pptx テンプレートと（任意の）Markdown から新規作成（新ドキュメントを mint）。GUI の Draft と同じ整形。書式は get_authoring_guide・図は get_diagram_types。既定は base64（templateBase64）。--root（scope）起動時は代わりに templatePath（scope 配下のファイル名）で渡せる（両方指定はエラー）。テンプレ bytes が無ければ create_template で生成できる", inputSchema: { templateBase64: z.string().optional(), templatePath: z.string().optional().describe("scope 配下のテンプレファイル名（.pptx・scope 起動時のみ有効・templateBase64 と排他）"), markdown: z.string().optional() } },
     (a, extra) => openInHost("new_project", withContract((s) => S.newProject(s, acquireScopedOrBase64(scopeRoot, a.templateBase64, a.templatePath, "pptx"), a.markdown)), extra),
   );
 
   // ── reads ──
-  server.registerTool("get_deck", { description: "現在の deck（DeckIR JSON）。resource `deck://current` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeck(sessionOf(extra, a.docId))));
-  server.registerTool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeckMarkdown(sessionOf(extra, a.docId))));
-  server.registerTool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）。`slide://{index}/markdown` の確実版", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideMarkdown(sessionOf(extra, a.docId), a.index)));
-  server.registerTool("get_slide", { description: "1スライドの構造化 read（1呼び出しで編集計画）：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・capacity（本文容量の実測 usedLines/maxLines）・predictedSplit（split_overflowing_slides の dry-run：実行せず何枚に割れるか）・当該スライドの issues・markdown。素の Markdown だけなら get_slide_markdown", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => R.getSlide(sessionOf(extra, a.docId), a.index)));
-  server.registerTool("get_deck_issues", { description: "deck の診断＝CONTENT レバー（split/condense/visualize/title）＋本文 budget＋次の一手 hints。`deck://issues` のミラー。※ export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(() => { const d = S.getDiagnostics(sessionOf(extra, a.docId)); return { ...d, hints: N.nextStepHints(d.issues) }; }));
-  server.registerTool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
-  server.registerTool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
-  server.registerTool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
+  tool("get_deck", { description: "現在の deck（DeckIR JSON）。resource `deck://current` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeck(sessionOf(extra, a.docId))));
+  tool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeckMarkdown(sessionOf(extra, a.docId))));
+  tool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）。`slide://{index}/markdown` の確実版", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideMarkdown(sessionOf(extra, a.docId), a.index)));
+  tool("get_slide", { description: "1スライドの構造化 read（1呼び出しで編集計画）：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・capacity（本文容量の実測 usedLines/maxLines）・predictedSplit（split_overflowing_slides の dry-run：実行せず何枚に割れるか）・当該スライドの issues・markdown。素の Markdown だけなら get_slide_markdown", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => R.getSlide(sessionOf(extra, a.docId), a.index)));
+  tool("get_deck_issues", { description: "deck の診断＝CONTENT レバー（split/condense/visualize/title）＋本文 budget＋次の一手 hints。`deck://issues` のミラー。※ export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(() => { const d = S.getDiagnostics(sessionOf(extra, a.docId)); return { ...d, hints: N.nextStepHints(d.issues) }; }));
+  tool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
+  tool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
+  tool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
   // #109: the AI's visual design check — screenshot the SHARED HTML rendering (SlideCard SSR,
   // fonts embedded) in a locally installed headless Chrome/Edge, network-dead and script-free.
   // Tool-only (no deck:// mirror): ADR-0008's dual-read rule serves STATE reads; tools/call is the
   // one universally supported channel and binary resources have far patchier client support.
-  server.registerTool(
+  tool(
     "get_slide_image",
     { description: "1スライドの現在の描画を PNG で返す（AI の視覚デザインチェック用）。共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定", inputSchema: { ...index, ...doc } },
     async (a, extra) => {
@@ -203,7 +206,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // #242: same shared rendering as get_slide_image, minus the local-browser requirement — the caller
   // rasterizes with its own means (CI/sandboxes often have no Chrome/Edge). R8: no second render
   // path — `renderSlideHtml` IS the exact page get_slide_image screenshots.
-  server.registerTool(
+  tool(
     "get_slide_html",
     { description: "1スライドの現在の描画を自己完結 HTML 文字列で返す（get_slide_image と同一の共有 HTML＝script ゼロ・CSP・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境向け：呼び出し側の任意の手段でラスタ化できる", inputSchema: { ...index, ...doc } },
     (a, extra) => run(() => renderSlideHtml(sessionOf(extra, a.docId), a.index)),
@@ -211,30 +214,30 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
 
   // ── authoring contract (self-describing surface; T3/S1) ── the single entry the AI reads BEFORE
   // authoring: how to write this template's slide Markdown, the body budget, and pointers to figures.
-  server.registerTool("get_authoring_guide", { description: "スライド Markdown の書き方（このテンプレのレイアウト名に解決した書式・`<!-- col/kpi/step -->` 区切り・表(GFM)・コード）＋本文 budget＋図/テンプレ作成ガイドへの入口。スライドを書く前にまずこれを読む", inputSchema: doc }, (a, extra) => run(() => G.getAuthoringGuide(sessionOf(extra, a.docId))));
-  server.registerTool("get_diagram_types", { description: "図の種類メニュー（authorable な12種＝type/label/hint）。図を入れるならまずここで種類を選ぶ（flowchart 以外に11種ある）" }, () => run(() => G.getDiagramTypes()));
-  server.registerTool("get_diagram_guide", { description: "選んだ図タイプの構文＋JSON例（```diagram に書く DiagramSpec）。class/state/ER/mindmap は type ではなく ```mermaid で描く", inputSchema: { type: z.string().describe("get_diagram_types の type") } }, (a) => run(() => G.getDiagramGuide(a.type)));
+  tool("get_authoring_guide", { description: "スライド Markdown の書き方（このテンプレのレイアウト名に解決した書式・`<!-- col/kpi/step -->` 区切り・表(GFM)・コード）＋本文 budget＋図/テンプレ作成ガイドへの入口。スライドを書く前にまずこれを読む", inputSchema: doc }, (a, extra) => run(() => G.getAuthoringGuide(sessionOf(extra, a.docId))));
+  tool("get_diagram_types", { description: "図の種類メニュー（authorable な12種＝type/label/hint）。図を入れるならまずここで種類を選ぶ（flowchart 以外に11種ある）" }, () => run(() => G.getDiagramTypes()));
+  tool("get_diagram_guide", { description: "選んだ図タイプの構文＋JSON例（```diagram に書く DiagramSpec）。class/state/ER/mindmap は type ではなく ```mermaid で描く", inputSchema: { type: z.string().describe("get_diagram_types の type") } }, (a) => run(() => G.getDiagramGuide(a.type)));
 
   // ── template provisioning (T3/S2) ── acquire a template with no bytes: create one from a spec (or the
   // MIDNIGHT preset). Session-independent; hand the returned templateBase64 to new_project to start.
-  server.registerTool("create_template", { description: "TemplateSpec の JSON 文字列（name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し base64 で返す。欠落は MIDNIGHT preset で補完＋低コントラストは自動修正（notices で告知）。書式は get_template_spec_guide。返した templateBase64 を new_project に渡して着手", inputSchema: { spec: z.string().optional().describe("TemplateSpec の JSON 文字列（オブジェクトではなく文字列で渡す・部分可・省略で MIDNIGHT preset）。例: spec: '{}'") } }, (a) => run(() => T.createTemplate(a.spec)));
-  server.registerTool("get_template_spec_guide", { description: "create_template 用 TemplateSpec の書式ガイド＋MIDNIGHT preset 値（開始点）" }, () => run(() => T.getTemplateSpecGuide()));
+  tool("create_template", { description: "TemplateSpec の JSON 文字列（name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し base64 で返す。欠落は MIDNIGHT preset で補完＋低コントラストは自動修正（notices で告知）。書式は get_template_spec_guide。返した templateBase64 を new_project に渡して着手", inputSchema: { spec: z.string().optional().describe("TemplateSpec の JSON 文字列（オブジェクトではなく文字列で渡す・部分可・省略で MIDNIGHT preset）。例: spec: '{}'") } }, (a) => run(() => T.createTemplate(a.spec)));
+  tool("get_template_spec_guide", { description: "create_template 用 TemplateSpec の書式ガイド＋MIDNIGHT preset 値（開始点）" }, () => run(() => T.getTemplateSpecGuide()));
 
   // ── cold bootstrap (ADR-0037 D2) ── ONE call returns the whole cold set; each section is composed
   // from the SAME functions as the 6 legacy tools (R8), which stay registered unchanged (ADR-0008 floor).
-  server.registerTool("bootstrap", { description: "セッション開始時に1回：コールド系（調達・契約）を1レスポンスで返す＝authoringGuide・diagramTypes・templateSpecGuide・templateCapabilities・templates（各節は同名の旧 get_*/list_* ツールと同一内容・図タイプ別構文のみ get_diagram_guide(type) で個別取得）。doc 未オープン時は doc 依存節が {ok:false, code} で埋まる（他節は返る）", inputSchema: doc }, (a, extra) => run(() => getBootstrap(() => sessionOf(extra, a.docId), host.templates, !!host.solo, scopeRoot)));
+  tool("bootstrap", { description: "セッション開始時に1回：コールド系（調達・契約）を1レスポンスで返す＝authoringGuide・diagramTypes・templateSpecGuide・templateCapabilities・templates（各節は同名の旧 get_*/list_* ツールと同一内容・図タイプ別構文のみ get_diagram_guide(type) で個別取得）。doc 未オープン時は doc 依存節が {ok:false, code} で埋まる（他節は返る）", inputSchema: doc }, (a, extra) => run(() => getBootstrap(() => sessionOf(extra, a.docId), host.templates, !!host.solo, scopeRoot)));
 
   // ── deterministic mutations ──
-  server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否。書式は get_authoring_guide（区切り・表/コード）", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
-  server.registerTool("set_deck_markdown", { description: "⚠️ deck 全体を置換（スライド数が変わりうる・図は自動保持されない）。1枚だけ直すなら set_slide_markdown を使うこと", inputSchema: { markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_deck_markdown", (s) => S.applyDeckMarkdown(s, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
-  server.registerTool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割", inputSchema: { ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "split_overflowing_slides", (s) => S.distill(s), { opId: a.opId, expectedRev: a.expectedRev }));
-  server.registerTool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
-  server.registerTool(
+  tool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否。書式は get_authoring_guide（区切り・表/コード）", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
+  tool("set_deck_markdown", { description: "⚠️ deck 全体を置換（スライド数が変わりうる・図は自動保持されない）。1枚だけ直すなら set_slide_markdown を使うこと", inputSchema: { markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_deck_markdown", (s) => S.applyDeckMarkdown(s, a.markdown), { opId: a.opId, expectedRev: a.expectedRev }));
+  tool("split_overflowing_slides", { description: "決定論レバー: 溢れた本文スライドをフォント縮小なしで分割", inputSchema: { ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "split_overflowing_slides", (s) => S.distill(s), { opId: a.opId, expectedRev: a.expectedRev }));
+  tool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
+  tool(
     "set_slide_diagram",
     { description: "図に【何を】置くか：DiagramSpec(yaml/json) or Mermaid の文字列で設定（検証＋native YAML 化）。図/mermaid を持つスライドは置換、text スライドは body 領域へ図を追加（created で判別）。配置・レイアウトの調整は apply_design_intent", inputSchema: { ...index, source: z.string().describe("DiagramSpec の JSON/YAML 文字列、または Mermaid 記法の文字列（format で指定・オブジェクトではなく文字列で渡す）。例: source: '{\"type\":\"flowchart\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\"},{\"id\":\"b\",\"label\":\"B\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\"}]}'"), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body 領域の 1-based ordinal（multi-body 用・既定 1）"), ...doc, ...cc } },
     (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }),
   );
-  server.registerTool(
+  tool(
     "apply_design_intent",
     {
       description: '図を【どう配置するか】（design edit）：ops 配列の JSON 文字列で regionSplit(text-left/right/diagram-only) / emphasize(nodeId) / relayout(TB/LR/RL/BT)。エンジンが座標を計算＋クランプ。図/mermaid を持つスライドのみ。図の中身そのものは set_slide_diagram。例: [{"op":"relayout","direction":"LR"}]',
@@ -245,15 +248,15 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // ── structure ops (T2/S4) ── surgical add/remove/reorder/duplicate a slide; the SURVIVING slides'
   // figures/layouts stay byte-identical (set_deck_markdown drops them). Prefix insert_/delete_/move_/
   // duplicate_ = structure vs set_/apply_/convert_/split_ = content, so the verb alone routes the AI.
-  server.registerTool("insert_slide", { description: "新しいスライドを Markdown から index の前/後に挿入（他スライドの図は保持＝set_deck_markdown と違い surgical）。書式は get_authoring_guide", inputSchema: { ...index, markdown: z.string(), position: z.enum(["before", "after"]).optional().describe("index の前/後（既定 before）"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "insert_slide", (s) => St.insertSlide(s, a.index, a.markdown, a.position), { opId: a.opId, expectedRev: a.expectedRev }));
-  server.registerTool("delete_slide", { description: "index のスライドを削除（最後の1枚は never-silent 拒否・deletedMd を返す）", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "delete_slide", (s) => St.deleteSlide(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
-  server.registerTool("move_slide", { description: "スライドを fromIndex から toIndex へ移動（純並べ替え・図/レイアウト保持。from===to は no-op）", inputSchema: { fromIndex: z.number().int().describe("移動元 0-based"), toIndex: z.number().int().describe("移動先 0-based"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "move_slide", (s) => St.moveSlide(s, a.fromIndex, a.toIndex), { opId: a.opId, expectedRev: a.expectedRev }));
-  server.registerTool("duplicate_slide", { description: "index のスライドを複製（structuredClone で図/表/コードを byte-identical に複製）。既定で後ろに挿入", inputSchema: { ...index, position: z.enum(["before", "after"]).optional().describe("複製の挿入位置（既定 after）"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "duplicate_slide", (s) => St.duplicateSlide(s, a.index, a.position), { opId: a.opId, expectedRev: a.expectedRev }));
+  tool("insert_slide", { description: "新しいスライドを Markdown から index の前/後に挿入（他スライドの図は保持＝set_deck_markdown と違い surgical）。書式は get_authoring_guide", inputSchema: { ...index, markdown: z.string(), position: z.enum(["before", "after"]).optional().describe("index の前/後（既定 before）"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "insert_slide", (s) => St.insertSlide(s, a.index, a.markdown, a.position), { opId: a.opId, expectedRev: a.expectedRev }));
+  tool("delete_slide", { description: "index のスライドを削除（最後の1枚は never-silent 拒否・deletedMd を返す）", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "delete_slide", (s) => St.deleteSlide(s, a.index), { opId: a.opId, expectedRev: a.expectedRev }));
+  tool("move_slide", { description: "スライドを fromIndex から toIndex へ移動（純並べ替え・図/レイアウト保持。from===to は no-op）", inputSchema: { fromIndex: z.number().int().describe("移動元 0-based"), toIndex: z.number().int().describe("移動先 0-based"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "move_slide", (s) => St.moveSlide(s, a.fromIndex, a.toIndex), { opId: a.opId, expectedRev: a.expectedRev }));
+  tool("duplicate_slide", { description: "index のスライドを複製（structuredClone で図/表/コードを byte-identical に複製）。既定で後ろに挿入", inputSchema: { ...index, position: z.enum(["before", "after"]).optional().describe("複製の挿入位置（既定 after）"), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "duplicate_slide", (s) => St.duplicateSlide(s, a.index, a.position), { opId: a.opId, expectedRev: a.expectedRev }));
 
-  server.registerTool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues", inputSchema: doc }, (a, extra) => run(() => S.validate(sessionOf(extra, a.docId))));
+  tool("validate_deck", { description: "EXPORT ゲート：schema 検証＋変換不能 mermaid スキャン→exportReadiness。※ 内容の手直し（溢れ/冗長/表化）は get_deck_issues", inputSchema: doc }, (a, extra) => run(() => S.validate(sessionOf(extra, a.docId))));
 
   // ── persist / export (base64 over stdio by default; scoped fs when the server has --root, ADR-0035) ──
-  server.registerTool(
+  tool(
     "save_project",
     { description: ".scft を生成。既定は base64（{dataBase64}）。サーバが --root（scope）起動時は scope 配下へファイル出力し {path} を返す（filename 省略時は自動命名）", inputSchema: { filename: z.string().optional().describe("scope 配下のファイル名（scope 起動時のみ有効・拡張子 .scft 必須・サブディレクトリ/絶対パス不可）"), ...doc } },
     (a, extra) =>
@@ -262,7 +265,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         return persistScopedOrBase64(s, await S.saveProjectBytes(s), "scft", a.filename);
       }),
   );
-  server.registerTool(
+  tool(
     "export_pptx",
     {
       description: ".pptx を native-vector で headless 生成（変換不能 mermaid は default reject / skip）。既定は base64（{dataBase64, skipped}）。サーバが --root（scope）起動時は scope 配下へファイル出力し {path, skipped} を返す（filename 省略時は自動命名）",
@@ -277,7 +280,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   );
 
   // ── multi-doc lifecycle + server-side undo (additive on solo stdio: 1 doc, no-op-ish) ──
-  server.registerTool("list_documents", { description: "開いているドキュメント一覧（AI クライアントは共有docのみ＝private-by-default）。各docに contract（書式ダイジェスト）付き", }, (extra) =>
+  tool("list_documents", { description: "開いているドキュメント一覧（AI クライアントは共有docのみ＝private-by-default）。各docに contract（書式ダイジェスト）付き", }, (extra) =>
     run(() => ({
       documents: host.registry.list({ sharedOnly: host.sharedOnly }).map((d) => {
         const c = safeContract(host.registry.get(d.docId).session); // so the list→operate flow carries the contract
@@ -286,7 +289,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       activeDocId: host.active(extra) ?? null,
     })),
   );
-  server.registerTool("select_document", { description: "このコネクションの対象ドキュメントを切り替える（AI 版 switchDoc。deck は変えない）", inputSchema: { docId: z.string() } }, ({ docId }, extra) =>
+  tool("select_document", { description: "このコネクションの対象ドキュメントを切り替える（AI 版 switchDoc。deck は変えない）", inputSchema: { docId: z.string() } }, ({ docId }, extra) =>
     run(() => {
       const e = host.registry.get(docId);
       host.setActive(extra, docId);
@@ -295,7 +298,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       return { docId: e.docId, slideCount: e.session.deck?.slides.length ?? 0, rev: e.rev, ...(c ? { contract: c } : {}) };
     }),
   );
-  server.registerTool("close_document", { description: "ドキュメントを閉じる（dirty は force 必須＝never-silent）", inputSchema: { docId: z.string(), force: z.boolean().optional() } }, ({ docId, force }) =>
+  tool("close_document", { description: "ドキュメントを閉じる（dirty は force 必須＝never-silent）", inputSchema: { docId: z.string(), force: z.boolean().optional() } }, ({ docId, force }) =>
     run(() => {
       const e = host.registry.get(docId);
       if (e.session.dirty && !force) return { ok: false as const, closed: false as const, dirty: true as const };
@@ -304,7 +307,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       return { ok: true as const, closed: true as const };
     }),
   );
-  server.registerTool("undo", { description: "サーバ側 Undo：このドキュメントの真実を1手戻す（新しい forward rev を発行）", inputSchema: doc }, (a, extra) =>
+  tool("undo", { description: "サーバ側 Undo：このドキュメントの真実を1手戻す（新しい forward rev を発行）", inputSchema: doc }, (a, extra) =>
     run(() => {
       const e = entryOf(extra, a.docId);
       const r = undoDoc(e);
@@ -315,7 +318,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       return { ...r, docId: e.docId };
     }),
   );
-  server.registerTool("redo", { description: "サーバ側 Redo：直前の Undo を取り消す", inputSchema: doc }, (a, extra) =>
+  tool("redo", { description: "サーバ側 Redo：直前の Undo を取り消す", inputSchema: doc }, (a, extra) =>
     run(() => {
       const e = entryOf(extra, a.docId);
       const r = redoDoc(e);
@@ -340,12 +343,12 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     if (!host.templates) throw T.templateRegistryUnavailable();
     return host.templates;
   };
-  server.registerTool(
+  tool(
     "list_templates",
     { description: "テンプレの一覧＝{id,name,builtin}。id を use_template に渡して着手。GUI の master レジストリが接続済みならそれを、単独（GUI 未接続）は組み込みプリセット（builtin:true）を返す。--root 起動時は <root>/templates/ 配下の .pptx/.potx（builtin:false・id は file: 始まり）も一覧に含む。bytes を自分で持っているなら create_template でも生成できる" },
     () => run(() => T.listTemplates(host.templates, !!host.solo, scopeRoot)),
   );
-  server.registerTool(
+  tool(
     "use_template",
     { description: "テンプレ（list_templates の id）から新規プロジェクトを開始（新ドキュメントを mint・任意の Markdown）。builtin id は create_template と同じハーネスで生成、file: 始まりの id は --root 配下 templates/ のファイルから起票。既存 doc のテンプレ入替ではない。書式は get_authoring_guide", inputSchema: { id: z.string().describe("list_templates の template id（builtin または file: 始まり）"), markdown: z.string().optional() } },
     (a, extra) =>
@@ -374,19 +377,17 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         extra,
       ),
   );
-  if (!host.sharedOnly) {
-    // gui-role only: the human's webview uploads its registry so the AI can select from it. An AI
-    // client (sharedOnly) never gets this tool, so it can't spoof the shared template set.
-    server.registerTool(
-      "register_templates",
-      { description: "（GUI 専用）webview の master レジストリを host に登録し AI が list_templates/use_template で選べるようにする。呼ぶ度に全置換（GUI の一覧が真実）", inputSchema: { templates: z.array(z.object({ id: z.string(), name: z.string(), builtin: z.boolean(), bytesBase64: z.string() })) } },
-      (a) =>
-        run(() => {
-          requireTemplates().register(a.templates.map((t) => ({ id: t.id, name: t.name, builtin: t.builtin, bytes: unb64(t.bytesBase64) })));
-          return { ok: true as const, count: a.templates.length };
-        }),
-    );
-  }
+  // collab-gui ONLY (the profile table): the human's webview uploads its registry so the AI can
+  // select from it — an AI client can't spoof the shared set, and solo (no GUI ever) never sees it.
+  tool(
+    "register_templates",
+    { description: "（GUI 専用）webview の master レジストリを host に登録し AI が list_templates/use_template で選べるようにする。呼ぶ度に全置換（GUI の一覧が真実）", inputSchema: { templates: z.array(z.object({ id: z.string(), name: z.string(), builtin: z.boolean(), bytesBase64: z.string() })) } },
+    (a) =>
+      run(() => {
+        requireTemplates().register(a.templates.map((t) => ({ id: t.id, name: t.name, builtin: t.builtin, bytes: unb64(t.bytesBase64) })));
+        return { ok: true as const, count: a.templates.length };
+      }),
+  );
 
   // ── read-only deck state as MCP resources (deck://… , slide://{i}/markdown) ──
   // A per-transport config flag, not a mode split (ADR-0033 D1): solo stdio defaults ON (no GUI, so
