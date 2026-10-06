@@ -26,7 +26,8 @@ import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
-import { GuardError } from "./guard-errors";
+import { GuardError, guardEnvelope } from "./guard-errors";
+import { getBootstrap } from "./bootstrap";
 import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
 import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
 
@@ -41,7 +42,7 @@ const ok = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSO
 // THE choke point: run() and both mutate() branches funnel every throw through here (ADR-0015).
 const fail = (e: unknown): ToolResult =>
   e instanceof GuardError
-    ? ok({ ok: false as const, error: e.message, code: e.code })
+    ? ok(guardEnvelope(e))
     : { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
 async function run(fn: () => unknown | Promise<unknown>): Promise<ToolResult> {
   try {
@@ -218,6 +219,10 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // MIDNIGHT preset). Session-independent; hand the returned templateBase64 to new_project to start.
   server.registerTool("create_template", { description: "TemplateSpec の JSON 文字列（name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し base64 で返す。欠落は MIDNIGHT preset で補完＋低コントラストは自動修正（notices で告知）。書式は get_template_spec_guide。返した templateBase64 を new_project に渡して着手", inputSchema: { spec: z.string().optional().describe("TemplateSpec の JSON 文字列（オブジェクトではなく文字列で渡す・部分可・省略で MIDNIGHT preset）。例: spec: '{}'") } }, (a) => run(() => T.createTemplate(a.spec)));
   server.registerTool("get_template_spec_guide", { description: "create_template 用 TemplateSpec の書式ガイド＋MIDNIGHT preset 値（開始点）" }, () => run(() => T.getTemplateSpecGuide()));
+
+  // ── cold bootstrap (ADR-0037 D2) ── ONE call returns the whole cold set; each section is composed
+  // from the SAME functions as the 6 legacy tools (R8), which stay registered unchanged (ADR-0008 floor).
+  server.registerTool("bootstrap", { description: "セッション開始時に1回：コールド系（調達・契約）を1レスポンスで返す＝authoringGuide・diagramTypes・templateSpecGuide・templateCapabilities・templates（各節は同名の旧 get_*/list_* ツールと同一内容・図タイプ別構文のみ get_diagram_guide(type) で個別取得）。doc 未オープン時は doc 依存節が {ok:false, code} で埋まる（他節は返る）", inputSchema: doc }, (a, extra) => run(() => getBootstrap(() => sessionOf(extra, a.docId), host.templates, !!host.solo, scopeRoot)));
 
   // ── deterministic mutations ──
   server.registerTool("set_slide_markdown", { description: "1スライド（index 指定）を Markdown で差し替え。既存の図/mermaid は自動保持。zod 検証・不正は never-silent で拒否。書式は get_authoring_guide（区切り・表/コード）", inputSchema: { ...index, markdown: z.string(), ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "set_slide_markdown", (s) => S.applySlideMarkdown(s, a.index, a.markdown), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
