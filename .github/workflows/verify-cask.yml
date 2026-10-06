@@ -1,0 +1,37 @@
+# Verify the Homebrew cask whenever it (or anything under packaging/homebrew) changes — Issue #287.
+#
+# `npm run version:set` bumps the cask's `version` but can't update `sha256` (the hash only exists
+# after that version's .dmg is built and published), so a cask can land on main reading
+# "version=NEW, sha256=OLD" — shipped for real at v0.4.0. This check fetches the published
+# SHA256SUMS for the version the cask claims and fails on any mismatch (never-silent, exit 1),
+# catching both a forgotten `update-cask.mjs` run and a cask edited against an unpublished version.
+#
+# Deliberately NOT wired into release.yml: at tag-build time the cask's sha256 is structurally the
+# PREVIOUS cycle's value (the new ad-hoc-signed dmg's hash cannot exist before it is built), so a
+# release-time comparison would false-red every healthy release (see Issue #287's PR #310 review).
+# The cask must be right when it lands on main — hence the paths filter below. Non-required check:
+# a version-bump PR goes red here until its release is published + update-cask is committed, which
+# is the visible "cask not ready yet" signal, not a merge blocker (the ruleset requires only `test`).
+name: Verify Cask
+
+on:
+  pull_request:
+    paths: ["packaging/homebrew/**"]
+  push:
+    branches: [main]
+    paths: ["packaging/homebrew/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-cask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+      # No npm ci: the script is dependency-free Node (same as update-cask.mjs).
+      - run: node scripts/verify-cask.mjs

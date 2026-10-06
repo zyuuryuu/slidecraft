@@ -34,9 +34,20 @@ interface ReviseDeps {
   activeSlide: number;
 }
 
+/**
+ * #419: the GUI's DISPLAY diagnostics — the panel readout only. Passing the template's raw layouts
+ * surfaces the binding family (unbound-content / visual-shadowed / section-footer, ADR-0030 stage A)
+ * that the MCP path (get_deck_issues) already showed; without it the GUI dropped unbound content with
+ * no warning (never-silent gap). refineDeck's convergence stays diagnoseDeck(deck, catalog), untouched
+ * (refine.ts). Pure, so tests drive it directly (repo style: no renderHook).
+ */
+export function reviseDiagnostics(deck: DeckIR | null, catalog: LayoutCatalog | undefined, templateData: TemplateData | null): DeckIssue[] {
+  return deck && catalog ? diagnoseDeck(deck, catalog, templateData?.layouts) : [];
+}
+
 export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, templateData, activeSlide }: ReviseDeps) {
-  // Non-destructive deck review (overflow / long bullets / key-value / missing title).
-  const diagnostics = useMemo(() => (deck && catalog ? diagnoseDeck(deck, catalog) : []), [deck, catalog]);
+  // Non-destructive deck review (overflow / long bullets / key-value / missing title / unbound — #419).
+  const diagnostics = useMemo(() => reviseDiagnostics(deck, catalog, templateData), [deck, catalog, templateData]);
   // The template's content-body capacity → the budget half of the slide-fix contract.
   const contentBox = useMemo(() => (catalog ? contentBodyBox(catalog) : undefined), [catalog]);
   // Issues for the slide currently being edited → "AIで整える" in the Edit AI dock.
