@@ -9,6 +9,8 @@
 ## 手順
 
 1. **バージョンを決めて伝播**（例 0.2.0）: `npm run version:set 0.2.0`（7ファイルへ反映）。`npm run version:check` で一致を確認。
+
+   > **注（verify-cask・#287）**: `version:set` は cask の `version` 行も進めるが `sha256` は旧版のまま残る。このため `version:set` 以降〜手順 6 の cask 更新までの間、`verify-cask` workflow が**赤になるのが正常**（「cask が未更新」という可視シグナル・非必須チェックなのでマージは阻まれない）。手順 6 を終えると緑に戻る。
 2. **CHANGELOG.md を更新**: `## [Unreleased]` の内容を `## [0.2.0] - YYYY-MM-DD` に移し、新しい空の Unreleased を作る。**このセクションがそのままリリースノートになる**（`release.yml` がタグの版に一致する `## [x.y.z]` 見出しを抽出して `releaseBody` に使う。無いと release ジョブが失敗する — never-silent）。
 3. **ローカル検証**: `npm test`・`npm run build`・`npm run typecheck:mcp` が全緑。
 4. **コミット & タグ**: `chore(release): v0.2.0` → `git tag v0.2.0 && git push origin main --tags`。→ `release.yml` が **3-OS**（macOS arm64・Windows・Linux。Intel Mac インストーラは廃止済み — [#112](https://github.com/zyuuryuu/slidecraft/issues/112)）installer をビルドして **draft** リリースを作成する。続けて `SHA256SUMS`・SBOM（npm＋cargo、CycloneDX）をリリースアセットとして添付し、各インストーラに `actions/attest-build-provenance` で build provenance attestation を付与する（署名の代わりの完全性シグナル — 署名自体は導入しない）。

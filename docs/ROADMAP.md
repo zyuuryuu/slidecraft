@@ -5,10 +5,11 @@
 CLAUDE.md「課題・記録の置き場」参照）。実装済みの履歴は [shipped.md](shipped.md)、決定は
 [docs/adr/](adr/)、設計仕様は [docs/design/](design/)。
 
-**現在地（2026-08-01）**：**v0.4.1 リリース済み**（2026-07-23 publish・cask sha 更新済み）。目玉＝MCP の
-ファイル授受 `serve --root`（ADR-0035）・単独モードの組み込みテンプレ fallback（#298）・リリース工程の
-never-silent 堅牢化（#316 ほか）・実ブラウザ CI の非必須 `browser-smoke` 分離（#281）。v0.4.0（2026-07-20）
-の内容と合わせ、詳細は [shipped.md](shipped.md) / [CHANGELOG](../CHANGELOG.md)。
+**現在地（2026-10-06）**：**v0.5.0 タグ直前**（version:set 済み・タグ push と publish は RELEASING 手順 4 以降＝手動）。
+目玉＝Markdown 語彙の拡張（インライン書式 #393/#395・番号付きリスト #394・フィールド行 `Takeaway:`/`Source:`/`Kicker:`
+#397/#398/#404/#447・compare/Before-After #396/#402）・never-silent 診断の面展開・WYSIWYG 底上げ・
+MCP の `bootstrap` 1 発読み＋プロファイル別登録（ADR-0037・#464/#465）。詳細は
+[shipped.md](shipped.md) / [CHANGELOG](../CHANGELOG.md)。
 
 ---
 

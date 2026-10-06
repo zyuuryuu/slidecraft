@@ -13,7 +13,7 @@
 #   shasum -a 256 SlideCraft_<version>_aarch64.dmg
 # (`scripts/update-cask.mjs` automates this against a GitHub release — see packaging/homebrew/README.md.)
 cask "slidecraft" do
-  version "0.4.1"
+  version "0.5.0"
   sha256 "19bfa2821519fceac233352b60f420e9aa5141d2dad54cd4ade6c2f173f2cdc0"
 
   url "https://github.com/zyuuryuu/slidecraft/releases/download/v#{version}/SlideCraft_#{version}_aarch64.dmg"

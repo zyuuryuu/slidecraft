@@ -71,7 +71,7 @@ export interface BuildServerOptions {
 }
 
 export function buildServer(session: Session, opts: BuildServerOptions = {}): McpServer {
-  const server = new McpServer({ name: "slidecraft", version: "0.4.1" });
+  const server = new McpServer({ name: "slidecraft", version: "0.5.0" });
   // ONE control plane always: an explicit host (collab) or a solo one minted around `session`
   // (stdio and any caller that doesn't bring its own multi-doc registry).
   const host: HostContext = opts.host ?? createSoloHostContext(session);
