@@ -44,6 +44,7 @@ Within a single slide, the role of each line is determined by its heading level 
 | `# 見出し` | The slide's **title** |
 | `## 見出し` or `> 引用` | **Subtitle** |
 | `- ` / `* ` bullets, paragraphs | **Body** |
+| `1. ` / `1) ` numbered lists | **Body** (auto-numbered; saved back as a `1.` `2.` … sequence) |
 | `### 見出し` | A **subheading** inside a group (column/card/step) |
 | `**太字**` / `*斜体*` | Inline styling |
 
@@ -113,12 +114,31 @@ Source: 総務省 2025
 
 Points to remember:
 
-- The keys are `Takeaway` / `Source` (case-insensitive). They may appear anywhere in the slide (on export they are gathered after the slide body).
+- The keys are `Takeaway` / `Source` (case-insensitive; `Kicker` below works the same way). They may appear anywhere in the slide (on export they are gathered after the slide body).
 - Repeating a key adds one paragraph per line to its box (e.g. two sources).
 - Unlike `Category:` and the other meta keys, a field row does not turn the slide into a title-type slide.
 - They also work on slides with region separators (`<!-- col -->` / `<!-- card -->` …): the row belongs to the whole slide, not to the last region.
 - A `Source:` line inside a code fence stays code.
 - If the template (or the pinned layout) has no box for the row, the row is **not exported**. MCP `get_deck_issues` warns that the layout has no box for the `Takeaway:` row (showing it in the app's diagnostics panel is tracked in #419). Move it into the body, or use a template that has the box.
+
+## Category line `Kicker:`
+
+`Kicker:` is the **small category line above a content slide's title** (e.g. `SECTION 02 · Cost analysis`). It is a field row like `Takeaway:` / `Source:`: if the template has a box whose name starts with `Kicker` / `Eyebrow`, a layout with that box is picked automatically and the row goes into it.
+
+```markdown
+# コスト構造の内訳
+
+- 人件費が 6 割
+- 外注費が増加
+
+Kicker: SECTION 02 · コスト分析
+```
+
+Things to know:
+
+- **The bundled templates do not have a Kicker box for content slides yet** (checked on every template, Midnight included). Without the box the row is not exported, as above, and `get_deck_issues` warns that the layout has no box for the `Kicker:` row. The AI guide (`get_authoring_guide`) mentions `Kicker:` only for templates that have the box.
+- **The category line of a title slide is still `Category:`.** Writing `Kicker:` does not turn a slide into a title slide, and `Category:` keeps its meaning.
+- **To show which chapter a slide belongs to, use a chapter cover's `<!-- section -->` (below)**: on templates with a footer box, each slide from a chapter cover onward gets its chapter's name in the footer automatically. Use `Kicker:` for a label other than the chapter name.
 
 ---
 
@@ -188,7 +208,7 @@ Even on a slide split with `<!-- col -->` and the like, a standalone image line 
 
 ---
 
-## Multi-column / KPI / Steps / Cards
+## Multi-column / KPI / Steps / Cards / Comparison
 
 When you want to split a slide's body into **multiple regions**, use separator comments. Place separator comments of the same kind after `# タイトル` and write the content of each region between them.
 
@@ -198,6 +218,8 @@ When you want to split a slide's body into **multiple regions**, use separator c
 | `<!-- kpi -->` | KPI (big-number) tiles |
 | `<!-- step -->` | Process / procedure steps |
 | `<!-- card -->` | Cards |
+| `<!-- compare -->` | Two options side by side (Option A vs Option B) |
+| `<!-- before -->` / `<!-- after -->` | A change from Before to After (As-is → To-be), with an arrow and Before/After labels |
 
 ```markdown
 # 3本柱
@@ -220,7 +242,82 @@ Usage notes:
 - A separator comment must be **on a line of its own** (do not write body before or after it, as in `<!-- col -->`).
 - Content written **before** the first separator comment does not go into any region, apart from the title/subtitle. The title (`#`) and subtitle (`>`) become the heading for the whole slide, and each region's content is written **between** the separators.
 - In each region, `### 小見出し` becomes the region's header, and bullets or paragraphs go beneath it.
-- Aside from `col` (a plain column), `kpi` / `step` / `card` act as hints to choose the corresponding layout (KPI tiles, process, cards). `col` is a plain side-by-side layout with no hint.
+- Aside from `col` (a plain column), `kpi` / `step` / `card` / `compare` / `before`·`after` act as hints to choose the corresponding layout (KPI tiles, process, cards, comparison). `col` is a plain side-by-side layout with no hint.
+
+### Comparing two options `<!-- compare -->`
+
+Use `<!-- compare -->` to put **two equal options side by side**, such as Option A and Option B. The template's comparison layout (e.g. `Compare.2Option.Versus`, or `12_課題と対策` in the report templates) is chosen automatically; each region's `### heading` names the option and the content goes below it.
+
+```markdown
+# Option A or Option B
+
+<!-- compare -->
+### A: build in-house
+- Lower upfront cost
+- Six months to launch
+
+<!-- compare -->
+### B: outsource
+- Higher upfront cost
+- Live in one month
+```
+
+- The comparison layout holds two regions. With three or more, the slide is laid out as ordinary columns (`<!-- col -->` or a table suits a comparison of three or more).
+- If the template has no comparison layout, the slide is also shown as ordinary columns.
+
+### Before and after `<!-- before -->` / `<!-- after -->`
+
+To show a **change from the left (current state) to the right (target state)**, such as an improvement proposal or a migration, use one `<!-- before -->` and one `<!-- after -->`. The slide uses the same layout as a comparison, plus an **arrow between the two sides** and a **Before / After label** above each side.
+
+```markdown
+# Revising the approval flow
+
+<!-- before -->
+### Today
+- Paper forms passed around
+- 5 days to approval on average
+
+<!-- after -->
+### After the change
+- Electronic approval in a workflow tool
+- 1 day to approval on average
+```
+
+- The meaning comes from **position**: the first region is Before, the second is After. If you write them in the other order, the left side is still drawn as Before (and on export the markers are written back as `before` then `after`, matching what is drawn).
+- The arrow and the labels use the template's theme accent color. If the template's layout already draws its own arrow (as `12_課題と対策` in the report templates does), that arrow is used and no second arrow is drawn.
+- Regions after the second are also treated as After. This is a two-sided structure, so keep it to two regions.
+
+### Adding an icon to a heading
+
+In a card / step / KPI region, start the `### heading` with `:icon-name:` to place a built-in icon (the same set as diagram nodes) to the left of the heading. The `:server:` token itself is not printed.
+
+```markdown
+<!-- card -->
+### :server: Availability
+- Redundant setup
+```
+
+- Icon names: `router` `switch` `server` `database` `cloud` `firewall` `client` `internet` `load_balancer` `wireless_ap` `storage` `printer` `phone` `vpn` `monitor` (aliases such as `db`→database and any letter case are accepted).
+- An unknown name (e.g. `:nosuch:`) does not become an icon and **stays as text** (a typo never makes content disappear).
+- It only becomes an icon at the **start** of the heading and **without formatting** (`**:server:**` stays as bold text).
+- It is drawn when the slide lands on a group layout (cards, process, …); on other layouts it stays as text.
+
+### Highlighting the current step
+
+To show "where we are" in a process band, write that step's separator as `<!-- step * -->`. Its heading becomes bold and its column gets a thin frame.
+
+```markdown
+<!-- step -->
+### Requirements
+
+<!-- step * -->
+### Design
+
+<!-- step -->
+### Build
+```
+
+- Only `step` accepts the `*` (not `card` / `kpi`).
 
 ### Placing a figure in a region
 

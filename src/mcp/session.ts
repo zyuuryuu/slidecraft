@@ -68,7 +68,8 @@ export function assertIndex(deck: DeckIR, i: number): void {
  *  serializer the binding authority (slideBindingPlan) so the readout can't diverge from export. */
 function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undefined, layouts?: TemplateData["layouts"]): string {
   const sl = deck.slides[i];
-  const resolved = sl.layout === "auto" ? autoSelectLayout(sl, i, deck.slides.length, catalog) : sl.layout;
+  // Unconditional (#435): a pin this template has is returned as-is; one it lacks degrades exactly as export does.
+  const resolved = autoSelectLayout(sl, i, deck.slides.length, catalog);
   const tpl = catalog && layouts ? { catalog, layouts } : undefined;
   return serializeMd({ slides: [{ ...sl, layout: resolved }] }, tpl);
 }
@@ -110,7 +111,7 @@ export async function newProject(s: Session, templateBytes: Uint8Array, markdown
   const template = await loadTemplate(templateBytes);
   const catalog = buildCatalog(template);
   assertTemplateUsable(catalog); // reject a structurally-unusable master, never-silent
-  const { deck: parsed, notices } = parseMdReport(markdown?.trim() ? markdown : "# Untitled");
+  const { deck: parsed, notices } = parseMdReport(markdown?.trim() ? markdown : "# Untitled", catalog);
   const { deck, offsets } = distillDeckReport(parsed, catalog);
   s.template = template;
   s.catalog = catalog;
@@ -215,7 +216,7 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown);
+  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown, catalog);
   const parsedSlide = parsedDeck.slides[0];
   if (!parsedSlide) return { ok: false as const, error: "Markdown からスライドを解釈できませんでした（空？）。" };
   const old = deck.slides[i];
@@ -244,7 +245,7 @@ export function applyDeckMarkdown(s: Session, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   const tpl = { catalog, layouts: template.layouts };
   const before = serializeMd(deck, tpl);
-  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown);
+  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown, catalog);
   const check = DeckIRSchema.safeParse(parsedDeck);
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   const changed = serializeMd(check.data, tpl) !== before;
@@ -282,7 +283,7 @@ export function visualizeKeyValue(s: Session, i: number) {
   const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(s, deck, catalog, template.layouts) });
   const fixed = visualizeKeyValueMd(before);
   if (!fixed) return notApplicable();
-  const { deck: fixedDeck, notices: fixedNotices } = parseMdReport(fixed);
+  const { deck: fixedDeck, notices: fixedNotices } = parseMdReport(fixed, catalog);
   const newSlide = fixedDeck.slides[0];
   if (!newSlide) return notApplicable();
   const slides = [...deck.slides];
@@ -313,7 +314,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   // (role-based = alien-safe) and remember whether the body already holds text.
   let ord = "1", hasBodyText = false;
   if (created) {
-    const layoutName = slide.layout === "auto" ? autoSelectLayout(slide, i, deck.slides.length, catalog) : slide.layout;
+    const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog); // = export's layout, unknown pins included (#435)
     const bodyCount = catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0;
     const n = Number(placeholderIdxArg ?? "1");
     if (bodyCount < 1 || !Number.isInteger(n) || n < 1 || n > bodyCount) {

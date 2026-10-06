@@ -1,12 +1,19 @@
 /**
- * field-rows.ts — the ONE mechanism behind slide-level FIELD ROWS (#397 `Takeaway:`, #398 `Source:`):
+ * field-rows.ts — the ONE mechanism behind slide-level FIELD ROWS (#397 `Takeaway:`, #398 `Source:`,
+ * #404 `Kicker:`):
  *
- *   field row (`Name: value`, one Markdown line)  →  canonical content idx ("callout" / "source")
+ *   field row (`Name: value`, one Markdown line)  →  canonical content idx ("callout" / "source" / "kicker")
  *   →  the auto pick prefers a layout variant that HAS a slot for it (field-variant.ts)
  *   →  binding places it in that slot (placeholder-binding.ts Pass 0, via fieldSlotOf)
  *
- * Both rows are the same shape, so they share this table instead of two ad-hoc paths (R8). A new
- * row is one entry here + its slot-name pattern.
+ * All rows are the same shape, so they share this table instead of ad-hoc paths (R8). A new row is
+ * one entry here + its slot-name pattern.
+ *
+ * `Kicker:` (#404) — the small category line above a content slide's title ("SECTION 02 · コスト分析").
+ * Its slot is a placeholder named Kicker…/Eyebrow…. Measured: no committed template has one on a
+ * content layout (kicker-like boxes sit only on title/section/closing, where `Category:` already binds
+ * idx 10), so today the row degrades never-silently (unbound-content) until a template offers the slot.
+ * It is NOT a meta field: it never moves the slide into the title namespace the way `Category:` does.
  *
  * Content side — the idx is NON-NUMERIC on purpose. An OOXML placeholder idx is always an unsigned
  * int, so "callout"/"source" can never collide with a template's own box (a numeric pick could: many
@@ -24,7 +31,7 @@
 import type { SlideIR } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 
-export type FieldKind = "callout" | "source";
+export type FieldKind = "callout" | "source" | "kicker";
 
 interface FieldRow {
   /** The Markdown key (case-insensitive on parse; emitted in this spelling). */
@@ -38,6 +45,7 @@ interface FieldRow {
 export const FIELD_ROWS: readonly FieldRow[] = [
   { name: "Takeaway", kind: "callout", slotName: /^(?:callout|takeaway)\b/i },
   { name: "Source", kind: "source", slotName: /^(?:source\b|出典)/i },
+  { name: "Kicker", kind: "kicker", slotName: /^(?:kicker|eyebrow)/i },
 ];
 
 const ROW_RE = new RegExp(`^(${FIELD_ROWS.map((r) => r.name).join("|")}):\\s*(.+)$`, "i");

@@ -8,6 +8,7 @@
  */
 
 import PptxGenJS from "pptxgenjs";
+import JSZip from "jszip";
 import type { DiagramSpec, ShapeType } from "./schema";
 import type { ThemeConfig } from "./theme";
 import { SLIDE_W, SLIDE_H, type ConnectionPoint } from "./layout-engine";
@@ -267,14 +268,38 @@ export async function renderToBufferWithGroups(
   spec: DiagramSpec,
   options: RenderOptions = {},
 ): Promise<{ buffer: Uint8Array; groups: GroupNode[] }> {
+  return paintToBufferWithGroups((target) => paintDiagram(target, spec, options));
+}
+
+/** Run ANY draw commands on a scratch PptxGenJS slide → its flat buffer + group tree. The one
+ *  PptxGenJS round trip behind both the embedded diagram and the group-cell overlay (#400/#401). */
+async function paintToBufferWithGroups(paint: (target: DrawTarget) => void): Promise<{ buffer: Uint8Array; groups: GroupNode[] }> {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "WIDE", width: SLIDE_W, height: SLIDE_H });
   pptx.layout = "WIDE";
   const slide = pptx.addSlide();
   const target = new PptxDrawTarget(slide);
-  paintDiagram(target, spec, options);
+  paint(target);
   const data = await pptx.write({ outputType: "uint8array" });
   return { buffer: data as Uint8Array, groups: target.groups };
+}
+
+/** Draw commands → the shapes' XML, nested into <p:grpSp> per the paint's group tree — what an embedded
+ *  figure / overlay contributes to a template slide (placeholder-filler). "" if no slide came out. */
+export async function paintToShapeXml(paint: (target: DrawTarget) => void): Promise<string> {
+  const { buffer, groups } = await paintToBufferWithGroups(paint);
+  const zip = await JSZip.loadAsync(buffer);
+  const slideXml = await zip.file("ppt/slides/slide1.xml")?.async("string");
+  if (!slideXml) return "";
+  return nestShapeXml(slideXml, groups);
+}
+
+/** Give every <p:cNvPr> in `xml` a fresh id from `start` up, in document order — one pass, so an id
+ *  already rewritten is never rewritten again. Returns the next free id. */
+export function renumberShapeIds(xml: string, start: number): { xml: string; next: number } {
+  let id = start;
+  const out = xml.replace(/(<p:cNvPr\b[^>]*?\bid=")\d+"/g, (_m, pre: string) => `${pre}${id++}"`);
+  return { xml: out, next: id };
 }
 
 /**

@@ -5,7 +5,7 @@
  * so it needs no tableStyles part from the template. Pure logic (R2): no DOM/Tauri.
  */
 
-import { computeColumnWidthsEmu, computeNumericColumns } from "./table-layout";
+import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL } from "./table-layout";
 import { parseInline } from "./md-inline";
 import { segmentToRun, type LinkResolver } from "./md-to-ooxml";
 
@@ -17,6 +17,8 @@ const HEADER_TEXT = "FFFFFF";
 const BODY_TEXT = "1E293B";
 const BAND_FILL = "F1F4F9";
 const BORDER = "C8D0DC";
+// Cell font size in 1/100 pt — from TABLE_CELL, the metrics the overflow estimate also reads (#436).
+const SZ = TABLE_CELL.fontPt * 100;
 
 function border(tag: string): string {
   return `<a:${tag} w="6350" cap="flat"><a:solidFill><a:srgbClr val="${BORDER}"/></a:solidFill></a:${tag}>`;
@@ -30,17 +32,17 @@ function cellXml(text: string, isHeader: boolean, band: boolean, rightAlign: boo
   const fill = isHeader ? HEADER_FILL : band ? BAND_FILL : "FFFFFF";
   const pPr = rightAlign ? `<a:pPr algn="r"/>` : "";
   const style = {
-    baseAttrs: [`lang="en-US"`, `sz="1100"`],
+    baseAttrs: [`lang="en-US"`, `sz="${SZ}"`],
     bold: isHeader,
     fillXml: `<a:solidFill><a:srgbClr val="${color}"/></a:solidFill>`,
     link,
   };
   const run = text
     ? parseInline(text).map((seg) => segmentToRun(seg, style)).join("")
-    : `<a:endParaRPr lang="en-US" sz="1100"/>`;
+    : `<a:endParaRPr lang="en-US" sz="${SZ}"/>`;
   return (
     `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p>${pPr}${run}</a:p></a:txBody>` +
-    `<a:tcPr marL="91440" marR="91440" marT="45720" marB="45720" anchor="ctr">` +
+    `<a:tcPr marL="${TABLE_CELL.marLREmu}" marR="${TABLE_CELL.marLREmu}" marT="${TABLE_CELL.marTBEmu}" marB="${TABLE_CELL.marTBEmu}" anchor="ctr">` +
     border("lnL") + border("lnR") + border("lnT") + border("lnB") +
     `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill></a:tcPr></a:tc>`
   );

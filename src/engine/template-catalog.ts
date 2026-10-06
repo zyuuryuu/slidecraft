@@ -43,11 +43,10 @@ export type PlaceholderRole =
   | "picture"
   | "chart"
   | "table"
-  // Field-row CONTENT roles (#397/#398, field-rows.ts): only slideIdxRole returns these (for the
-  // canonical "callout"/"source" idx). placeholderRole never does — a layout's slot is recognized by
-  // name (fieldSlotOf) on top of its ordinary role, and binding matches the two in Pass 0.
-  | "callout"
-  | "source"
+  // Field-row CONTENT roles (#397/#398/#404, field-rows.ts): only slideIdxRole returns these (for the
+  // canonical "callout"/"source"/"kicker" idx). placeholderRole never does — a layout's slot is
+  // recognized by name (fieldSlotOf) on top of its ordinary role, and binding matches the two in Pass 0.
+  | FieldKind
   | "other";
 
 export interface CatalogPlaceholder {
@@ -517,7 +516,7 @@ export function placeholderCapacity(style: { w: number; h: number; fontSize: num
  * 12=footer, 50=slideNumber. Lets injection bind by ROLE into any template.
  */
 export function slideIdxRole(idx: string, hasCtrTitle: boolean): PlaceholderRole {
-  if (isFieldIdx(idx)) return idx; // field-row content ("callout"/"source") — its own role (field-rows.ts)
+  if (isFieldIdx(idx)) return idx; // field-row content ("callout"/"source"/"kicker") — its own role (field-rows.ts)
   switch (idx) {
     case "0":
     case "15":

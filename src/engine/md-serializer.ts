@@ -18,7 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
@@ -71,10 +71,12 @@ function serializeSlide(
     }
   }
 
-  const layout =
-    slide.layout === "auto"
-      ? autoSelectLayout(slide, slideIndex, totalSlides, tpl?.catalog)
-      : slide.layout;
+  // ALWAYS via autoSelectLayout (#435, R8): it honors a pin THIS template has and degrades one it
+  // lacks to the layout export actually draws — so the format/binding readout below matches export.
+  // (A `layout === "auto" ? … : slide.layout` fork kept an unknown name: a 2-column slide pinned to
+  // it was read as single-body and lost its `<!-- col -->` split.) Without a catalog the pin is
+  // returned as-is, so catalog-free serialization is unchanged.
+  const layout = autoSelectLayout(slide, slideIndex, totalSlides, tpl?.catalog);
 
   // `<!-- section -->` chapter declaration rides FIRST (the ADR-0032 D2 taught form); the
   // parser strips it before the layout-pin check, so ordering stays round-trip-safe.
@@ -85,9 +87,11 @@ function serializeSlide(
   // Emit the layout directive only when it was explicitly set. "auto" slides stay
   // directive-free so they round-trip as "auto" (re-resolved deterministically on
   // import) instead of being pinned to a concrete layout. `layout` (resolved) is
-  // still used below to choose the serialization format.
+  // still used below to choose the serialization format. The directive carries the AUTHORED
+  // name (identical to `layout` for a pin this template has): an unknown pin is kept verbatim so
+  // re-opening on a template that HAS it restores the pin (do-no-harm; diagnoseDeck warns, #435).
   if (slide.layout !== "auto") {
-    lines.push(`<!-- slide: ${layout} -->`);
+    lines.push(`<!-- slide: ${slide.layout} -->`);
   }
 
   // ADR-0030 stage B: with the template at hand, read a NON-group slide back out through the binding
@@ -169,8 +173,8 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
     if (subtitle) lines.push(`> ${subtitle}`);
     lines.push("");
 
-    // Prefer the slide's own group kind (card/step/kpi) over inferring from the layout name, so a
-    // `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
+    // Prefer the slide's own group kind (card/step/kpi/compare/beforeAfter) over inferring from the
+    // layout name, so a `<!-- card -->` slide round-trips as a card even before it's pinned to a card layout. But a
     // single-body code/image is NEVER column-scoped: a figure slide that merely RESOLVED to a
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
     // trailing figure into the last column). A table is the SAME — UNLESS it's genuinely
@@ -197,9 +201,10 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
       if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
       if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
       if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
+      maxCol = Math.max(maxCol, maxCurrentStepCol(sepType, slide));
 
       for (let col = 1; col <= maxCol; col++) {
-        lines.push(`<!-- ${sepType} -->`);
+        lines.push(separatorLine(sepType, slide, col));
         if (col === diagIdx) {
           lines.push("```diagram");
           lines.push(slide.diagram!.yaml);

@@ -14,15 +14,19 @@ import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, Placeho
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
-import { computeColumnWidthsEmu, computeNumericColumns } from "../engine/table-layout";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, dragImageRect } from "../engine/visual-placement";
-import { isGroupedLayout, expandGroups } from "../engine/group-binding";
+import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL, TABLE_CELL_IN } from "../engine/table-layout";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, imageObjectFit, dragImageRect } from "../engine/visual-placement";
+import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
+import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
+import { renderPaintToSvg } from "../engine/svg-writer";
 import { imageCaption } from "../engine/image-caption";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { cjkFontFamily } from "../engine/font-stack";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
+import BeforeAfterOverlay from "./BeforeAfterOverlay";
+import { orderedNumbers } from "../engine/list-markers";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -112,7 +116,10 @@ function renderCell(cell: string) {
 // it stays proportional at every zoom level. ~0.25in/level, matching a typical PowerPoint list indent.
 const NEST_INDENT_PT = 18;
 
-function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number) {
+/** `num` — the item's number when it is an ordered (#394) bullet (list-markers.orderedNumbers, the same
+ *  count the serializer writes), else 0. A numbered item shows `N.` even when the master has no glyph,
+ *  matching the export's buAutoNum, which overrides the master's bullet (or its absence). */
+function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number, num = 0) {
   const level = para.bullet ? (para.level ?? 0) : 0;
   // Font size for a nested level: the layout/master's own lvl2-4 style when extractStyle found one,
   // else its computed step-down fallback (template-loader.nestedFallbackFontSize) — level 0 is
@@ -128,7 +135,11 @@ function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scal
         ...(para.heading ? { fontWeight: "bold" } : {}),
       }}
     >
-      {para.bullet && s.bulletChar && <span style={{ marginRight: "0.4em" }}>{s.bulletChar}</span>}
+      {num > 0 ? (
+        <span style={{ marginRight: "0.4em" }}>{num}.</span>
+      ) : (
+        para.bullet && s.bulletChar && <span style={{ marginRight: "0.4em" }}>{s.bulletChar}</span>
+      )}
       {renderSegments(para.segments)}
     </div>
   );
@@ -164,6 +175,9 @@ interface SlideCardProps {
    *  で導出して渡す — PPTX export（placeholder-filler.buildSlideXml）と同じ導出関数（R8）。
    *  null＝章扉より前 or section 無しデッキ＝注入なし。 */
   sectionFooterText?: string | null;
+  /** The template's resolved scheme colors (TemplateData.themeColors) — the #402 Before/After overlay
+   *  paints in accent1/lt1 like the export's schemeClr. Omitted → neutral fallbacks. */
+  themeColors?: Record<string, string>;
 }
 
 // PowerPoint preset shapes → SVG polygon points (in a 0–100 box, stretched to the shape's rect).
@@ -234,7 +248,7 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   );
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText, themeColors }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -243,6 +257,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   const contentFor = slide.groupKind && layout && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layoutPhs);
+  // Group-cell decorations (#400 icons / #401 current-step frame) — the export's same overlay + painter.
+  const overlay = slide.groupKind && layout && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
   const bodyPhs = bodyPlaceholders(layoutPhs);
   const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
@@ -292,7 +308,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   };
   // The image box (drag-move + corner-resize when editable). Shared by the inline body-figure render and
   // the behind (backmost) layer so both look/behave identically. `resolved` = the committed rect (live
-  // drag overrides it). object-fit mirrors the PPTX aspect math (fitImageInBox) so preview == export.
+  // drag overrides it). object-fit comes from the SAME aspect resolver as the PPTX math (imageObjectFit ↔
+  // drawnImage) so preview == export — incl. an `ar`-less image (#417).
   const renderImageBox = (resolved: ImageRect) => {
     const img = slide.image!;
     const box = dragRect ?? resolved;
@@ -321,7 +338,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         }}
       >
         <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-          <img src={img.src} alt={img.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: img.fit === "cover" ? "cover" : "contain", pointerEvents: "none" }} />
+          <img src={img.src} alt={img.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: imageObjectFit(img), pointerEvents: "none" }} />
         </div>
         {imgEditable && HANDLES.map((h) => (
           <div
@@ -556,7 +573,18 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                 overflow: "hidden",
               }}
             >
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 * (scale / 72), tableLayout: "fixed" }}>
+              {/* #443: font size / line height / cell padding all derive from TABLE_CELL (table-layout)
+                  so a row is the same height here and in the export's overflow estimate (R8).
+                  pt → px is pt × scale/72 (NEST_INDENT_PT's convention); in → px is in × scale. */}
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: TABLE_CELL.fontPt * (scale / 72),
+                  lineHeight: TABLE_CELL_IN.lineSpacing,
+                  tableLayout: "fixed",
+                }}
+              >
                 <colgroup>
                   {colWidthsEmu.map((w, ci) => (
                     <col key={ci} style={{ width: `${(w / totalEmu) * 100}%` }} />
@@ -573,7 +601,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                             key={ci}
                             style={{
                               border: "1px solid #C8D0DC",
-                              padding: "1px 6px",
+                              padding: `${TABLE_CELL_IN.padTB * scale}px ${TABLE_CELL_IN.padLR * scale}px`,
                               background: isHeader ? "#1E2761" : band ? "#F1F4F9" : "#FFFFFF",
                               color: isHeader ? "#FFFFFF" : "#1E293B",
                               fontWeight: isHeader ? 700 : 400,
@@ -632,6 +660,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           content = { idx: ph.idx, paragraphs: [{ segments: [{ text: sectionFooterText }] }] };
         }
         if (!content) return null;
+        const nums = orderedNumbers(content.paragraphs); // `1.` items (#394)
 
         return (
           <div
@@ -653,12 +682,23 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                   : "left",
               overflow: "hidden",
               lineHeight: 1.3,
+              // #400: an icon cell's text starts past the icon (the export's lIns, in px = in × scale)
+              ...(overlay?.insets.has(ph.idx) ? { paddingLeft: overlay.insets.get(ph.idx)! * scale, boxSizing: "border-box" as const } : {}),
             }}
           >
-            {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale))}
+            {content.paragraphs.map((p, i) => renderParagraph(p, i, s, scale, nums[i]))}
           </div>
         );
       })}
+
+      {overlay && !isEmptyOverlay(overlay) && (
+        <div
+          style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+          dangerouslySetInnerHTML={{ __html: renderPaintToSvg((t) => paintGroupOverlay(t, overlay)) }}
+        />
+      )}
+      {/* #402 Before/After arrow + role labels — frontmost, the export's geometry (renders null otherwise) */}
+      <BeforeAfterOverlay slide={slide} layout={layout} themeColors={themeColors} scale={scale} slideW={SLIDE_W} slideH={SLIDE_H} />
 
       {/* Slide number — preview only; the standalone-HTML shell provides its own counter */}
       {!exportMode && (
@@ -773,6 +813,7 @@ export default function SlidePreview({
         masterDecorations={template?.masterDecorations}
         masterImages={template?.masterImages}
         masterStaticTexts={template?.masterStaticTexts}
+        themeColors={template?.themeColors}
         scale={scale}
         isActive={active}
         sectionFooterText={sectionFooterFor(deck!, i)}

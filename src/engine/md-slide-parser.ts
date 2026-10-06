@@ -9,11 +9,12 @@ import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
 import { findTableInLines, extractBodyTable } from "./md-body-table";
-import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS } from "./slide-roles";
+import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS, type LayoutRoleLookup } from "./slide-roles";
 import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
 import { parseInline } from "./md-inline";
+import { matchListItem } from "./list-markers";
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -76,16 +77,17 @@ function linesToParagraphs(lines: string[], opts?: { cellHeading?: boolean }): P
       paragraphs.push({ segments: parseInline(headingMatch[1] || " "), heading: true });
       continue;
     }
-    const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
-    if (bulletMatch) {
+    const item = matchListItem(trimmed); // `-`/`*`, or `1.`/`1)` = ordered (#394, list-markers)
+    if (item) {
       // Nesting depth from the ORIGINAL line's leading whitespace (#103) — clamped to
       // MAX_NEST_LEVEL rather than dropped (no-silent-drop), 0 stays field-absent (byte-identical
       // for existing flat decks).
       const level = levelFromIndent(measureIndent(line));
       paragraphs.push({
-        segments: parseInline(bulletMatch[1]),
+        segments: parseInline(item.content),
         bullet: true,
         ...(level > 0 ? { level } : {}),
+        ...(item.ordered ? { ordered: true } : {}),
       });
     } else {
       paragraphs.push({ segments: parseInline(unescapeCommentLead(trimmed)) });
@@ -158,7 +160,7 @@ const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
  *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
  *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
  *  drop class — only the bare markers survive. */
-const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|note|section|toc)\s*-->$)/;
+const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|compare|before|after|note|section|toc|step\s*\*)\s*-->$)/; // `step *` = #401
 
 // ── Speaker notes (#150 / ADR-0032 D1) ──
 
@@ -247,6 +249,7 @@ export function parseSlideBlock(
   lines: string[],
   startLine: number,
   notices?: ParseNotice[],
+  catalog?: LayoutRoleLookup,
 ): SlideIR | null {
   // sourceLineStart/End must span the ORIGINAL block — useDeckRevise slices the raw
   // Markdown by these — so capture the length before comment lines are stripped.
@@ -351,7 +354,11 @@ export function parseSlideBlock(
     }
 
     // Split remaining content by separator
-    const sections = splitBySeparator(groupContent, separatorType);
+    const { sections, currentSections, leading } = splitBySeparator(groupContent, separatorType);
+    // #451: body before the FIRST separator is dropped (each section starts at its marker) — title/
+    // subtitle/field rows/backdrop are already consumed above, so any non-blank line left here is
+    // author text that silently vanishes. Only the parser sees these raw lines, hence a notice.
+    if (leading.some((l) => l.trim() !== "")) notices?.push({ kind: "pre-separator-dropped", detail: separatorType });
 
     if (title) {
       placeholders.push({
@@ -379,6 +386,7 @@ export function parseSlideBlock(
       } else {
         const found = findTableInLines(sl);
         if (found) {
+          if (table) notices?.push({ kind: "table-dropped" }); // #412: one table per slide — the earlier column's is replaced
           table = { rows: found.rows, header: true, placeholderIdx: colIdx };
         } else {
           const paras = linesToParagraphs(sl, { cellHeading: true });
@@ -402,6 +410,7 @@ export function parseSlideBlock(
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
+      ...(currentSections.length ? { currentSteps: currentSections } : {}), // `<!-- step * -->` (#401)
       sourceLineStart: startLine,
       sourceLineEnd: startLine + sourceLen - 1,
     };
@@ -508,8 +517,9 @@ export function parseSlideBlock(
   if (inCodeBlock) commitCodeBlock();
 
   // Determine the placeholder namespace (title vs content) — the SINGLE shared rule (slide-roles):
-  // a Title/Closing layout OR the presence of any meta field promotes the slide to the title namespace.
-  const isTitle = isTitleNamespace(layout, Object.keys(titleFields).length > 0);
+  // a Title/Closing layout OR the presence of any meta field promotes the slide to the title
+  // namespace; with a catalog, so does a pin whose resolved layout ROLE is title/closing (#453).
+  const isTitle = isTitleNamespace(layout, Object.keys(titleFields).length > 0, catalog);
   const ns = isTitle ? TITLE_NS : CONTENT_NS;
 
   // Build placeholders: # → title idx, ## / > → subtitle idx (namespace-dependent).

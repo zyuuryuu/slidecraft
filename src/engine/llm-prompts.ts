@@ -11,7 +11,9 @@ import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt } fr
 import { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, type DiagramType } from "./diagram-type-prompts";
 import { templateSpecSystemPrompt } from "./template-spec-prompts";
 import type { LayoutCatalog, LayoutRole } from "./template-catalog";
-import type { FieldKind } from "./field-rows";
+import { fieldSlotOf, type FieldKind } from "./field-rows";
+import { BUILTIN_LAYOUTS } from "./template-layout-library";
+import { ICON_NAMES } from "./icon-catalog";
 
 // The diagram prompt surface moved to diagram-type-prompts.ts (two-stage per-type design); re-export so
 // existing importers of these names keep resolving them from here.
@@ -45,6 +47,27 @@ export function systemPromptForMode(
 
 // ── Slide deck prompt ──
 
+/** #396/#402: the compare markers, advertised only when THIS template has a compare layout that holds 2
+ *  regions — no catalog → the canonical set, which has Compare.2Option.Versus. The name is the one auto
+ *  selection lands on for 2 regions (GROUP_MATCH: smallest groupCount ≥ 2, catalog order on ties —
+ *  compare-guide.test locks the agreement, R8), so the guide tells the AI what it will actually get. */
+function compareRules(catalog?: LayoutCatalog): string[] {
+  const fits = (catalog ?? []).filter((e) => e.groupKind === "compare" && (e.groupCount ?? 0) >= 2);
+  const name = catalog && catalog.length
+    ? [...fits].sort((a, b) => a.groupCount! - b.groupCount!)[0]?.name
+    : "Compare.2Option.Versus";
+  if (!name) return [];
+  return [
+    `- Two-option comparison (A vs B): \`${name}\` — put one \`<!-- compare -->\` before EACH of the 2 regions (\`### option name\` + bullets)`,
+    `- Before → After change (As-is → To-be): \`<!-- before -->\` before the first region, \`<!-- after -->\` before the second — same layout plus an arrow and Before/After labels (the first region is always Before)`,
+  ];
+}
+
+/** The field rows the canonical built-in layouts have a slot for (the no-template default). */
+const CANONICAL_FIELD_KINDS: ReadonlySet<FieldKind> = new Set(
+  BUILTIN_LAYOUTS.flatMap((l) => l.placeholders.flatMap((p) => fieldSlotOf(p) ?? [])),
+);
+
 export function slideSystemPrompt(catalog?: LayoutCatalog): string {
   // Advertise the ACTUAL template's layouts when we have a catalog (alien-safe); else the canonical set
   // (manual copy with no template loaded). Same rule for the role-based selection guidance below.
@@ -62,15 +85,19 @@ export function slideSystemPrompt(catalog?: LayoutCatalog): string {
     rule("columns", "Column.2Body.Equal", "Two/three-column comparison", "<!-- col -->"),
     rule("kpi", "KPI.*", "KPI / metrics", "<!-- kpi -->"),
     rule("process", "Process.*", "Process steps", "<!-- step -->"),
+    ...compareRules(catalog),
     rule("closing", "Closing.1Message.Single", "Last slide (closing)"),
   ].filter(Boolean).join("\n");
 
-  // #397/#398 field rows — advertised only when THIS template has a slot for them (no catalog → the
-  // canonical set, which has both). A template without the slot gets the prompt unchanged.
-  const hasSlot = (k: FieldKind) => !catalog || !catalog.length || catalog.some((e) => e.fieldSlots?.some((s) => s.kind === k));
+  // #397/#398/#404 field rows — advertised only when THIS template has a slot for them (no catalog → the
+  // canonical built-in set, read off its own layout defs by the same fieldSlotOf binding uses). A
+  // template without the slot gets the prompt unchanged.
+  const hasSlot = (k: FieldKind) =>
+    catalog && catalog.length ? catalog.some((e) => e.fieldSlots?.some((s) => s.kind === k)) : CANONICAL_FIELD_KINDS.has(k);
   const fieldRows = [
     hasSlot("callout") ? "Takeaway: the slide's ONE message as one line (content slides — one per slide; shown in the callout band)" : undefined,
     hasSlot("source") ? "Source: where the data comes from (data/table slides — always cite; shown as the source line)" : undefined,
+    hasSlot("kicker") ? "Kicker: a short category label shown above the title (content slides, e.g. \"SECTION 02 · Cost\"; title slides use Category:)" : undefined,
   ].filter(Boolean).map((l) => `\n${l}`).join("");
 
   return `You are a presentation assistant. Generate a slide deck in SlideCraft Markdown format based on the user's request.
@@ -106,6 +133,23 @@ ${layoutList}
 ## Layout Selection Rules
 
 ${layoutRules}
+
+## Group Cells (steps / cards / KPI)
+
+Inside a region, a \`### heading\` may lead with a built-in icon \`:name:\` — drawn left of the heading
+(an unknown name stays as text). Mark the CURRENT step with \`<!-- step * -->\` (its heading is emphasized):
+
+\`\`\`
+<!-- step -->
+### :client: 要件
+- 現状整理
+
+<!-- step * -->
+### :server: 設計
+- 方式決定
+\`\`\`
+
+Icons: ${ICON_NAMES.join(", ")}
 
 ## Embedded Diagrams
 

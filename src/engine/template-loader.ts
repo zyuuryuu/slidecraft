@@ -177,6 +177,13 @@ function extractThemeFonts(themeXml: string): ThemeFonts {
 
 // ── Namespace normalization ──
 
+/** A `xmlns:<prefix>="…"` declaration INCLUDING its leading whitespace — leaving the space behind
+ *  turned `<a:solidFill xmlns:ns4="…">` into `<a:solidFill >`, which the exact-tag regexes below
+ *  (`/<a:solidFill>/`, `/<a:prstGeom prst="/`) never match, so such shapes were silently dropped (#416). */
+function nsDeclRe(prefix: string): RegExp {
+  return new RegExp(`\\s+xmlns:${prefix}="[^"]*"`, "g");
+}
+
 function normalizeNs(xml: string): string {
   let r = xml;
   // Map all ns0-ns9 prefixes. Detect which maps to which namespace.
@@ -188,19 +195,13 @@ function normalizeNs(xml: string): string {
     if (r.includes(`xmlns:${prefix}="http://schemas.openxmlformats.org/presentationml`)) {
       r = r.split(`<${prefix}:`).join("<p:");
       r = r.split(`</${prefix}:`).join("</p:");
-      r = r.replace(
-        new RegExp(`xmlns:${prefix}="[^"]*"`, "g"),
-        "",
-      );
+      r = r.replace(nsDeclRe(prefix), "");
     }
     // Check if this prefix is used for drawingml
     if (r.includes(`xmlns:${prefix}="http://schemas.openxmlformats.org/drawingml`)) {
       r = r.split(`<${prefix}:`).join("<a:");
       r = r.split(`</${prefix}:`).join("</a:");
-      r = r.replace(
-        new RegExp(`xmlns:${prefix}="[^"]*"`, "g"),
-        "",
-      );
+      r = r.replace(nsDeclRe(prefix), "");
     }
   }
   // Fallback: if still has ns0-ns4, apply common mapping
@@ -821,12 +822,14 @@ export async function loadTemplate(
 
 // ── Auto layout selection ──
 
-// Which catalog group kinds a slide.groupKind may fill. card→card only (compare/課題対策 stays
-// pin-only to avoid surprising routing; a future `<!-- compare -->` can add it here).
+// Which catalog group kinds a slide.groupKind may fill. Each kind fills only its own family — card never
+// lands on a compare/課題対策 layout; that family is reached only by the explicit `<!-- compare -->` (#396).
 const GROUP_MATCH: Record<NonNullable<SlideIR["groupKind"]>, Array<"card" | "step" | "kpi" | "compare">> = {
   card: ["card"],
   step: ["step"],
   kpi: ["kpi"],
+  compare: ["compare"],
+  beforeAfter: ["compare"], // #402: the directed 2-face pair shares the compare layouts (+ arrow/labels overlay)
 };
 
 interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
@@ -910,7 +913,7 @@ export function autoSelectLayout(
   }
 
   // Group-aware: a `slide.groupKind` slide routes to the matching GROUP layout (card→card, step→step,
-  // kpi→kpi), preferring the group-count that fits (exact, then smallest overshoot). Only fires on
+  // kpi→kpi, compare→compare), preferring the group-count that fits (exact, then smallest overshoot). Only fires on
   // groupKind — non-grouped selection is byte-identical. Falls through when the template has no such
   // layout (degrades to columns-with-headings via the normal path below).
   if (slide.groupKind && catalog && catalog.length > 0) {

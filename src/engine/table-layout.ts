@@ -78,3 +78,40 @@ export function computeColumnWidthsEmu(rows: string[][], boxWidthIn: number): nu
   widths[widths.length - 1] += boxWidthEmu - widths.reduce((a, b) => a + b, 0);
   return widths;
 }
+
+/** A native table cell's text metrics — the font size and cell margins table-ooxml WRITES, and the
+ *  overflow estimate below READS (#436, R8: one definition, so the estimate can't drift from export). */
+export const TABLE_CELL = { fontPt: 11, marLREmu: 91440, marTBEmu: 45720 } as const;
+
+// PowerPoint's single line spacing ≈ 1.2 × the font size; one displayWidth column ≈ half an em.
+const LINE_SPACING = 1.2;
+const PT_PER_INCH = 72;
+
+/** TABLE_CELL's margins in INCHES plus the line spacing the row-height estimate assumes — the
+ *  preview derives its td padding / line-height from these (#443, R8: same numbers table-ooxml
+ *  writes in EMU, so a table row is the same height on screen and in the export's estimate). */
+export const TABLE_CELL_IN = {
+  padLR: TABLE_CELL.marLREmu / EMU_PER_INCH,
+  padTB: TABLE_CELL.marTBEmu / EMU_PER_INCH,
+  lineSpacing: LINE_SPACING,
+} as const;
+
+/**
+ * #436: each row's ESTIMATED rendered height (inches) in a table `boxWidthIn` wide. PowerPoint grows a
+ * row to fit its text (table-ooxml's nominal `box.h / rows` is only a floor), so the real height is the
+ * tallest cell's wrapped line count × line height + the top/bottom cell margins. Wrapping reuses the
+ * SAME column widths the export assigns (computeColumnWidthsEmu) and the SAME CJK-aware displayWidth
+ * on the VISIBLE text (R8 — no second width calculation). An estimate, not a layout: glyph widths are
+ * averaged (CJK = 1 em, else ½ em) and word-boundary wrapping is ignored. Pure (R2).
+ */
+export function estimateTableRowHeightsIn(rows: string[][], boxWidthIn: number): number[] {
+  const widths = computeColumnWidthsEmu(rows, boxWidthIn);
+  const colPt = TABLE_CELL.fontPt / 2;
+  const lineIn = (TABLE_CELL.fontPt * LINE_SPACING) / PT_PER_INCH;
+  const padIn = (2 * TABLE_CELL.marTBEmu) / EMU_PER_INCH;
+  const perLine = widths.map((w) => Math.max(1, Math.floor((((w - 2 * TABLE_CELL.marLREmu) / EMU_PER_INCH) * PT_PER_INCH) / colPt)));
+  return rows.map((r) => {
+    const lines = perLine.map((cap, c) => Math.max(1, Math.ceil(displayWidth(inlinePlainText(r[c] ?? "")) / cap)));
+    return Math.max(1, ...lines) * lineIn + padIn;
+  });
+}

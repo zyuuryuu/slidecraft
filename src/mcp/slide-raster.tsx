@@ -144,6 +144,7 @@ export function renderSlideHtml(session: Session, index: number, env: NodeJS.Pro
       masterDecorations={template.masterDecorations}
       masterImages={template.masterImages}
       masterStaticTexts={template.masterStaticTexts}
+      themeColors={template.themeColors}
       scale={SCALE}
       sectionFooterText={sectionFooterFor(prepared, index)}
       exportMode

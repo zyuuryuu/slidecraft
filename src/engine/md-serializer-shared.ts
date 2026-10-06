@@ -7,8 +7,9 @@
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { serializeInline } from "./md-inline";
 import { tableToMarkdown } from "./md-table";
-import { indentForLevel } from "./paragraph-nesting";
+import { orderedNumbers, listItemLine } from "./list-markers";
 import { FIELD_ROWS } from "./field-rows";
+import { beforeAfterRole } from "./md-separators";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -32,6 +33,23 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   return null;
 }
 
+/** The separator line opening region `col` (1-based) — the ONE marker writer for both readouts (R8):
+ *  `<!-- step * -->` for a current step (#401); the #402 before/after pair writes the region's
+ *  positional role (beforeAfterRole — the same mapping the overlay labels draw); every other family
+ *  repeats its own word. */
+export function separatorLine(sepType: string, slide: SlideIR, col: number): string {
+  if (sepType === "step" && slide.currentSteps?.includes(col)) return "<!-- step * -->";
+  const word = sepType === "beforeAfter" ? beforeAfterRole(col) : sepType;
+  return `<!-- ${word} -->`;
+}
+
+/** The highest current-step column to keep when emitting a step band — so a starred EMPTY trailing
+ *  step still round-trips (#401). 0 when nothing applies; capped at the 1..10 body-region range. */
+export function maxCurrentStepCol(sepType: string, slide: SlideIR): number {
+  if (sepType !== "step") return 0;
+  return Math.max(0, ...(slide.currentSteps ?? []).filter((n) => n <= 10));
+}
+
 // ── Paragraphs → Markdown lines ──
 
 /** A PLAIN paragraph's text is, trimmed, EXACTLY one complete `<!-- … -->` comment — the shape #147's
@@ -40,11 +58,12 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
 const COMMENT_ONLY_TEXT_RE = /^<!--(?:(?!-->).)*-->$/;
 
 export function serializeParagraphs(paragraphs: Paragraph[]): string {
+  const numbers = orderedNumbers(paragraphs); // `1.` items renumbered per run (#394)
   return paragraphs
-    .map((p) => {
+    .map((p, i) => {
       const text = serializeInline(p.segments);
       if (p.heading) return `### ${text}`;
-      if (p.bullet) return `${indentForLevel(p.level ?? 0)}- ${text}`;
+      if (p.bullet) return listItemLine(p, numbers[i], text);
       // #165: a GUI-authored comment-only PLAIN paragraph would otherwise emit a line #147's parser
       // drops on the next parse (silent text loss). Escape its leading `<` so the line survives —
       // md-slide-parser.ts strips exactly this one leading backslash back off.

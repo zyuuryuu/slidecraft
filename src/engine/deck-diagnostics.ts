@@ -14,12 +14,13 @@ import type { DeckIR, SlideIR, Paragraph } from "./slide-schema";
 import type { LayoutCatalog } from "./template-catalog";
 import { slideIdxRole, isSectionFooterTarget } from "./template-catalog";
 import type { LayoutInfo } from "./template-loader";
-import { autoSelectLayout } from "./template-loader";
+import { autoSelectLayout, suggestLayouts } from "./template-loader";
 import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
-import { visualOccupancy } from "./visual-placement";
+import { visualOccupancy, visualCollisions, bodyPlaceholders, nthBody, type VisualKind } from "./visual-placement";
+import { estimateTableRowHeightsIn } from "./table-layout";
 import { isBlankParagraphs } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 
@@ -34,19 +35,24 @@ export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
  */
 export type ReviewRuleId =
   | "missing-title"
+  | "unknown-layout-pin"
   | "touten-used"
   | "kuten-used"
   | "image-markdown-leftover"
   | "unrecognized-meta-key"
   | "body-overflow"
+  | "title-overflow"
   | "long-bullet"
   | "key-value-table"
   | "unbound-content"
   | "visual-shadowed-content"
+  | "visual-collision"
+  | "table-overflow"
   | "table-dropped"
   | "image-dropped"
   | "meta-key-dropped"
   | "figure-dropped"
+  | "pre-separator-dropped"
   | "section-footer-injected";
 
 export interface ReviewRule {
@@ -56,19 +62,24 @@ export interface ReviewRule {
 
 export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "missing-title", level: "warn" },
+  { id: "unknown-layout-pin", level: "warn" },
   { id: "touten-used", level: "warn" },
   { id: "kuten-used", level: "info" },
   { id: "image-markdown-leftover", level: "info" },
   { id: "unrecognized-meta-key", level: "warn" },
   { id: "body-overflow", level: "warn" },
+  { id: "title-overflow", level: "warn" },
   { id: "long-bullet", level: "info" },
   { id: "key-value-table", level: "info" },
   { id: "unbound-content", level: "warn" },
   { id: "visual-shadowed-content", level: "warn" },
+  { id: "visual-collision", level: "warn" },
+  { id: "table-overflow", level: "warn" },
   { id: "table-dropped", level: "info" },
   { id: "image-dropped", level: "info" },
   { id: "meta-key-dropped", level: "warn" },
   { id: "figure-dropped", level: "info" },
+  { id: "pre-separator-dropped", level: "warn" },
   { id: "section-footer-injected", level: "info" },
 ];
 
@@ -85,6 +96,18 @@ export interface DeckIssue {
   /** Optional so pre-#244 hand-built DeckIssue fixtures in other tests keep compiling (additive
    *  field, ADR-0015-style non-breaking contract). Every issue THIS module produces always sets it. */
   id?: ReviewRuleId;
+}
+
+const VISUAL_LABEL: Record<VisualKind, string> = { diagram: "図", mermaid: "図", table: "表", code: "コード", image: "画像" };
+
+/** #436: the table's estimated rendered height vs its placed box — undefined when it fits (or has no
+ *  box). `fit` = how many leading rows the estimate fits in the box (header included). */
+function tableOverflow(rows: string[][], box: { w: number; h: number }): { fit: number } | undefined {
+  const heights = estimateTableRowHeightsIn(rows, box.w);
+  if (heights.reduce((a, b) => a + b, 0) <= box.h) return undefined;
+  let used = 0;
+  const fit = heights.findIndex((h) => (used += h) > box.h);
+  return { fit };
 }
 
 // Full-width chars: a bullet longer than this reads as a sentence, not a key phrase.
@@ -127,6 +150,19 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
     const body = rolePlaceholder(slide, "body");
 
     if (!title.trim() && (body || isVisual)) add("missing-title", "タイトルが無い", ["title"]);
+
+    // #435 never-silent: a `<!-- slide: X -->` pin THIS template lacks. Read off the SAME resolution
+    // export/preview draw with (autoSelectLayout honors a pin the catalog has, degrades one it lacks —
+    // so `resolved !== slide.layout` iff the pin is unknown; R8, no second membership check). Needs only
+    // the catalog, so the GUI's diagnoseDeck(deck, catalog) surfaces it too.
+    if (catalog && catalog.length > 0 && slide.layout !== "auto") {
+      const resolved = autoSelectLayout(slide, i, deck.slides.length, catalog);
+      if (resolved !== slide.layout) {
+        const alts = suggestLayouts(slide, i, deck.slides.length, catalog, 4).filter((n) => n !== resolved);
+        const others = alts.length > 0 ? `（他の候補: ${alts.join(" / ")}）` : "";
+        add("unknown-layout-pin", `レイアウト「${slide.layout}」はこのテンプレにありません。auto 選択で「${resolved}」に代替しました${others}`, []);
+      }
+    }
 
     // 句読点はスライドでは prose に見える（体言止めが読みやすい）。読点「、」が最も可読性を落とすので
     // 強い警告（warn）、句点「。」は末尾を落とせば済むことが多いので軽い注意（info）。タイトル＋本文を走査。
@@ -182,6 +218,7 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
   // vanish. On a healthy deck all content binds → unbound is empty → not one diagnostic is added.
   if (layouts && layouts.length > 0 && catalog && catalog.length > 0) {
     const layoutByName = new Map(layouts.map((l) => [l.name, l] as const));
+    const catalogEntryByName = new Map(catalog.map((e) => [e.name, e] as const)); // #437: the fit estimates live on the catalog entry
     deck.slides.forEach((slide, i) => {
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
@@ -209,6 +246,23 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "visual-shadowed-content", level: RULE_LEVEL["visual-shadowed-content"], message: `本文 ${hidden.length} 件がビジュアル（${kinds}）と同じ枠に入り出力時に表示されません（${layout.name}）`, levers: [] });
       }
 
+      // #434 never-silent: 2+ visuals resolved to ONE placeholder (e.g. 本文＋表＋図 → table and figure
+      // both at ordinal 2). Read off the SAME claims visualOccupancy is built from (R8). Placement is
+      // unchanged (#392 resolves it); the message states what export/preview do today.
+      for (const c of visualCollisions(slide, layout.placeholders)) {
+        const what = [...new Set(c.kinds.map((k) => VISUAL_LABEL[k]))].join("と");
+        const name = layout.placeholders.find((p) => p.idx === c.idx)?.name ?? c.idx;
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "visual-collision", level: RULE_LEVEL["visual-collision"], message: `${what}が同じ枠（${name}）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（${layout.name}）`, levers: ["split"] });
+      }
+
+      // #436 never-silent: PowerPoint grows each table row to fit its 11pt text, so a long table runs
+      // past its box. Same box the export places it in (nthBody), estimate from table-layout (R8).
+      const tableBox = slide.table ? nthBody(bodyPlaceholders(layout.placeholders), slide.table.placeholderIdx)?.style : undefined;
+      const over = tableBox && tableOverflow(slide.table!.rows, tableBox);
+      if (over) {
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "table-overflow", level: RULE_LEVEL["table-overflow"], message: `表 ${slide.table!.rows.length} 行（見出し含む）はこのレイアウト（${layout.name}）の枠に収まりません（推定 ${over.fit} 行まで）。出力（PPTX）では行が文字に合わせて伸び枠の下へはみ出します。スライドの分割を検討してください`, levers: ["split"] });
+      }
+
       // #292: never-silent visibility for the section-footer auto-inject (#168) — the SAME
       // eligibility check (isSectionFooterTarget) and the SAME "did binding leave it empty"
       // signal (plan.unfilled) that placeholder-filler.buildSlideXml / SlideCard actually use, so
@@ -225,6 +279,29 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
             level: RULE_LEVEL["section-footer-injected"],
             message: `章名フッタ「${sectionFooterText}」がこの枠（${ph.name}）に自動注入されます（明示 Footer: 未指定）`,
             levers: [],
+          });
+        }
+      }
+
+      // #437 案a never-silent: a title longer than the resolved layout's title box clips at the right
+      // edge in the preview (R7: no autofit pre-computation on titles; PPTX behavior depends on the
+      // template's autofit). Diagnostic ONLY — rendering is untouched. Reads the SAME fit estimate the
+      // body budget rides (placeholderFitBox via the catalog entry + paragraphLines; R8, no second
+      // capacity computation). Title bands are often shorter than one body-tuned line-height, so the
+      // estimate's maxLines floor reads 0 — a title still renders (at least) one line, hence the clamp.
+      const titleFit = catalogEntryByName.get(layout.name)?.placeholders.find((p) => p.role === "title");
+      const titlePara = rolePlaceholder(slide, "title")?.paragraphs[0];
+      if (titleFit && titleFit.charsPerLine > 0 && titlePara && textOf(titlePara).trim()) {
+        const maxLines = Math.max(1, titleFit.maxLines);
+        const lines = paragraphLines(titlePara, titleFit.charsPerLine);
+        if (lines > maxLines) {
+          issues.push({
+            slideIndex: i,
+            title: slideTitle(slide),
+            id: "title-overflow",
+            level: RULE_LEVEL["title-overflow"],
+            message: `タイトルがこのレイアウト（${layout.name}）のタイトル枠に収まりません（目安 全角${titleFit.charsPerLine}字×${maxLines}行、推定 ${lines}行）。プレビューでは右端で切れます。タイトルを短くしてください`,
+            levers: ["condense"],
           });
         }
       }
@@ -245,13 +322,18 @@ export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseN
     const base = { slideIndex: n.slideIndex, title, levers: [] as Lever[] };
     switch (n.kind) {
       case "table-dropped":
-        return { ...base, id: "table-dropped" as const, level: RULE_LEVEL["table-dropped"], message: "2つ目以降の表（とその前後の内容）が変換時に失われました（ネイティブ表として保持されるのは1つのみ）" };
+        return { ...base, id: "table-dropped" as const, level: RULE_LEVEL["table-dropped"], message: "2つ目以降の表があり、残らなかった表（とその前後の内容）が変換時に失われました（ネイティブ表として保持されるのは1つのみ。本文では最初の表、<!-- col --> では最後の列の表が残ります）" };
       case "image-dropped":
         return { ...base, id: "image-dropped" as const, level: RULE_LEVEL["image-dropped"], message: "画像記法（![alt](src)）を含む内容が2つ目以降の表と衝突し変換時に失われました" };
       case "meta-key-dropped":
         return { ...base, id: "meta-key-dropped" as const, level: RULE_LEVEL["meta-key-dropped"], message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が2つ目以降の表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
       case "figure-dropped":
         return { ...base, id: "figure-dropped" as const, level: RULE_LEVEL["figure-dropped"], message: "同じスライドの先行する図（```diagram / ```mermaid）が後続の図に上書きされ変換時に失われました（1スライドに保持される図は最後の1つのみ）" };
+      case "pre-separator-dropped": {
+        // detail is the parser's SeparatorType — the before/after family's first marker is `<!-- before -->`.
+        const marker = `<!-- ${n.detail === "beforeAfter" ? "before" : n.detail ?? "col"} -->`;
+        return { ...base, id: "pre-separator-dropped" as const, level: RULE_LEVEL["pre-separator-dropped"], message: `最初の ${marker} より前に書かれた本文が変換時に失われました（各区切りの内容はその区切りコメントの後に書きます。1つ目の内容の前にも ${marker} を置いてください）` };
+      }
     }
   });
 }

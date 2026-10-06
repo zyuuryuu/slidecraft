@@ -14,12 +14,15 @@ import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, fitImageInBox, visualOccupancy } from "./visual-placement";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, drawnImage, visualOccupancy } from "./visual-placement";
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
-import { isGroupedLayout, expandGroups } from "./group-binding";
+import { isGroupedLayout, expandGroups, groupCellOverlay } from "./group-binding";
+import { isEmptyOverlay, paintGroupOverlay, withLeftInset } from "./group-overlay";
+import { beforeAfterOverlay, beforeAfterShapesXml } from "./before-after";
 import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
 import { createLinkRegistry } from "./hyperlink-rels";
-import { renderToBufferWithGroups, nestShapeXml } from "./pptx-writer";
+import { paintToShapeXml, renumberShapeIds } from "./pptx-writer";
+import { paintDiagram } from "./diagram-painter";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
 import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT, NOTES_FIRST_LINK_RID } from "./notes-ooxml";
@@ -91,19 +94,9 @@ async function extractDiagramShapes(
   // Embedded in a titled slide → the diagram omits its own title bar so it
   // doesn't duplicate / overlap the slide's title placeholder. When `region` is
   // given (diagram beside body text), confine the shapes to that placeholder box.
-  const { buffer, groups } = await renderToBufferWithGroups(spec, {
-    theme,
-    omitTitle: true,
-    region,
-  });
-
-  // Open the PptxGenJS-generated PPTX and pull slide1's shapes, then nest them
-  // into PowerPoint sub-groups (figure = one object; node/edge = grabbable parts)
-  // per the painter's group tree.
-  const diagZip = await JSZip.loadAsync(buffer);
-  const slideXml = await diagZip.file("ppt/slides/slide1.xml")?.async("string");
-  if (!slideXml) return "";
-  return nestShapeXml(slideXml, groups);
+  // The PptxGenJS slide's shapes, nested into PowerPoint sub-groups (figure = one object; node/edge =
+  // grabbable parts) per the painter's group tree.
+  return paintToShapeXml((t) => paintDiagram(t, spec, { theme, omitTitle: true, region }));
 }
 
 /** Parse a base64 image data URI → bytes + ext + mime for OOXML media embedding. Returns null for a
@@ -153,6 +146,8 @@ async function buildSlideXml(
   const contentFor = slide.groupKind && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layout.placeholders);
+  // Group-cell decorations (#400 heading icons / #401 current-step frame) from the same pass.
+  const overlay = slide.groupKind && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
 
   // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
   const bodyPhs = bodyPlaceholders(layout.placeholders);
@@ -177,7 +172,7 @@ async function buildSlideXml(
   const buildImagePic = (shapeId: number): string => {
     // Fit the image into its box the same way the browser preview does (contain/cover) so preview and
     // export agree — the manual rect / full-slide backdrop / placeholder box, then the aspect math.
-    const { rect: r, srcRect: cr } = fitImageInBox(imageBox!, slide.image!.fit, slide.image!.aspect);
+    const { rect: r, srcRect: cr } = drawnImage(slide.image!, imageBox!);
     const EMU = (inches: number) => Math.round(inches * 914400);
     const srcRectXml = cr
       ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`
@@ -217,6 +212,8 @@ async function buildSlideXml(
     if (!content) continue;
 
     let shapeXml = replaceTextInShape(ph.shapeXml, content, links.rIdFor);
+    const inset = overlay?.insets.get(ph.idx);
+    if (inset !== undefined) shapeXml = withLeftInset(shapeXml, inset); // room for the #400 icon
     // Update shape ID to be unique within the slide
     shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
     shapes += shapeXml;
@@ -248,6 +245,12 @@ async function buildSlideXml(
     : undefined;
   if (caption) { shapes += imageCaptionShapeXml(id, caption); id++; }
 
+  if (overlay && !isEmptyOverlay(overlay)) {
+    const r = renumberShapeIds(await paintToShapeXml((t) => paintGroupOverlay(t, overlay)), id);
+    shapes += r.xml;
+    id = r.next;
+  }
+
   // Add diagram shapes if present
   // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is confined to its placeholder
   // region so it doesn't cover the bullets. A region-bound figure whose region does NOT resolve is
@@ -258,18 +261,11 @@ async function buildSlideXml(
   const diagPh = diagWantsRegion ? visualBody(slide.diagram!.placeholderIdx) : undefined;
   if (slide.diagram && (!diagWantsRegion || diagPh)) {
     const diagramShapes = await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
-    // Re-number shape IDs to avoid conflicts
-    let reNumbered = diagramShapes;
-    const idMatches = [...reNumbered.matchAll(/<p:cNvPr[^>]*id="(\d+)"/g)];
-    const usedIds = new Set(idMatches.map(m => m[1]));
-    for (const oldId of usedIds) {
-      reNumbered = reNumbered.replace(
-        new RegExp(`id="${oldId}"`, "g"),
-        `id="${id}"`,
-      );
-      id++;
-    }
-    shapes += reNumbered;
+    // Re-number shape IDs (incl. nestShapeXml's <p:grpSp> 7000-range ids) in ONE document-order pass.
+    // The old per-id global replace re-rewrote ids whose NEW value collided with a later oldId (#441).
+    const r = renumberShapeIds(diagramShapes, id);
+    shapes += r.xml;
+    id = r.next;
   }
 
   // Add a native table if present (fills its body region; editable in PowerPoint).
@@ -277,8 +273,14 @@ async function buildSlideXml(
     const tablePh = visualBody(slide.table.placeholderIdx);
     if (tablePh) {
       shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id, links.rIdFor);
+      id++;
     }
   }
+
+  // #402: a Before/After pair's direction arrow + role labels, frontmost — the SAME geometry the preview
+  // draws (before-after.ts). Undefined for every other slide → nothing added.
+  const ba = beforeAfterOverlay(slide, layout);
+  if (ba) shapes += beforeAfterShapesXml(id, ba).xml;
 
   const xml =
     `<?xml version='1.0' encoding='UTF-8' standalone='yes'?>` +

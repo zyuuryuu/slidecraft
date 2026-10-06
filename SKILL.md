@@ -63,8 +63,8 @@ scoped path/filename are mutually exclusive on every call — passing both is a 
      `--root` scope, `new_project(templatePath, markdown?)` reads the template file from that
      directory instead (and `open_project(path)` likewise for an existing `.slidecraft`) — no base64.
 2. **Read the contract**: `get_authoring_guide()` — this template's resolved layout names, the Markdown
-   rules (slide separators, `<!-- col/kpi/step -->` region markers, GFM tables, code, `<!-- note -->`
-   speaker notes), body budget, and pointers. This is your single entry point; read it before authoring.
+   rules (slide separators, `<!-- col/kpi/step/card/compare -->` and `<!-- before -->`/`<!-- after -->`
+   region markers, GFM tables, code, `<!-- note -->` speaker notes), body budget, and pointers. This is your single entry point; read it before authoring.
 3. **Write slides**: `set_slide_markdown(index, markdown)` per slide (figures/mermaid on a slide are
    auto-preserved). `get_slide(index)` gives a one-call structured edit plan (resolvedLayout, hasFigure,
    bulletCount, budget, overBudget, this slide's issues, notes, markdown).

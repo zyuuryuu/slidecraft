@@ -13,6 +13,8 @@
  * anything around it) is discarded (md-slide-parser #148). Surrounding PROSE around a SINGLE table
  * no longer triggers this: #101 fixed the parser to keep it (merged into idx "1", coexisting beside
  * the table) instead of dropping it, so this notice now fires ONLY when a 2nd table is present.
+ * #412: the `<!-- col -->` path reports the same kind when a later column's table replaces an earlier
+ * column's ("last wins" there — the earlier table and the rest of its column are what's lost).
  *
  * `image-dropped` / `meta-key-dropped`: sub-classifications of a table-dropped leftover — the
  * discarded content happened to be SHAPED like an image line / an unrecognized `Key: Value` line.
@@ -27,11 +29,24 @@
  * only ONE diagram and ONE mermaid image survive per slide today ("last wins"), so the earlier
  * figure is discarded. Only the parser sees the replaced block, hence a notice (same as table-dropped).
  */
-export type ParseNoticeKind = "table-dropped" | "image-dropped" | "meta-key-dropped" | "figure-dropped";
+/*
+ * `pre-separator-dropped` (#451): on a grouped slide (`<!-- col -->` / kpi / step / card / compare /
+ * before-after), body written BEFORE the first separator is discarded — each section starts at its
+ * marker, so column 1 needs a marker of its own. Only the parser sees those raw leading lines
+ * (splitBySeparator's `leading`), hence a notice. The drop itself is unchanged (treating that text
+ * as section 1 is a separate oversight call, #451 案 2).
+ */
+export type ParseNoticeKind =
+  | "table-dropped"
+  | "image-dropped"
+  | "meta-key-dropped"
+  | "figure-dropped"
+  | "pre-separator-dropped";
 
 export interface ParseNotice {
   kind: ParseNoticeKind;
-  /** meta-key-dropped only: the unrecognized key (e.g. "Meta"). */
+  /** meta-key-dropped: the unrecognized key (e.g. "Meta").
+   *  pre-separator-dropped: the slide's SeparatorType (e.g. "col", "beforeAfter"). */
   detail?: string;
 }
 
