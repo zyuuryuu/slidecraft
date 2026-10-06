@@ -261,18 +261,11 @@ async function buildSlideXml(
   const diagPh = diagWantsRegion ? visualBody(slide.diagram!.placeholderIdx) : undefined;
   if (slide.diagram && (!diagWantsRegion || diagPh)) {
     const diagramShapes = await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
-    // Re-number shape IDs to avoid conflicts
-    let reNumbered = diagramShapes;
-    const idMatches = [...reNumbered.matchAll(/<p:cNvPr[^>]*id="(\d+)"/g)];
-    const usedIds = new Set(idMatches.map(m => m[1]));
-    for (const oldId of usedIds) {
-      reNumbered = reNumbered.replace(
-        new RegExp(`id="${oldId}"`, "g"),
-        `id="${id}"`,
-      );
-      id++;
-    }
-    shapes += reNumbered;
+    // Re-number shape IDs (incl. nestShapeXml's <p:grpSp> 7000-range ids) in ONE document-order pass.
+    // The old per-id global replace re-rewrote ids whose NEW value collided with a later oldId (#441).
+    const r = renumberShapeIds(diagramShapes, id);
+    shapes += r.xml;
+    id = r.next;
   }
 
   // Add a native table if present (fills its body region; editable in PowerPoint).
