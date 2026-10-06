@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-06
+
+早期版（0.x）のマイナー版。**Markdown 語彙の大幅拡張**（インライン書式・番号付きリスト・フィールド行 3 種・比較/Before-After・カードアイコン・現在ステップ強調）、**「黙って消える」挙動の一掃**（never-silent 診断の面展開）、**プレビュー忠実度（WYSIWYG）の底上げ**、**MCP のコールド 1 発読み（bootstrap）とプロファイル別登録**、リリース工程のセーフティが中心。
+
+### Added
+
+- **インライン書式**: `` `code` `` / `[リンク](url)` / `~~取消線~~` が PPTX・プレビュー両方で実書式に（表セル内も同じ 1 パーサ）（[#393](https://github.com/zyuuryuu/slidecraft/issues/393)/[#395](https://github.com/zyuuryuu/slidecraft/issues/395)・PR #420）
+- **番号付きリスト `1.`** を ordered bullet として解釈し `buAutoNum` で出力。serializer は連番へ正規化（[#394](https://github.com/zyuuryuu/slidecraft/issues/394)・PR #450）
+- **フィールド行 3 種**: `Takeaway:`（結論帯）/ `Source:`（出典行）（[#397](https://github.com/zyuuryuu/slidecraft/issues/397)/[#398](https://github.com/zyuuryuu/slidecraft/issues/398)・PR #421）、`Kicker:`（タイトル上のカテゴリ行）（[#404](https://github.com/zyuuryuu/slidecraft/issues/404)・PR #448）— 1 行書くだけで専用枠を持つレイアウトが自動選択される
+- **内蔵テンプレ（Midnight）に `+1Kicker` 変種レイアウトを追加** — `Kicker:` が既定テンプレでそのまま描画される（[#447](https://github.com/zyuuryuu/slidecraft/issues/447)・PR #472）
+- **比較スライド `<!-- compare -->`・Before/After `<!-- before -->`/`<!-- after -->`**（方向矢印・役割ラベル付き）（[#396](https://github.com/zyuuryuu/slidecraft/issues/396)/[#402](https://github.com/zyuuryuu/slidecraft/issues/402)・PR #442）
+- **カード見出しアイコン `:name:`＋現在ステップ強調 `<!-- step * -->`**（[#400](https://github.com/zyuuryuu/slidecraft/issues/400)/[#401](https://github.com/zyuuryuu/slidecraft/issues/401)・PR #440）
+- **画像 alt → キャプション＋代替テキスト**（PPTX の `descr` 込み・アクセシビリティ）（[#399](https://github.com/zyuuryuu/slidecraft/issues/399)・PR #418)
+- **MCP `bootstrap` ツール** — セッション開始時のコールド読み（authoring guide・図タイプ・テンプレ能力・テンプレ一覧ほか）を 1 往復に統合。旧 6 ツールは入出力不変で存続（[#464](https://github.com/zyuuryuu/slidecraft/issues/464)・PR #471・[ADR-0037](docs/adr/0037-mcp-surface-realignment.md)）
+- **長タイトルの枠溢れ警告 `title-overflow`**（診断のみ）（[#437](https://github.com/zyuuryuu/slidecraft/issues/437) 案a・PR #459）
+
+### Fixed
+
+- **「黙って消える」を通知へ**: 本文＋表/コード共存時の本文消失・図 2 つ目の黙殺（[#390](https://github.com/zyuuryuu/slidecraft/issues/390)/[#391](https://github.com/zyuuryuu/slidecraft/issues/391)・PR #413）、区切り前本文の黙殺（[#451](https://github.com/zyuuryuu/slidecraft/issues/451)・PR #456）、col 経路の表上書き・表と図の衝突・長い表の下端溢れの warn/notice 化（[#412](https://github.com/zyuuryuu/slidecraft/issues/412)/[#434](https://github.com/zyuuryuu/slidecraft/issues/434)/[#436](https://github.com/zyuuryuu/slidecraft/issues/436)・PR #438）
+- **テンプレ実名 pin の表紙が content 扱いになる問題** — title 名前空間判定を catalog の role 対応に（[#453](https://github.com/zyuuryuu/slidecraft/issues/453)・PR #458）
+- **未知のレイアウト pin の解決を export と同一経路に統一**＋warn `unknown-layout-pin`（[#435](https://github.com/zyuuryuu/slidecraft/issues/435)・PR #452）
+- **GUI の診断パネルに未束縛コンテンツ系警告（unbound-content）が出ない問題**（[#419](https://github.com/zyuuryuu/slidecraft/issues/419)・PR #459）
+- **図スライドの shape id 重複**（PowerPoint の修復ダイアログの原因）（[#441](https://github.com/zyuuryuu/slidecraft/issues/441)・PR #460）
+- **同梱 3 テンプレのネスト箇条書きサイズ逆転**（子が親より大きい）（[#449](https://github.com/zyuuryuu/slidecraft/issues/449)・PR #460）
+- **プレビュー忠実度**: Midnight の装飾パネル 68 枚がプレビューに出ない・ar 無し画像の引き伸ばし乖離（[#416](https://github.com/zyuuryuu/slidecraft/issues/416)/[#417](https://github.com/zyuuryuu/slidecraft/issues/417)・PR #439）、表セル余白のプレビュー/PPTX 一致（[#443](https://github.com/zyuuryuu/slidecraft/issues/443)・PR #456）
+- **e2e スイート復旧**（約 2 ヶ月続いた silent cancel を根治）（[#334](https://github.com/zyuuryuu/slidecraft/issues/334)・PR #415）
+
+### Security
+
+- **npm 間接依存 6 件の脆弱性を解消**（dompurify XSS・ip-address SSRF・brace-expansion DoS・proxy-addr critical IP spoofing・source-map-js DoS・vue XSS）＋ **rustls 0.23.45**（PR #467/#468）。残は katex（low 2 件・mermaid 12 major 連動のため据え置き #431）
+- **Tauri を cargo↔npm 同 minor（2.12 系）へ整列して更新**（PR #467）
+
+### Changed
+
+- **MCP のプロファイル別登録** — solo（stdio 単独）セッションには collab 専用 4 ツール（doc 切替 3 本＋register_templates）を見せない。ツール自体は削除せず、どのプロファイルでも入出力不変（[#465](https://github.com/zyuuryuu/slidecraft/issues/465)・PR #474・ADR-0037 D2）
+- **Homebrew cask の sha256↔version 照合を CI 化**（`verify-cask`・packaging 変更時のみ・stale は never-silent に赤）（[#287](https://github.com/zyuuryuu/slidecraft/issues/287)・PR #459）。`version:set` 後〜publish 前の赤は正常シグナル（RELEASING 参照）
+- **MCP サーフェス再設計の原理を [ADR-0037](docs/adr/0037-mcp-surface-realignment.md) として確定**（用途の主従・ループ温度・md-DSL 優先・削除は証拠つき）＋ 38 ツールの敵対的監査（[#466](https://github.com/zyuuryuu/slidecraft/issues/466)・PR #470）
+
 ## [0.4.1] - 2026-07-23
 
 早期版（0.x）のパッチ。**MCP の大きなデータをファイルで授受**（`--root`）、**単独モードでの組み込みテンプレ利用**、表紙まわりの描画修正、Windows での `npm install` 失敗の修正、依存の脆弱性更新が中心。
