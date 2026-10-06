@@ -26,15 +26,15 @@ beforeAll(async () => {
 });
 
 describe("loadTemplate", () => {
-  it("loads 31 layouts", () => {
-    expect(tpl.layouts).toHaveLength(31); // 30 canonical + SectionNav.1TitleList.Single (#167)
+  it("loads 32 layouts", () => {
+    expect(tpl.layouts).toHaveLength(32); // 30 canonical + SectionNav.1TitleList.Single (#167) + Content.1Body.Single+1Kicker (#447)
   });
 
   it("each layout has a name and index", () => {
     for (const layout of tpl.layouts) {
       expect(layout.name).toBeTruthy();
       expect(layout.index).toBeGreaterThanOrEqual(1);
-      expect(layout.index).toBeLessThanOrEqual(31);
+      expect(layout.index).toBeLessThanOrEqual(32);
     }
   });
 

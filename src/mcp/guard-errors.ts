@@ -26,6 +26,10 @@ export type GuardCode =
   | "ambiguous-input" // both dataBase64/templateBase64 AND path/templatePath were supplied
   | "missing-input"; // neither dataBase64/templateBase64 NOR path/templatePath was supplied
 
+/** The single GuardError → { ok:false, error, code } mapping (R8: one envelope shape — server.ts's
+ *  fail() and the bootstrap sections share it instead of re-typing the object in two places). */
+export const guardEnvelope = (e: GuardError): { ok: false; error: string; code: GuardCode } => ({ ok: false as const, error: e.message, code: e.code });
+
 export class GuardError extends Error {
   // Explicit field (not a `public readonly code` parameter property): parameter properties emit
   // runtime code, which erasableSyntaxOnly (tsconfig.app/mcp) forbids (TS1294).

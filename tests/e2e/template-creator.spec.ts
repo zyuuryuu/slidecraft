@@ -23,9 +23,9 @@ test.describe("Template creator (作成後続UI)", () => {
     expect(baseCount).toBeGreaterThanOrEqual(3);
 
     // (b) layout subset: the count label + toggles; deselecting all blocks 生成して適用 never-silently.
-    await expect(dialog.getByText(/レイアウト（31\/31/)).toBeVisible(); // 30 canonical + SectionNav.1TitleList.Single (#167)
+    await expect(dialog.getByText(/レイアウト（32\/32/)).toBeVisible(); // 30 canonical + SectionNav.1TitleList.Single (#167) + Content.1Body.Single+1Kicker (#447)
     await dialog.getByRole("button", { name: "全解除" }).click();
-    await expect(dialog.getByText(/レイアウト（0\/31/)).toBeVisible();
+    await expect(dialog.getByText(/レイアウト（0\/32/)).toBeVisible();
     await expect(dialog.getByRole("button", { name: /生成して適用/ })).toBeDisabled();
     await dialog.getByRole("button", { name: "全選択" }).click();
     await expect(dialog.getByRole("button", { name: /生成して適用/ })).toBeEnabled();
