@@ -22,7 +22,7 @@ never-silent 堅牢化（#316 ほか）・実ブラウザ CI の非必須 `brows
 | **表・描画 / HTML** | SmartArt/複雑図形のプレビュー追随（残スコープは会社テンプレ待ち・図ノード衝突/折返し #104 と slice 1–2 は完了・shipped.md 参照） | #105 |
 | **AI 編集の深化** | 部分生成 ops（P2–P4）・encoding 事故の構造抑止 | #106 #107 |
 | **GUI / アプリ堅牢性** | 最背面画像ドラッグ・Help 導線・.scft version ゲート | #122 #114 #121 |
-| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・署名付き自動更新・egress hard boundary／**リリース工程の自動化・堅牢化**（cask sha↔version セーフティ #287・tap ミラー自動化 #288・リリースノート ADR リンク絶対化 #289・タグ発火の摩擦 #290） | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#112 #120・#287–#290）・#119 |
+| **リリース / 配布 / セキュリティ** | アプリアイコン・Win 署名・Intel mac・署名付き自動更新・egress hard boundary／**リリース工程の自動化・堅牢化**（tap ミラー自動化 #288・リリースノート ADR リンク絶対化 #289・タグ発火の摩擦 #290） | [`release`](https://github.com/zyuuryuu/slidecraft/labels/release)（#110–#112 #120・#288–#290）・#119 |
 | **保守性（ADR-0031 運用）** | 凍結/許可リストの ratchet 縮小（分割は #129 型・継続運用） | — |
 
 ---
