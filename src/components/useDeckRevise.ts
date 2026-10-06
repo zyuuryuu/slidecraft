@@ -72,7 +72,7 @@ export function useDeckRevise({ mdText, setMdText, parseMdText, deck, catalog, t
     if (catalog) {
       // tpl feeds ONLY the serialize side (change-log md + this readout) — refineDeck's convergence
       // stays diagnoseDeck(deck, catalog), untouched (see refine.ts).
-      const { deck: tidied } = await refineDeck(distillDeck(parseMd(base), catalog), catalog, { level: 2, tpl: serializeTpl(catalog, templateData) });
+      const { deck: tidied } = await refineDeck(distillDeck(parseMd(base, catalog), catalog), catalog, { level: 2, tpl: serializeTpl(catalog, templateData) });
       result = deckMarkdown(tidied, catalog, templateData);
     }
     if (result.trim() && result.trim() !== mdText.trim()) {

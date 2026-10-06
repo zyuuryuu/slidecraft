@@ -95,7 +95,7 @@ export function useDeckController() {
     (text: string, mode: HistoryMode | "reset") => {
       if (editLockedRef.current) return; // observe-only: host = truth (covers every parseMdText caller)
       try {
-        const parsed = text.trim() ? parseMd(text) : null;
+        const parsed = text.trim() ? parseMd(text, catalog) : null;
         // Distill to fit the template: split overflowing content slides (no shrink).
         const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
         if (mode === "reset") resetDeck(fitted);
@@ -260,7 +260,7 @@ export function useDeckController() {
     if (!deck) return; // 確定 is disabled when the Markdown doesn't parse
     clearParse();
     try {
-      const parsed = mdText.trim() ? parseMd(mdText) : null;
+      const parsed = mdText.trim() ? parseMd(mdText, catalog) : null;
       const fitted = parsed && catalog ? distillDeck(parsed, catalog) : parsed;
       if (!fitted) return;
       setDeck(initSnapshot, "silent"); // present = pre-Initialize…
@@ -404,7 +404,7 @@ export function useDeckController() {
       const resolved = autoSelectLayout(slide, slideIndex, cur!.slides.length, catalog); // = export's layout (#435)
       const fixed = visualizeKeyValueMd(slideMarkdown({ ...slide, layout: resolved }, catalog, templateData));
       if (!fixed) return;
-      const newSlide = parseMd(fixed).slides[0];
+      const newSlide = parseMd(fixed, catalog).slides[0];
       if (newSlide) handleSlideUpdate(slideIndex, newSlide, "commit");
     },
     [catalog, templateData, handleSlideUpdate],
@@ -512,7 +512,7 @@ export function useDeckController() {
       // reviewer decided 採用/却下 informed. Adoption just COMMITS that same reconciled slide — no
       // post-hoc validation, no blocking: an adopted slide is valid and always renders.
       if (!old) {
-        const ns = parseMd(raw).slides[0];
+        const ns = parseMd(raw, catalog).slides[0];
         if (ns) handleSlideUpdate(activeSlide, ns, "commit");
         return;
       }
@@ -599,11 +599,11 @@ export function useDeckController() {
   const handleSlideMdChange = useCallback(
     (md: string) => {
       if (!deck) return;
-      const newSlide = parseMd(md).slides[0];
+      const newSlide = parseMd(md, catalog).slides[0];
       if (!newSlide) return;
       handleSlideUpdate(activeSlide, newSlide, "coalesce");
     },
-    [deck, activeSlide, handleSlideUpdate],
+    [deck, activeSlide, catalog, handleSlideUpdate],
   );
 
   // Get current slide's layout info for editor

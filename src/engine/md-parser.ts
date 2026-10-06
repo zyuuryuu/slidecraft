@@ -19,6 +19,7 @@
 
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { parseSlideBlock } from "./md-slide-parser";
+import type { LayoutRoleLookup } from "./slide-roles";
 import type { ParseNotice, SlideParseNotice } from "./parse-notice";
 
 // ── Extract YAML front matter ──
@@ -41,14 +42,16 @@ function extractFrontMatter(md: string): {
 
 // ── Main parser ──
 
-export function parseMd(md: string): DeckIR {
-  return parseMdReport(md).deck;
+/** `catalog`（任意, #453）: 渡すと実名 pin の title 名前空間判定に解決レイアウトの role を使う
+ *  （slide-roles.isTitleNamespace）。無しのパースは従来どおり byte-identical。 */
+export function parseMd(md: string, catalog?: LayoutRoleLookup): DeckIR {
+  return parseMdReport(md, catalog).deck;
 }
 
 /** As parseMd, but ALSO report the ParseNotice[] the parser raised along the way — fallbacks (like a
  *  dropped 2nd table, #148) that are only knowable AT parse time, since the raw dropped lines don't
  *  survive into SlideIR. Mirrors distillDeckReport's `{ deck, ... }` side-channel shape. */
-export function parseMdReport(rawMd: string): { deck: DeckIR; notices: SlideParseNotice[] } {
+export function parseMdReport(rawMd: string, catalog?: LayoutRoleLookup): { deck: DeckIR; notices: SlideParseNotice[] } {
   // Windows 由来の CRLF は行数を変えずに正規化する（sourceLine 計算は行数に依存するため影響なし）。
   // これにより front matter / layout directive の raw 行照合（`\n$` 前提の正規表現）が LF と同様に効く（#164）。
   const md = rawMd.replace(/\r\n/g, "\n");
@@ -105,7 +108,7 @@ export function parseMdReport(rawMd: string): { deck: DeckIR; notices: SlidePars
   const notices: SlideParseNotice[] = [];
   for (const block of slideBlocks) {
     const blockNotices: ParseNotice[] = [];
-    const slide = parseSlideBlock(block.lines, block.startLine, blockNotices);
+    const slide = parseSlideBlock(block.lines, block.startLine, blockNotices, catalog);
     if (slide) {
       const slideIndex = slides.length;
       slides.push(slide);
