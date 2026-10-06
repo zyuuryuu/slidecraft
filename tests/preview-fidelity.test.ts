@@ -103,11 +103,12 @@ describe("preview fidelity: layout background + decorations", () => {
 
   it("keeps ONLY real solid-filled panels on the canonical master (no text-box ghosts)", () => {
     // 29 real spPr-solidFill panels + 2 more (BG/AccentBar) on SectionNav.1TitleList.Single (#167),
+    // + 1 more (HeaderBar) on Content.1Body.Single+1Kicker (#447),
     // + the 68 solid-filled panels (HeaderBar / Card / BG / StepsPanel …, no text) of the 19 layouts
     // whose shapes carry `xmlns:nsN` declarations — they were silently dropped before #416. noFill
     // text boxes must still be dropped (were ghosted before).
     const total = canon.layouts.reduce((n, l) => n + l.decorations.length, 0);
-    expect(total).toBe(99);
+    expect(total).toBe(100);
     // the signature navy panel color is still present.
     expect(canon.layouts.some((l) => l.decorations.some((d) => d.color === "1E2761"))).toBe(true);
   });

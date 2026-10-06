@@ -314,4 +314,20 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
     { name: "Subtitle.Top", type: "body", idx: 16, x: 1.2, y: 2.35, w: 10.5, h: 0.5, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
     { name: "ChapterList.Bottom", type: "body", idx: 1, x: 1.2, y: 3.0, w: 10.5, h: 4.0, fontSize: 17, font: "minor", color: "subtle", bold: false, align: "l" },
   ]},
+  // 31: Content.1Body.Single+1Kicker — `Kicker:` 行（コンテンツスライドのタイトル上のカテゴリ行）の
+  // 受け枠を持つ変種（#447・+1Callout と同じ型＝基底 Content.1Body.Single は不変）。ヘッダ帯
+  // （0〜1.15in）の中でタイトル/サブタイトルを下げ、空いた最上段に Kicker.Top を置く。
+  // Kicker.Top は Callout.Top と同じく「2 本目の content body」として数えられる（fontSize は 13 —
+  // 12 以下だと isChromeBand（master-scorer.ts）に掛かり #127 の健全テンプレ不変条件を破る）。
+  // 行の無いスライドが誤って流れ込まないのは field-variant.ts の bodyOrdinal ガード＋自動選択の
+  // addon 数タイブレーク（基底が勝つ）によるもので、束縛は行があるときだけ名前
+  // （fieldSlotOf・field-rows.ts）で届く — 行なしデッキのスライド出力は不変。
+  // idx 40 は idx-META 慣習（10/11/12）とも canonical content idx（1-9）とも衝突しない自由枠。
+  { name: "Content.1Body.Single+1Kicker", family: "light", placeholders: [
+    { name: "Kicker.Top", type: "body", idx: 40, x: 0.8, y: 0.06, w: 10, h: 0.26, fontSize: 13, font: "minor", color: "accent", bold: true, align: "l" },
+    { name: "SlideTitle.Header", type: "body", idx: 15, x: 0.8, y: 0.36, w: 10, h: 0.5, fontSize: 28, font: "major", color: "titleText", bold: true, align: "l" },
+    { name: "SlideSubtitle.Header", type: "body", idx: 16, x: 0.8, y: 0.88, w: 10, h: 0.25, fontSize: 12, font: "minor", color: "subtle", bold: false, align: "l" },
+    { name: "Body.Center", type: "body", idx: 1, x: 0.8, y: 1.45, w: 11.7, h: 5.4, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
+    { name: "SlideNum.Footer", type: "sldNum", idx: 50, x: 12.0, y: 7.05, w: 1.2, h: 0.3, fontSize: 10, font: "minor", color: "muted", bold: false, align: "r" },
+  ]},
 ];
