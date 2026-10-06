@@ -81,7 +81,7 @@
     "typescript-eslint": "^8.71.0",
     "vite": "^8.3.2",
     "vitepress": "^2.0.0-alpha.18",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3"
   },
   "overrides": {
     "image-size": "^2.0.4"
