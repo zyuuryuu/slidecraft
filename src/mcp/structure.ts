@@ -37,7 +37,7 @@ export function insertSlide(s: Session, index: number, markdown: string, positio
   assertIdx(deck.slides.length, index);
   // insert takes EXACTLY one slide — reject empty AND multi-slide never-silently (parseMd splits on '---',
   // so multi-slide markdown would otherwise drop slides 2..N silently — the very loss these ops exist to avoid).
-  const parsed = parseMd(markdown);
+  const parsed = parseMd(markdown, s.catalog ?? undefined);
   if (parsed.slides.length !== 1) {
     return {
       ok: false as const,

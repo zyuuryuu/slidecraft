@@ -41,6 +41,7 @@ export type ReviewRuleId =
   | "image-markdown-leftover"
   | "unrecognized-meta-key"
   | "body-overflow"
+  | "title-overflow"
   | "long-bullet"
   | "key-value-table"
   | "unbound-content"
@@ -67,6 +68,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "image-markdown-leftover", level: "info" },
   { id: "unrecognized-meta-key", level: "warn" },
   { id: "body-overflow", level: "warn" },
+  { id: "title-overflow", level: "warn" },
   { id: "long-bullet", level: "info" },
   { id: "key-value-table", level: "info" },
   { id: "unbound-content", level: "warn" },
@@ -216,6 +218,7 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
   // vanish. On a healthy deck all content binds → unbound is empty → not one diagnostic is added.
   if (layouts && layouts.length > 0 && catalog && catalog.length > 0) {
     const layoutByName = new Map(layouts.map((l) => [l.name, l] as const));
+    const catalogEntryByName = new Map(catalog.map((e) => [e.name, e] as const)); // #437: the fit estimates live on the catalog entry
     deck.slides.forEach((slide, i) => {
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
@@ -276,6 +279,29 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
             level: RULE_LEVEL["section-footer-injected"],
             message: `章名フッタ「${sectionFooterText}」がこの枠（${ph.name}）に自動注入されます（明示 Footer: 未指定）`,
             levers: [],
+          });
+        }
+      }
+
+      // #437 案a never-silent: a title longer than the resolved layout's title box clips at the right
+      // edge in the preview (R7: no autofit pre-computation on titles; PPTX behavior depends on the
+      // template's autofit). Diagnostic ONLY — rendering is untouched. Reads the SAME fit estimate the
+      // body budget rides (placeholderFitBox via the catalog entry + paragraphLines; R8, no second
+      // capacity computation). Title bands are often shorter than one body-tuned line-height, so the
+      // estimate's maxLines floor reads 0 — a title still renders (at least) one line, hence the clamp.
+      const titleFit = catalogEntryByName.get(layout.name)?.placeholders.find((p) => p.role === "title");
+      const titlePara = rolePlaceholder(slide, "title")?.paragraphs[0];
+      if (titleFit && titleFit.charsPerLine > 0 && titlePara && textOf(titlePara).trim()) {
+        const maxLines = Math.max(1, titleFit.maxLines);
+        const lines = paragraphLines(titlePara, titleFit.charsPerLine);
+        if (lines > maxLines) {
+          issues.push({
+            slideIndex: i,
+            title: slideTitle(slide),
+            id: "title-overflow",
+            level: RULE_LEVEL["title-overflow"],
+            message: `タイトルがこのレイアウト（${layout.name}）のタイトル枠に収まりません（目安 全角${titleFit.charsPerLine}字×${maxLines}行、推定 ${lines}行）。プレビューでは右端で切れます。タイトルを短くしてください`,
+            levers: ["condense"],
           });
         }
       }

@@ -17,6 +17,10 @@
 // process.exit() fired from inside the async download path (while fetch's handle is still closing)
 // aborts the Node process on Windows ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)").
 // Setting exitCode and unwinding lets Node drain and exit cleanly on every OS.
+//
+// `parseCaskVersion` / `parseCaskShas` / `caskMatchesSums` are exported so `verify-cask.mjs` (the CI
+// check that catches the "version bumped, sha256 not" window — Issue #287) reads the cask's version
+// and sha256 lines the same way this script writes them (R8: one implementation, not two).
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
@@ -24,7 +28,50 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const caskPath = join(here, "..", "packaging", "homebrew", "Casks", "slidecraft.rb");
-const REPO = "zyuuryuu/slidecraft";
+export const REPO = "zyuuryuu/slidecraft";
+
+// File order in the cask is arm64 first, intel second (if present) — the on_arm/on_intel convention
+// this script's rewrite below relies on too.
+const CASK_SHA_RE = /sha256 "([0-9a-f]{64})"/g;
+
+/** The cask's `version "…"` field, or null — read with the SAME shape the rewrite below writes. */
+export function parseCaskVersion(caskText) {
+  const m = caskText.match(/version "([^"]*)"/);
+  return m ? m[1] : null;
+}
+
+/** Extract the sha256 hex strings from a cask file's text, in file order. */
+export function parseCaskShas(caskText) {
+  return [...caskText.matchAll(CASK_SHA_RE)].map((m) => m[1]);
+}
+
+/** The release asset filename SHA256SUMS uses for a given version + arch (same shape as the dmg URL below). */
+function dmgName(version, arch) {
+  return `SlideCraft_${version}_${arch}.dmg`;
+}
+
+/** Parse `sha256sum`-style output ("<hex>  <filename>" per line, "*" binary marker optional). */
+function parseSums(sumsText) {
+  const map = new Map();
+  for (const line of sumsText.split("\n")) {
+    const m = line.match(/^([0-9a-f]{64})\s+\*?(.+?)\s*$/);
+    if (m) map.set(m[2], m[1]);
+  }
+  return map;
+}
+
+/**
+ * True iff every sha256 the cask currently carries for `version` matches the corresponding
+ * SlideCraft dmg entry in `sumsText` (a SHA256SUMS file's contents). Pure — no I/O — so
+ * verify-cask.mjs and the unit tests share one "does the cask match?" implementation.
+ */
+export function caskMatchesSums(caskText, sumsText, version) {
+  const shas = parseCaskShas(caskText);
+  if (shas.length < 1 || shas.length > 2) return false;
+  const sums = parseSums(sumsText);
+  const archOrder = shas.length === 2 ? ["aarch64", "x64"] : ["aarch64"];
+  return archOrder.every((arch, i) => sums.get(dmgName(version, arch)) === shas[i]);
+}
 
 // Returns the .dmg's sha256 hex, or null on failure (missing local file / non-200 download). The
 // caller aborts on null — errors are reported here, not thrown, so no exit races an open handle.
@@ -87,7 +134,7 @@ async function main() {
 
   // The cask may be arm64-only (1 sha256) or arm+intel (2, order: on_arm then on_intel). Match the
   // current template so we don't download an Intel .dmg that isn't built.
-  const shaCount = (cask.match(/sha256 "[0-9a-f]{64}"/g) ?? []).length;
+  const shaCount = parseCaskShas(cask).length;
   if (shaCount < 1 || shaCount > 2) {
     console.error(`update-cask: expected 1 (arm64-only) or 2 (arm+intel) sha256 lines, found ${shaCount}. Check the template.`);
     process.exitCode = 1;
