@@ -1,7 +1,7 @@
 # MCP 再設計 — ユーザ価値起点のサーフェス整列（DISCUSS）
 
-- Status: 💬 DISCUSS（議論のスナップショット・決定は ADR 化してから）
-- Date: 2026-09-28
+- Status: 💬 DISCUSS（議論のスナップショット。決定部分は [ADR-0037](../adr/0037-mcp-surface-realignment.md) に永続化済み・2026-10-06）
+- Date: 2026-09-28（§7 の監査は 2026-10-06 追記・#466）
 - 参加: ユーザ・レビュー統括セッション
 
 ## 1. ユーザ価値（北極星）
@@ -32,7 +32,8 @@
 - ツール面は **18（ADR-0008・6月）→ 38（現在）** に 3 ヶ月で倍増。各追加は局所的に正当
   （ADR-0015 の構造操作・ADR-0034/35/36）だが、**用途レベルの設計単位が無いまま堆積**した。
   ADR-0033 は管制（control plane）を 1 つにしたが、**サーフェスの用途別再区分は未実施**。
-- 説明文だけで約 3.8k 字（≈3–4k トークン）＋スキーマ＝**毎セッション 5–6k トークンの固定費**。
+- 説明文だけで約 3.8k 字（≈3–4k トークン）＋スキーマ＝**毎セッション 5–6k トークンの固定費**
+  （2026-10-06 の実測では**過少**だった — 実際は約 6.9k–8.1k。§7 参照）。
   U1 では 1 指示あたりの往復・トークンが**人が画面の前で待つ体感レイテンシそのもの**なので、
   これは品質問題である。
 - 「何が悪いか」を尋ねる口が 3 系統（`get_deck_issues`／`validate_deck`／`get_slide_fix_request`）、
@@ -45,6 +46,7 @@
 ## 4. 再編原理 — CRUD 分類ではなく「ループの温度」
 
 U1 のループ：指示 →（AI: 契約参照→編集→自己診断）→ 人が見る → 次の指示。
+（下表は 2026-09-28 のスケッチ。38 本全部の較正済み分類と実測トークンは **§7** が上書きする）
 
 | 温度 | 段階 | 現状 | 方針 |
 | --- | --- | --- | --- |
@@ -73,8 +75,121 @@ U1 のループ：指示 →（AI: 契約参照→編集→自己診断）→ �
 3. bootstrap 統合とプロファイル別登録の設計 → Issue 分割（S/M 単位）
 4. 段階実装：追加→alias→（証拠が揃ってから）縮退。**削除は最後・証拠つき**
 
+## 7. 敵対的監査（2026-10-06・#466）— 分類の較正とトークン固定費の実測
+
+ADR-0037 D4「削除は最後・証拠つき」の証拠集め第 1 弾。38 ツール全部を「このツールが無いと本当に
+困るか」を問う側に立って監査した。§3–§4 のスナップショットとの乖離はこの節が上書きする
+（ADR-0037 本文は immutable のためこちらに記録）。
+
+### 7.1 測り方（再現手順つき）
+
+- **測定対象**: solo stdio サーフェスの `tools/list` 応答そのもの。`buildServer(createSession(null))` を
+  MCP SDK の `InMemoryTransport` で Client に繋ぎ `tools/list` を呼び、ツールごとに
+  `{name, description, inputSchema}` を**改行なし JSON**（compact）に直列化した文字列を計測した。
+  solo は `register_templates` を含む **38 本**（collab の AI クライアントは sharedOnly のため
+  これが隠れて 37 本）。
+- **トークンの概算法**: Claude のトークナイザは非公開で、この計測環境では `count_tokens` API も
+  使えないため、公開トークナイザ **o200k_base**（OpenAI 系。npm `gpt-tokenizer`）での符号化長を
+  表の値とした。Anthropic の公式ガイダンスでは tiktoken/o200k 系は Claude 比 **15–20% 過少**
+  （非英語はそれ以上）なので、Claude 換算は **×1.15–1.35** のレンジで併記する。
+- **測っていないもの**: クライアント側のツール提示フレーミング（1 ツールあたり数トークンの
+  ラッパ）と resources（`deck://…`）側の列挙コスト。どちらも上乗せ方向なので、本表は**下限寄り**。
+
+### 7.2 固定費の実測 — 「約 5–6k」は過少
+
+| 範囲 | o200k 実測 | Claude 換算（×1.15–1.35） |
+| --- | --- | --- |
+| 38 ツール合計（description＋inputSchema＋name） | **5,972** | **約 6.9k–8.1k** |
+| うち説明文のみ | 1,955（3,983 字） | 約 2.2k–2.6k |
+
+- §3 の「説明文だけで約 3.8k 字」は**正確**（実測 3,983 字）。「毎セッション 5–6k トークン」は
+  **過少**で、スキーマ込みの実態は約 6.9k–8.1k。診断としての方向（固定費が品質問題）はむしろ強まる。
+- 温度別の内訳: **ホット 16 本で 3,503（59%）**・コールド 13 本で 1,478（25%）・出口 3 本で 482・
+  人間側 6 本で 509。**コールド bootstrap 統合（v0.5.0 スコープ）だけでは固定費は最大 25% しか
+  下がらない** — 統合の主眼は往復削減であって固定費削減ではない、と期待値を較正しておく。
+  固定費を削るならホット側の説明文圧縮（特に下表上位 2 本: `set_slide_diagram` 408 ＋
+  `apply_design_intent` 336 ＝全体の 12%。インラインの JSON 例が主因）が効く。
+
+### 7.3 較正済み温度分類と md-DSL 重複判定（38 本全行）
+
+「md-DSL 重複」＝その操作が `set_slide_markdown` 経由の Markdown 語彙（D3 の安い拡張面）でも
+表現できるか。read/契約/出口/人間側は著作面ではないので対象外（n/a）。
+
+**コールド（セッション 1 回・調達/契約/入口）— 13 本・1,478 tok**
+
+| ツール | tok | md-DSL 重複 | 備考 |
+| --- | --- | --- | --- |
+| new_project | 204 | n/a | 入口。§4 の表では未分類だった（乖離①） |
+| create_template | 168 | n/a | 入口（U3）。同上 |
+| use_template | 154 | n/a | 入口。同上 |
+| open_project | 141 | n/a | 入口。同上 |
+| list_templates | 134 | n/a | §4 どおりコールド |
+| get_authoring_guide | 134 | n/a | ガイド 4。bootstrap 統合対象（D2） |
+| get_diagram_guide | 95 | n/a | 同上（図タイプ毎に 1 回） |
+| get_template_capabilities | 95 | n/a | §4 どおりコールド |
+| get_deck_markdown | 85 | n/a | 全 deck read ＝セッション初回の全体把握（乖離②） |
+| get_project_info | 80 | n/a | 低頻度 read。削除候補（7.4） |
+| get_deck | 79 | n/a | 全 deck read。同乖離② |
+| get_diagram_types | 64 | n/a | ガイド 4 |
+| get_template_spec_guide | 45 | n/a | ガイド 4 |
+
+**ホット（毎指示・著作/レバー/診断/per-slide read）— 16 本・3,503 tok（固定費の 59%）**
+
+| ツール | tok | md-DSL 重複 | 備考 |
+| --- | --- | --- | --- |
+| set_slide_diagram | 408 | **高** — ```diagram/```mermaid フェンスで新規も置換も可（applySlideMarkdown はフェンスがあれば置換・無ければ保持） | 固有価値＝json/mermaid 入力の検証・native YAML 化・placeholderIdx 指定。説明文圧縮の筆頭 |
+| apply_design_intent | 336 | 部分 — relayout は DiagramSpec.direction の yaml 編集で可。emphasize/regionSplit は座標計算がエンジン側で md 不可 | 説明文圧縮の次点 |
+| insert_slide | 263 | 不可 — set_deck_markdown 全置換でも書けるが他スライドの図が落ちる（surgical 性が本体価値） | |
+| move_slide | 260 | 不可（同上） | |
+| set_slide_markdown | 258 | —（md-DSL の入口そのもの） | |
+| duplicate_slide | 248 | 不可（同上・byte-identical 複製が価値） | |
+| delete_slide | 209 | 不可（同上） | |
+| convert_bullets_to_table | 203 | **完全** — GFM 表は md-DSL 語彙。AI が自分で書き換えれば足りる | 固有価値＝決定論・往復ゼロ。削除候補（7.4） |
+| set_deck_markdown | 202 | —（md-DSL の全 deck 版） | ⚠ D5-3（増分性）に反する「丸ごと再生成」の口。温度はホットだが呼出文脈を監視対象に（乖離③） |
+| get_slide | 195 | n/a | §4 どおりホット read の本線 |
+| get_slide_image | 201 | n/a | プロファイル依存: U2 では毎指示の視覚確認＝ホット、U1 では GUI が read 面（乖離④） |
+| get_slide_html | 178 | n/a | 同上（ブラウザ無し環境向けの R8 兄弟） |
+| split_overflowing_slides | 173 | 不可 — 溢れ判定（容量実測）がエンジン側。md では表現不能 | |
+| get_slide_fix_request | 132 | n/a | 診断 3 系統の重複。get_slide が issues＋predictedSplit＋markdown を内包済み。削除候補筆頭（7.4） |
+| get_slide_markdown | 128 | n/a | get_slide の部分集合。削除候補（7.4） |
+| get_deck_issues | 109 | n/a | §4 どおり診断の本線 |
+
+**出口（稀）— 3 本・482 tok**: export_pptx 207・save_project 167・validate_deck 108。§4 どおり健全・現状維持。
+
+**人間側 — 6 本・509 tok**: register_templates 144（既に gui-role 限定登録）・undo 87・select_document 75・
+redo 74・close_document 72・list_documents 57。§4 どおり削除しない・プロファイル別登録で solo から隠す。
+
+#### §4 スナップショットからの乖離（較正点）
+
+1. **入口 4 本（open/new/use_template/create_template）が温度表に未分類だった** → コールドに編入。
+2. **全 deck read（get_deck/get_deck_markdown）はホットでなくコールド** — 毎指示の全 deck 再読は
+   D5-3（増分性）に反する使い方で、想定頻度はセッション初回の全体把握。
+3. **set_deck_markdown** はホット登録のまま維持するが、「deck 丸ごと再生成に落ちる操作」の入口
+   なので指標計測（D5-3）の監視対象と明記。
+4. **get_slide_image / get_slide_html の温度はプロファイル依存**（U2 ホット・U1 では GUI が read 面）。
+   プロファイル別登録の設計時に solo/collab で扱いを分ける判断材料になる。
+
+### 7.4 削除候補と証拠要件（D4: 証拠が揃うまで削除しない）
+
+前提: どの候補も読み取り系は [ADR-0008](../adr/0008-mcp-tool-surface-audit.md) の互換性フロア
+（読み取りツール削除禁止）に触れるため、削除には証拠＋フロア supersede の個別 ADR が要る。
+呼び出し頻度ログの収集基盤は #406 の子タスク「指標の計測手段」へ送る（本監査のスコープ外）。
+
+| 候補 | 重複先 | 削除を正当化する証拠（1 行定義） |
+| --- | --- | --- |
+| get_slide_fix_request | get_slide（issues＋predictedSplit＋markdown を内包） | 実セッション 20 本以上で呼出率が get_slide の 5% 未満、かつ fix packet 経由の編集が get_slide 経由より成功率で優位でないログ |
+| convert_bullets_to_table | md-DSL（GFM 表を set_slide_markdown で自書き） | 呼出頻度ログ＋「AI 自書きの表化」との一致比較（R8 の agreement 形式）で品質同等を確認 |
+| get_slide_markdown | get_slide の markdown フィールド | get_slide 導入（ADR-0015）以降の実セッションで呼出が get_slide に吸収されている（併用率 10% 未満）こと |
+| get_project_info | （単独・低情報量） | 実セッション 20 本以上で呼出ほぼゼロ（1 セッション平均 0.1 回未満）の確認 |
+| ガイド 4（authoring/diagram_types/diagram_guide/template_spec） | bootstrap 統合（D2・削除ではない） | 統合後に旧名 alias の呼出率が 1% 未満に落ちてから alias 縮退を判断（統合自体は証拠不要＝D2 合意済み） |
+
+逆に、**削除候補に挙げない**と明記するもの: 構造 4 本（insert/delete/move/duplicate — surgical 性は
+md-DSL で代替不能）・set_slide_diagram と apply_design_intent（重複はあるが検証・座標計算という
+エンジン価値が残る。まず説明文圧縮で固定費だけ削る）・出口 3 本・人間側 6 本（D2 で削除しないと決定済み）。
+
 ## References
 
 - ADR-0008（ツール面監査・互換性フロア）・ADR-0009（協働ホスト）・ADR-0015（brushup）・
   ADR-0033（単一管制）・ADR-0035/0036（scoped fs・テンプレ discovery）
-- 関連 Issue: #220（編集経路の engine 一本化）・#392（ビジュアル並置・SlideIR）・#396–#404（md-DSL 語彙輸入）
+- 関連 Issue: #220（編集経路の engine 一本化）・#392（ビジュアル並置・SlideIR）・#396–#404（md-DSL 語彙輸入）・
+  #406（再設計の親タスク）・#466（§7 の敵対的監査）
