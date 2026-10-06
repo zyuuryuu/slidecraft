@@ -136,7 +136,7 @@ Kicker: SECTION 02 · コスト分析
 
 Things to know:
 
-- **The bundled templates do not have a Kicker box for content slides yet** (checked on every template, Midnight included). Without the box the row is not exported, as above, and `get_deck_issues` warns that the layout has no box for the `Kicker:` row. The AI guide (`get_authoring_guide`) mentions `Kicker:` only for templates that have the box.
+- **Midnight Executive (the default template) has a content layout with a Kicker box, `Content.1Body.Single+1Kicker`**: writing a `Kicker:` row picks that layout automatically and draws the row above the title. The other bundled templates (技術報告 / ビジュアルデッキ / 配布資料) do not have the box yet — there the row is not exported, as above, and `get_deck_issues` warns that the layout has no box for the `Kicker:` row. The AI guide (`get_authoring_guide`) mentions `Kicker:` only for templates that have the box.
 - **The category line of a title slide is still `Category:`.** Writing `Kicker:` does not turn a slide into a title slide, and `Category:` keeps its meaning.
 - **To show which chapter a slide belongs to, use a chapter cover's `<!-- section -->` (below)**: on templates with a footer box, each slide from a chapter cover onward gets its chapter's name in the footer automatically. Use `Kicker:` for a label other than the chapter name.
 
