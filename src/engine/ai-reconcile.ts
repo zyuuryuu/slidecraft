@@ -14,7 +14,7 @@
  */
 
 import type { SlideIR, PlaceholderContent } from "./slide-schema";
-import { titleSubtitleIdx, META_IDXS } from "./slide-roles";
+import { titleSubtitleIdx, META_IDXS, type LayoutRoleLookup } from "./slide-roles";
 
 /** True when a placeholder carries any non-whitespace text. */
 export function hasText(ph: PlaceholderContent | undefined): boolean {
@@ -45,7 +45,7 @@ function hasAnyContent(s: SlideIR): boolean {
  * edit KEPT (non-empty) is never overwritten; only a dropped/empty one is restored. Body content is
  * always the edit's to change. A fully-empty edit is treated as a failed edit → old is kept wholesale.
  */
-export function reconcileEdit(old: SlideIR, edited: SlideIR): SlideIR {
+export function reconcileEdit(old: SlideIR, edited: SlideIR, catalog?: LayoutRoleLookup): SlideIR {
   // Meltdown guard: an edit with no content at all is a failed edit, not an intentional clear.
   if (!hasAnyContent(edited)) return old;
 
@@ -59,7 +59,9 @@ export function reconcileEdit(old: SlideIR, edited: SlideIR): SlideIR {
   //    presence (the authoritative prior structure), not the layout name alone. Merge through a Map
   //    keyed by idx → never a duplicate idx (injective, ADR-0011).
   const oldHasMeta = META_IDXS.some((idx) => hasText(old.placeholders.find((p) => p.idx === idx)));
-  const { title, subtitle } = titleSubtitleIdx(layout, oldHasMeta);
+  // `catalog` mirrors the parser's #453 rule: a REAL-name title/closing pin (公文書系 "00_表紙")
+  // restores into idx 0/1, the same idx a catalog-aware parse wrote it to.
+  const { title, subtitle } = titleSubtitleIdx(layout, oldHasMeta, catalog);
 
   // A FLATTENING edit — old was a multi-column group but the edit collapsed it to fewer columns with
   // NO per-column heading and no group hint — is the user turning cards into a plain list. Respect it:

@@ -111,7 +111,7 @@ export async function newProject(s: Session, templateBytes: Uint8Array, markdown
   const template = await loadTemplate(templateBytes);
   const catalog = buildCatalog(template);
   assertTemplateUsable(catalog); // reject a structurally-unusable master, never-silent
-  const { deck: parsed, notices } = parseMdReport(markdown?.trim() ? markdown : "# Untitled");
+  const { deck: parsed, notices } = parseMdReport(markdown?.trim() ? markdown : "# Untitled", catalog);
   const { deck, offsets } = distillDeckReport(parsed, catalog);
   s.template = template;
   s.catalog = catalog;
@@ -216,7 +216,7 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown);
+  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown, catalog);
   const parsedSlide = parsedDeck.slides[0];
   if (!parsedSlide) return { ok: false as const, error: "Markdown からスライドを解釈できませんでした（空？）。" };
   const old = deck.slides[i];
@@ -245,7 +245,7 @@ export function applyDeckMarkdown(s: Session, markdown: string) {
   const { deck, catalog, template } = requireLoaded(s);
   const tpl = { catalog, layouts: template.layouts };
   const before = serializeMd(deck, tpl);
-  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown);
+  const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown, catalog);
   const check = DeckIRSchema.safeParse(parsedDeck);
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   const changed = serializeMd(check.data, tpl) !== before;
@@ -283,7 +283,7 @@ export function visualizeKeyValue(s: Session, i: number) {
   const notApplicable = () => ({ ok: true as const, changed: false as const, status: "not-applicable" as const, beforeMd: before, ...fitTail(s, deck, catalog, template.layouts) });
   const fixed = visualizeKeyValueMd(before);
   if (!fixed) return notApplicable();
-  const { deck: fixedDeck, notices: fixedNotices } = parseMdReport(fixed);
+  const { deck: fixedDeck, notices: fixedNotices } = parseMdReport(fixed, catalog);
   const newSlide = fixedDeck.slides[0];
   if (!newSlide) return notApplicable();
   const slides = [...deck.slides];
