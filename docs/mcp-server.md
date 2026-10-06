@@ -94,6 +94,7 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 |---|---|---|
 | 入口 | `open_project(dataBase64?, path?)` | `.scft` を読み込み。既定は base64。`--root` scope 起動時は `path`（scope 配下のファイル名）でも渡せる（両方指定はエラー・下記「scoped fs 入出力」）。`{slideCount, diagnostics, contract}` |
 | 入口 | `new_project(templateBase64?, templatePath?, markdown?)` | `.pptx` テンプレ＋（任意）Markdown から新規（GUI の Draft と同じ parseMd→distill）。既定は base64。`--root` scope 起動時は `templatePath` でも渡せる（両方指定はエラー）。`{slideCount, diagnostics, contract}` |
+| コールド一括 | `bootstrap(docId?)` | **セッション開始時に1回**：コールド系（調達・契約）を1レスポンスで返す＝`authoringGuide`・`diagramTypes`・`templateSpecGuide`・`templateCapabilities`・`templates` の各節（内容は同名の旧 `get_*`/`list_*` ツールと deep-equal 同一・R8）。図タイプ別構文のみ `get_diagram_guide(type)` で個別取得（12種同梱は実測約22,400字のため見送り・#464）。doc 未オープン時は doc 依存節（`authoringGuide`/`templateCapabilities`）が `{ok:false, code}` で埋まり他節は返る。旧6ツールは alias として存続（ADR-0037 D2/D4・ADR-0008 フロア） |
 | 調達 | `create_template(spec?)` | `spec` は `TemplateSpec` の **JSON 文字列**（オブジェクト不可・例 `spec: '{}'`。name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し `{templateBase64, health, notices}`。欠落は MIDNIGHT preset 補完＋コントラスト自動修正。返り値を `new_project` に渡す |
 | 調達 | `get_template_spec_guide()` | `create_template` 用 spec の書式ガイド＋MIDNIGHT preset 値 |
 | 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`、既定 `midnight`）を返す（#298）。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#332）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
@@ -199,6 +200,8 @@ deck の状態は **MCP resource** としても公開する。tool を連打せ�
    `new_project({templatePath})` で scope 配下のファイルを直接開ける（下記「scoped fs 入出力」）。
 1. 開いた戻りの `contract`（レイアウト名・区切り・budget・ポインタ）を読み、`get_authoring_guide` で全書式を、
    図を入れるなら `get_diagram_types` → `get_diagram_guide(type)` で構文を得る。
+   **往復を減らすなら `bootstrap()` 1回**で 0〜1 のコールド読み（書式・図メニュー・spec ガイド・能力・テンプレ一覧）を
+   まとめて受け取れる（各節は旧ツールと同一内容・ADR-0037 D2）。
 2. 著作/編集：`set_slide_markdown(i, md)` で1枚ずつ（budget 内に収める）、構造は `insert_/delete_/move_/duplicate_slide`、
    図は `set_slide_diagram`（text スライドにも追加可）。1枚の状態は `get_slide(i)` で構造化して把握。
 3. mutation の戻りの `hints`（次の一手）に従う：溢れ→`split_overflowing_slides`、key-value→`convert_bullets_to_table(i)`、
