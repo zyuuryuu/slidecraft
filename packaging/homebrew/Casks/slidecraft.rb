@@ -14,7 +14,7 @@
 # (`scripts/update-cask.mjs` automates this against a GitHub release — see packaging/homebrew/README.md.)
 cask "slidecraft" do
   version "0.5.0"
-  sha256 "19bfa2821519fceac233352b60f420e9aa5141d2dad54cd4ade6c2f173f2cdc0"
+  sha256 "a5a2d4ffee85b67975c3a93dce537e202203d19d9d1a6d8be5db11715aef3113"
 
   url "https://github.com/zyuuryuu/slidecraft/releases/download/v#{version}/SlideCraft_#{version}_aarch64.dmg"
   name "SlideCraft"
