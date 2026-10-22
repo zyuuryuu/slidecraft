@@ -140,14 +140,22 @@ jobs:
       # Provenance attestation for the installers this job just built (#257) — ties each artifact
       # back to this workflow run/commit via the GitHub attestations API (`gh attestation verify`).
       # Split per-OS because subject-path globs that match zero files make the action fail.
+      #
+      # continue-on-error: attestation is a SUPPLEMENTARY integrity signal (the primary artifacts are
+      # the installers + SHA256SUMS + SBOM). A transient attestations-API outage once failed the whole
+      # macOS release job, which cascaded to SKIP the needs:release SHA256SUMS/SBOM job (v0.5.0 first
+      # cut). Making attestation non-fatal keeps a flake from dropping the essential integrity files;
+      # a genuine attestation failure still shows as a yellow step in the run (not silently swallowed).
       - name: Attest build provenance (macOS)
         if: startsWith(matrix.platform, 'macos')
+        continue-on-error: true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: src-tauri/target/**/release/bundle/dmg/*.dmg
 
       - name: Attest build provenance (Linux)
         if: matrix.platform == 'ubuntu-latest'
+        continue-on-error: true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
@@ -157,6 +165,7 @@ jobs:
 
       - name: Attest build provenance (Windows)
         if: matrix.platform == 'windows-latest'
+        continue-on-error: true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
