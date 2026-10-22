@@ -16,7 +16,7 @@
 // releaseBody (Issue #316). Setting exitCode + returning lets Node drain stdio and exit naturally.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HEADING_RE = /^## \[([^\]]+)\][^\n]*$/gm;
 const REPO_BLOB_BASE = "https://github.com/zyuuryuu/slidecraft/blob/main/";
@@ -98,6 +98,10 @@ async function main() {
   console.log(absolutizeRepoLinks(body));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run main() only when invoked as the CLI (not when imported by tests). Use pathToFileURL so this
+// works on Windows too: there `import.meta.url` is `file:///C:/...` but `file://${process.argv[1]}`
+// would be `file://C:\...` — they never match, so main() silently never ran and release.yml got an
+// empty releaseBody on the windows-latest leg (#316 misdiagnosed this as an stdio-flush race).
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }

@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { extractChangelogSection, absolutizeRepoLinks } from "../scripts/extract-changelog-section.mjs";
 
@@ -99,6 +100,22 @@ describe("extract-changelog-section CLI (never-silent contract — #316)", () =>
     const r = spawnSync("node", [SCRIPT], { encoding: "utf8" });
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("usage:");
+  });
+
+  // The CLI's main() runs only under the `import.meta.url === pathToFileURL(argv[1]).href` entry
+  // guard. The earlier `file://${argv[1]}` idiom was FALSE on windows-latest (file:///C:/… vs
+  // file://C:\…), so main() never ran → empty releaseBody → the v0.5.0 Windows release leg hard-
+  // failed. This locks the success-path CLI contract: a present section is emitted on stdout at
+  // exit 0. (CI is Linux-only, where the old idiom happened to match — so this is an intent lock,
+  // not a Windows reproduction; the cross-OS safety net is pathToFileURL + release.yml's empty-body
+  // guard.) Reads the real CHANGELOG.md and picks its newest version so it survives version bumps.
+  it("emits a present section's body on stdout at exit 0 (main-module entry guard runs)", () => {
+    const changelog = readFileSync(fileURLToPath(new URL("../CHANGELOG.md", import.meta.url)), "utf8");
+    const newest = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m);
+    expect(newest, "CHANGELOG.md must have at least one released ## [x.y.z] heading").not.toBeNull();
+    const r = spawnSync("node", [SCRIPT, newest![1]], { encoding: "utf8" });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim().length).toBeGreaterThan(0);
   });
 });
 
