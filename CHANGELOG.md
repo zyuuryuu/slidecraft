@@ -41,6 +41,7 @@
 
 - **npm 間接依存 6 件の脆弱性を解消**（dompurify XSS・ip-address SSRF・brace-expansion DoS・proxy-addr critical IP spoofing・source-map-js DoS・vue XSS）＋ **rustls 0.23.45**（PR #467/#468）。残は katex（low 2 件・mermaid 12 major 連動のため据え置き #431）
 - **Tauri を cargo↔npm 同 minor（2.12 系）へ整列して更新**（PR #467）
+- **vite `8.3.5`・hono `4.13.13` へ更新**（PR #494・リリース準備後に公開された advisory を解消）— vite high は dev サーバの cross-origin script 実行・`server.fs.allow` 外ファイル露出等（GHSA-9jrq-w75r-8gcw ほか）で**出荷される app バンドルには vite 自体が含まれない**が、`npm audit --omit=dev --audit-level=high` の CI ゲートを緑に戻すため bump。hono moderate は `serveStatic` のパス二重デコードによる middleware バイパス（GHSA-5r4p-p66f-jhc7）。残は katex（low 2 件・mermaid 12 major 連動のため据え置き #431）
 
 ### Changed
 
