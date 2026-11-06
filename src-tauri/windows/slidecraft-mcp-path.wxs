@@ -5,7 +5,9 @@
 
   WHY: put the install dir (where slidecraft-mcp.cmd, node.exe and cli.cjs live, flat under INSTALLDIR)
   on the USER PATH, so an upstream agent registers the bundled MCP server with ONE word, like the macOS
-  Homebrew cask (#519 / ADR-0022 / ADR-0038 D5):  claude mcp add slidecraft -- slidecraft-mcp
+  Homebrew cask (#519 / ADR-0022 / ADR-0038 D5). The exact `claude mcp add` command is in
+  docs/mcp-server.md: it contains a double hyphen, which an XML comment must not hold (XML 1.0 §2.5;
+  WiX candle.exe rejects the whole file with CNDL0104, #536), so it is not repeated here.
 
   How it meets the #519 invariants — all declarative, executed by Windows Installer itself:
     * USER scope: Environment/@System="no" edits the installing user's HKCU\Environment\Path, never the
