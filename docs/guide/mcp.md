@@ -52,7 +52,9 @@ brew install --cask zyuuryuu/slidecraft/slidecraft   # 済みなら不要
 claude mcp add slidecraft -- slidecraft-mcp           # Claude Code の場合
 ```
 
-Claude Desktop / Cursor など mcp.json で登録する場合は `{"command": "slidecraft-mcp"}` を書きます。ランチャを使わず、同梱 node ＋ cli.cjs を直接指す方法は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) の「使い方は 2 通り」を参照してください。
+**Windows（`.exe` / `.msi`）・Linux（`.deb` / `.rpm`）** — **v0.5.1 以降**のインストーラも `slidecraft-mcp` を PATH に置くので（ユーザ単位・アンインストールで除去）、同じ 1 行で登録できます。Windows はインストール後に**新しく開いた**ターミナルから有効です。AppImage は `--appimage-extract` で展開した `squashfs-root/usr/bin/slidecraft-mcp` の絶対パスを登録します。
+
+Claude Desktop / Cursor など mcp.json で登録する場合は `{"command": "slidecraft-mcp"}` を書きます。ランチャを使わず、同梱 node ＋ cli.cjs を直接指す方法や OS 別の詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) の「使い方は 2 通り」を参照してください。
 
 ### B. ソースから起動（開発版）
 
@@ -120,8 +122,13 @@ Copilot だけ**設定スキーマが違います**。キーは `mcpServers` で
 
 ユーザ全体に入れる場合は VS Code の `settings.json` の `"mcp": { "servers": { ... } }` 配下でも同じ形です。
 
-::: details Windows / Linux、またはソース版（B）で登録する
-`slidecraft-mcp` の PATH 登録は現状 macOS/Homebrew のみです。Windows/Linux は **同梱 node ＋ `cli.cjs` の絶対パス**（インストール先を要確認）で登録します（`command` を同梱 node、`args` を `["/絶対パス/resources/cli.cjs"]` に）。ソース版（B）なら `command` を `node`、`args` を `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]`（絶対パス）に。Claude Code では `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`。Copilot は上記いずれの場合も `"type": "stdio"` を併記します。直接パスの詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照してください。
+::: details Windows で `.cmd` を直接起動できないクライアント、v0.5.0 以前、AppImage、ソース版（B）で登録する
+- **Windows**: v0.5.1 以降は `slidecraft-mcp`（実体は `slidecraft-mcp.cmd`）が PATH にあります。クライアントが `.cmd` を直接 spawn できない場合は `command` を `cmd`、`args` を `["/c", "slidecraft-mcp"]` に（Claude Code: `claude mcp add slidecraft -- cmd /c slidecraft-mcp`）。
+- **v0.5.0 以前のインストーラ**（ランチャ無し）: **同梱 node ＋ `cli.cjs` の絶対パス**で登録します。Windows は `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（同じフォルダ）、Linux は `command` = `/usr/bin/node`、`args` = `["/usr/lib/SlideCraft/cli.cjs"]`。
+- **AppImage**: `./SlideCraft_<ver>_amd64.AppImage --appimage-extract` で展開し、`squashfs-root/usr/bin/slidecraft-mcp` の絶対パスを `command` に。
+- **ソース版（B）**: `command` を `node`、`args` を `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]`（絶対パス）に。Claude Code では `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`。
+
+Copilot は上記いずれの場合も `"type": "stdio"` を併記します。OS 別の仕組みと注意点は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照してください。
 :::
 
 登録後、エージェントから SlideCraft のツール群（後述）が見えるようになります。
