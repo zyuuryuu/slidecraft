@@ -25,8 +25,8 @@ The server speaks the full contract itself (tool descriptions + `bootstrap`); th
    `split_overflowing_slides` for overflow, `convert_bullets_to_table(index)` for key-value bullets — then
    rewrite what remains as content. Repeat until the list is empty. The diagnostics are never-silent
    (overflow, collisions, unbound content and unknown layout pins all surface): do NOT screenshot each round.
-6. **Look once**: when `get_deck_issues` is clean, do ONE visual pass — the deck-wide thumbnail tool if the
-   server lists one, otherwise `get_slide_image(index)` on the slides you changed most. Then stop.
+6. **Look once**: when `get_deck_issues` is clean, do ONE visual pass — `get_deck_image()` (the whole deck as one
+   labeled contact sheet; `get_deck_html()` without a browser), then `get_slide_image(index)` only to zoom in. Then stop.
 7. **Ship**: `validate_deck` (export gate) → `export_pptx`. Both return `{path}` under `--root`, else `{dataBase64}`.
 
 **Success / failure**: a call succeeded iff its result has neither `ok:false` nor `isError`.
