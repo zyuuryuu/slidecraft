@@ -146,9 +146,10 @@ Copilot だけ**設定スキーマが違います**。キーは `mcpServers` で
 
 MCP 接続で渡るのは**ツール**（エンジンの操作）です。加えて、エージェントに**「どう著作するか」の手順**を渡すと、
 狙いどおりのデッキが安定して作れます。そのための手順書が
-[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) です — 接続 → テンプレ調達 →
-`get_authoring_guide` → `set_slide_markdown` → 図 → `get_deck_issues` フィードバックループ →
-`validate_deck`/`export_pptx` の流れと、never-silent・envelope・`data:image` のみ、等の契約を1枚にまとめています。
+[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) です — 接続 → `bootstrap`（著作契約を
+1 回で取得）→ テンプレ調達 → `set_slide_markdown` → 図 → `get_deck_issues` フィードバックループ（画像確認は
+最後に 1 回）→ `validate_deck`/`export_pptx` の**手順だけ**を 40 行以内にまとめています。never-silent・envelope・
+`data:image` のみ、等の契約そのものはサーバが語ります（`bootstrap` の応答とツール説明に含まれる・ADR-0037 D3）。
 
 **渡し方（エージェント別）:**
 
@@ -158,8 +159,8 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 
 ::: tip 実行時の契約が最優先
 `SKILL.md` は**汎用の手順**です。いま読み込んでいるテンプレの**正確な書式・レイアウト名・本文 budget** は、
-実行時に `get_authoring_guide()` が返す**自己記述コントラクト**が常に最新・正典です。エージェントには
-「まず `get_authoring_guide` を読む」と伝えてください（`SKILL.md` にもそう明記しています）。
+実行時に `bootstrap()`（＝`get_authoring_guide()` 等を 1 回にまとめたもの）が返す**自己記述コントラクト**が
+常に最新・正典です。エージェントには「まず `bootstrap` を呼ぶ」と伝えてください（`SKILL.md` にもそう明記しています）。
 :::
 
 ---
