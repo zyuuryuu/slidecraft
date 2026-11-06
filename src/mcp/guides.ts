@@ -30,6 +30,22 @@ export function getAuthoringGuide(s: Session) {
     // clean — a literal projection of deck-diagnostics.ts's REVIEW_RULES, the SAME registry
     // get_deck_issues draws its DeckIssue.id/level from (R8: one source, no drift between the two).
     activeReviewRules: REVIEW_RULES.map((r) => ({ id: r.id, level: r.level })),
+    // #521 (ADR-0037 D3 "the server speaks the contract"): the result/authoring contract lines that
+    // previously lived ONLY in SKILL.md. SKILL.md is now the order of operations; these ride the guide
+    // (= bootstrap.authoringGuide) so the AI reads them in the same cold call. Moved, not invented —
+    // each line mirrors docs/mcp-server.md (成否判定 #246 / envelope / エラー契約 / PPTX 出力の制約).
+    contract: {
+      success:
+        "成否判定は 1 行：成功＝結果に {ok:false} も isError:true も無いこと。read 系と export_pptx は payload をそのまま返し ok キーを持たない（無い＝成功）。{ok:false, error, code} はモデル化済みの拒否（正常な戻り・クラッシュではない）— error を読んで直して再実行する。isError:true は未モデル化クラッシュ専用",
+      mutationEnvelope:
+        "内容 mutation は {ok, changed, beforeMd?, afterMd?, diagnostics, budget?, hints} を返す。changed:false は本当の no-op（undo 対象なし）。hints が次に呼ぶツール（溢れ→split_overflowing_slides・key-value→convert_bullets_to_table）",
+      editing: "1 枚直すなら set_slide_markdown（図/mermaid を自動保持）。set_deck_markdown は deck 全体の置換で図を保持しないので単スライド編集には使わない",
+      layouts:
+        "レイアウト名は上の format の一覧（このテンプレに解決済み）から選ぶ。無指定は role ベースで自動解決（autoSelectLayout）。このテンプレに無い名前を pin しても自動解決に代替され、get_deck_issues が unknown-layout-pin で告知する（役割/レイアウト名は著者が増やせない）",
+      images: "埋め込み画像は ![alt](data:image/…;base64,…) の data URI のみ（可搬・XSS 安全）。他のスキーム（http/相対パス）は画像にならずテキスト扱い",
+      export:
+        "export_pptx は native-vector のみ。変換不能な Mermaid（gitGraph / sankey / C4 等）は onUnsupportedMermaid=reject（既定・正確なエラー）か skip（そのスライドを落として skipped で報告）— 黙って消えることはない。事前に validate_deck の exportReadiness で確認できる",
+    },
     seeAlso: {
       figures: "図を入れるなら get_diagram_types で種類を選び、get_diagram_guide(type) で構文を得る",
       templateSpec: "新しいテンプレを作るなら get_template_spec_guide（→ create_template）",

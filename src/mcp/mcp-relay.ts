@@ -12,10 +12,10 @@
  * a `notifications/initialized` message is relayed, so no separate notification-forwarding code is
  * needed here (that would be exactly the kind of duplicated meaning R8 forbids).
  */
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import type { HostHandshake } from "./host-json";
+import { createProbeAwareStdio } from "./discover-probe";
 
 /** Structural subset of the SDK's `Transport` interface (shared/transport.js) — declared locally
  *  instead of importing that module so this file doesn't pull in a new deep SDK import path; every
@@ -37,12 +37,14 @@ const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(Strin
  *  per-message relay failure surfaces via the transport's own `onerror` (logged, non-fatal) rather
  *  than tearing down the whole session.
  *
- *  `local` defaults to real stdio and `remote` to a real `StreamableHTTPClientTransport` pointed at
- *  the discovered host (production, cli.ts). Tests inject in-memory transports on EITHER side so the
- *  relay's forwarding logic can be driven deterministically, without a subprocess or real sockets. */
+ *  `local` defaults to real stdio — behind the #518 probe filter, so a `server/discover` version probe
+ *  is answered HERE and never forwarded to the host (discover-probe.ts) — and `remote` to a real
+ *  `StreamableHTTPClientTransport` pointed at the discovered host (production, cli.ts). Tests inject
+ *  in-memory transports on EITHER side so the relay's forwarding logic can be driven
+ *  deterministically, without a subprocess or real sockets. */
 export function runRelay(
   handshake: HostHandshake,
-  local: RelayTransport = new StdioServerTransport(),
+  local: RelayTransport = createProbeAwareStdio(),
   remote: RelayTransport = new StreamableHTTPClientTransport(new URL(handshake.url), {
     requestInit: { headers: { authorization: `Bearer ${handshake.token}` } },
   }),

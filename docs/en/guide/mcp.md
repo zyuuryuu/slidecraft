@@ -148,9 +148,11 @@ If you're already registering the HTTP endpoint directly, remove it and switch t
 
 An MCP connection hands over **tools** (engine operations). In addition, giving the agent **a procedure for "how to author"**
 lets it reliably produce the deck you intend. That procedure lives in
-[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) — it condenses onto a single page the flow of
-connect → provision a template → `get_authoring_guide` → `set_slide_markdown` → diagrams → the `get_deck_issues` feedback loop →
-`validate_deck`/`export_pptx`, along with contracts such as never-silent, the envelope, and `data:image` only.
+[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) — within 40 lines it gives **only the order of
+operations**: connect → `bootstrap` (the whole authoring contract in one call) → provision a template → `set_slide_markdown` →
+diagrams → the `get_deck_issues` feedback loop (one visual check, at the end) → `validate_deck`/`export_pptx`. The contracts
+themselves (never-silent, the envelope, `data:image` only, …) are spoken by the server: they are in the `bootstrap` response and
+the tool descriptions (ADR-0037 D3).
 
 **How to hand it over (by agent):**
 
@@ -160,8 +162,8 @@ connect → provision a template → `get_authoring_guide` → `set_slide_markdo
 
 ::: tip The runtime contract takes precedence
 `SKILL.md` is a **generic procedure**. The **exact formatting, layout names, and body budget** for the template currently loaded
-are always most-current and authoritative in the **self-describing contract** that `get_authoring_guide()` returns at runtime.
-Tell the agent to "read `get_authoring_guide` first" (`SKILL.md` states this too).
+are always most-current and authoritative in the **self-describing contract** that `bootstrap()` (which bundles
+`get_authoring_guide()` and the other cold reads) returns at runtime. Tell the agent to "call `bootstrap` first" (`SKILL.md` states this too).
 :::
 
 ---
