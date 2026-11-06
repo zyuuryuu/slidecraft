@@ -244,6 +244,12 @@ describe("slidecraft-mcp-path.nsh — NSIS hooks", () => {
     .split("\n")
     .map((l) => l.replace(/\s;.*$/, "").replace(/^\s*;.*$/, ""))
     .join("\n");
+  /** The body of one `!macro <name>` … `!macroend` block (code only, comments already stripped). */
+  const macro = (name: string): string => {
+    const start = nsh.indexOf(`!macro ${name}`);
+    expect(start, `!macro ${name} not found`).toBeGreaterThanOrEqual(0);
+    return nsh.slice(start, nsh.indexOf("!macroend", start));
+  };
 
   it("adds on POSTINSTALL (after resources exist) and removes on PREUNINSTALL (before they are deleted)", () => {
     expect(nsh).toMatch(/^!macro NSIS_HOOK_POSTINSTALL\s*$/m);
@@ -262,8 +268,8 @@ describe("slidecraft-mcp-path.nsh — NSIS hooks", () => {
   });
 
   it("is never silent: DetailPrint in both hooks, and any MessageBox has a silent-mode default (/SD)", () => {
-    const post = nsh.slice(nsh.indexOf("!macro NSIS_HOOK_POSTINSTALL"), nsh.indexOf("!macroend", nsh.indexOf("!macro NSIS_HOOK_POSTINSTALL")));
-    const pre = nsh.slice(nsh.indexOf("!macro NSIS_HOOK_PREUNINSTALL"), nsh.indexOf("!macroend", nsh.indexOf("!macro NSIS_HOOK_PREUNINSTALL")));
+    const post = macro("NSIS_HOOK_POSTINSTALL");
+    const pre = macro("NSIS_HOOK_PREUNINSTALL");
     expect(post).toMatch(/DetailPrint/);
     expect(pre).toMatch(/DetailPrint/);
     for (const line of nsh.split("\n").filter((l) => /^\s*MessageBox\b/.test(l))) expect(line).toMatch(/\/SD\s+ID\w+/);
@@ -276,6 +282,20 @@ describe("slidecraft-mcp-path.nsh — NSIS hooks", () => {
 
   it("is idempotent: strips an existing entry before appending, so reinstall/update never duplicates", () => {
     expect(nsh).toMatch(/WordReplace/);
+  });
+
+  it("#539: appends without a separator when the existing user PATH already ends with ';' (no empty ';;' entry)", () => {
+    // Seen on a real Windows 11: PATH `…copilot-shim;` became `…copilot-shim;;C:\…\SlideCraft`. The append
+    // branch must look at the last char of $R0 and add ";" only when it is not already there.
+    const post = macro("NSIS_HOOK_POSTINSTALL");
+    expect(post).toMatch(
+      /StrCpy\s+\$R1\s+\$R0\s+1\s+-1\s*\n\s*\$\{If\}\s+\$R1\s+==\s+";"\s*\n\s*StrCpy\s+\$R0\s+"\$R0\$R9"\s*\n\s*\$\{Else\}\s*\n\s*StrCpy\s+\$R0\s+"\$R0;\$R9"\s*\n\s*\$\{EndIf\}/,
+    );
+  });
+
+  it("#539: prints the registration command on a DetailPrint line of its own (the details pane truncates long lines)", () => {
+    const post = macro("NSIS_HOOK_POSTINSTALL");
+    expect(post).toMatch(/^\s*DetailPrint\s+"\s*claude mcp add slidecraft -- slidecraft-mcp\s*"\s*$/m);
   });
 });
 
@@ -292,6 +312,22 @@ describe("slidecraft-mcp-path.wxs — WiX fragment", () => {
     const opens = [...wxs.matchAll(/<([A-Za-z]+)\b[^>]*?(?<!\/)>/g)].map((m) => m[1]);
     const closes = [...wxs.matchAll(/<\/([A-Za-z]+)>/g)].map((m) => m[1]);
     expect(opens.sort()).toEqual(closes.sort());
+  });
+
+  it("#536: every XML comment is legal XML — its body holds no '--' and does not end in '-' (candle CNDL0104)", () => {
+    // XML 1.0 §2.5: the string "--" MUST NOT occur within comments, and a comment may not end "--->".
+    // WiX's candle.exe rejects the whole fragment ("Not a valid source file") and the MSI build dies.
+    // Checked on every fragment the overlay ships, not just this one file.
+    const fragments = overlay.bundle.windows?.wix?.fragmentPaths ?? [];
+    expect(fragments.length).toBeGreaterThan(0);
+    for (const f of fragments) {
+      const comments = [...read(join("src-tauri", f)).matchAll(/<!--([\s\S]*?)-->/g)].map((m) => m[1]);
+      expect(comments.length, `${f}: expected at least one <!-- --> comment`).toBeGreaterThan(0);
+      for (const body of comments) {
+        expect(body, `${f}: '--' inside an XML comment`).not.toContain("--");
+        expect(body.endsWith("-"), `${f}: XML comment ends in '-' ("--->")`).toBe(false);
+      }
+    }
   });
 
   it("appends [INSTALLDIR] to the USER PATH, non-permanent (removed on uninstall)", () => {
