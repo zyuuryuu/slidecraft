@@ -5,7 +5,6 @@
     "resources": {
       "../dist/mcp/host.cjs": "host.cjs",
       "../dist/mcp/cli.cjs": "cli.cjs",
-      "../scripts/slidecraft-mcp": "slidecraft-mcp",
       "../scripts/slidecraft-mcp.cmd": "slidecraft-mcp.cmd"
     },
     "macOS": {

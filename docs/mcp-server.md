@@ -61,6 +61,7 @@ claude mcp add slidecraft -- slidecraft-mcp
 Windows の注意点：
 
 - PATH の反映は**インストール後に新しく開いたターミナル**から（開いたままのターミナルには反映されない）。
+- インストール先にあるランチャは `slidecraft-mcp.cmd` の 1 つだけです（`where slidecraft-mcp` は 1 件を返します）。macOS 用の sh 版 `slidecraft-mcp` は Windows には入りません（#537）。
 - `slidecraft-mcp` は `.cmd` ファイルです。クライアントが `.cmd` を直接 spawn できない場合（Claude Code の Windows ネイティブ版で `npx` に `cmd /c` が要るのと同じ事情）は `claude mcp add slidecraft -- cmd /c slidecraft-mcp`、mcp.json なら `{"command": "cmd", "args": ["/c", "slidecraft-mcp"]}` を使ってください。1 行登録で接続に失敗する場合はこの形を試し、結果を Issue で知らせてもらえると助かります。
 - ユーザ PATH が極端に長い（約 1,000 文字超）場合、NSIS インストーラは **PATH を壊さないために編集を見送り**、追加すべきフォルダをダイアログで案内します。その場合は手で追加してください。
 - ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。

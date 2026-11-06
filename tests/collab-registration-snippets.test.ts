@@ -18,18 +18,20 @@ import {
   type McpInstallInfo,
 } from "../src/components/collab-panel-snippets";
 
+// Windows paths are the REAL install layout: Tauri's NSIS/WiX put resources (cli.cjs) and the node.exe
+// sidecar FLAT in the install dir (no `resources\` subfolder) — confirmed on a Windows 11 install (#538).
 const WIN_SPACES: McpInstallInfo = {
   os: "windows",
   launcherOnPath: false,
   nodePath: "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\node.exe",
-  cliPath: "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\resources\\cli.cjs",
+  cliPath: "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\cli.cjs",
 };
 
 const WIN_PLAIN: McpInstallInfo = {
   os: "windows",
   launcherOnPath: false,
   nodePath: "C:\\Program\\SlideCraft\\node.exe",
-  cliPath: "C:\\Program\\SlideCraft\\resources\\cli.cjs",
+  cliPath: "C:\\Program\\SlideCraft\\cli.cjs",
 };
 
 const MAC_LAUNCHER: McpInstallInfo = {
@@ -57,7 +59,7 @@ describe("buildRegistrationSnippets — acceptance examples (#520)", () => {
   it("Windows + no launcher + path with spaces → quoted node.exe and cli.cjs after `--`", () => {
     const s = buildRegistrationSnippets(WIN_SPACES);
     expect(s.claudeCode).toBe(
-      'claude mcp add slidecraft -- "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\node.exe" "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\resources\\cli.cjs"',
+      'claude mcp add slidecraft -- "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\node.exe" "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\cli.cjs"',
     );
   });
 
@@ -69,7 +71,7 @@ describe("buildRegistrationSnippets — acceptance examples (#520)", () => {
 describe("buildRegistrationSnippets — Claude Code one-liner quoting", () => {
   it("Windows without whitespace stays unquoted", () => {
     expect(buildRegistrationSnippets(WIN_PLAIN).claudeCode).toBe(
-      "claude mcp add slidecraft -- C:\\Program\\SlideCraft\\node.exe C:\\Program\\SlideCraft\\resources\\cli.cjs",
+      "claude mcp add slidecraft -- C:\\Program\\SlideCraft\\node.exe C:\\Program\\SlideCraft\\cli.cjs",
     );
   });
 

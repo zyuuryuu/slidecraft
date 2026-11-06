@@ -35,13 +35,17 @@ describe("MCP CLI bundling — config consistency", () => {
     expect(conf.build.beforeBuildCommand).toContain("build:mcp:bundled");
   });
 
-  it("the bundle overlay ships cli.cjs and the launcher as resources", () => {
+  it("the bundle overlay ships cli.cjs; the macOS platform config ships the launcher (#537)", () => {
     const overlay = JSON.parse(read("src-tauri/tauri.bundle.conf.json")) as {
       bundle: { resources: Record<string, string> };
     };
-    const res = overlay.bundle.resources;
-    expect(res["../dist/mcp/cli.cjs"]).toBe("cli.cjs");
-    expect(res["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
+    expect(overlay.bundle.resources["../dist/mcp/cli.cjs"]).toBe("cli.cjs");
+    // Tauri auto-merges src-tauri/tauri.macos.conf.json (also under `--config`), so the sh launcher only
+    // lands in the macOS Contents/Resources the cask points at — not in the Windows install dir on PATH.
+    const mac = JSON.parse(read("src-tauri/tauri.macos.conf.json")) as {
+      bundle: { resources: Record<string, string> };
+    };
+    expect(mac.bundle.resources["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
   });
 
   it("the launcher execs the bundled node + cli.cjs and survives the Homebrew symlink", () => {
