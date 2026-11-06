@@ -7,6 +7,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Windows / Linux のインストーラも `slidecraft-mcp` ランチャを PATH に置く** — macOS cask と同じ `claude mcp add slidecraft -- slidecraft-mcp` の 1 行で登録できる。Windows は `slidecraft-mcp.cmd`（同梱 `node.exe` で `cli.cjs` を起動）をインストール先に同梱し、NSIS（インストーラフック）/ MSI（WiX フラグメント）が**ユーザ PATH** に追加・アンインストールで除去。Linux の `.deb`/`.rpm`/AppImage は `/usr/bin/slidecraft-mcp` を同梱。CI の Linux smoke が実 `.deb` を展開してランチャ起動まで検査する（[#519](https://github.com/zyuuryuu/slidecraft/issues/519)・ADR-0022・ADR-0038 D5）
+
 ## [0.5.0] - 2026-10-06
 
 早期版（0.x）のマイナー版。**Markdown 語彙の大幅拡張**（インライン書式・番号付きリスト・フィールド行 3 種・比較/Before-After・カードアイコン・現在ステップ強調）、**「黙って消える」挙動の一掃**（never-silent 診断の面展開）、**プレビュー忠実度（WYSIWYG）の底上げ**、**MCP のコールド 1 発読み（bootstrap）とプロファイル別登録**、リリース工程のセーフティが中心。

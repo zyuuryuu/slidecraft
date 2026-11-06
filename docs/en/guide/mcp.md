@@ -53,7 +53,9 @@ brew install --cask zyuuryuu/slidecraft/slidecraft   # skip if already installed
 claude mcp add slidecraft -- slidecraft-mcp           # for Claude Code
 ```
 
-When registering via mcp.json in Claude Desktop / Cursor, write `{"command": "slidecraft-mcp"}`. To point directly at the bundled node plus cli.cjs without using the launcher, see "Two ways to use it" in the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
+**Windows (`.exe` / `.msi`) and Linux (`.deb` / `.rpm`)** — installers from **v0.5.1 on** also put `slidecraft-mcp` on your PATH (per user; removed on uninstall), so the same one-line command works. On Windows it takes effect in terminals opened **after** the install. For an AppImage, extract it with `--appimage-extract` and register the absolute path of `squashfs-root/usr/bin/slidecraft-mcp`.
+
+When registering via mcp.json in Claude Desktop / Cursor, write `{"command": "slidecraft-mcp"}`. To point directly at the bundled node plus cli.cjs without using the launcher, and for per-OS details, see "Two ways to use it" in the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
 
 ### B. Launch from source (development version)
 
@@ -121,8 +123,13 @@ Copilot uses a **different config schema**. The key is **`servers`** (not `mcpSe
 
 To register it for your whole user profile, use the same shape under `"mcp": { "servers": { ... } }` in VS Code's `settings.json`.
 
-::: details Registering on Windows / Linux, or with the source version (B)
-PATH registration of `slidecraft-mcp` is currently macOS/Homebrew only. On Windows/Linux, register with the **absolute path to the bundled node plus `cli.cjs`** (confirm the install location — set `command` to the bundled node and `args` to `["/absolute/path/resources/cli.cjs"]`). For the source version (B), set `command` to `node` and `args` to `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]` (an absolute path). In Claude Code: `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`. In all of these cases Copilot also needs `"type": "stdio"`. For details on direct paths, see the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
+::: details Registering when a Windows client cannot spawn a `.cmd`, on v0.5.0 or older, with an AppImage, or with the source version (B)
+- **Windows**: from v0.5.1 on, `slidecraft-mcp` (really `slidecraft-mcp.cmd`) is on PATH. If your client cannot spawn a `.cmd` directly, set `command` to `cmd` and `args` to `["/c", "slidecraft-mcp"]` (Claude Code: `claude mcp add slidecraft -- cmd /c slidecraft-mcp`).
+- **Installers v0.5.0 or older** (no launcher): register the **absolute path to the bundled node plus `cli.cjs`**. Windows: `command` = `<install dir>\node.exe`, `args` = `["<install dir>\cli.cjs"]` (same folder). Linux: `command` = `/usr/bin/node`, `args` = `["/usr/lib/SlideCraft/cli.cjs"]`.
+- **AppImage**: run `./SlideCraft_<ver>_amd64.AppImage --appimage-extract` and set `command` to the absolute path of `squashfs-root/usr/bin/slidecraft-mcp`.
+- **Source version (B)**: set `command` to `node` and `args` to `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]` (an absolute path). In Claude Code: `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`.
+
+In all of these cases Copilot also needs `"type": "stdio"`. For the per-OS mechanics and caveats, see the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
 :::
 
 After registration, SlideCraft's tools (described below) become visible to the agent.

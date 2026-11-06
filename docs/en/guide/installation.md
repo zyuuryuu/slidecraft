@@ -95,7 +95,7 @@ On macOS 15 (Sequoia) and later, the old "right-click → 'Open'" alone no longe
 :::
 
 ::: tip Using it from an AI agent (no build required)
-When you install via Homebrew, the MCP server that lets upstream AI (Claude Code / Cursor / Claude Desktop) drive SlideCraft is also **bundled and registered on PATH** (v0.2.0 and later). No source clone or system Node is needed; register it with `claude mcp add slidecraft -- slidecraft-mcp`. See the [MCP guide](/en/guide/mcp) for details.
+The installers also **bundle and put on PATH** the MCP server that lets upstream AI (Claude Code / Cursor / Claude Desktop) drive SlideCraft (macOS/Homebrew since v0.2.0; Windows `.exe`/`.msi` and Linux `.deb`/`.rpm` since v0.5.1 — the PATH entry is per user and removed on uninstall). No source clone or system Node is needed; register it with `claude mcp add slidecraft -- slidecraft-mcp`. See the [MCP guide](/en/guide/mcp) for details.
 :::
 
 ::: warning First-launch note when opening the .dmg directly on macOS
