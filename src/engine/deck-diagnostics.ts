@@ -23,6 +23,7 @@ import { visualOccupancy, visualCollisions, bodyPlaceholders, nthBody, type Visu
 import { estimateTableRowHeightsIn } from "./table-layout";
 import { isBlankParagraphs } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
+import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml } from "./diagram-node-shrink";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -48,6 +49,7 @@ export type ReviewRuleId =
   | "visual-shadowed-content"
   | "visual-collision"
   | "table-overflow"
+  | "diagram-node-shrink"
   | "table-dropped"
   | "image-dropped"
   | "meta-key-dropped"
@@ -75,6 +77,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "visual-shadowed-content", level: "warn" },
   { id: "visual-collision", level: "warn" },
   { id: "table-overflow", level: "warn" },
+  { id: "diagram-node-shrink", level: "warn" },
   { id: "table-dropped", level: "info" },
   { id: "image-dropped", level: "info" },
   { id: "meta-key-dropped", level: "warn" },
@@ -108,6 +111,12 @@ function tableOverflow(rows: string[][], box: { w: number; h: number }): { fit: 
   let used = 0;
   const fit = heights.findIndex((h) => (used += h) > box.h);
   return { fit };
+}
+
+/** #473: a figure at body ordinal 2+ is confined to that placeholder's box by export (placeholder-filler's
+ *  `diagWantsRegion`); ordinal 1 (or an unparsable idx) fills the slide. Same predicate, same default. */
+function diagramWantsRegion(placeholderIdx: string): boolean {
+  return (parseInt(placeholderIdx) || 1) !== 1;
 }
 
 // Full-width chars: a bullet longer than this reads as a sentence, not a key phrase.
@@ -183,6 +192,15 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       if (p.bullet || p.heading) continue;
       const key = unrecognizedMetaKey(textOf(p));
       if (key) add("unrecognized-meta-key", `「${key}:」は認識されないメタキーのため本文テキスト化されました（Category/Date/Footer のみ対応）`, []);
+    }
+
+    // #473 never-silent: a SOLO figure (body ordinal 1) fills the slide as laid out — export paints
+    // computeLayout's result as-is, so the shrink is readable without a template. Read off that same
+    // result (diagramNodeShrink, R8). A beside-text figure needs its region → the layouts pass below.
+    if (slide.diagram && !diagramWantsRegion(slide.diagram.placeholderIdx)) {
+      const spec = parseDiagramYaml(slide.diagram.yaml);
+      const shrink = spec && diagramNodeShrink(spec);
+      if (shrink) add("diagram-node-shrink", diagramNodeShrinkMessage(shrink, "スライド"), ["split"]);
     }
 
     if (isVisual || !body) return;
@@ -261,6 +279,19 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const over = tableBox && tableOverflow(slide.table!.rows, tableBox);
       if (over) {
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "table-overflow", level: RULE_LEVEL["table-overflow"], message: `表 ${slide.table!.rows.length} 行（見出し含む）はこのレイアウト（${layout.name}）の枠に収まりません（推定 ${over.fit} 行まで）。出力（PPTX）では行が文字に合わせて伸び枠の下へはみ出します。スライドの分割を検討してください`, levers: ["split"] });
+      }
+
+      // #473 never-silent: a beside-text figure is confined to its body placeholder (placeholder-filler
+      // → paintDiagram region → fitTransform), shrinking it again. Same region (nthBody) and same fit
+      // (diagramNodeShrink, R8). An unresolved region means export drops the figure — reported as
+      // unbound, not here.
+      if (slide.diagram && diagramWantsRegion(slide.diagram.placeholderIdx)) {
+        const region = nthBody(bodyPlaceholders(layout.placeholders), slide.diagram.placeholderIdx)?.style;
+        const spec = region && parseDiagramYaml(slide.diagram.yaml);
+        const shrink = spec && diagramNodeShrink(spec, region);
+        if (shrink) {
+          issues.push({ slideIndex: i, title: slideTitle(slide), id: "diagram-node-shrink", level: RULE_LEVEL["diagram-node-shrink"], message: diagramNodeShrinkMessage(shrink, "枠"), levers: ["split"] });
+        }
       }
 
       // #292: never-silent visibility for the section-footer auto-inject (#168) — the SAME
