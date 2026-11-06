@@ -63,6 +63,26 @@ describe("cjkFontFamily", () => {
     expect(names.filter((n) => n === '"Yu Gothic"')).toHaveLength(1);
   });
 
+  it("an unresolved theme token (+mn-lt / +mj-lt) is quoted so the WHOLE declaration stays valid CSS (#528)", () => {
+    // `+` cannot start an unquoted <family-name>; left bare it invalidates the entire font-family
+    // declaration — Chromium drops it (computed: "Times New Roman"), so the embedded @font-face
+    // fallback is never reached and CJK text vanishes on machines without CJK system fonts (CI).
+    for (const token of ["+mn-lt", "+mj-lt", "+mn-ea"]) {
+      const names = cjkFontFamily(token).split(", ");
+      expect(names[0]).toBe(`"${token}"`);
+      expect(names).toContain('"Noto Sans CJK JP"');
+    }
+    const names = cjkFontFamily("+mj-lt", "+mj-ea").split(", ");
+    expect(names.slice(0, 2)).toEqual(['"+mj-lt"', '"+mj-ea"']);
+  });
+
+  it("every emitted token is a <string> or a plain ident / CSS generic — nothing a CSS parser rejects", () => {
+    const valid = /^"(?:[^"\\]|\\.)*"$|^-?[A-Za-z_][A-Za-z0-9_-]*$/;
+    for (const name of ["Calibri", "+mn-lt", "1Font", "Font@2", "Yu Gothic", "游ゴシック", 'Say "hi"', "Back\\slash"]) {
+      for (const n of cjkFontFamily(name).split(", ")) expect(n).toMatch(valid);
+    }
+  });
+
   it("no eaFontName: still resolves a full ordered stack, not a bare 'fontName, sans-serif' pair", () => {
     const css = cjkFontFamily("Arial");
     expect(css.split(", ").length).toBeGreaterThan(2);
