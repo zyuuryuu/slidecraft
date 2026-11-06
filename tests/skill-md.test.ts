@@ -86,11 +86,14 @@ describe("SKILL.md — the three #521 mandates", () => {
     // the old file told the AI to read get_authoring_guide first; bootstrap now contains it
     expect(SKILL).not.toMatch(/get_authoring_guide\(\)` — this template's resolved layout names/);
   });
-  it("trust the diagnosis; the visual check happens once, at the end, without a hard-coded thumbnail tool name", () => {
+  it("trust the diagnosis; the visual check happens once, at the end, via the deck-wide contact sheet (#522)", () => {
     expect(SKILL).toMatch(/\bonce\b/i);
     expect(SKILL).toMatch(/never-silent/);
-    // #522's deck-wide thumbnail tool is in flight under an unsettled name — SKILL.md must not guess it
-    expect(SKILL).not.toMatch(/get_deck_image|get_deck_thumbnails|get_slide_images/);
+    // #522 shipped the deck-wide thumbnail tool as `get_deck_image` (+ browser-less `get_deck_html`):
+    // the ONE visual pass names it, and the per-slide screenshot is demoted to zooming in.
+    expect(SKILL).toMatch(/`get_deck_image\(\)`/);
+    expect(SKILL).toMatch(/`get_deck_html\(\)`/);
+    expect(SKILL).not.toMatch(/get_deck_thumbnails|get_slide_images/);
   });
   it("the AI never touches bytes: --root, use_template, export_pptx {path}, no cp/stage", () => {
     expect(SKILL).toMatch(/--root/);

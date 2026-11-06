@@ -69,7 +69,7 @@
   StrLen $R1 $R0
   StrLen $R2 $R9
   IntOp $R2 $R2 + $R1
-  IntOp $R2 $R2 + 1 ; the ";" separator we add
+  IntOp $R2 $R2 + 1 ; the ";" separator we may add (counted even when PATH already ends with ";" — conservative)
   ${If} $R1 >= ${SLIDECRAFT_PATH_BUDGET}
   ${OrIf} $R2 > ${SLIDECRAFT_PATH_BUDGET}
     ; Either ReadRegStr may already have truncated the value, or appending would overflow. Do no harm.
@@ -80,7 +80,16 @@
     ${If} $R0 == ""
       StrCpy $R0 "$R9"
     ${Else}
-      StrCpy $R0 "$R0;$R9"
+      ; A user PATH that already ends with ";" (common: Windows itself leaves one) must not get a second
+      ; one, or an EMPTY entry appears between them — cmd.exe searches the current directory for an empty
+      ; PATH entry (#539). Uninstall then drops that trailing ";" (1 byte, same as the MSI); the strip
+      ; above still keeps a trailing ";" when WE did not consume it, so re-install stays idempotent.
+      StrCpy $R1 $R0 1 -1
+      ${If} $R1 == ";"
+        StrCpy $R0 "$R0$R9"
+      ${Else}
+        StrCpy $R0 "$R0;$R9"
+      ${EndIf}
     ${EndIf}
     ClearErrors
     WriteRegExpandStr HKCU "Environment" "Path" "$R0"
@@ -89,7 +98,9 @@
       MessageBox MB_ICONEXCLAMATION|MB_OK "SlideCraft could not update your user PATH (registry write failed). To register the MCP server, add this folder to your user PATH by hand:$\r$\n$R9" /SD IDOK
     ${Else}
       !insertmacro SLIDECRAFT_BROADCAST_ENVIRONMENT
-      DetailPrint "MCP launcher: user PATH updated. Register with: claude mcp add slidecraft -- slidecraft-mcp"
+      ; Two lines: the details pane truncates long lines, and the command must stay readable to the end (#539).
+      DetailPrint "MCP launcher: user PATH updated. Open a NEW terminal and register the MCP server with:"
+      DetailPrint "claude mcp add slidecraft -- slidecraft-mcp"
     ${EndIf}
   ${EndIf}
 !macroend
