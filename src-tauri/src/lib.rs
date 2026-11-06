@@ -37,6 +37,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             collab::start_collab,
             collab::stop_collab,
+            collab::mcp_install_info,
             local_ai::start_local_ai,
             local_ai::stop_local_ai,
             local_ai::local_ai_status,
