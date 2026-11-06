@@ -105,6 +105,10 @@ scoped path/filename are mutually exclusive on every call — passing both is a 
   Chrome/Edge only** — never bundled or auto-downloaded (a stale bundled browser is a security risk).
   Absent → never-silent `{ok:false, code:"browser-not-found"}` guiding you to set `SLIDECRAFT_BROWSER`.
   Optional: authoring never depends on a screenshot.
+- **Finishing check = `get_deck_image()` ONCE at the end**: the whole deck as one contact-sheet PNG
+  (a grid of thumbnails, each labeled with its 0-based index; default 5 columns, up to 30 slides,
+  `truncated:true` + `nextStart` when more remain). Don't loop `get_slide_image` over every slide —
+  use it only to zoom into a slide the sheet flagged. `get_deck_html()` is the browser-less twin.
 - Embedded images are **`data:image/…` data URIs only** (portable, XSS-safe). Other schemes become text.
 - Prefer `set_slide_markdown` (surgical, figure-preserving) over `set_deck_markdown` (whole-deck replace,
   drops figures) for single-slide edits.

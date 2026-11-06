@@ -111,6 +111,8 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 読む | `get_slide_fix_request(index)` | 修正リクエスト packet（**エージェントが LLM として埋める**） |
 | 視覚 | `get_slide_image(index)` | 1スライドの**現在の描画を PNG**（image content）で返す＝AI の視覚デザインチェック用。共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一の painter）をローカルの Chrome/Edge で撮る。ブラウザ調達・閉じ込めは下記「スクショの前提」参照。tool-only（`deck://` ミラー無し・ADR-0008） |
 | 視覚 | `get_slide_html(index)` | 1スライドの**現在の描画を自己完結 HTML 文字列**で返す＝`get_slide_image` と同一の共有 HTML（script ゼロ・CSP・フォント埋め込み済）。ローカル Chrome/Edge が無い環境向け＝呼び出し側の任意の手段でラスタ化できる。`slide://{index}/html` リソースにも同じ内容がある |
+| 視覚 | `get_deck_image(start?, columns?, maxSlides?)` | deck **全枚（または `start` からの範囲）のサムネイルを 1 枚の PNG**（image content＋`{from,count,total,columns,width,height,truncated,nextStart?}` の text 1 行）で返す＝**仕上がり確認は最後にこれを 1 回**（#522・1 枚ずつ `get_slide_image` を呼ぶ 29 往復を 1 往復に）。各セルは `get_slide_image` と**同一の共有描画**を CSS で縮小したもの（第 2 の描画経路なし・R8）で、左上に 0-based index を描く。既定 5 列・最大 30 枚・幅 1920px（30 枚で約 180KB・画素予算 3.2Mpx を超える列数指定は幅を自動縮小）。超過分は `truncated:true`＋`nextStart` で続きを取る。ブラウザ要件・未検出時の案内は `get_slide_image` と同じ。細部を読むなら `get_slide_image(index)` |
+| 視覚 | `get_deck_html(start?, columns?, maxSlides?)` | `get_deck_image` と同一のコンタクトシートを**自己完結 HTML 文字列**で返す（`{html, from, count, total, columns, width, height, truncated, nextStart?}`・script ゼロ・CSP・フォント埋め込み済）。ブラウザ無し環境向け |
 | 編集(内容) | `set_slide_markdown(index, markdown)` | 1スライドを差し替え（図/mermaid 自動保持・zod 検証・不正は never-silent 拒否） |
 | 編集(内容) | `set_deck_markdown(markdown)` | ⚠ deck 全体を置換（図は保持されない・1枚だけなら set_slide_markdown / insert_slide） |
 | 編集(内容) | `split_overflowing_slides()` | 決定論レバー：溢れた本文をフォント縮小なしで分割。`changedSlides`（新 index）を返す |
@@ -303,9 +305,10 @@ use_template({id:"file:tech-report.potx"})    → {slideCount, diagnostics, cont
 
 ---
 
-## スクショの前提（`get_slide_image` のブラウザ）
+## スクショの前提（`get_slide_image` / `get_deck_image` のブラウザ）
 
-`get_slide_image` は「AI が自分の編集で崩れていないか」を視覚確認するための任意機能（#109）。撮る対象は
+`get_slide_image` は「AI が自分の編集で崩れていないか」を視覚確認するための任意機能（#109）。`get_deck_image`（#522・
+全枚を 1 枚の格子画像で）も同じ前提・同じ rasterizer・同じ未検出時の案内で動く。撮る対象は
 **共有 HTML 描画そのもの**（`SlideCard` の SSR＝preview / HTML 書き出しと同一の painter・フォント埋め込み済）で、
 第2の描画経路は作らない＝WYSIWYG 単一源。ラスタ化は近似ライブラリでなく**ブラウザのネイティブ描画**で行う。
 

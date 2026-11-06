@@ -18,6 +18,7 @@ export type GuardCode =
   | "browser-launch-failed" // the resolved browser binary would not start
   | "raster-timeout" // the browser hung past the deadline (killed)
   | "raster-failed" // the browser ran but produced no screenshot (stderr excerpt in message)
+  | "invalid-argument" // get_deck_image/html (#522): columns / maxSlides outside 1..n
   // ADR-0035 stage 1 (scoped fs output) — export_pptx / save_project:
   | "scope-violation" // filename escapes the --root scope (traversal / absolute / symlink / bad ext)
   | "scope-not-configured" // a filename/path was supplied but the server has no --root scope

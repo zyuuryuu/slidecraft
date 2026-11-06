@@ -198,6 +198,8 @@ while `class` / `state` / `ER` / `mindmap` go in ` ```mermaid `. See [Diagrams](
 | `get_slide_markdown(index)` | The raw Markdown of one slide (layout already resolved) |
 | `get_slide_image(index)` | Returns the slide's **current rendering as a PNG** (the AI's visual design check). Screenshots the same shared rendering as the preview / HTML export, using a locally installed Chrome/Edge. Optional feature (see below) |
 | `get_slide_html(index)` | Returns the slide's **current rendering as a self-contained HTML string** (the same shared rendering `get_slide_image` screenshots — zero `<script>`, fonts embedded). Works even without a local Chrome/Edge — rasterize it with whatever means the caller has |
+| `get_deck_image(start?, columns?, maxSlides?)` | Returns **thumbnails of the whole deck as ONE PNG** (a grid; each cell is labeled with its 0-based index). Do the finishing check with one call instead of one `get_slide_image` per slide. Defaults: 5 columns, at most 30 slides, 1920 px wide; the remainder is reported as `truncated:true` with `nextStart` |
+| `get_deck_html(start?, columns?, maxSlides?)` | The same contact sheet as `get_deck_image`, as a **self-contained HTML string** (for environments without a browser) |
 | `set_slide_markdown(index, markdown)` | Replaces one slide (diagrams/mermaid are auto-preserved, validated, and invalid input is never-silent rejected) |
 | `set_slide_diagram(index, source, format, ...)` | Sets a diagram from DiagramSpec/Mermaid. Replaces an existing diagram, or adds to the body area on a text slide |
 | `apply_design_intent(index, intent)` | Applies **spatial intent** to a diagram (text left / diagram right, node emphasis, orientation change). *Only for slides that have a diagram* |

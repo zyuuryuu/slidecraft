@@ -49,6 +49,8 @@ export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
   get_slide_fix_request: ALL,
   get_slide_image: ALL,
   get_slide_html: ALL,
+  get_deck_image: ALL, // #522: 全枚コンタクトシート（ホット往復 29→1・ADR-0037 D3）
+  get_deck_html: ALL,
   // 契約・ガイド
   get_authoring_guide: ALL,
   get_diagram_types: ALL,

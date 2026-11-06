@@ -7,6 +7,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **MCP `get_deck_image` / `get_deck_html`** — deck 全枚のサムネイルを 1 枚の PNG（格子・各セルに 0-based index）／自己完結 HTML で返す。AI の仕上がり確認が「1 枚ずつ `get_slide_image`」の往復（#516 実測 29 回）から 1 回になる。各セルは `get_slide_image` と同一の共有描画の縮小で、既存の rasterizer で 1 回だけ撮る（合成ライブラリ・第 2 の描画経路なし）。既定 5 列・最大 30 枚・幅 1920px、超過分は `truncated`＋`nextStart`（[#522](https://github.com/zyuuryuu/slidecraft/issues/522)・[ADR-0037](docs/adr/0037-mcp-surface-realignment.md) D3）
+
 ## [0.5.0] - 2026-10-06
 
 早期版（0.x）のマイナー版。**Markdown 語彙の大幅拡張**（インライン書式・番号付きリスト・フィールド行 3 種・比較/Before-After・カードアイコン・現在ステップ強調）、**「黙って消える」挙動の一掃**（never-silent 診断の面展開）、**プレビュー忠実度（WYSIWYG）の底上げ**、**MCP のコールド 1 発読み（bootstrap）とプロファイル別登録**、リリース工程のセーフティが中心。
