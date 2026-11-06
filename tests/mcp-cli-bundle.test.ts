@@ -35,13 +35,17 @@ describe("MCP CLI bundling — config consistency", () => {
     expect(conf.build.beforeBuildCommand).toContain("build:mcp:bundled");
   });
 
-  it("the bundle overlay ships cli.cjs and the launcher as resources", () => {
+  it("the bundle overlay ships cli.cjs; the macOS platform config ships the launcher (#537)", () => {
     const overlay = JSON.parse(read("src-tauri/tauri.bundle.conf.json")) as {
       bundle: { resources: Record<string, string> };
     };
-    const res = overlay.bundle.resources;
-    expect(res["../dist/mcp/cli.cjs"]).toBe("cli.cjs");
-    expect(res["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
+    expect(overlay.bundle.resources["../dist/mcp/cli.cjs"]).toBe("cli.cjs");
+    // Tauri auto-merges src-tauri/tauri.macos.conf.json (also under `--config`), so the sh launcher only
+    // lands in the macOS Contents/Resources the cask points at — not in the Windows install dir on PATH.
+    const mac = JSON.parse(read("src-tauri/tauri.macos.conf.json")) as {
+      bundle: { resources: Record<string, string> };
+    };
+    expect(mac.bundle.resources["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
   });
 
   it("the launcher execs the bundled node + cli.cjs and survives the Homebrew symlink", () => {
@@ -91,11 +95,23 @@ describe("MCP CLI bundling — the bundled server actually runs standalone", () 
       expect.arrayContaining(["tools", "resources"]),
     );
   });
+
+  it("#518: answers Claude Code's `server/discover` probe (top-level _meta) BEFORE initialize, not silence", async () => {
+    // The real repro from the Issue: the 2026-07-28 version probe as the very first line on stdin.
+    // Before the fix the SDK's strict schema dropped it on deserialisation and nothing came back.
+    const probe = {
+      jsonrpc: "2.0", id: 1, method: "server/discover", params: {},
+      _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" },
+    };
+    const { response } = await runInitialize(out, probe);
+    expect(response).toEqual({ jsonrpc: "2.0", id: 1, error: { code: -32601, message: "Method not found" } });
+  });
 });
 
-// Spawn `node <cliCjs>` in a scratch cwd (proving it does NOT lean on the repo's node_modules), send a
-// JSON-RPC initialize over stdio, and resolve with the first JSON reply + collected stderr.
-function runInitialize(cliCjs: string): Promise<{ stderr: string; response: InitResponse | null }> {
+// Spawn `node <cliCjs>` in a scratch cwd (proving it does NOT lean on the repo's node_modules), send one
+// JSON-RPC request over stdio (an initialize by default), and resolve with the first JSON reply +
+// collected stderr.
+function runInitialize(cliCjs: string, request?: Record<string, unknown>): Promise<{ stderr: string; response: InitResponse | null }> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cliCjs], { cwd: dirname(cliCjs), stdio: ["pipe", "pipe", "pipe"] });
     let out = "";
@@ -117,7 +133,7 @@ function runInitialize(cliCjs: string): Promise<{ stderr: string; response: Init
       clearTimeout(timer);
       reject(e);
     });
-    const req = {
+    const req = request ?? {
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",

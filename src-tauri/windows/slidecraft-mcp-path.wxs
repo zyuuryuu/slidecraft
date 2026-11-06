@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  slidecraft-mcp-path.wxs — WiX 3 fragment merged into the MSI (bundle.windows.wix.fragmentPaths +
+  componentRefs in tauri.bundle.conf.json). The MSI counterpart of windows/slidecraft-mcp-path.nsh.
+
+  WHY: put the install dir (where slidecraft-mcp.cmd, node.exe and cli.cjs live, flat under INSTALLDIR)
+  on the USER PATH, so an upstream agent registers the bundled MCP server with ONE word, like the macOS
+  Homebrew cask (#519 / ADR-0022 / ADR-0038 D5). The exact `claude mcp add` command is in
+  docs/mcp-server.md: it contains a double hyphen, which an XML comment must not hold (XML 1.0 §2.5;
+  WiX candle.exe rejects the whole file with CNDL0104, #536), so it is not repeated here.
+
+  How it meets the #519 invariants — all declarative, executed by Windows Installer itself:
+    * USER scope: Environment/@System="no" edits the installing user's HKCU\Environment\Path, never the
+      machine PATH. (Tauri's MSI is InstallScope=perMachine and elevates, but the user environment is
+      still the launching user's.) Windows Installer broadcasts WM_SETTINGCHANGE itself.
+    * Reversible: @Permanent="no" → removed on uninstall; MSI also rolls it back if the install fails.
+    * Idempotent: Windows Installer's Environment table de-duplicates ("set"/"last" appends only when
+      the value is not already present) and merges on repair/upgrade.
+    * Visible: the component is referenced from Tauri's always-installed "External" feature, and the
+      change is listed in the MSI log (msiexec /l*v) under WriteEnvironmentStrings.
+    * A component that writes per-user data must have an HKCU registry KeyPath (MSI/ICE38 rule); the
+      value doubles as a hint for support ("where is the launcher?").
+
+  Tauri's main.wxs defines Directory Id="INSTALLDIR" (the install dir) and puts resources + external
+  binaries directly under it, so [INSTALLDIR] IS the folder containing slidecraft-mcp.cmd.
+  Content-pinned by tests/mcp-launcher-win-linux.test.ts (cannot be compiled on Linux CI).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="SlidecraftMcpUserPath" Guid="*">
+        <RegistryValue Root="HKCU" Key="Software\The SlideCraft Authors\SlideCraft" Name="McpLauncherDir" Type="string" Value="[INSTALLDIR]" KeyPath="yes" />
+        <Environment Id="SlidecraftMcpUserPathEnv" Name="PATH" Value="[INSTALLDIR]" Action="set" Part="last" Permanent="no" System="no" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

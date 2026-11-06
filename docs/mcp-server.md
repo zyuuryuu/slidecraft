@@ -43,13 +43,30 @@ claude mcp add slidecraft -- slidecraft-mcp
 }
 ```
 
-**Windows / Linux** — 同梱 node と `cli.cjs` はインストール先（アプリ本体と同じフォルダ、および `resources/` サブフォルダ）に入っています。ただし**正確なパスはインストーラ・バージョンで変わり、現状デバイス未検証**です（アプリのバイナリ名は `diagram-pipeline-desktop` で、Linux の `.deb`/`.rpm` はこの名前のディレクトリ配下に入る可能性が高い）。次のいずれかを推奨します:
+**Windows（`.exe` / `.msi`）・Linux（`.deb` / `.rpm`）** — **v0.5.1 以降**のインストーラは macOS と同じく **`slidecraft-mcp` を PATH に置きます**（ユーザ単位・アンインストールで除去・インストーラのログに表示）。登録は同じ 1 行です（#519）：
 
-- インストール先を実際に確認し、`cli.cjs`（`resources/` 配下）と `node`（アプリ本体と同階層）の絶対パスを見つけて登録する。
-- 分からなければ**ソースからの起動（B）**を使う（確実）。
-- AppImage は展開先が起動ごとに変わるため、直接パス指定は不向き → **B** を使う。
+```bash
+claude mcp add slidecraft -- slidecraft-mcp
+```
 
-> Windows/Linux 向けの PATH ランチャ（macOS の `slidecraft-mcp` 相当）は follow-up 予定です。
+インストール先を調べる必要はありません。仕組みは次のとおり（ランチャは同梱 Node で同梱 `cli.cjs` を起動するだけ。system Node 不要）：
+
+| 形式 | PATH に載るもの | ランチャの実体 |
+|---|---|---|
+| Windows NSIS（`*_x64-setup.exe`） | インストール先フォルダ（既定 `%LOCALAPPDATA%\SlideCraft`）を**ユーザ PATH**（`HKCU\Environment\Path`）に追加。インストーラの「詳細」に表示され、アンインストールで除去 | `slidecraft-mcp.cmd` — 同じフォルダの `node.exe` で `cli.cjs` を実行（Tauri は resources と sidecar をインストール先に**平置き**する） |
+| Windows MSI（`*_x64_en-US.msi`） | インストール先（既定 `C:\Program Files\SlideCraft\`）をユーザ PATH に追加（Windows Installer の Environment テーブル＝アンインストール/失敗時ロールバックで除去） | 同上 |
+| Linux `.deb` / `.rpm` | `/usr/bin/slidecraft-mcp`（sh） | `/usr/bin/node`（同梱 sidecar）で `/usr/lib/SlideCraft/cli.cjs` を実行 |
+| Linux AppImage | 自動では載らない（マウント先が起動ごとに変わる）。`./SlideCraft_<ver>_amd64.AppImage --appimage-extract` で展開し、`squashfs-root/usr/bin/slidecraft-mcp` の**絶対パス**を `command` に登録する | 同上（展開先相対で解決） |
+
+Windows の注意点：
+
+- PATH の反映は**インストール後に新しく開いたターミナル**から（開いたままのターミナルには反映されない）。
+- インストール先にあるランチャは `slidecraft-mcp.cmd` の 1 つだけです（`where slidecraft-mcp` は 1 件を返します）。macOS 用の sh 版 `slidecraft-mcp` は Windows には入りません（#537）。
+- `slidecraft-mcp` は `.cmd` ファイルです。クライアントが `.cmd` を直接 spawn できない場合（Claude Code の Windows ネイティブ版で `npx` に `cmd /c` が要るのと同じ事情）は `claude mcp add slidecraft -- cmd /c slidecraft-mcp`、mcp.json なら `{"command": "cmd", "args": ["/c", "slidecraft-mcp"]}` を使ってください。1 行登録で接続に失敗する場合はこの形を試し、結果を Issue で知らせてもらえると助かります。
+- ユーザ PATH が極端に長い（約 1,000 文字超）場合、NSIS インストーラは **PATH を壊さないために編集を見送り**、追加すべきフォルダをダイアログで案内します。その場合は手で追加してください。
+- ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
+
+> **v0.5.0 以前**のインストーラにはランチャが入っていません（`.deb` に `/usr/bin/slidecraft-mcp` は無い）。その場合は上の直接パス指定（Linux: `/usr/bin/node` ＋ `/usr/lib/SlideCraft/cli.cjs`）か、**ソースからの起動（B）**を使ってください。
 
 ### B. ソースから起動（開発版）
 
@@ -111,6 +128,8 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 読む | `get_slide_fix_request(index)` | 修正リクエスト packet（**エージェントが LLM として埋める**） |
 | 視覚 | `get_slide_image(index)` | 1スライドの**現在の描画を PNG**（image content）で返す＝AI の視覚デザインチェック用。共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一の painter）をローカルの Chrome/Edge で撮る。ブラウザ調達・閉じ込めは下記「スクショの前提」参照。tool-only（`deck://` ミラー無し・ADR-0008） |
 | 視覚 | `get_slide_html(index)` | 1スライドの**現在の描画を自己完結 HTML 文字列**で返す＝`get_slide_image` と同一の共有 HTML（script ゼロ・CSP・フォント埋め込み済）。ローカル Chrome/Edge が無い環境向け＝呼び出し側の任意の手段でラスタ化できる。`slide://{index}/html` リソースにも同じ内容がある |
+| 視覚 | `get_deck_image(start?, columns?, maxSlides?)` | deck **全枚（または `start` からの範囲）のサムネイルを 1 枚の PNG**（image content＋`{from,count,total,columns,width,height,truncated,nextStart?}` の text 1 行）で返す＝**仕上がり確認は最後にこれを 1 回**（#522・1 枚ずつ `get_slide_image` を呼ぶ 29 往復を 1 往復に）。各セルは `get_slide_image` と**同一の共有描画**を CSS で縮小したもの（第 2 の描画経路なし・R8）で、左上に 0-based index を描く。既定 5 列・最大 30 枚・幅 1920px（30 枚で約 180KB・画素予算 3.2Mpx を超える列数指定は幅を自動縮小）。超過分は `truncated:true`＋`nextStart` で続きを取る。ブラウザ要件・未検出時の案内は `get_slide_image` と同じ。細部を読むなら `get_slide_image(index)` |
+| 視覚 | `get_deck_html(start?, columns?, maxSlides?)` | `get_deck_image` と同一のコンタクトシートを**自己完結 HTML 文字列**で返す（`{html, from, count, total, columns, width, height, truncated, nextStart?}`・script ゼロ・CSP・フォント埋め込み済）。ブラウザ無し環境向け |
 | 編集(内容) | `set_slide_markdown(index, markdown)` | 1スライドを差し替え（図/mermaid 自動保持・zod 検証・不正は never-silent 拒否） |
 | 編集(内容) | `set_deck_markdown(markdown)` | ⚠ deck 全体を置換（図は保持されない・1枚だけなら set_slide_markdown / insert_slide） |
 | 編集(内容) | `split_overflowing_slides()` | 決定論レバー：溢れた本文をフォント縮小なしで分割。`changedSlides`（新 index）を返す |
@@ -303,9 +322,10 @@ use_template({id:"file:tech-report.potx"})    → {slideCount, diagnostics, cont
 
 ---
 
-## スクショの前提（`get_slide_image` のブラウザ）
+## スクショの前提（`get_slide_image` / `get_deck_image` のブラウザ）
 
-`get_slide_image` は「AI が自分の編集で崩れていないか」を視覚確認するための任意機能（#109）。撮る対象は
+`get_slide_image` は「AI が自分の編集で崩れていないか」を視覚確認するための任意機能（#109）。`get_deck_image`（#522・
+全枚を 1 枚の格子画像で）も同じ前提・同じ rasterizer・同じ未検出時の案内で動く。撮る対象は
 **共有 HTML 描画そのもの**（`SlideCard` の SSR＝preview / HTML 書き出しと同一の painter・フォント埋め込み済）で、
 第2の描画経路は作らない＝WYSIWYG 単一源。ラスタ化は近似ライブラリでなく**ブラウザのネイティブ描画**で行う。
 

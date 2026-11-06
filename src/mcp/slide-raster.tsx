@@ -1,6 +1,8 @@
 /**
  * slide-raster.tsx — #109: render ONE slide's CURRENT drawing to PNG for `get_slide_image`
- * (the upstream AI's visual design check). 方式 A1, decided in #109 and not deviated from:
+ * (the upstream AI's visual design check), and #522: the WHOLE deck as one labeled contact sheet
+ * for `get_deck_image` (the finishing check in one round trip — same page markup, same rasterizer,
+ * shot once at a planned window size). 方式 A1, decided in #109 and not deviated from:
  *
  *  - The page IS the shared rendering: the SAME SlideCard the preview mounts and the HTML export
  *    SSRs (WYSIWYG single source — #105's drawing fixes apply here automatically), wrapped by
@@ -32,7 +34,7 @@ import { SlideCard, SLIDE_W, SLIDE_H } from "../components/SlidePreview";
 import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
-import { assembleSlidePage, type EmbeddedFontFace } from "../engine/html-shell";
+import { assembleSlidePage, assembleContactSheetPage, type EmbeddedFontFace } from "../engine/html-shell";
 import { classifyCjkFont, embedFallbackFamily, type CjkClass } from "../engine/font-stack";
 import { resolveFontSubsetSource } from "../engine/font-subset-plan";
 import { collectDeckText, deckHasCjkText } from "../engine/deck-text-collect";
@@ -123,16 +125,21 @@ function embeddedFontsFor(deck: DeckIR, template: TemplateData, env: NodeJS.Proc
   return faces;
 }
 
-/** SSR ONE slide to a self-contained, script-free page — the SAME SlideCard + layout resolution +
- *  derived-slide materialization as the preview and the HTML export (WYSIWYG single source). */
-export function renderSlideHtml(session: Session, index: number, env: NodeJS.ProcessEnv = process.env): string {
+/** The deck as the renderer sees it: derived slides materialized, catalog built — resolved ONCE per
+ *  call so a whole-deck sheet doesn't redo it per slide. */
+function preparedDeck(session: Session) {
   const { deck, template } = requireLoaded(session);
   const prepared = materializeDerivedSlides(deck);
-  assertIndex(prepared, index);
-  const catalog = buildCatalog(template);
+  return { prepared, template, catalog: buildCatalog(template) };
+}
+
+/** SSR ONE slide's markup (SlideCard, exportMode, 96dpi) — THE single render path (R8): the
+ *  single-slide page and the deck contact sheet both wrap exactly this string. */
+function renderSlideBody(p: ReturnType<typeof preparedDeck>, index: number): string {
+  const { prepared, template, catalog } = p;
   const slide = prepared.slides[index];
   const layout = findLayout(template, autoSelectLayout(slide, index, prepared.slides.length, catalog));
-  const slideHtml = renderToStaticMarkup(
+  return renderToStaticMarkup(
     <SlideCard
       slide={slide}
       slideIndex={index}
@@ -150,22 +157,112 @@ export function renderSlideHtml(session: Session, index: number, env: NodeJS.Pro
       exportMode
     />,
   );
-  return assembleSlidePage(slideHtml, {
+}
+
+/** SSR ONE slide to a self-contained, script-free page — the SAME SlideCard + layout resolution +
+ *  derived-slide materialization as the preview and the HTML export (WYSIWYG single source). */
+export function renderSlideHtml(session: Session, index: number, env: NodeJS.ProcessEnv = process.env): string {
+  const p = preparedDeck(session);
+  assertIndex(p.prepared, index);
+  return assembleSlidePage(renderSlideBody(p, index), {
     stageW: SLIDE_W * SCALE,
     stageH: SLIDE_H * SCALE,
-    embeddedFonts: embeddedFontsFor(prepared, template, env),
+    embeddedFonts: embeddedFontsFor(p.prepared, p.template, env),
   });
+}
+
+// ── Deck contact sheet (#522): every slide as a labeled thumbnail on ONE page, shot ONCE ──
+
+/** Sizing defaults, measured in PR #522's body (30 mixed slides on the Midnight fixture → a
+ *  1918×1436 PNG of ≈180 KB, rasterized in <1 s; far under the Issue's 2–3 MB ceiling):
+ *  - columns 5 / maxSlides 30: one default call covers a typical deck in a single round trip;
+ *  - maxWidth 1920: cells of 374 px — layout, overflow and figure shrink are visible, text is not
+ *    meant to be read here (that is get_slide_image's job);
+ *  - pixelBudget 3.2 Mpx (≈1920×1660): a tall request (few columns × many slides) shrinks the sheet
+ *    instead of producing a multi-thousand-px image (columns:2 × 30 slides → 1244×2558 would be
+ *    ~3.2 Mpx anyway; columns:1 is clamped the same way). */
+export const DECK_SHEET = { columns: 5, maxSlides: 30, maxWidth: 1920, pixelBudget: 3_200_000, labelH: 20, gap: 8, pad: 8 } as const;
+
+export interface DeckSheetOptions {
+  /** First slide (0-based, default 0). Out of range → index-out-of-range. */
+  start?: number;
+  /** Grid columns (default DECK_SHEET.columns; clamped to the slide count so a short deck gets bigger cells). */
+  columns?: number;
+  /** Max slides on this sheet (default DECK_SHEET.maxSlides). Slides left after the window → truncated:true. */
+  maxSlides?: number;
+}
+
+export interface DeckSheetPlan {
+  from: number;
+  count: number;
+  total: number;
+  truncated: boolean;
+  columns: number;
+  rows: number;
+  cellW: number;
+  cellH: number;
+  width: number;
+  height: number;
+}
+
+/** Pure geometry: window the deck (start/maxSlides), pick whole-pixel cells that fill `maxWidth`, then
+ *  shrink until the sheet fits `pixelBudget`. The browser window is set to exactly width×height. */
+export function planDeckSheet(total: number, o: DeckSheetOptions): DeckSheetPlan {
+  const from = o.start ?? 0;
+  if (!Number.isInteger(from) || from < 0 || from >= total) {
+    throw new GuardError(`スライド番号が範囲外です（0..${total - 1}）: ${from}`, "index-out-of-range");
+  }
+  const maxSlides = o.maxSlides ?? DECK_SHEET.maxSlides;
+  if (!Number.isInteger(maxSlides) || maxSlides < 1) throw new GuardError(`maxSlides は 1 以上の整数で指定してください: ${maxSlides}`, "invalid-argument");
+  const wantCols = o.columns ?? DECK_SHEET.columns;
+  if (!Number.isInteger(wantCols) || wantCols < 1) throw new GuardError(`columns は 1 以上の整数で指定してください: ${wantCols}`, "invalid-argument");
+  const count = Math.min(maxSlides, total - from);
+  const columns = Math.min(wantCols, count);
+  const rows = Math.ceil(count / columns);
+  const { labelH, gap, pad } = DECK_SHEET;
+  const geometry = (cellW: number) => {
+    const cellH = Math.round((cellW * SLIDE_H) / SLIDE_W);
+    return { cellW, cellH, width: 2 * pad + columns * cellW + (columns - 1) * gap, height: 2 * pad + rows * (labelH + cellH) + (rows - 1) * gap };
+  };
+  let g = geometry(Math.floor((DECK_SHEET.maxWidth - 2 * pad - (columns - 1) * gap) / columns));
+  if (g.width * g.height > DECK_SHEET.pixelBudget) g = geometry(Math.floor(g.cellW * Math.sqrt(DECK_SHEET.pixelBudget / (g.width * g.height))));
+  while (g.width * g.height > DECK_SHEET.pixelBudget && g.cellW > 16) g = geometry(g.cellW - 1); // fixed pad/gap make the sqrt step approximate
+  // truncated = slides remain AFTER this window (the caller pages on with start = from + count).
+  return { from, count, total, truncated: from + count < total, columns, rows, ...g };
+}
+
+/** ONE self-contained page with slides [from, from+count) as labeled thumbnails — each cell wraps the
+ *  byte-identical markup renderSlideHtml puts in its <body> (R8: no second render path). */
+export function renderDeckHtml(session: Session, o: DeckSheetOptions, env: NodeJS.ProcessEnv = process.env): { html: string; meta: DeckSheetPlan } {
+  const p = preparedDeck(session);
+  const meta = planDeckSheet(p.prepared.slides.length, o);
+  const cells = Array.from({ length: meta.count }, (_, k) => ({ index: meta.from + k, slideHtml: renderSlideBody(p, meta.from + k) }));
+  const html = assembleContactSheetPage(cells, {
+    stageW: SLIDE_W * SCALE,
+    stageH: SLIDE_H * SCALE,
+    columns: meta.columns,
+    cellW: meta.cellW,
+    cellH: meta.cellH,
+    labelH: DECK_SHEET.labelH,
+    gap: DECK_SHEET.gap,
+    pad: DECK_SHEET.pad,
+    width: meta.width,
+    height: meta.height,
+    embeddedFonts: embeddedFontsFor(p.prepared, p.template, env),
+  });
+  return { html, meta };
 }
 
 // ── Headless rasterization (confined) ──
 
 /** Screenshot `html` in the given Chromium-family browser. Network is DEAD (closed-port proxy +
  *  NOTFOUND DNS), profile is disposable, sandbox stays on unless explicitly opted out (root
- *  containers). Returns the PNG bytes; any failure is a modeled, never-silent GuardError. */
+ *  containers). Returns the PNG bytes; any failure is a modeled, never-silent GuardError.
+ *  `width`/`height` size the window (default: one slide); the deck sheet passes its own plan. */
 export async function rasterizeHtml(
   browserPath: string,
   html: string,
-  opts: { timeoutMs?: number; env?: NodeJS.ProcessEnv } = {},
+  opts: { timeoutMs?: number; env?: NodeJS.ProcessEnv; width?: number; height?: number } = {},
 ): Promise<Buffer> {
   const env = opts.env ?? process.env;
   const work = mkdtempSync(join(tmpdir(), "slidecraft-raster-"));
@@ -175,7 +272,7 @@ export async function rasterizeHtml(
   const args = [
     "--headless",
     `--screenshot=${pngPath}`,
-    `--window-size=${RASTER_W},${RASTER_H}`,
+    `--window-size=${opts.width ?? RASTER_W},${opts.height ?? RASTER_H}`,
     "--hide-scrollbars",
     "--disable-gpu",
     "--disable-dev-shm-usage",
@@ -234,10 +331,9 @@ export interface SlideImage {
   browserPath: string;
 }
 
-/** The full get_slide_image path: resolve doc state → shared-rendering page → confined headless
- *  screenshot. Browser absence is a modeled, GUIDING error (screenshots are optional; the server
- *  keeps working without them). */
-export async function rasterizeSlide(session: Session, index: number, env: NodeJS.ProcessEnv = process.env): Promise<SlideImage> {
+/** Browser absence is a modeled, GUIDING error (screenshots are optional; the server keeps working
+ *  without them) — ONE wording for get_slide_image and get_deck_image. */
+function requireBrowser(env: NodeJS.ProcessEnv): string {
   const found = findBrowser(env);
   if (!found) {
     throw new GuardError(
@@ -245,7 +341,27 @@ export async function rasterizeSlide(session: Session, index: number, env: NodeJ
       "browser-not-found",
     );
   }
+  return found.path;
+}
+
+/** The full get_slide_image path: resolve doc state → shared-rendering page → confined headless
+ *  screenshot. */
+export async function rasterizeSlide(session: Session, index: number, env: NodeJS.ProcessEnv = process.env): Promise<SlideImage> {
+  const browserPath = requireBrowser(env);
   const html = renderSlideHtml(session, index, env);
-  const png = await rasterizeHtml(found.path, html, { env });
-  return { pngBase64: png.toString("base64"), mimeType: "image/png", width: RASTER_W, height: RASTER_H, browserPath: found.path };
+  const png = await rasterizeHtml(browserPath, html, { env });
+  return { pngBase64: png.toString("base64"), mimeType: "image/png", width: RASTER_W, height: RASTER_H, browserPath };
+}
+
+export type DeckImage = SlideImage & DeckSheetPlan;
+
+/** The full get_deck_image path (#522): the contact-sheet page, shot ONCE at exactly the planned
+ *  width×height by the same confined rasterizer as get_slide_image. */
+export async function rasterizeDeck(session: Session, o: DeckSheetOptions, env: NodeJS.ProcessEnv = process.env): Promise<DeckImage> {
+  const browserPath = requireBrowser(env);
+  const { html, meta } = renderDeckHtml(session, o, env);
+  // Same 30 s deadline as one slide (measured <1 s for 30 slides) — a longer one would outlive the
+  // MCP SDK's default 60 s client timeout and turn a modeled raster-timeout into a transport error.
+  const png = await rasterizeHtml(browserPath, html, { env, width: meta.width, height: meta.height });
+  return { pngBase64: png.toString("base64"), mimeType: "image/png", browserPath, ...meta };
 }

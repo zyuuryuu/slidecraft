@@ -10,6 +10,10 @@
 *.sh    text eol=lf
 *.mjs   text eol=lf
 
+# Windows batch files are checked out CRLF on EVERY OS (so the release runner packages a CRLF file):
+# cmd.exe mis-parses some LF-only batch constructs. The index still stores LF (text=auto normalisation).
+*.cmd   text eol=crlf
+
 # Binary assets — never apply text/eol conversion.
 *.pptx  binary
 *.potx  binary

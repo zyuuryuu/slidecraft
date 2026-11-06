@@ -13,7 +13,7 @@
  * diagram-zones.ts (groups/lanes/buses). Coordinates are inches.
  */
 
-import type { DiagramSpec, EdgeStyle } from "./schema";
+import type { DiagramSpec, EdgeStyle, Node } from "./schema";
 import { DEFAULT_THEME } from "./theme";
 import { luminance } from "./ooxml-resolve";
 import {
@@ -79,6 +79,23 @@ function paintFitted(
   dt.beginGroup();
   paint(dt);
   dt.endGroup();
+}
+
+/** The style a node is painted with: defaults ← its classDef ← its inline `style`. ONE resolution
+ *  shared by the painter and by the shrink diagnostic (#473) that reads the painted label font (R8). */
+export function resolveNodeStyle(spec: DiagramSpec, node: Node): ResolvedStyle {
+  const style: ResolvedStyle = {
+    fill: undefined,
+    border: undefined,
+    border_width: 1.5,
+    border_dash: false,
+    font_color: "#FFFFFF",
+    font_size: 11,
+    font_bold: true,
+  };
+  if (node.class && spec.classDefs[node.class]) Object.assign(style, spec.classDefs[node.class]);
+  if (node.style) Object.assign(style, node.style);
+  return style;
 }
 
 export function paintDiagram(
@@ -214,26 +231,9 @@ export function paintDiagram(
     const node = nodeMap.get(pos.nodeId);
     if (!node) continue;
 
-    const baseStyle: ResolvedStyle = {
-      fill: undefined,
-      border: undefined,
-      border_width: 1.5,
-      border_dash: false,
-      font_color: "#FFFFFF",
-      font_size: 11,
-      font_bold: true,
-    };
-
-    if (node.class && spec.classDefs[node.class]) {
-      Object.assign(baseStyle, spec.classDefs[node.class]);
-    }
-    if (node.style) {
-      Object.assign(baseStyle, node.style);
-    }
-
     // A node = its box + label (+ class compartments) as one sub-group.
     dt.beginGroup();
-    paintShape(dt, node, pos, baseStyle, theme, layoutScale);
+    paintShape(dt, node, pos, resolveNodeStyle(spec, node), theme, layoutScale);
     dt.endGroup();
   }
 

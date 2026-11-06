@@ -1,15 +1,24 @@
 #!/bin/sh
 # slidecraft-mcp — launch the bundled SlideCraft MCP server with the bundled Node runtime.
 #
-# Ships INSIDE SlideCraft.app (Contents/Resources/slidecraft-mcp) and is placed on PATH by the
-# Homebrew cask's `binary` stanza. It needs NO system Node: it execs the Node runtime and the
-# self-contained MCP server (cli.cjs) that ship inside the app. Register it in an upstream agent:
+# macOS: ships INSIDE SlideCraft.app (Contents/Resources/slidecraft-mcp) and is placed on PATH by the
+# Homebrew cask's `binary` stanza. Linux: the .deb/.rpm/AppImage ALSO install this very file as
+# /usr/bin/slidecraft-mcp (bundle.linux.*.files) — on PATH by construction. Either way it needs NO
+# system Node: it execs the Node runtime and the self-contained MCP server (cli.cjs) that ship with
+# the app (ADR-0022). Register it in an upstream agent:
 #
 #   claude mcp add slidecraft -- slidecraft-mcp
 #   # or, in a mcp.json:  {"command": "slidecraft-mcp"}
 #
 # The MCP server talks stdio JSON-RPC (--no-fs: .slidecraft/.pptx bytes flow as base64), so the
 # trust boundary is just the agent that spawned it — no network, no filesystem writes.
+#
+# Shipped layouts this script must resolve (Tauri v2 bundler, verified against the v0.5.0 .deb):
+#   macOS .app     Contents/Resources/slidecraft-mcp  node=../MacOS/node          cli=./cli.cjs
+#   Linux /usr/bin /usr/bin/slidecraft-mcp            node=./node (sidecar)       cli=../lib/SlideCraft/cli.cjs
+#   Linux resource /usr/lib/SlideCraft/slidecraft-mcp node=../../bin/node         cli=./cli.cjs
+#   AppImage       same as Linux, under the --appimage-extract'ed squashfs-root/
+# (/usr/lib/SlideCraft = Tauri's resource dir, /usr/lib/<productName>; tests pin the agreement.)
 
 # Resolve this script's REAL path. Homebrew installs it as a symlink in <prefix>/bin, so $0 is the
 # symlink; follow the chain (POSIX, no `readlink -f` which BSD/macOS historically lacks) to the
@@ -23,10 +32,21 @@ while [ -h "$target" ]; do
     *) target="$dir/$link" ;;
   esac
 done
-here="$(cd "$(dirname "$target")" && pwd)" # .../SlideCraft.app/Contents/Resources
+here="$(cd "$(dirname "$target")" && pwd)" # .../SlideCraft.app/Contents/Resources, /usr/bin or /usr/lib/SlideCraft
 
-node="$here/../MacOS/node" # the bundled Node externalBin sits in Contents/MacOS (sibling of Resources)
-cli="$here/cli.cjs"        # the self-contained MCP server bundled next to this script
+node="$here/../MacOS/node" # macOS: the bundled Node externalBin sits in Contents/MacOS (sibling of Resources)
+cli="$here/cli.cjs"        # the self-contained MCP server bundled next to this script (macOS, Linux resource dir)
 
-[ -x "$node" ] || node="node" # fall back to a PATH node if the bundle layout ever differs
+if [ ! -x "$node" ]; then
+  # Linux (.deb/.rpm/AppImage): the node sidecar is installed to /usr/bin (next to this launcher when
+  # it runs as /usr/bin/slidecraft-mcp) and cli.cjs to Tauri's resource dir /usr/lib/<productName>/.
+  [ -f "$cli" ] || cli="$here/../lib/SlideCraft/cli.cjs"
+  if [ -x "$here/node" ]; then
+    node="$here/node"
+  elif [ -x "$here/../../bin/node" ]; then
+    node="$here/../../bin/node" # launched from the resource-dir copy (/usr/lib/SlideCraft/slidecraft-mcp)
+  else
+    node="node" # fall back to a PATH node if the bundle layout ever differs
+  fi
+fi
 exec "$node" "$cli" "$@"

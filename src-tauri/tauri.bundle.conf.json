@@ -5,11 +5,23 @@
     "resources": {
       "../dist/mcp/host.cjs": "host.cjs",
       "../dist/mcp/cli.cjs": "cli.cjs",
-      "../scripts/slidecraft-mcp": "slidecraft-mcp"
+      "../scripts/slidecraft-mcp.cmd": "slidecraft-mcp.cmd"
     },
     "macOS": {
       "signingIdentity": "-",
       "hardenedRuntime": false
+    },
+    "linux": {
+      "deb": { "files": { "/usr/bin/slidecraft-mcp": "../scripts/slidecraft-mcp" } },
+      "rpm": { "files": { "/usr/bin/slidecraft-mcp": "../scripts/slidecraft-mcp" } },
+      "appimage": { "files": { "/usr/bin/slidecraft-mcp": "../scripts/slidecraft-mcp" } }
+    },
+    "windows": {
+      "nsis": { "installerHooks": "./windows/slidecraft-mcp-path.nsh" },
+      "wix": {
+        "fragmentPaths": ["./windows/slidecraft-mcp-path.wxs"],
+        "componentRefs": ["SlidecraftMcpUserPath"]
+      }
     }
   }
 }

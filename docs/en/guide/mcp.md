@@ -53,7 +53,9 @@ brew install --cask zyuuryuu/slidecraft/slidecraft   # skip if already installed
 claude mcp add slidecraft -- slidecraft-mcp           # for Claude Code
 ```
 
-When registering via mcp.json in Claude Desktop / Cursor, write `{"command": "slidecraft-mcp"}`. To point directly at the bundled node plus cli.cjs without using the launcher, see "Two ways to use it" in the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
+**Windows (`.exe` / `.msi`) and Linux (`.deb` / `.rpm`)** — installers from **v0.5.1 on** also put `slidecraft-mcp` on your PATH (per user; removed on uninstall), so the same one-line command works. On Windows it takes effect in terminals opened **after** the install. For an AppImage, extract it with `--appimage-extract` and register the absolute path of `squashfs-root/usr/bin/slidecraft-mcp`.
+
+When registering via mcp.json in Claude Desktop / Cursor, write `{"command": "slidecraft-mcp"}`. To point directly at the bundled node plus cli.cjs without using the launcher, and for per-OS details, see "Two ways to use it" in the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
 
 ### B. Launch from source (development version)
 
@@ -121,8 +123,13 @@ Copilot uses a **different config schema**. The key is **`servers`** (not `mcpSe
 
 To register it for your whole user profile, use the same shape under `"mcp": { "servers": { ... } }` in VS Code's `settings.json`.
 
-::: details Registering on Windows / Linux, or with the source version (B)
-PATH registration of `slidecraft-mcp` is currently macOS/Homebrew only. On Windows/Linux, register with the **absolute path to the bundled node plus `cli.cjs`** (confirm the install location — set `command` to the bundled node and `args` to `["/absolute/path/resources/cli.cjs"]`). For the source version (B), set `command` to `node` and `args` to `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]` (an absolute path). In Claude Code: `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`. In all of these cases Copilot also needs `"type": "stdio"`. For details on direct paths, see the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
+::: details Registering when a Windows client cannot spawn a `.cmd`, on v0.5.0 or older, with an AppImage, or with the source version (B)
+- **Windows**: from v0.5.1 on, `slidecraft-mcp` (really `slidecraft-mcp.cmd`) is on PATH. If your client cannot spawn a `.cmd` directly, set `command` to `cmd` and `args` to `["/c", "slidecraft-mcp"]` (Claude Code: `claude mcp add slidecraft -- cmd /c slidecraft-mcp`).
+- **Installers v0.5.0 or older** (no launcher): register the **absolute path to the bundled node plus `cli.cjs`**. Windows: `command` = `<install dir>\node.exe`, `args` = `["<install dir>\cli.cjs"]` (same folder). Linux: `command` = `/usr/bin/node`, `args` = `["/usr/lib/SlideCraft/cli.cjs"]`.
+- **AppImage**: run `./SlideCraft_<ver>_amd64.AppImage --appimage-extract` and set `command` to the absolute path of `squashfs-root/usr/bin/slidecraft-mcp`.
+- **Source version (B)**: set `command` to `node` and `args` to `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]` (an absolute path). In Claude Code: `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`.
+
+In all of these cases Copilot also needs `"type": "stdio"`. For the per-OS mechanics and caveats, see the [MCP server specification](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md).
 :::
 
 After registration, SlideCraft's tools (described below) become visible to the agent.
@@ -148,9 +155,11 @@ If you're already registering the HTTP endpoint directly, remove it and switch t
 
 An MCP connection hands over **tools** (engine operations). In addition, giving the agent **a procedure for "how to author"**
 lets it reliably produce the deck you intend. That procedure lives in
-[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) — it condenses onto a single page the flow of
-connect → provision a template → `get_authoring_guide` → `set_slide_markdown` → diagrams → the `get_deck_issues` feedback loop →
-`validate_deck`/`export_pptx`, along with contracts such as never-silent, the envelope, and `data:image` only.
+[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) — within 40 lines it gives **only the order of
+operations**: connect → `bootstrap` (the whole authoring contract in one call) → provision a template → `set_slide_markdown` →
+diagrams → the `get_deck_issues` feedback loop (one visual check, at the end) → `validate_deck`/`export_pptx`. The contracts
+themselves (never-silent, the envelope, `data:image` only, …) are spoken by the server: they are in the `bootstrap` response and
+the tool descriptions (ADR-0037 D3).
 
 **How to hand it over (by agent):**
 
@@ -160,8 +169,8 @@ connect → provision a template → `get_authoring_guide` → `set_slide_markdo
 
 ::: tip The runtime contract takes precedence
 `SKILL.md` is a **generic procedure**. The **exact formatting, layout names, and body budget** for the template currently loaded
-are always most-current and authoritative in the **self-describing contract** that `get_authoring_guide()` returns at runtime.
-Tell the agent to "read `get_authoring_guide` first" (`SKILL.md` states this too).
+are always most-current and authoritative in the **self-describing contract** that `bootstrap()` (which bundles
+`get_authoring_guide()` and the other cold reads) returns at runtime. Tell the agent to "call `bootstrap` first" (`SKILL.md` states this too).
 :::
 
 ---
@@ -198,6 +207,8 @@ while `class` / `state` / `ER` / `mindmap` go in ` ```mermaid `. See [Diagrams](
 | `get_slide_markdown(index)` | The raw Markdown of one slide (layout already resolved) |
 | `get_slide_image(index)` | Returns the slide's **current rendering as a PNG** (the AI's visual design check). Screenshots the same shared rendering as the preview / HTML export, using a locally installed Chrome/Edge. Optional feature (see below) |
 | `get_slide_html(index)` | Returns the slide's **current rendering as a self-contained HTML string** (the same shared rendering `get_slide_image` screenshots — zero `<script>`, fonts embedded). Works even without a local Chrome/Edge — rasterize it with whatever means the caller has |
+| `get_deck_image(start?, columns?, maxSlides?)` | Returns **thumbnails of the whole deck as ONE PNG** (a grid; each cell is labeled with its 0-based index). Do the finishing check with one call instead of one `get_slide_image` per slide. Defaults: 5 columns, at most 30 slides, 1920 px wide; the remainder is reported as `truncated:true` with `nextStart` |
+| `get_deck_html(start?, columns?, maxSlides?)` | The same contact sheet as `get_deck_image`, as a **self-contained HTML string** (for environments without a browser) |
 | `set_slide_markdown(index, markdown)` | Replaces one slide (diagrams/mermaid are auto-preserved, validated, and invalid input is never-silent rejected) |
 | `set_slide_diagram(index, source, format, ...)` | Sets a diagram from DiagramSpec/Mermaid. Replaces an existing diagram, or adds to the body area on a text slide |
 | `apply_design_intent(index, intent)` | Applies **spatial intent** to a diagram (text left / diagram right, node emphasis, orientation change). *Only for slides that have a diagram* |

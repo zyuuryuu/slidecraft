@@ -52,7 +52,9 @@ brew install --cask zyuuryuu/slidecraft/slidecraft   # 済みなら不要
 claude mcp add slidecraft -- slidecraft-mcp           # Claude Code の場合
 ```
 
-Claude Desktop / Cursor など mcp.json で登録する場合は `{"command": "slidecraft-mcp"}` を書きます。ランチャを使わず、同梱 node ＋ cli.cjs を直接指す方法は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) の「使い方は 2 通り」を参照してください。
+**Windows（`.exe` / `.msi`）・Linux（`.deb` / `.rpm`）** — **v0.5.1 以降**のインストーラも `slidecraft-mcp` を PATH に置くので（ユーザ単位・アンインストールで除去）、同じ 1 行で登録できます。Windows はインストール後に**新しく開いた**ターミナルから有効です。AppImage は `--appimage-extract` で展開した `squashfs-root/usr/bin/slidecraft-mcp` の絶対パスを登録します。
+
+Claude Desktop / Cursor など mcp.json で登録する場合は `{"command": "slidecraft-mcp"}` を書きます。ランチャを使わず、同梱 node ＋ cli.cjs を直接指す方法や OS 別の詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) の「使い方は 2 通り」を参照してください。
 
 ### B. ソースから起動（開発版）
 
@@ -120,8 +122,13 @@ Copilot だけ**設定スキーマが違います**。キーは `mcpServers` で
 
 ユーザ全体に入れる場合は VS Code の `settings.json` の `"mcp": { "servers": { ... } }` 配下でも同じ形です。
 
-::: details Windows / Linux、またはソース版（B）で登録する
-`slidecraft-mcp` の PATH 登録は現状 macOS/Homebrew のみです。Windows/Linux は **同梱 node ＋ `cli.cjs` の絶対パス**（インストール先を要確認）で登録します（`command` を同梱 node、`args` を `["/絶対パス/resources/cli.cjs"]` に）。ソース版（B）なら `command` を `node`、`args` を `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]`（絶対パス）に。Claude Code では `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`。Copilot は上記いずれの場合も `"type": "stdio"` を併記します。直接パスの詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照してください。
+::: details Windows で `.cmd` を直接起動できないクライアント、v0.5.0 以前、AppImage、ソース版（B）で登録する
+- **Windows**: v0.5.1 以降は `slidecraft-mcp`（実体は `slidecraft-mcp.cmd`）が PATH にあります。クライアントが `.cmd` を直接 spawn できない場合は `command` を `cmd`、`args` を `["/c", "slidecraft-mcp"]` に（Claude Code: `claude mcp add slidecraft -- cmd /c slidecraft-mcp`）。
+- **v0.5.0 以前のインストーラ**（ランチャ無し）: **同梱 node ＋ `cli.cjs` の絶対パス**で登録します。Windows は `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（同じフォルダ）、Linux は `command` = `/usr/bin/node`、`args` = `["/usr/lib/SlideCraft/cli.cjs"]`。
+- **AppImage**: `./SlideCraft_<ver>_amd64.AppImage --appimage-extract` で展開し、`squashfs-root/usr/bin/slidecraft-mcp` の絶対パスを `command` に。
+- **ソース版（B）**: `command` を `node`、`args` を `["/absolute/path/to/slidecraft/dist/mcp/cli.js"]`（絶対パス）に。Claude Code では `claude mcp add slidecraft -- node /absolute/path/to/slidecraft/dist/mcp/cli.js`。
+
+Copilot は上記いずれの場合も `"type": "stdio"` を併記します。OS 別の仕組みと注意点は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照してください。
 :::
 
 登録後、エージェントから SlideCraft のツール群（後述）が見えるようになります。
@@ -146,9 +153,10 @@ Copilot だけ**設定スキーマが違います**。キーは `mcpServers` で
 
 MCP 接続で渡るのは**ツール**（エンジンの操作）です。加えて、エージェントに**「どう著作するか」の手順**を渡すと、
 狙いどおりのデッキが安定して作れます。そのための手順書が
-[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) です — 接続 → テンプレ調達 →
-`get_authoring_guide` → `set_slide_markdown` → 図 → `get_deck_issues` フィードバックループ →
-`validate_deck`/`export_pptx` の流れと、never-silent・envelope・`data:image` のみ、等の契約を1枚にまとめています。
+[`SKILL.md`](https://github.com/zyuuryuu/slidecraft/blob/main/SKILL.md) です — 接続 → `bootstrap`（著作契約を
+1 回で取得）→ テンプレ調達 → `set_slide_markdown` → 図 → `get_deck_issues` フィードバックループ（画像確認は
+最後に 1 回）→ `validate_deck`/`export_pptx` の**手順だけ**を 40 行以内にまとめています。never-silent・envelope・
+`data:image` のみ、等の契約そのものはサーバが語ります（`bootstrap` の応答とツール説明に含まれる・ADR-0037 D3）。
 
 **渡し方（エージェント別）:**
 
@@ -158,8 +166,8 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 
 ::: tip 実行時の契約が最優先
 `SKILL.md` は**汎用の手順**です。いま読み込んでいるテンプレの**正確な書式・レイアウト名・本文 budget** は、
-実行時に `get_authoring_guide()` が返す**自己記述コントラクト**が常に最新・正典です。エージェントには
-「まず `get_authoring_guide` を読む」と伝えてください（`SKILL.md` にもそう明記しています）。
+実行時に `bootstrap()`（＝`get_authoring_guide()` 等を 1 回にまとめたもの）が返す**自己記述コントラクト**が
+常に最新・正典です。エージェントには「まず `bootstrap` を呼ぶ」と伝えてください（`SKILL.md` にもそう明記しています）。
 :::
 
 ---
@@ -196,6 +204,8 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 | `get_slide_markdown(index)` | 1 スライドの素の Markdown（レイアウト解決済み） |
 | `get_slide_image(index)` | 1 スライドの**現在の描画を PNG で返す**（AI の視覚デザインチェック）。preview / HTML 書き出しと同じ共有描画をローカルの Chrome/Edge で撮る。任意機能（後述） |
 | `get_slide_html(index)` | 1 スライドの**現在の描画を自己完結 HTML 文字列で返す**（`get_slide_image` と同じ共有描画・script ゼロ・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境でも、呼び出し側の任意の手段でラスタ化できる |
+| `get_deck_image(start?, columns?, maxSlides?)` | deck **全枚のサムネイルを 1 枚の PNG**（格子・各セル左上に 0-based index）で返す。仕上がり確認は最後にこれを 1 回（1 枚ずつ `get_slide_image` を呼ぶ往復を無くす）。既定 5 列・最大 30 枚・幅 1920px、超過分は `truncated:true`＋`nextStart` で続きを取る |
+| `get_deck_html(start?, columns?, maxSlides?)` | `get_deck_image` と同じコンタクトシートを**自己完結 HTML 文字列**で返す（ブラウザ無し環境向け） |
 | `set_slide_markdown(index, markdown)` | 1 スライドを差し替え（図/mermaid は自動保持・検証・不正は never-silent 拒否） |
 | `set_slide_diagram(index, source, format, ...)` | 図を DiagramSpec/Mermaid で設定。図ありは置換、テキストスライドには本文領域へ追加 |
 | `apply_design_intent(index, intent)` | 図に**空間意図**を反映（テキスト左/図右・ノード強調・向きの変更）※図を持つスライドのみ |
