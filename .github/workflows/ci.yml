@@ -137,16 +137,3 @@ jobs:
         env:
           SLIDECRAFT_E2E_BROWSER: "1"
         run: npx vitest run tests/mcp-slide-image.test.ts tests/mcp-deck-image.test.ts
-      # TEMPORARY DIAGNOSTIC (PR #528, reverted before merge): shoot the contact sheet under a flag/CSS
-      # matrix in this runner's google-chrome and keep the PNGs + HTML as an artifact.
-      - name: DIAG deck-sheet matrix (#528, temporary)
-        if: ${{ always() }}
-        env:
-          SLIDECRAFT_DIAG: "1"
-        run: npx vitest run tests/zz-diag-deck-sheet.test.ts
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ always() }}
-        with:
-          name: diag-deck-sheet
-          path: diag-out/
-          retention-days: 3
