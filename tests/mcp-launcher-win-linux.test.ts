@@ -50,6 +50,32 @@ interface Overlay {
 const overlay = JSON.parse(read("src-tauri/tauri.bundle.conf.json")) as Overlay;
 const productName = (JSON.parse(read("src-tauri/tauri.conf.json")) as { productName: string }).productName;
 
+// ── Effective bundle config per OS (mirrors tauri-cli's load order, #537) ─────────────────────────
+// tauri-cli (`crates/tauri-cli/src/helpers/config.rs::load_config`) builds the config as
+//   tauri.conf.json  ⊕  tauri.<platform>.conf.json (if present)  ⊕  every `--config` overlay,
+// each step a JSON Merge Patch (RFC 7396): objects merge key by key, anything else (arrays included)
+// replaces the whole value. The platform file is read unconditionally — `--config` does NOT switch it
+// off — so `bundle.resources` (an object) is the union of the common overlay and the platform file.
+type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+const isObj = (v: Json): v is { [k: string]: Json } => typeof v === "object" && v !== null && !Array.isArray(v);
+function mergePatch(target: Json, patch: Json): Json {
+  if (!isObj(patch)) return patch;
+  const out: { [k: string]: Json } = isObj(target) ? { ...target } : {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null) delete out[k];
+    else out[k] = mergePatch(out[k] ?? null, v);
+  }
+  return out;
+}
+type Platform = "windows" | "macos" | "linux";
+function effectiveBundle(platform: Platform): Overlay["bundle"] {
+  let conf: Json = JSON.parse(read("src-tauri/tauri.conf.json")) as Json;
+  const platformFile = `src-tauri/tauri.${platform}.conf.json`;
+  if (existsSync(join(root, platformFile))) conf = mergePatch(conf, JSON.parse(read(platformFile)) as Json);
+  conf = mergePatch(conf, overlay as unknown as Json);
+  return (conf as unknown as Overlay).bundle;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Windows launcher (.cmd) — content (cannot execute on Linux)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,9 +229,51 @@ describe.skipIf(skipPosix)("slidecraft-mcp (sh) — resolves the bundled node + 
 // Bundle overlay wiring (Tauri v2 config) — one place ships the launcher on every OS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("tauri.bundle.conf.json — ships the launchers and the installer PATH wiring", () => {
-  it("resources carry both launchers next to cli.cjs", () => {
-    expect(overlay.bundle.resources["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
+  it("the common overlay carries the .cmd launcher next to cli.cjs, and NOT the POSIX sh launcher (#537)", () => {
+    // The sh launcher used to sit here too, so Windows installs got an extension-less `slidecraft-mcp`
+    // FIRST on PATH (`where slidecraft-mcp` → sh file, then .cmd). It now lives in the macOS platform file.
     expect(overlay.bundle.resources["../scripts/slidecraft-mcp.cmd"]).toBe("slidecraft-mcp.cmd");
+    expect(overlay.bundle.resources["../dist/mcp/cli.cjs"]).toBe("cli.cjs");
+    expect(overlay.bundle.resources["../scripts/slidecraft-mcp"]).toBeUndefined();
+    expect(Object.values(overlay.bundle.resources)).not.toContain("slidecraft-mcp");
+  });
+
+  it("tauri.macos.conf.json (auto-merged platform config) is where the sh launcher ships for the cask", () => {
+    const mac = JSON.parse(read("src-tauri/tauri.macos.conf.json")) as Overlay;
+    expect(mac.bundle.resources["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
+    // Only the launcher — everything else stays in the common overlay so the two never disagree.
+    expect(Object.keys(mac.bundle.resources)).toEqual(["../scripts/slidecraft-mcp"]);
+  });
+
+  it("effective Windows resources: cli.cjs, host.cjs and the .cmd — no extension-less sh file on PATH", () => {
+    const res = effectiveBundle("windows").resources;
+    expect(Object.values(res)).toContain("slidecraft-mcp.cmd");
+    expect(Object.values(res)).toContain("cli.cjs");
+    expect(Object.values(res)).toContain("host.cjs");
+    expect(Object.values(res)).not.toContain("slidecraft-mcp");
+    expect(res["../scripts/slidecraft-mcp"]).toBeUndefined();
+  });
+
+  it("effective macOS resources still include Contents/Resources/slidecraft-mcp (cask `binary` stanza, ADR-0022)", () => {
+    const res = effectiveBundle("macos").resources;
+    expect(res["../scripts/slidecraft-mcp"]).toBe("slidecraft-mcp");
+    expect(res["../dist/mcp/cli.cjs"]).toBe("cli.cjs"); // the platform file ADDS to, never replaces, the overlay
+    expect(res["../scripts/slidecraft-mcp.cmd"]).toBe("slidecraft-mcp.cmd");
+  });
+
+  it("effective Linux resources drop the sh copy; /usr/bin/slidecraft-mcp comes from bundle.linux.*.files instead", () => {
+    const b = effectiveBundle("linux");
+    expect(Object.values(b.resources)).not.toContain("slidecraft-mcp");
+    expect(b.linux?.deb?.files?.["/usr/bin/slidecraft-mcp"]).toBe("../scripts/slidecraft-mcp");
+  });
+
+  it("agreement (R8): the macOS platform file points at the SAME script the cask + Linux packages ship", () => {
+    const mac = JSON.parse(read("src-tauri/tauri.macos.conf.json")) as Overlay;
+    const [src, dst] = Object.entries(mac.bundle.resources)[0];
+    expect(existsSync(join(root, "src-tauri", src))).toBe(true);
+    expect(dst).toBe("slidecraft-mcp");
+    expect(read("packaging/homebrew/Casks/slidecraft.rb")).toContain(`Contents/Resources/${dst}`);
+    expect(overlay.bundle.linux?.deb?.files?.["/usr/bin/slidecraft-mcp"]).toBe(src);
   });
 
   it("deb / rpm / AppImage install the POSIX launcher as /usr/bin/slidecraft-mcp (on PATH by construction)", () => {
