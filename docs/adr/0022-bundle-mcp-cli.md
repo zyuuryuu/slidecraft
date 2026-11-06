@@ -32,6 +32,16 @@
 - 副次修正：`update-cask.mjs` が arm64-only（sha256 が 1 行）に非対応で次リリースで失敗する潜在バグを是正（1 行＝arm のみ、2 行＝arm+intel を許容）。
 - 将来：GUI に「登録コマンドをコピー」ボタン（アプリが自分の resource/node 実パスを解決して提示）を出せば、直接パス方式のパス調べが不要になる。
 
+## Addendum（2026-11-06・#519）
+
+上記 Consequences の「Windows `.cmd` / Linux 相当の PATH shim は follow-up」は #519 で実施した。Windows は
+`scripts/slidecraft-mcp.cmd` を resources に同梱し、NSIS `installerHooks`（`src-tauri/windows/slidecraft-mcp-path.nsh`）
+と WiX フラグメント（同 `.wxs`）が**ユーザ PATH**にインストール先を追加・アンインストールで除去する。Linux は
+`bundle.linux.{deb,rpm,appimage}.files` で同じ sh ランチャを `/usr/bin/slidecraft-mcp` に置き、ランチャ側が
+Tauri の実配置（sidecar `/usr/bin/node`・resources `/usr/lib/<productName>/`。v0.5.0 の `.deb` で実測。バイナリ名は
+Cargo 名だが resources ディレクトリは productName）を相対解決する。結果、全 OS で登録は
+`claude mcp add slidecraft -- slidecraft-mcp` の 1 語（ADR-0038 D5）。決定本体は不変。
+
 ## References
 
 - `package.json`（`build:mcp:bundled`）, `src-tauri/tauri.conf.json`（beforeBuildCommand）, `src-tauri/tauri.bundle.conf.json`（resources）
