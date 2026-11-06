@@ -45,11 +45,18 @@ export function embedFallbackFamily(cjkClass: CjkClass): string {
 
 const GENERIC_KEYWORDS = new Set(["serif", "sans-serif", "system-ui", "monospace", "cursive", "fantasy"]);
 
-/** Quote a font-family token per CSS syntax (spaces/quotes/non-ASCII require quoting); leave CSS
- *  generic keywords bare. */
+/** A name that is safe to emit bare: one plain CSS identifier (`Calibri`, `Meiryo`, `MS-Gothic`).
+ *  Anything else — spaces, non-ASCII, punctuation, a leading digit, and in particular a raw theme
+ *  token such as `+mn-lt` (an <a:latin> value template-loader keeps unresolved by contract) — must
+ *  be a <string>: left bare, ONE bad token invalidates the ENTIRE font-family declaration, the
+ *  browser silently drops it, and the embedded CJK @font-face later in the chain is never reached
+ *  (#528: CI's Chrome drew no CJK text at all). */
+const BARE_IDENT = /^-?[A-Za-z_][A-Za-z0-9_-]*$/;
+
+/** Quote a font-family token per CSS syntax; leave CSS generic keywords and plain idents bare. */
 function quoteFont(name: string): string {
   if (GENERIC_KEYWORDS.has(name)) return name;
-  return /[\s"'.]|[^\x20-\x7e]/.test(name) ? `"${name.replace(/"/g, '\\"')}"` : name;
+  return BARE_IDENT.test(name) ? name : `"${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 /**

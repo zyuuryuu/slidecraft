@@ -26,32 +26,14 @@ import * as N from "./next-steps";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
-import { GuardError, guardEnvelope } from "./guard-errors";
+import { GuardError } from "./guard-errors";
 import { getBootstrap } from "./bootstrap";
 import { gatedToolRegistrar } from "./tool-profiles";
-import { rasterizeSlide, renderSlideHtml } from "./slide-raster";
+import { registerVisualTools } from "./visual-tools";
 import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
+// The ONE result envelope (tool-result.ts): ok / fail (GuardError → {ok:false,code}; else isError) / run.
+import { type ToolResult, ok, fail, run } from "./tool-result";
 
-interface ToolResult {
-  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
-  isError?: boolean;
-  [k: string]: unknown; // match the SDK's CallToolResult (passthrough _meta etc.)
-}
-const ok = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 2) }] });
-// A GuardError is a MODELED precondition failure → the { ok:false, error, code } envelope
-// (isError:false, a normal result). Everything else is an unmodeled crash → isError:true. This is
-// THE choke point: run() and both mutate() branches funnel every throw through here (ADR-0015).
-const fail = (e: unknown): ToolResult =>
-  e instanceof GuardError
-    ? ok(guardEnvelope(e))
-    : { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
-async function run(fn: () => unknown | Promise<unknown>): Promise<ToolResult> {
-  try {
-    return ok(await fn());
-  } catch (e) {
-    return fail(e);
-  }
-}
 const unb64 = (s: string): Uint8Array => new Uint8Array(Buffer.from(s, "base64"));
 
 /** Attach deterministic next-step hints (MCP layer — references tool names) to any result carrying a
@@ -187,30 +169,9 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   tool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
   tool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
   tool("get_slide_fix_request", { description: "1スライドの修正リクエスト packet（agent が LLM として埋め、set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
-  // #109: the AI's visual design check — screenshot the SHARED HTML rendering (SlideCard SSR,
-  // fonts embedded) in a locally installed headless Chrome/Edge, network-dead and script-free.
-  // Tool-only (no deck:// mirror): ADR-0008's dual-read rule serves STATE reads; tools/call is the
-  // one universally supported channel and binary resources have far patchier client support.
-  tool(
-    "get_slide_image",
-    { description: "1スライドの現在の描画を PNG で返す（AI の視覚デザインチェック用）。共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定", inputSchema: { ...index, ...doc } },
-    async (a, extra) => {
-      try {
-        const img = await rasterizeSlide(sessionOf(extra, a.docId), a.index);
-        return { content: [{ type: "image" as const, data: img.pngBase64, mimeType: img.mimeType }] };
-      } catch (e) {
-        return fail(e);
-      }
-    },
-  );
-  // #242: same shared rendering as get_slide_image, minus the local-browser requirement — the caller
-  // rasterizes with its own means (CI/sandboxes often have no Chrome/Edge). R8: no second render
-  // path — `renderSlideHtml` IS the exact page get_slide_image screenshots.
-  tool(
-    "get_slide_html",
-    { description: "1スライドの現在の描画を自己完結 HTML 文字列で返す（get_slide_image と同一の共有 HTML＝script ゼロ・CSP・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境向け：呼び出し側の任意の手段でラスタ化できる", inputSchema: { ...index, ...doc } },
-    (a, extra) => run(() => renderSlideHtml(sessionOf(extra, a.docId), a.index)),
-  );
+  // Visual reads (#109 get_slide_image / #242 get_slide_html / #522 get_deck_image+html) — one shared
+  // rendering, one confined rasterizer; registered here so the profile table's order holds.
+  registerVisualTools({ tool, sessionOf, index, doc });
 
   // ── authoring contract (self-describing surface; T3/S1) ── the single entry the AI reads BEFORE
   // authoring: how to write this template's slide Markdown, the body budget, and pointers to figures.

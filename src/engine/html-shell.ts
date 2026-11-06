@@ -279,6 +279,63 @@ export function assembleSlidePage(slideHtml: string, opts: { stageW: number; sta
 </html>`;
 }
 
+/** One cell of a contact sheet: a slide's pre-rendered markup (the SAME string assembleSlidePage
+ *  wraps — R8) and the 0-based index drawn above it so the viewer can map a thumbnail to a tool arg. */
+export interface ContactSheetCell {
+  index: number;
+  slideHtml: string;
+}
+
+export interface ContactSheetOptions {
+  /** Reference-stage size in px of each slide's markup (SLIDE_W×scale) — scaled down per cell. */
+  stageW: number;
+  stageH: number;
+  /** Grid geometry (whole px) — the caller plans it (slide-raster's planDeckSheet) so the page's body
+   *  is exactly `width`×`height` and the screenshot window can match it 1:1. */
+  columns: number;
+  cellW: number;
+  cellH: number;
+  labelH: number;
+  gap: number;
+  pad: number;
+  width: number;
+  height: number;
+  embeddedFonts?: EmbeddedFontFace[];
+  title?: string;
+}
+
+/** Assemble N pre-rendered slides into ONE script-free contact-sheet page (#522 / get_deck_image):
+ *  a grid of `cellW`-wide thumbnails, each a CSS-scaled copy of the full-size slide markup (the DOM
+ *  never re-lays-out — wrapping is identical to the single-slide page and the preview), with the
+ *  slide's 0-based index above it. Same CSP as assembleSlidePage (no script, no network); fonts are
+ *  embedded ONCE for the whole sheet. */
+export function assembleContactSheetPage(cells: ContactSheetCell[], o: ContactSheetOptions): string {
+  const title = esc(o.title?.trim() || "SlideCraft");
+  const scale = (o.cellW / o.stageW).toFixed(6);
+  const body = cells
+    .map(
+      (c) =>
+        `<div class="cell" data-i="${c.index}"><div class="lbl">${c.index}</div><div class="thumb"><div class="stage">${c.slideHtml}</div></div></div>`,
+    )
+    .join("");
+  return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'">
+<title>${title}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${o.width}px;height:${o.height}px;overflow:hidden;background:#1f2430}
+.grid{display:grid;grid-template-columns:repeat(${o.columns},${o.cellW}px);gap:${o.gap}px;padding:${o.pad}px;align-content:start}
+.cell{width:${o.cellW}px}
+.lbl{height:${o.labelH}px;font:600 ${Math.round(o.labelH * 0.65)}px/${o.labelH}px system-ui,-apple-system,"Segoe UI",sans-serif;color:#e5e9f2}
+.thumb{width:${o.cellW}px;height:${o.cellH}px;overflow:hidden;background:#fff}
+.stage{width:${o.stageW}px;height:${o.stageH}px;transform:scale(${scale});transform-origin:0 0}
+${fontFaceCss(o.embeddedFonts ?? [])}</style>
+</head>
+<body><div class="grid">${body}</div></body>
+</html>`;
+}
+
 /** Assemble N pre-rendered slide HTML strings into one self-contained .html document. */
 export function assembleHtmlDeck(slideHtmls: string[], opts: HtmlShellOptions): string {
   const { stageW, stageH } = opts;

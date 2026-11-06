@@ -204,6 +204,8 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 | `get_slide_markdown(index)` | 1 スライドの素の Markdown（レイアウト解決済み） |
 | `get_slide_image(index)` | 1 スライドの**現在の描画を PNG で返す**（AI の視覚デザインチェック）。preview / HTML 書き出しと同じ共有描画をローカルの Chrome/Edge で撮る。任意機能（後述） |
 | `get_slide_html(index)` | 1 スライドの**現在の描画を自己完結 HTML 文字列で返す**（`get_slide_image` と同じ共有描画・script ゼロ・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境でも、呼び出し側の任意の手段でラスタ化できる |
+| `get_deck_image(start?, columns?, maxSlides?)` | deck **全枚のサムネイルを 1 枚の PNG**（格子・各セル左上に 0-based index）で返す。仕上がり確認は最後にこれを 1 回（1 枚ずつ `get_slide_image` を呼ぶ往復を無くす）。既定 5 列・最大 30 枚・幅 1920px、超過分は `truncated:true`＋`nextStart` で続きを取る |
+| `get_deck_html(start?, columns?, maxSlides?)` | `get_deck_image` と同じコンタクトシートを**自己完結 HTML 文字列**で返す（ブラウザ無し環境向け） |
 | `set_slide_markdown(index, markdown)` | 1 スライドを差し替え（図/mermaid は自動保持・検証・不正は never-silent 拒否） |
 | `set_slide_diagram(index, source, format, ...)` | 図を DiagramSpec/Mermaid で設定。図ありは置換、テキストスライドには本文領域へ追加 |
 | `apply_design_intent(index, intent)` | 図に**空間意図**を反映（テキスト左/図右・ノード強調・向きの変更）※図を持つスライドのみ |

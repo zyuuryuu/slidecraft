@@ -21,7 +21,9 @@ import { buildServer } from "../src/mcp/server";
 import { DocRegistry, MemTemplateStore, type HostContext } from "../src/mcp/host-core";
 import { TOOL_PROFILES, isToolVisible, profileOf } from "../src/mcp/tool-profiles";
 
-/** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 35 本。 */
+/** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 37 本。
+ *  #522 で get_deck_image / get_deck_html（deck 全枚のコンタクトシート＝ホット往復 29→1・ADR-0037 D3）を
+ *  全プロファイルに追加（35→37）。 */
 const SHARED_TOOLS = [
   "apply_design_intent",
   "bootstrap",
@@ -32,6 +34,8 @@ const SHARED_TOOLS = [
   "export_pptx",
   "get_authoring_guide",
   "get_deck",
+  "get_deck_html",
+  "get_deck_image",
   "get_deck_issues",
   "get_deck_markdown",
   "get_diagram_guide",
