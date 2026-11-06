@@ -44,25 +44,73 @@ pub struct CollabState {
     info: Mutex<Option<CollabInfo>>,
 }
 
-/// Locate the host.cjs sidecar bundle. `SLIDECRAFT_HOST_CJS` overrides everything (escape hatch).
-/// Dev (`debug_assertions`): the repo file relative to this crate — resource resolution is
-/// unreliable under `tauri dev`. Release: bundled at the resource root via tauri.conf
-/// `bundle.resources` (`"../dist/mcp/host.cjs" → "host.cjs"`), which resolves next to SlideCraft.exe.
-fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    if let Ok(p) = std::env::var("SLIDECRAFT_HOST_CJS") {
-        return Ok(std::path::PathBuf::from(p));
-    }
+/// Locate a bundled MCP file (`host.cjs` / `cli.cjs`). Dev (`debug_assertions`): the repo build output
+/// relative to this crate — resource resolution is unreliable under `tauri dev`. Release: bundled at
+/// the resource root via tauri.bundle.conf `bundle.resources` (`"../dist/mcp/<name>" → "<name>"`).
+fn resolve_bundled(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
     #[cfg(debug_assertions)]
     {
         let _ = app; // CARGO_MANIFEST_DIR = .../src-tauri ; the built bundle lives at ../dist/mcp
-        Ok(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../dist/mcp/host.cjs"))
+        Ok(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../dist/mcp").join(name))
     }
     #[cfg(not(debug_assertions))]
     {
         app.path()
-            .resolve("host.cjs", tauri::path::BaseDirectory::Resource)
+            .resolve(name, tauri::path::BaseDirectory::Resource)
             .map_err(|e| e.to_string())
     }
+}
+
+/// Locate the host.cjs sidecar bundle. `SLIDECRAFT_HOST_CJS` overrides everything (escape hatch).
+fn resolve_host_cjs(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    if let Ok(p) = std::env::var("SLIDECRAFT_HOST_CJS") {
+        return Ok(std::path::PathBuf::from(p));
+    }
+    resolve_bundled(app, "host.cjs")
+}
+
+/// What the 協働 panel needs to write a registration that actually runs on THIS install (#520):
+/// the OS (quoting rules), whether the `slidecraft-mcp` launcher is reachable from a shell, and the
+/// real paths of the bundled node + cli.cjs as the fallback. Read-only — nothing is executed or written.
+#[derive(Clone, Serialize)]
+pub struct McpInstallInfo {
+    /// `std::env::consts::OS`: "windows" | "macos" | "linux" (anything else is treated as POSIX by the UI).
+    pub os: &'static str,
+    #[serde(rename = "launcherOnPath")]
+    pub launcher_on_path: bool,
+    #[serde(rename = "nodePath")]
+    pub node_path: String,
+    #[serde(rename = "cliPath")]
+    pub cli_path: String,
+}
+
+/// Is `slidecraft-mcp` resolvable from the user's shell? Checked against this process's PATH plus the
+/// well-known bin dirs the installers write to (Homebrew's prefix on macOS — a Finder-launched GUI
+/// inherits a minimal PATH that lacks it — and /usr/bin for deb/rpm, #519). A heuristic by design:
+/// the GUI cannot observe the user's interactive shell, so a miss only means "show the real paths",
+/// which work everywhere.
+fn launcher_on_path() -> bool {
+    let names: &[&str] = if cfg!(windows) { &["slidecraft-mcp.cmd", "slidecraft-mcp"] } else { &["slidecraft-mcp"] };
+    let mut dirs: Vec<std::path::PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    if !cfg!(windows) {
+        for d in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"] {
+            dirs.push(std::path::PathBuf::from(d));
+        }
+    }
+    dirs.iter().any(|d| names.iter().any(|n| d.join(n).is_file()))
+}
+
+#[tauri::command]
+pub fn mcp_install_info(app: tauri::AppHandle) -> Result<McpInstallInfo, String> {
+    let cli = resolve_bundled(&app, "cli.cjs")?;
+    Ok(McpInstallInfo {
+        os: std::env::consts::OS,
+        launcher_on_path: launcher_on_path(),
+        node_path: resolve_node().to_string_lossy().into_owned(),
+        cli_path: cli.to_string_lossy().into_owned(),
+    })
 }
 
 /// Resolve the `node` runtime. Dev: from PATH. Release: the bundled externalBin sits next to the main

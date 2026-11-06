@@ -25,19 +25,21 @@
  * (fs-scope.ts). --no-fs (base64) stays the byte-identical default when --root is absent. Input-side
  * fs (open_project/new_project) and the loopback-binary data plane remain follow-up work.
  */
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createSession } from "./session";
 import { buildServer } from "./server";
 import { createSoloHostContext } from "./host-core";
 import { resolveHostJsonPath, discoverLiveHost } from "./host-discovery";
 import { runRelay } from "./mcp-relay";
 import { resolveScopeRoot } from "./fs-scope";
+import { createProbeAwareStdio } from "./discover-probe";
 
 async function runSolo(root: string | null): Promise<void> {
   const session = createSession(root); // root===null: --no-fs, bytes flow as base64; else scoped fs (ADR-0035)
   const host = createSoloHostContext(session); // solo control plane: one doc, sole-doc resolution, no token
   const server = buildServer(session, { host, registerResources: true });
-  await server.connect(new StdioServerTransport());
+  // #518: the 2026-07-28 `server/discover` probe is answered in front of the SDK (discover-probe.ts);
+  // every other line reaches the SDK transport byte-for-byte, so the legacy handshake is unchanged.
+  await server.connect(createProbeAwareStdio());
   process.stderr.write(`slidecraft mcp: ready (solo stdio, ${root ? `scoped fs — root=${root}` : "--no-fs / base64"})\n`);
 }
 

@@ -91,11 +91,23 @@ describe("MCP CLI bundling — the bundled server actually runs standalone", () 
       expect.arrayContaining(["tools", "resources"]),
     );
   });
+
+  it("#518: answers Claude Code's `server/discover` probe (top-level _meta) BEFORE initialize, not silence", async () => {
+    // The real repro from the Issue: the 2026-07-28 version probe as the very first line on stdin.
+    // Before the fix the SDK's strict schema dropped it on deserialisation and nothing came back.
+    const probe = {
+      jsonrpc: "2.0", id: 1, method: "server/discover", params: {},
+      _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" },
+    };
+    const { response } = await runInitialize(out, probe);
+    expect(response).toEqual({ jsonrpc: "2.0", id: 1, error: { code: -32601, message: "Method not found" } });
+  });
 });
 
-// Spawn `node <cliCjs>` in a scratch cwd (proving it does NOT lean on the repo's node_modules), send a
-// JSON-RPC initialize over stdio, and resolve with the first JSON reply + collected stderr.
-function runInitialize(cliCjs: string): Promise<{ stderr: string; response: InitResponse | null }> {
+// Spawn `node <cliCjs>` in a scratch cwd (proving it does NOT lean on the repo's node_modules), send one
+// JSON-RPC request over stdio (an initialize by default), and resolve with the first JSON reply +
+// collected stderr.
+function runInitialize(cliCjs: string, request?: Record<string, unknown>): Promise<{ stderr: string; response: InitResponse | null }> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cliCjs], { cwd: dirname(cliCjs), stdio: ["pipe", "pipe", "pipe"] });
     let out = "";
@@ -117,7 +129,7 @@ function runInitialize(cliCjs: string): Promise<{ stderr: string; response: Init
       clearTimeout(timer);
       reject(e);
     });
-    const req = {
+    const req = request ?? {
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
