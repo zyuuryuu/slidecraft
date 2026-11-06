@@ -1,7 +1,7 @@
 /**
  * CollabPanel.tsx — the P2.4 "Connect" surface. Starts/stops GUI-hosted collaboration and shows the
- * ready-to-paste stdio registration (`claude mcp add slidecraft -- slidecraft-mcp`) so an upstream AI
- * can connect — stdio auto-discovers and forwards to this host while the GUI runs (ADR-0033), so no
+ * ready-to-paste stdio registration (CollabRegistration: `claude mcp add slidecraft -- …`, generated from
+ * this install's real paths, #520) so an upstream AI can connect — stdio auto-discovers and forwards to this host while the GUI runs (ADR-0033), so no
  * url/token management is needed. The loopback URL + per-launch token direct-HTTP path stays available
  * as a folded "advanced" fallback for clients that can't spawn stdio (#283 anti-pattern, #297). The
  * deck mirrors the host's truth live while connected.
@@ -9,7 +9,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CollabStatus } from "../ipc/collab-projection";
-import { STDIO_SNIPPET, DESKTOP_JSON_SNIPPET, maskToken, httpSnippet } from "./collab-panel-snippets";
+import { maskToken, httpSnippet } from "./collab-panel-snippets";
+import CollabRegistration, { CopyButton, Field } from "./CollabRegistration";
 
 interface CollabPanelProps {
   /** When embedded in the AI hub's 協働 tab: render body-only (no floating card, no own header/close). */
@@ -27,44 +28,6 @@ interface CollabPanelProps {
   /** #407: whether the view follows (jumps to + flashes) the AI's edits. Omitted → toggle hidden. */
   followAi?: boolean;
   onFollowAiChange?: (v: boolean) => void;
-}
-
-function CopyButton({ value }: { value: string }) {
-  const { t } = useTranslation();
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setDone(true);
-          setTimeout(() => setDone(false), 1200);
-        } catch {
-          /* clipboard blocked — the field is selectable as a fallback */
-        }
-      }}
-      className="px-2 py-1 text-[11px] rounded bg-edge hover:bg-accent/50 text-fg shrink-0"
-    >
-      {done ? t("collabPanel.copied") : t("collabPanel.copy")}
-    </button>
-  );
-}
-
-function Field({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <div className="text-[10px] text-faint mb-0.5">{label}</div>
-      <div className="flex items-center gap-1.5">
-        <input
-          readOnly
-          value={value}
-          onFocus={(e) => e.currentTarget.select()}
-          className={`flex-1 min-w-0 px-2 py-1 rounded bg-void border border-edge text-fg2 text-[11px] ${mono ? "font-mono" : ""}`}
-        />
-        <CopyButton value={value} />
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -207,27 +170,31 @@ export default function CollabPanel({
                     {t("collabPanel.followAi")}
                   </label>
                 )}
-
-                {/* Primary registration line — static, unconditional, never needs rewriting (#297 / ADR-0033). */}
-                <Field label={t("collabPanel.addToClaudeCode")} value={STDIO_SNIPPET} />
-                <Field label={t("collabPanel.desktopClientsLabel")} value={DESKTOP_JSON_SNIPPET} />
-                <p className="text-[10px] text-faint leading-relaxed">{t("collabPanel.otherClientsHint")}</p>
-
-                <AdvancedHttp
-                  open={advancedOpen}
-                  onToggle={() => setAdvancedOpen((v) => !v)}
-                  url={url}
-                  token={token}
-                  hostJsonPath={hostJsonPath}
-                />
-
-                <div className="flex items-center justify-end pt-1">
-                  <button onClick={onStop} className="px-4 py-1.5 rounded bg-edge hover:bg-surface text-fg text-xs">
-                    {t("collabPanel.stopButton")}
-                  </button>
-                </div>
               </>
             )}
+          </>
+        )}
+
+        {/* Registration is independent of the connection (register once; stdio auto-discovers the host —
+            ADR-0033), so it shows in EVERY state, browser demo included (#520: real install paths on
+            desktop, the generic launcher form elsewhere). */}
+        <CollabRegistration />
+
+        {available && connected && (
+          <>
+            <AdvancedHttp
+              open={advancedOpen}
+              onToggle={() => setAdvancedOpen((v) => !v)}
+              url={url}
+              token={token}
+              hostJsonPath={hostJsonPath}
+            />
+
+            <div className="flex items-center justify-end pt-1">
+              <button onClick={onStop} className="px-4 py-1.5 rounded bg-edge hover:bg-surface text-fg text-xs">
+                {t("collabPanel.stopButton")}
+              </button>
+            </div>
           </>
         )}
       </div>

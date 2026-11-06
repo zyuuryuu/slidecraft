@@ -108,10 +108,23 @@ jobs:
             libssl-dev patchelf
       - run: npm ci
       - run: npm run build
+      # Stage the sidecars so the smoke builds with the SAME bundle overlay release.yml uses (externalBin
+      # node/llamafile + bundled MCP server + launcher wiring). Before #519 the smoke built the base config
+      # only, so an overlay typo (NSIS hooks, WiX fragment, deb/rpm files) was first seen on a release tag.
+      - name: Stage Node sidecar (externalBin)
+        run: node scripts/stage-node.mjs x86_64-unknown-linux-gnu
+      - name: Stage llamafile sidecar (externalBin)
+        run: node scripts/stage-llamafile.mjs x86_64-unknown-linux-gnu
       - name: Build Tauri app (Linux smoke — installers are release.yml)
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --config src-tauri/tauri.bundle.conf.json
+      # #519 acceptance: the built .deb (and AppImage) must contain /usr/bin/slidecraft-mcp, and that
+      # launcher must start the bundled MCP server with the bundled node (no system Node on PATH).
+      - name: Verify the bundled MCP launcher in the Linux packages (#519)
+        run: node scripts/verify-deb-launcher.mjs src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/appimage/*.AppImage
 
   # ── Real-Chrome rasterization smoke (get_slide_image #109) — NON-REQUIRED, skipped on docs-only ──
   # These vitest blocks spawn a real browser and demand it paint within 30s; under CI-runner load

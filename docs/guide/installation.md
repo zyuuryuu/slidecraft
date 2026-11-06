@@ -96,7 +96,7 @@ macOS 15（Sequoia）以降では、従来の「右クリック →『開く』�
 :::
 
 ::: tip AI エージェントから使う（ビルド不要）
-Homebrew でインストールすると、上流 AI（Claude Code / Cursor / Claude Desktop）から SlideCraft を駆動する MCP サーバも**同梱・PATH 登録**されます（v0.2.0 以降）。ソースの clone もシステム Node も不要で、`claude mcp add slidecraft -- slidecraft-mcp` で登録できます。詳細は [MCP ガイド](/guide/mcp) を参照してください。
+インストーラは、上流 AI（Claude Code / Cursor / Claude Desktop）から SlideCraft を駆動する MCP サーバも**同梱・PATH 登録**します（macOS/Homebrew は v0.2.0 以降、Windows の `.exe`/`.msi` と Linux の `.deb`/`.rpm` は v0.5.1 以降。PATH 登録はユーザ単位でアンインストール時に除去）。ソースの clone もシステム Node も不要で、`claude mcp add slidecraft -- slidecraft-mcp` で登録できます。詳細は [MCP ガイド](/guide/mcp) を参照してください。
 :::
 
 ::: warning macOS で直接 .dmg を開く場合の初回注意

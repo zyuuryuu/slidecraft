@@ -68,6 +68,20 @@ test.describe("SlideCraft", () => {
     await expect(page.getByPlaceholder(/このスライドへの指示/)).toHaveValue(/要約|キーフレーズ|タイトル|簡潔/);
   });
 
+  test("協働 tab: MCP registration command is shown and 「Claude Code に登録」 copies it (#520)", async ({ page, context }) => {
+    // Browser build → no bundled install, so the generic launcher form shows (desktop generates the real
+    // paths via Rust). The register button copies EXACTLY the command displayed in the field.
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByRole("button", { name: /✨ AI/ }).click();
+    await page.getByRole("button", { name: /協働/ }).click();
+    const cmd = "claude mcp add slidecraft -- slidecraft-mcp";
+    await expect(page.locator(`input[value="${cmd}"]`)).toBeVisible();
+    await expect(page.getByText(/ブラウザ版のため既定のコマンド名/)).toBeVisible();
+    await page.getByRole("button", { name: /Claude Code に登録/ }).click();
+    await expect(page.getByRole("status")).toContainText("コピーしました");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(cmd);
+  });
+
   test("AI Assist hosts the task list (タスク tab)", async ({ page }) => {
     await page.getByRole("button", { name: /✨ AI/ }).click();
     // The panel opens with the generate/edit + タスク tabs; the task tab shows the list.

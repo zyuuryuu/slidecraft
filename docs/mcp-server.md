@@ -43,13 +43,29 @@ claude mcp add slidecraft -- slidecraft-mcp
 }
 ```
 
-**Windows / Linux** — 同梱 node と `cli.cjs` はインストール先（アプリ本体と同じフォルダ、および `resources/` サブフォルダ）に入っています。ただし**正確なパスはインストーラ・バージョンで変わり、現状デバイス未検証**です（アプリのバイナリ名は `diagram-pipeline-desktop` で、Linux の `.deb`/`.rpm` はこの名前のディレクトリ配下に入る可能性が高い）。次のいずれかを推奨します:
+**Windows（`.exe` / `.msi`）・Linux（`.deb` / `.rpm`）** — **v0.5.1 以降**のインストーラは macOS と同じく **`slidecraft-mcp` を PATH に置きます**（ユーザ単位・アンインストールで除去・インストーラのログに表示）。登録は同じ 1 行です（#519）：
 
-- インストール先を実際に確認し、`cli.cjs`（`resources/` 配下）と `node`（アプリ本体と同階層）の絶対パスを見つけて登録する。
-- 分からなければ**ソースからの起動（B）**を使う（確実）。
-- AppImage は展開先が起動ごとに変わるため、直接パス指定は不向き → **B** を使う。
+```bash
+claude mcp add slidecraft -- slidecraft-mcp
+```
 
-> Windows/Linux 向けの PATH ランチャ（macOS の `slidecraft-mcp` 相当）は follow-up 予定です。
+インストール先を調べる必要はありません。仕組みは次のとおり（ランチャは同梱 Node で同梱 `cli.cjs` を起動するだけ。system Node 不要）：
+
+| 形式 | PATH に載るもの | ランチャの実体 |
+|---|---|---|
+| Windows NSIS（`*_x64-setup.exe`） | インストール先フォルダ（既定 `%LOCALAPPDATA%\SlideCraft`）を**ユーザ PATH**（`HKCU\Environment\Path`）に追加。インストーラの「詳細」に表示され、アンインストールで除去 | `slidecraft-mcp.cmd` — 同じフォルダの `node.exe` で `cli.cjs` を実行（Tauri は resources と sidecar をインストール先に**平置き**する） |
+| Windows MSI（`*_x64_en-US.msi`） | インストール先（既定 `C:\Program Files\SlideCraft\`）をユーザ PATH に追加（Windows Installer の Environment テーブル＝アンインストール/失敗時ロールバックで除去） | 同上 |
+| Linux `.deb` / `.rpm` | `/usr/bin/slidecraft-mcp`（sh） | `/usr/bin/node`（同梱 sidecar）で `/usr/lib/SlideCraft/cli.cjs` を実行 |
+| Linux AppImage | 自動では載らない（マウント先が起動ごとに変わる）。`./SlideCraft_<ver>_amd64.AppImage --appimage-extract` で展開し、`squashfs-root/usr/bin/slidecraft-mcp` の**絶対パス**を `command` に登録する | 同上（展開先相対で解決） |
+
+Windows の注意点：
+
+- PATH の反映は**インストール後に新しく開いたターミナル**から（開いたままのターミナルには反映されない）。
+- `slidecraft-mcp` は `.cmd` ファイルです。クライアントが `.cmd` を直接 spawn できない場合（Claude Code の Windows ネイティブ版で `npx` に `cmd /c` が要るのと同じ事情）は `claude mcp add slidecraft -- cmd /c slidecraft-mcp`、mcp.json なら `{"command": "cmd", "args": ["/c", "slidecraft-mcp"]}` を使ってください。1 行登録で接続に失敗する場合はこの形を試し、結果を Issue で知らせてもらえると助かります。
+- ユーザ PATH が極端に長い（約 1,000 文字超）場合、NSIS インストーラは **PATH を壊さないために編集を見送り**、追加すべきフォルダをダイアログで案内します。その場合は手で追加してください。
+- ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
+
+> **v0.5.0 以前**のインストーラにはランチャが入っていません（`.deb` に `/usr/bin/slidecraft-mcp` は無い）。その場合は上の直接パス指定（Linux: `/usr/bin/node` ＋ `/usr/lib/SlideCraft/cli.cjs`）か、**ソースからの起動（B）**を使ってください。
 
 ### B. ソースから起動（開発版）
 
