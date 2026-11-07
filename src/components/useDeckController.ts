@@ -17,7 +17,7 @@ import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasCo
 import { parseMd } from "../engine/md-parser";
 import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
 import { autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsAugmented } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
 import type { SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
@@ -195,6 +195,13 @@ export function useDeckController() {
   const applyMasterBytesAsRemake = useCallback(
     (buf: ArrayBuffer | Uint8Array, name: string) =>
       applyTemplateBytesAsFaithfulRemake(buf, name, { setTemplateData, setTemplateName, setParseError }),
+    [setTemplateData, setTemplateName, setParseError],
+  );
+
+  // #568「テンプレを強化」: 無い N 列レイアウトを合成した派生 bytes を、検査ゲートを通して適用する。
+  const applyMasterBytesAsAugmented = useCallback(
+    (buf: ArrayBuffer | Uint8Array, name: string) =>
+      applyTemplateBytesAsAugmented(buf, name, { setTemplateData, setTemplateName, setParseError }),
     [setTemplateData, setTemplateName, setParseError],
   );
 
@@ -673,7 +680,7 @@ export function useDeckController() {
     subMode, setSubMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, setSelected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsAugmented,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
     handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,

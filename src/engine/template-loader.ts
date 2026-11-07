@@ -831,7 +831,7 @@ const GROUP_MATCH: Record<NonNullable<SlideIR["groupKind"]>, Array<"card" | "ste
   beforeAfter: ["compare"], // #402: the directed 2-face pair shares the compare layouts (+ arrow/labels overlay)
 };
 
-interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
+export interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
 
 /** The no-template answer of autoSelectLayout, keyed by the slide's role (+ region count) in the
  *  canonical vocabulary — NOT by index into LAYOUT_NAMES' file order, which encoded the 30-layout
@@ -849,7 +849,7 @@ const CANONICAL_FALLBACK = {
 /** Classify a slide → the ideal layout ROLE + body-region count (+ a canonical fallback name).
  *  Shared by autoSelectLayout (pick the single best) and suggestLayouts (rank candidates), so the
  *  auto pick and the suggestion list can never disagree about the slide's intent. */
-function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: number): RolePick {
+export function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: number): RolePick {
   const idxs = new Set(slide.placeholders.map((p) => p.idx));
   const hasTitle = idxs.has("15");
   const hasCtrTitle = idxs.has("0");

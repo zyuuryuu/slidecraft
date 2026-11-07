@@ -132,7 +132,9 @@
     "viewForm": "フォーム",
     "defaultTemplateLoadFailed": "既定テンプレート「{{name}}」を読み込めませんでした: {{detail}}",
     "defaultTemplateRejected": "テンプレートとして使えません",
-    "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}"
+    "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}",
+    "augmentTemplateTitle": "テンプレートの強化",
+    "augmentSuffix": "（強化）"
   },
   "applyTemplate": {
     "templateUnusable": "このテンプレートは使用できません: {{reason}}",
@@ -144,7 +146,11 @@
     "repairPartSeparator": "・",
     "repairPlanHeader": "このテンプレートはそのままでは使用できません:\n{{blocks}}\n\n",
     "repairPlanProposal": "自動修復の提案: 計 {{total}} 件（{{parts}}）のプレースホルダに種別を付与します。\n",
-    "repairPlanConfirm": "整形して取り込みますか？"
+    "repairPlanConfirm": "整形して取り込みますか？",
+    "augmentColumns": "{{n}} 列",
+    "augmentSize": "{{n}} 列 {{from}}→{{to}}pt",
+    "augmentPlan": "このテンプレートに無い {{what}} のレイアウトを、レイアウト「{{base}}」を元に追加します。\n体裁（フォント・配色・装飾・フッタ）はこのテンプレートのまま継承し、本文の文字サイズは列数に応じて下げます（{{sizes}}）。\n既存のレイアウトは変更しません。\n\n強化しますか？",
+    "augmentFailed": "テンプレートの強化を中止しました（検査に通りませんでした）: {{reason}}"
   },
   "builtinRuntime": {
     "desktopOnly": "組み込みモデルはデスクトップ版でのみ利用できます。"
@@ -287,7 +293,8 @@
   "intake": {
     "mode": {
       "import": "取り込み",
-      "remake": "作り直し（デザイン保持）"
+      "remake": "作り直し（デザイン保持）",
+      "augment": "強化（レイアウト追加）"
     },
     "progress": {
       "loading": "読み込み中…",
@@ -317,7 +324,10 @@
     "sampleBody": "本文テキストの例",
     "unboundChip": "未束縛の内容があるスライド {{count}} 枚（出力時に消えます）",
     "unboundTitle": "どの枠にも入らない内容（このテンプレでは出力時に消えます）",
-    "unboundItem": "スライド {{slide}}: {{message}}"
+    "unboundItem": "スライド {{slide}}: {{message}}",
+    "augmentButton": "テンプレを強化（{{what}}を追加）",
+    "augmentUnavailable": "テンプレの強化はできません: {{reason}}",
+    "augmented": "追加したレイアウト"
   },
   "lang": {
     "name": "日本語",
