@@ -15,6 +15,9 @@ import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template
 import { masterToTemplateSpec, extractLogo, logoForDarkLayouts } from "../engine/master-remake";
 import { faithfulRemake } from "../engine/faithful-remake";
 import { writeTemplate } from "../engine/template-writer";
+import { augmentAndVerify } from "../engine/layout-augment";
+import type { AugmentPlan, AugmentOptions } from "../engine/layout-augment-plan";
+import { adjustTemplate, type TemplateAdjustRecipe } from "../engine/template-adjust";
 
 export interface TemplateSetters {
   setTemplateData: (t: TemplateData) => void;
@@ -32,6 +35,7 @@ export interface IntakeSummary {
   findings: string[]; // health finding messages (warnings the user should see)
   theme?: { major: string; minor: string; palette: string[]; logo: boolean }; // Re-make modes (hex WITH #)
   repairs?: number; // faithful-Import repair path: how many placeholder frames were repaired
+  added?: string[]; // #568 augment: names of the synthesized layouts
 }
 
 /** Progress ticks emitted DURING a (possibly slow) intake so the UI can show a live indicator. */
@@ -240,6 +244,43 @@ export async function applyTemplateBytesAsFaithfulRemake(
 }
 
 
+export interface AdjustResult extends ApplyTemplateResult {
+  adjustedBytes?: Uint8Array; // the derived template — register THESE bytes (the source stays as it was)
+}
+
+/**
+ * テンプレ調整（#570 段 2）: 元テンプレ bytes にレシピ（書体置換 → サイズ倍率）を掛けた**派生**を、faithful
+ * Re-make と同じゲート（loadTemplate → assessTemplateHealth）で適用する。元 bytes は書き換えない。GUI は
+ * スライダを動かすたびに「元テンプレ＋レシピ」からこれを呼び直す（調整の上塗りをしない）。
+ */
+export async function applyTemplateBytesAsAdjusted(
+  source: ArrayBuffer | Uint8Array,
+  recipe: TemplateAdjustRecipe,
+  name: string,
+  setters: TemplateSetters,
+): Promise<AdjustResult> {
+  try {
+    const adjustedBytes = await adjustTemplate(source, recipe);
+    const adjusted = await loadTemplate(adjustedBytes);
+    const health = assessTemplateHealth(buildCatalog(adjusted));
+    if (health.status === "rejected") {
+      setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
+      return { ok: false, health };
+    }
+    setters.setTemplateData(adjusted);
+    setters.setTemplateName(name);
+    return {
+      ok: true,
+      health,
+      adjustedBytes,
+      summary: { layoutCount: adjusted.layouts.length, status: health.status, findings: health.findings.map((f) => f.message) },
+    };
+  } catch (err) {
+    setters.setParseError(i18n.t("templateAdjust.failed", { error: err instanceof Error ? err.message : String(err) }));
+    return { ok: false };
+  }
+}
+
 /** 修復プランを確認ダイアログ向けの短い日本語に要約する（純粋・UI 非依存）。 */
 export function describeRepairPlan(plan: RepairPlan): string {
   const blocks = plan.health.findings.filter((f) => f.level === "block").map((f) => f.message);
@@ -254,4 +295,56 @@ export function describeRepairPlan(plan: RepairPlan): string {
     i18n.t("applyTemplate.repairPlanProposal", { total: plan.ops.length, parts }) +
     i18n.t("applyTemplate.repairPlanConfirm")
   );
+}
+
+export interface AugmentApplyResult extends ApplyTemplateResult {
+  augmentedBytes?: Uint8Array; // the augmented template — register THESE bytes (the source stays untouched)
+  reason?: string; // why nothing was applied (nothing missing / no base layout / gate failure)
+}
+
+/**
+ * #568 段 2「テンプレを強化」: そのテンプレに無い N 列レイアウトを合成して足し（layout-augment.ts）、
+ * 検査ゲートに通った派生 bytes を faithful Re-make と同じ形で適用する。元の bytes は書き換えない。
+ * 足すものが無い・元にできない・ゲート不合格のときは適用せず reason を返す（never-silent）。
+ */
+export async function applyTemplateBytesAsAugmented(
+  buf: ArrayBuffer | Uint8Array,
+  name: string,
+  setters: TemplateSetters,
+  opts: AugmentOptions = {},
+): Promise<AugmentApplyResult> {
+  try {
+    const r = await augmentAndVerify(buf, opts);
+    if (!r.applied) {
+      const reason = r.failures.length > 0
+        ? i18n.t("applyTemplate.augmentFailed", { reason: r.failures.join(" / ") })
+        : (r.reason ?? r.plan.skipped.map((x) => x.reason).join(" "));
+      return { ok: false, reason };
+    }
+    const augmented = await loadTemplate(r.bytes);
+    const health = assessTemplateHealth(buildCatalog(augmented));
+    if (health.status === "rejected") return { ok: false, health, reason: i18n.t("applyTemplate.augmentFailed", { reason: health.status }) };
+    setters.setTemplateData(augmented);
+    setters.setTemplateName(name.replace(/\.pptx$/i, "") + i18n.t("app.augmentSuffix"));
+    return {
+      ok: true,
+      health,
+      augmentedBytes: r.bytes,
+      summary: { layoutCount: augmented.layouts.length, status: health.status, findings: health.findings.map((f) => f.message), added: r.added.map((a) => a.name) },
+    };
+  } catch (err) {
+    setters.setParseError(i18n.t("applyTemplate.augmentFailed", { reason: err instanceof Error ? err.message : String(err) }));
+    return { ok: false };
+  }
+}
+
+/** 強化の確認文（describeRepairPlan と同じ形・純粋・UI 非依存）。 */
+export function describeAugmentPlan(plan: AugmentPlan): string {
+  const sep = i18n.t("applyTemplate.repairPartSeparator");
+  const from = plan.base?.sourceSizes[0];
+  return i18n.t("applyTemplate.augmentPlan", {
+    what: plan.add.map((a) => i18n.t("applyTemplate.augmentColumns", { n: a.columns })).join(sep),
+    base: plan.base?.layoutName ?? "",
+    sizes: plan.add.map((a) => i18n.t("applyTemplate.augmentSize", { n: a.columns, from, to: a.levelSizes[0] })).join(sep),
+  });
 }

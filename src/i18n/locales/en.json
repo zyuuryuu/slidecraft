@@ -132,7 +132,10 @@
     "viewForm": "Form",
     "defaultTemplateLoadFailed": "Couldn't load the default template \"{{name}}\": {{detail}}",
     "defaultTemplateRejected": "it can't be used as a template",
-    "helpUrlFallback": "Couldn't open the docs — use this URL instead: {{url}}"
+    "helpUrlFallback": "Couldn't open the docs — use this URL instead: {{url}}",
+    "augmentTemplateTitle": "Augment template",
+    "augmentSuffix": " (augmented)",
+    "adjustSuffix": " (adjusted)"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",
@@ -144,7 +147,11 @@
     "repairPartSeparator": ", ",
     "repairPlanHeader": "This template can't be used as-is:\n{{blocks}}\n\n",
     "repairPlanProposal": "Auto-repair proposal: assign types to {{total}} placeholder(s) in total ({{parts}}).\n",
-    "repairPlanConfirm": "Format and import it?"
+    "repairPlanConfirm": "Format and import it?",
+    "augmentColumns": "{{n}}-column",
+    "augmentSize": "{{n}} columns {{from}}→{{to}}pt",
+    "augmentPlan": "Adds the {{what}} layout(s) this template lacks, built from the layout \"{{base}}\".\nThe look (fonts, colors, decorations, footer) is inherited from this template; body text is sized down for the narrower columns ({{sizes}}).\nExisting layouts are not changed.\n\nAugment the template?",
+    "augmentFailed": "Template augmentation was cancelled (it did not pass the checks): {{reason}}"
   },
   "builtinRuntime": {
     "desktopOnly": "The built-in model is only available in the desktop app."
@@ -287,7 +294,8 @@
   "intake": {
     "mode": {
       "import": "Import",
-      "remake": "Remake (design-preserving)"
+      "remake": "Remake (design-preserving)",
+      "augment": "Augment (layouts added)"
     },
     "progress": {
       "loading": "Loading…",
@@ -317,7 +325,10 @@
     "sampleBody": "Sample body text",
     "unboundChip": "{{count}} slide(s) with unbound content (dropped on export)",
     "unboundTitle": "Content no placeholder can hold (dropped on export with this template)",
-    "unboundItem": "Slide {{slide}}: {{message}}"
+    "unboundItem": "Slide {{slide}}: {{message}}",
+    "augmentButton": "Augment template (add {{what}})",
+    "augmentUnavailable": "This template can't be augmented: {{reason}}",
+    "augmented": "Added layouts"
   },
   "lang": {
     "name": "English",
@@ -382,7 +393,9 @@
     "createTitle": "Pick colors and fonts to generate a new template",
     "createLabel": "Create template…",
     "showInfoTitle": "Show the latest intake result",
-    "removeTitle": "Delete this template"
+    "removeTitle": "Delete this template",
+    "adjustTitle": "Make a derived template with the current master's fonts and text sizes adjusted in one go (the original is not changed)",
+    "adjustLabel": "Adjust template (fonts / sizes)…"
   },
   "masterReg": {
     "defaultName": "Template",
@@ -560,5 +573,29 @@
     "transitionZoom": "Zoom",
     "transitionPush": "Push",
     "help": "Help / open the docs site"
+  },
+  "templateAdjust": {
+    "title": "Adjust template",
+    "source": "From: {{name}} (the original template is not changed)",
+    "headingFont": "Heading font",
+    "bodyFont": "Body font",
+    "sharedFont": "Font (heading and body)",
+    "sharedHint": "This template uses the same font name for headings and body, so it is replaced as one font",
+    "fontPlaceholder": "{{name}} (unchanged)",
+    "scope": "Replace in",
+    "scopeTheme": "Theme only",
+    "scopeThemeTitle": "Replace only the theme's heading / body fonts (fonts named directly in layouts stay)",
+    "scopeInline": "Theme + inline",
+    "scopeInlineTitle": "Also replace the same font where the master / layouts name it directly (recommended)",
+    "sizeTitle": "Title",
+    "sizeBody": "Body",
+    "sizeOther": "Other",
+    "sizeHint": "Text sizes are rounded to 0.5pt and kept within 1–400pt",
+    "updating": "Updating…",
+    "reset": "Reset",
+    "apply": "Apply adjustment",
+    "applyTitle": "Add as \"{{name}}\" to the master list and apply it to this deck",
+    "cancel": "Cancel",
+    "failed": "Template adjustment failed: {{error}}"
   }
 }

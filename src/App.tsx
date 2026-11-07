@@ -28,7 +28,8 @@ import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
 import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { openDocs } from "./ipc/docs";
-import { describeRepairPlan } from "./components/apply-template";
+import { describeRepairPlan, describeAugmentPlan } from "./components/apply-template";
+import type { AugmentPlan } from "./engine/layout-augment-plan";
 import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
 import UpdateBanner from "./components/UpdateBanner";
 import { useUpdateBanner } from "./components/useUpdateBanner";
@@ -36,6 +37,8 @@ import Onboarding from "./components/Onboarding";
 import { useOnboarding } from "./components/useOnboarding";
 import { ONBOARDING_SAMPLE_MD } from "./components/onboarding-sample";
 import TemplateCreator from "./components/TemplateCreator";
+import TemplateAdjustPanel from "./components/TemplateAdjustPanel";
+import { useTemplateAdjust } from "./components/useTemplateAdjust";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
 import { materializeDerivedSlides } from "./engine/deck-sections";
@@ -56,7 +59,7 @@ export default function App() {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, setSelected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsAugmented, applyMasterBytesAsAdjusted,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
@@ -135,6 +138,26 @@ export default function App() {
       setIntakeBusy(null);
     }
   }, [intakeBusy, registerMaster, applyMasterBytesAsRemake, showIntake, t]);
+  // #568「テンプレを強化」: 有効なテンプレに無い N 列レイアウトを合成 → 確認 → 検査ゲート → 派生 bytes を登録。
+  const handleAugmentMaster = useCallback(async (plan: AugmentPlan) => {
+    if (intakeBusy || !templateData) return;
+    if (!(await confirmDialog(describeAugmentPlan(plan), t("app.augmentTemplateTitle")))) return;
+    setIntakeBusy({ mode: "augment", phase: { phase: "composing" } });
+    try {
+      const name = templateName || "template";
+      const r = await applyMasterBytesAsAugmented(await templateData.zip.generateAsync({ type: "uint8array" }), name);
+      if (!r.ok || !r.augmentedBytes) { if (r.reason) setEditNotice(r.reason); return; }
+      setMasterId(registerMaster(name + t("app.augmentSuffix"), r.augmentedBytes).id);
+      if (r.summary) showIntake({ mode: "augment", name, summary: r.summary, ts: Date.now() });
+    } finally {
+      setIntakeBusy(null);
+    }
+  }, [intakeBusy, templateData, templateName, applyMasterBytesAsAugmented, registerMaster, showIntake, setEditNotice, t]);
+  // テンプレ調整（#570 段 2）: 今のマスター＋レシピ → 派生をプレビューに即反映し、適用で「（調整）」として登録。
+  const adjust = useTemplateAdjust({
+    masters, masterId, getMasterBytes, registerMaster, setMasterId, deck,
+    applySource: applyMasterBytes, applyAdjusted: applyMasterBytesAsAdjusted, restoreDeck: (d) => setDeck(d, "silent"),
+  });
   // 新規テンプレ作成（テーマ2 S4）: スペック → template-writer で生成 → 通常のゲート経由で適用＋登録。
   const [showTemplateCreator, setShowTemplateCreator] = useState(false);
   const handleCreateTemplate = useCallback(async (spec: TemplateSpec) => {
@@ -416,7 +439,7 @@ export default function App() {
               (this registers the imported master + applies). Both are gated while collab-locked. */}
           <button
             onClick={handleEnterImport}
-            disabled={editLocked}
+            disabled={editLocked || !!adjust.session}
             title={editLocked ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}
             className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge"
           >
@@ -428,10 +451,11 @@ export default function App() {
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
             onRemake={handleRemakeMaster}
+            onAdjust={() => void adjust.start()}
             onCreate={() => setShowTemplateCreator(true)}
             onShowInfo={intakeResult ? () => setIntakeDismissed((d) => !d) : undefined}
             onRemove={handleRemoveMaster}
-            disabled={editLocked}
+            disabled={editLocked || !!adjust.session}
           />
           <LanguageToggle />
           <ThemeToggle />
@@ -450,7 +474,12 @@ export default function App() {
         onDismiss={() => setIntakeDismissed(true)}
         template={templateData}
         unbound={diagnostics.filter((d) => d.id === "unbound-content")}
+        onAugment={editLocked || !!adjust.session ? undefined : handleAugmentMaster}
       />
+      {adjust.session && (
+        <TemplateAdjustPanel session={adjust.session} busy={adjust.busy} onPreview={adjust.preview}
+          onApply={(r) => void adjust.apply(r)} onCancel={() => void adjust.cancel()} />
+      )}
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>

@@ -7,7 +7,7 @@
  */
 
 import { LAYOUT_NAMES } from "./slide-schema";
-import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt } from "./deck-plan-prompts";
+import { deckPlanSystemPrompt, slideMarkdownEditPrompt, slideCondensePrompt, slideRetrySystemPrompt } from "./deck-plan-prompts";
 import { diagramSystemPrompt, diagramEditSystemPrompt, diagramRoutePrompt, type DiagramType } from "./diagram-type-prompts";
 import { templateSpecSystemPrompt } from "./template-spec-prompts";
 import type { LayoutCatalog, LayoutRole } from "./template-catalog";
@@ -22,18 +22,21 @@ export type { DiagramType, DiagramTypeInfo } from "./diagram-type-prompts";
 
 /** The SYSTEM prompt actually sent for a given AI mode — the SAME selection ipc/ai.ts
  *  uses, exported so the task panel can show exactly what was sent. `today` is only used
- *  by the "slides" (whole-deck generation) prompt; `diagramType` picks the ONE diagram shape
- *  fragment for the diagram / diagram-edit modes (Stage 2 of the two-stage design). "condense" is the
+ *  by the "slides" (whole-deck generation) prompt; "slide-retry" regenerates ONE of its slides that the
+ *  floor had to strip (#107); `diagramType` picks the ONE diagram shape fragment for the
+ *  diagram / diagram-edit modes (Stage 2 of the two-stage design). "condense" is the
  *  harness refine residue: a Markdown-ONLY sub-prompt (no design-ops branch) so a small model stays on format. */
 export function systemPromptForMode(
-  mode: "slides" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec",
+  mode: "slides" | "slide-retry" | "slide" | "condense" | "diagram" | "diagram-edit" | "diagram-route" | "template-spec",
   today: string,
   diagramType?: DiagramType,
 ): string {
   return mode === "slides"
     ? deckPlanSystemPrompt(today)
-    : mode === "slide"
-      ? slideMarkdownEditPrompt()
+    : mode === "slide-retry"
+      ? slideRetrySystemPrompt()
+      : mode === "slide"
+        ? slideMarkdownEditPrompt()
       : mode === "condense"
         ? slideCondensePrompt()
         : mode === "template-spec"

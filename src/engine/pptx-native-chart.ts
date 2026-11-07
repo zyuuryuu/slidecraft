@@ -15,10 +15,10 @@
 import type PptxGenJS from "pptxgenjs";
 import type { DiagramSpec } from "./schema";
 import { type ThemeConfig, bareTextColor } from "./theme";
-import { fitTransform, type Box } from "./draw-target";
+import { estTextWidth, fitTransform, type Box } from "./draw-target";
 import { PIE_COLORS, computePieLayout } from "./diagram-pie";
 import { SERIES_COLORS as XY_COLORS, computeXychartLayout } from "./diagram-xychart";
-import { SERIES_COLORS as RADAR_COLORS, computeRadarLayout } from "./diagram-radar";
+import { SERIES_COLORS as RADAR_COLORS, RINGS as RADAR_RINGS, computeRadarLayout } from "./diagram-radar";
 
 /** 書き出しオプション: 既定 "shapes"＝現状の図形描画（byte-identical）／"native"＝ネイティブ chart。 */
 export type ChartsMode = "shapes" | "native";
@@ -61,7 +61,7 @@ function baseOptions(theme: ThemeConfig, title: string | undefined, legend: "r" 
     showTitle: !!title,
     ...(title ? { title, titleFontFace: theme.fonts.heading, titleFontSize: 13, titleColor: ink } : {}),
     showLegend: legend !== null,
-    ...(legend ? { legendPos: legend, legendFontFace: font, legendFontSize: 10, legendColor: ink } : {}),
+    ...(legend ? { legendPos: legend, legendFontFace: font, legendFontSize: LEGEND_PT, legendColor: ink } : {}),
   };
 }
 
@@ -103,8 +103,10 @@ function pieChart(spec: DiagramSpec, theme: ThemeConfig): NativeChart | null {
       ...baseOptions(theme, undefined, "r"),
       chartColors: slices.map((_, i) => hex(PIE_COLORS[i % PIE_COLORS.length])),
       dataBorder: { pt: 1.25, color: hex(theme.diagram_style.slide_bg ?? "#0A0E27") },
+      // the native legend shows category names only (the painter's legend reads "製品A  42"), so the value
+      // rides on the slice label with the % instead (#566 (a)); the workbook's category names stay untouched
       showPercent: true,
-      showValue: false,
+      showValue: true,
       dataLabelColor: "FFFFFF",
       dataLabelFontSize: 10,
       dataLabelFontBold: true,
@@ -155,6 +157,7 @@ function radarChart(spec: DiagramSpec, theme: ThemeConfig): NativeChart | null {
   const max = r.max > 0 ? r.max : 5; // painter と同じ既定
   const ink = hex(bareTextColor(theme));
   const values = r.series.map((s) => r.axes.map((_, k) => s.values[k] ?? 0));
+  const top = Math.max(max, ...values.flat());
   // painter は max 超えを外周にクランプして描くが、ネイティブは実データを持つので、軸の上限を超えた値まで
   // 広げる（固定 max のままだと線が軸の外へはみ出して描かれる — LibreOffice 描画で実測）。
   return {
@@ -169,12 +172,14 @@ function radarChart(spec: DiagramSpec, theme: ThemeConfig): NativeChart | null {
       lineDataSymbol: "circle",
       lineDataSymbolSize: 7,
       valAxisMinVal: 0,
-      valAxisMaxVal: Math.max(max, ...values.flat()),
+      valAxisMaxVal: top,
+      // the painter's RINGS rings, the outer one on the axis top (unset, renderers picked a unit of 5 and drew a
+      // single ring — #566); no value labels on the rings, like the painter
+      valAxisMajorUnit: top / RADAR_RINGS,
+      valAxisLabelPos: "none",
       catAxisLabelColor: ink,
       catAxisLabelFontFace: theme.fonts.body,
       catAxisLabelFontSize: 9,
-      valAxisLabelColor: ink,
-      valAxisLabelFontSize: 8,
       valGridLine: { color: hex(theme.diagram_style.edge_color), size: 0.5 },
     },
   };
@@ -188,21 +193,38 @@ export function chartSpecToNativeChart(spec: DiagramSpec, theme: ThemeConfig): N
   return null;
 }
 
+/** Legend font size (pt) — the same for the native legend (baseOptions) and its width estimate below. */
+const LEGEND_PT = 10;
+/** pie: what a native legend row needs right of the painter's legendX — swatch 0.18 + gap 0.28 (as the
+ *  painter's legend) + the longest category name; plus a margin for the chart's own inner padding. */
+const PIE_LEGEND_INSET = 0.46;
+const PIE_FRAME_MARGIN = 0.3;
+
 /** 埋め込み図（omitTitle＝painter の contentTop 0.8）の配置矩形（inch）: layout の bbox を、region があれば
- *  painter と同じ fitTransform で region に収めたもの。図形版の図が占める矩形と同じ。対象外は null。 */
+ *  painter と同じ fitTransform で region に収めたもの。図形版の図が占める矩形と同じ。対象外は null。
+ *  pie だけは右端を「凡例の右端の見積もり」で切る（#566）: 図形版の bbox は凡例の文字のため SLIDE_W - 0.4 まで
+ *  取るが、ネイティブ chart は枠いっぱいに広がり凡例を枠の右端に置くので、そのままでは円と凡例が離れる。
+ *  縮尺・左上は図形版と同じ（円は図形版の円の位置に描かれる）。 */
 export function nativeChartRect(spec: DiagramSpec, region?: Box): Box | null {
   const contentTop = 0.8;
+  const pie = spec.type === "pie" ? computePieLayout(spec, contentTop) : null;
   const bbox =
-    spec.type === "pie" ? computePieLayout(spec, contentTop).bbox
+    pie ? pie.bbox
     : spec.type === "xychart" ? computeXychartLayout(spec, contentTop).bbox
     : spec.type === "radar" ? computeRadarLayout(spec, contentTop).bbox
     : null;
   if (!bbox) return null;
   const t = region ? fitTransform(bbox, region) : { scale: 1, offsetX: 0, offsetY: 0 };
+  const maxX = pie ? Math.min(bbox.maxX, pieLegendRight(pie) + PIE_FRAME_MARGIN) : bbox.maxX;
   return {
     x: bbox.minX * t.scale + t.offsetX,
     y: bbox.minY * t.scale + t.offsetY,
-    w: (bbox.maxX - bbox.minX) * t.scale,
+    w: (maxX - bbox.minX) * t.scale,
     h: (bbox.maxY - bbox.minY) * t.scale,
   };
+}
+
+function pieLegendRight(lay: ReturnType<typeof computePieLayout>): number {
+  const longest = Math.max(0, ...lay.slices.map((s) => estTextWidth(s.label, LEGEND_PT) / 72));
+  return lay.legendX + PIE_LEGEND_INSET + longest;
 }

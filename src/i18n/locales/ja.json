@@ -132,7 +132,10 @@
     "viewForm": "フォーム",
     "defaultTemplateLoadFailed": "既定テンプレート「{{name}}」を読み込めませんでした: {{detail}}",
     "defaultTemplateRejected": "テンプレートとして使えません",
-    "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}"
+    "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}",
+    "augmentTemplateTitle": "テンプレートの強化",
+    "augmentSuffix": "（強化）",
+    "adjustSuffix": "（調整）"
   },
   "applyTemplate": {
     "templateUnusable": "このテンプレートは使用できません: {{reason}}",
@@ -144,7 +147,11 @@
     "repairPartSeparator": "・",
     "repairPlanHeader": "このテンプレートはそのままでは使用できません:\n{{blocks}}\n\n",
     "repairPlanProposal": "自動修復の提案: 計 {{total}} 件（{{parts}}）のプレースホルダに種別を付与します。\n",
-    "repairPlanConfirm": "整形して取り込みますか？"
+    "repairPlanConfirm": "整形して取り込みますか？",
+    "augmentColumns": "{{n}} 列",
+    "augmentSize": "{{n}} 列 {{from}}→{{to}}pt",
+    "augmentPlan": "このテンプレートに無い {{what}} のレイアウトを、レイアウト「{{base}}」を元に追加します。\n体裁（フォント・配色・装飾・フッタ）はこのテンプレートのまま継承し、本文の文字サイズは列数に応じて下げます（{{sizes}}）。\n既存のレイアウトは変更しません。\n\n強化しますか？",
+    "augmentFailed": "テンプレートの強化を中止しました（検査に通りませんでした）: {{reason}}"
   },
   "builtinRuntime": {
     "desktopOnly": "組み込みモデルはデスクトップ版でのみ利用できます。"
@@ -287,7 +294,8 @@
   "intake": {
     "mode": {
       "import": "取り込み",
-      "remake": "作り直し（デザイン保持）"
+      "remake": "作り直し（デザイン保持）",
+      "augment": "強化（レイアウト追加）"
     },
     "progress": {
       "loading": "読み込み中…",
@@ -317,7 +325,10 @@
     "sampleBody": "本文テキストの例",
     "unboundChip": "未束縛の内容があるスライド {{count}} 枚（出力時に消えます）",
     "unboundTitle": "どの枠にも入らない内容（このテンプレでは出力時に消えます）",
-    "unboundItem": "スライド {{slide}}: {{message}}"
+    "unboundItem": "スライド {{slide}}: {{message}}",
+    "augmentButton": "テンプレを強化（{{what}}を追加）",
+    "augmentUnavailable": "テンプレの強化はできません: {{reason}}",
+    "augmented": "追加したレイアウト"
   },
   "lang": {
     "name": "日本語",
@@ -382,7 +393,9 @@
     "createTitle": "配色とフォントを選んで新しいテンプレを生成する",
     "createLabel": "テンプレを作成…",
     "showInfoTitle": "直近の取り込み結果を表示",
-    "removeTitle": "このテンプレを削除"
+    "removeTitle": "このテンプレを削除",
+    "adjustTitle": "今のマスターの書体と文字サイズを一括で調整した派生テンプレを作る（元テンプレは変更しない）",
+    "adjustLabel": "テンプレ調整（書体・サイズ）…"
   },
   "masterReg": {
     "defaultName": "テンプレート",
@@ -560,5 +573,29 @@
     "transitionZoom": "ズーム",
     "transitionPush": "プッシュ",
     "help": "ヘルプ / ドキュメントサイトを開く"
+  },
+  "templateAdjust": {
+    "title": "テンプレ調整",
+    "source": "元: {{name}}（元テンプレは変更しません）",
+    "headingFont": "見出し書体",
+    "bodyFont": "本文書体",
+    "sharedFont": "書体（見出し・本文共通）",
+    "sharedHint": "このテンプレは見出しと本文で同じ書体名を使っているため、1 つの書体として置き換えます",
+    "fontPlaceholder": "{{name}}（変更なし）",
+    "scope": "置換の対象",
+    "scopeTheme": "テーマのみ",
+    "scopeThemeTitle": "テーマの見出し／本文フォントだけを置き換える（レイアウトに実名で書かれた書体はそのまま）",
+    "scopeInline": "テーマ＋直書き",
+    "scopeInlineTitle": "テーマに加えて、マスター／レイアウトに実名で直書きされた同じ書体も置き換える（推奨）",
+    "sizeTitle": "タイトル",
+    "sizeBody": "本文",
+    "sizeOther": "その他",
+    "sizeHint": "文字サイズは 0.5pt 単位に丸め、1〜400pt に収めます",
+    "updating": "反映中…",
+    "reset": "リセット",
+    "apply": "調整を適用",
+    "applyTitle": "「{{name}}」としてマスター一覧に追加し、このデッキに適用する",
+    "cancel": "キャンセル",
+    "failed": "テンプレ調整に失敗しました: {{error}}"
   }
 }

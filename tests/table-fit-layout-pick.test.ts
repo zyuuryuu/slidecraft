@@ -9,6 +9,11 @@
  * table is estimated to overflow — by the SAME judgment table-overflow uses (tableOverflow, R8). The
  * demotion is weaker than a body-count mismatch, and a table that overflows every candidate keeps the
  * old order (byte-identical).
+ *
+ * #589: the magazine now has a generic body layout `13_本文（1カラム）` and 02_ステートメント is classified
+ * "statement" (out of the content candidates), so on the shipped catalog a table no longer competes with the
+ * 0.9in box at all. To keep exercising the #444 demotion on the SAME real geometry, the block below rebuilds
+ * the pre-#589 catalog (02 back to content, 13 removed); the post-#589 pick is asserted separately.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -33,7 +38,10 @@ describe("#444 auto pick on the visual magazine master — a table avoids a box 
   let catalog: LayoutCatalog;
   beforeAll(async () => {
     tpl = await loadTemplate(readFileSync(MAGAZINE));
-    catalog = buildCatalog(tpl);
+    // Pre-#589 catalog (see header): the 02-vs-08 competition the demotion was written for.
+    catalog = buildCatalog(tpl)
+      .filter((e) => e.name !== "13_本文（1カラム）")
+      .map((e) => (e.name === "02_ステートメント" ? { ...e, role: "content" as const } : e));
   });
   const pick = (md: string) => {
     const deck = parseMd(md);
@@ -58,6 +66,16 @@ describe("#444 auto pick on the visual magazine master — a table avoids a box 
 
   it("a table-less slide's pick is unchanged (02_ステートメント)", () => {
     expect(pick("# 表紙\n\n---\n\n# 要点\n\n- 一行の主張")).toBe("02_ステートメント");
+  });
+});
+
+describe("#589 the shipped magazine catalog: a table goes to the generic body layout, not 02_ステートメント", () => {
+  it("4-row table → 13_本文（1カラム）, no table-overflow warn", async () => {
+    const tpl = await loadTemplate(readFileSync(MAGAZINE));
+    const catalog = buildCatalog(tpl);
+    const deck = parseMd(tableDeck(4));
+    expect(autoSelectLayout(deck.slides[1], 1, deck.slides.length, catalog)).toBe("13_本文（1カラム）");
+    expect(diagnoseDeck(deck, catalog, tpl.layouts).filter((i) => i.id === "table-overflow")).toEqual([]);
   });
 });
 

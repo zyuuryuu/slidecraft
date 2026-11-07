@@ -82,6 +82,12 @@ Re-make does **not replace** faithful import. Both intake points are in the impo
 
 ---
 
+## 1-c. Adjusting fonts and text sizes in one go (Adjust template)
+
+**"🔤 Adjust template (fonts / sizes)…"** in the master menu makes a **derived template** of the one in use with its fonts and text sizes changed together. A control strip opens under the toolbar: pick the heading / body font (a single shared font when the template uses the same font name for both), where to replace it (**Theme + inline** — the theme plus the same font named directly in layouts, the default — or **Theme only**), and a size factor for title / body / other text (50–150%); the preview follows right away. Sizes are rounded to 0.5pt and kept within 1–400pt, and fonts that are not the theme's (such as Consolas in code frames) stay as they are. **Apply adjustment** adds it to the master list as "original name (adjusted)" — the original template is not changed, and Cancel restores it. Because the sizes change in the template itself, overflow diagnostics and automatic splitting use the new sizes.
+
+---
+
 ## 2. Repair-importing a broken template
 
 A `.pptx` whose title or body placeholders have **lost their role (type)** cannot be poured into correctly as-is (because it can't tell which is the title and which is the body). SlideCraft diagnoses this at import time and rescues it via **"clean up and import."**
@@ -105,6 +111,12 @@ A template that has no fatal problem (i.e. is usable as-is) is **not altered at 
 ::: details Only the "role (type)" is repaired
 Each placeholder in a PPTX carries a role, such as `<p:ph type="title">`. When this type is missing, the engine cannot judge whether the placeholder is a title or body. Repair only re-applies this type; it does not rebuild the placeholder's substance (position, size) or the layout naming.
 :::
+
+---
+
+## 2-b. Adding missing column layouts (Augment template)
+
+If an imported template has **no 3-column (or 2-column) body layout**, a 3-column slide is placed on the closest 2-box layout and some content may not fit. The intake bar's **"Augment template (add 3-column)"** copies the template's basic title-plus-one-body layout, splits the body into equal-width columns and **adds only that new layout** (named `<original layout name> +3Body`). Fonts, colors, decorations and the footer are inherited from the master; the body text size steps down the PowerPoint size list by one step for 2 columns and two steps for 3 columns (e.g. 16pt → 12pt in 3 columns). Existing layouts are left untouched; before applying, the result is reloaded and checked that the existing layouts read the same, the new layout reads as N columns, and the editor fields map 1:1 to its boxes. The original `.pptx` is not rewritten — the augmented template is registered as a separate master marked "(augmented)". When the template has no basic layout to build from, the reason is shown instead of the button. The review panel's "this template has no 3-column layout" hint (rule `missing-column-layout`) points to the same feature.
 
 ---
 

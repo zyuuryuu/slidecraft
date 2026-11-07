@@ -12,8 +12,9 @@ import { chartSpecToNativeChart, nativeChartRect, type NativeChart } from "../sr
 import { computePieLayout } from "../src/engine/diagram-pie";
 import { computeXychartLayout } from "../src/engine/diagram-xychart";
 import { computeRadarLayout } from "../src/engine/diagram-radar";
+import { SLIDE_W } from "../src/engine/layout-engine";
 import { paintDiagram } from "../src/engine/diagram-painter";
-import type { DrawTarget, Box } from "../src/engine/draw-target";
+import { estTextWidth, fitTransform, type DrawTarget, type Box } from "../src/engine/draw-target";
 import { midnightExecutive, bareTextColor } from "../src/engine/theme";
 import { parseDiagramJson } from "../src/engine/schema";
 import { PIE, XY, XY_BAR_ONLY, XY_LINE_ONLY, RADAR, FLOW } from "./native-chart-fixtures";
@@ -29,14 +30,15 @@ function must(spec: Parameters<typeof chartSpecToNativeChart>[0]): NativeChart {
 }
 
 describe("chartSpecToNativeChart — snapshot of the 3 chart kinds", () => {
-  it("pie → `pie`: positive slices only, slice colours, % labels, legend right, no title", () => {
+  it("pie → `pie`: positive slices only, slice colours, value + % labels, legend right, no title", () => {
     const nc = must(PIE);
     expect(nc.type).toBe("pie");
     expect(nc.data).toEqual([{ name: "市場シェア", labels: ["製品A", "製品B", "その他"], values: [42, 30, 28] }]);
     expect(nc.options).toMatchObject({
       chartColors: ["3B82F6", "06B6D4", "10B981"],
+      // #566 (a): the native legend shows names only, so the value goes on the slice label with the %
       showPercent: true,
-      showValue: false,
+      showValue: true,
       showLegend: true,
       legendPos: "r",
       legendColor: INK,
@@ -112,6 +114,8 @@ describe("chartSpecToNativeChart — snapshot of the 3 chart kinds", () => {
       chartColors: ["3B82F6", "F59E0B"],
       valAxisMinVal: 0,
       valAxisMaxVal: 6, // max 5, but 目標/文書 = 6 — a fixed 5 would draw the line outside the chart
+      valAxisMajorUnit: 1.5, // #566: 4 rings (6 / 4) like the painter — unset, renderers drew one ring at 5
+      valAxisLabelPos: "none", // the painter draws no value labels on the rings
       showLegend: true,
       legendPos: "b",
       showTitle: true,
@@ -123,6 +127,7 @@ describe("chartSpecToNativeChart — snapshot of the 3 chart kinds", () => {
     const within = parseDiagramJson(JSON.stringify({ type: "radar", direction: "TB", nodes: [], edges: [], radar: { axes: ["a", "b", "c"], max: 10, series: [{ values: [1, 2] }] } }));
     const nc = must(within);
     expect(nc.options.valAxisMaxVal).toBe(10);
+    expect(nc.options.valAxisMajorUnit).toBe(2.5);
     expect(nc.data).toEqual([{ name: "系列 1", labels: ["a", "b", "c"], values: [1, 2, 0] }]); // missing axis → 0, like the painter
   });
 
@@ -199,6 +204,12 @@ describe("R8 agreement — mapper data == painter layout data", () => {
       });
     });
   });
+
+  it("radar (#566): the native axis has as many rings as the painter draws (majorUnit == axis top / rings)", () => {
+    const lay = computeRadarLayout(RADAR, EMBED_TOP);
+    const nc = must(RADAR);
+    expect(nc.options.valAxisMajorUnit).toBe((nc.options.valAxisMaxVal as number) / lay.rings.length);
+  });
 });
 
 // ── the native chart sits where the shapes figure sits ──
@@ -219,7 +230,7 @@ class ExtentRecorder implements DrawTarget {
 
 describe("nativeChartRect — the shapes figure's rectangle (layout bbox, fitted into the region)", () => {
   const TOL = 0.2; // inches: painter text boxes may poke slightly past the layout bbox
-  for (const [name, spec] of [["pie", PIE], ["xychart", XY], ["radar", RADAR]] as const) {
+  for (const [name, spec] of [["xychart", XY], ["radar", RADAR]] as const) {
     for (const region of [undefined, { x: 6.9, y: 1.6, w: 5.9, h: 5.2 }]) {
       it(`${name}${region ? " (beside text, region)" : " (solo)"}: rect encloses what the painter draws`, () => {
         const rect = nativeChartRect(spec, region)!;
@@ -238,6 +249,39 @@ describe("nativeChartRect — the shapes figure's rectangle (layout bbox, fitted
       });
     }
   }
+
+  // #566: the pie's layout bbox runs to SLIDE_W - 0.4 so the shapes legend text has room; a native chart
+  // fills its frame and pins the legend to the frame's right edge, so that bbox left the legend far from the
+  // pie. The pie frame instead stops at the native legend's estimated right edge (swatch + longest label).
+  for (const region of [undefined, { x: 6.9, y: 1.6, w: 5.9, h: 5.2 }]) {
+    it(`pie${region ? " (beside text, region)" : " (solo)"}: frame = pie + legend estimate, at the painter's scale`, () => {
+      const rect = nativeChartRect(PIE, region)!;
+      const lay = computePieLayout(PIE, EMBED_TOP);
+      const t = region ? fitTransform(lay.bbox, region) : { scale: 1, offsetX: 0, offsetY: 0 };
+      const X = (x: number) => x * t.scale + t.offsetX;
+      const Y = (y: number) => y * t.scale + t.offsetY;
+      // the left / top / bottom are the painter's (the pie sits where the shapes pie sits)
+      expect(rect.x).toBeCloseTo(X(lay.bbox.minX), 9);
+      expect(rect.y).toBeCloseTo(Y(lay.bbox.minY), 9);
+      expect(rect.h).toBeCloseTo((lay.bbox.maxY - lay.bbox.minY) * t.scale, 9);
+      // the right edge holds the pie + a legend of the longest label, but no more than a small margin past it
+      const longest = Math.max(...lay.slices.map((sl) => estTextWidth(sl.label, 10) / 72));
+      const legendRight = X(lay.legendX + 0.46 + longest);
+      expect(rect.x + rect.w).toBeGreaterThanOrEqual(legendRight);
+      expect(rect.x + rect.w).toBeLessThanOrEqual(legendRight + 0.5 * t.scale);
+      expect(rect.x + rect.w).toBeLessThan(X(SLIDE_W - 0.4) - 1); // not stretched to the shapes bbox edge
+      expect(rect.x + rect.w).toBeGreaterThan(X(lay.cx + lay.r)); // the pie itself is inside
+    });
+  }
+
+  it("pie with very long labels: the frame never grows past the shapes bbox", () => {
+    const long = parseDiagramJson(JSON.stringify({ type: "pie", direction: "TB", edges: [], nodes: [
+      { id: "a", label: "長".repeat(80), value: 1 }, // ≈ 11 in at 10 pt — far past the slide's right edge
+      { id: "b", label: "b", value: 1 },
+    ] }));
+    const rect = nativeChartRect(long)!;
+    expect(rect.x + rect.w).toBeCloseTo(computePieLayout(long, EMBED_TOP).bbox.maxX, 9);
+  });
 
   it("non-chart specs have no rect (null)", () => {
     expect(nativeChartRect(FLOW)).toBeNull();

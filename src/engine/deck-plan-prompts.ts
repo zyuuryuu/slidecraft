@@ -3,6 +3,17 @@
  * + edit. Split from deck-plan.ts (R1); re-exported from it so importers are
  * unchanged. Pure strings (R2): no DOM / Tauri, no deck-plan internals.
  */
+// The Slide vocabulary + the encoding rule, shared by the whole-deck prompt and the one-slide
+// regeneration prompt (Issue #107) so the two can never drift apart (R8).
+const SLIDE_SHAPES = `- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}  // opening slide; all but title optional
+- {"kind":"section","title":"..."}                                                                // a section divider
+- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}                       // a normal slide; subtitle optional
+- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
+- {"kind":"table","title":"...","subtitle":"...","headers":["列A","列B"],"rows":[["a1","b1"],["a2","b2"]]}  // a DATA TABLE: pricing, metric comparisons, schedules
+- {"kind":"diagram","title":"...","subtitle":"...","mermaid":"flowchart LR\\n  A[開始] --> B[次] --> C[完了]"}  // a FIGURE: emit a small Mermaid diagram
+- {"kind":"closing","title":"...","subtitle":"...","bullets":["..."]}                             // closing slide; subtitle + bullets optional`;
+const UTF8_RULE = `- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.`;
+
 // ── System prompt the model fills (tiny vocabulary — no Markdown DSL) ──
 
 export function deckPlanSystemPrompt(today?: string): string {
@@ -12,13 +23,7 @@ Shape:
 { "slides": [ Slide, ... ] }
 
 Each Slide is exactly one of:
-- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}  // opening slide; all but title optional
-- {"kind":"section","title":"..."}                                                                // a section divider
-- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}                       // a normal slide; subtitle optional
-- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
-- {"kind":"table","title":"...","subtitle":"...","headers":["列A","列B"],"rows":[["a1","b1"],["a2","b2"]]}  // a DATA TABLE: pricing, metric comparisons, schedules
-- {"kind":"diagram","title":"...","subtitle":"...","mermaid":"flowchart LR\\n  A[開始] --> B[次] --> C[完了]"}  // a FIGURE: emit a small Mermaid diagram
-- {"kind":"closing","title":"...","subtitle":"...","bullets":["..."]}                             // closing slide; subtitle + bullets optional
+${SLIDE_SHAPES}
 
 Rules:
 - Write EVERY field in the SAME language as the user's request, and keep that ONE
@@ -41,7 +46,24 @@ Rules:
 - The "closing" title is a CONCISE takeaway in ONE short line (not a single word like
   "Summary"/"まとめ", and not a long sentence that overflows).${today ? `\n- Use ${today} (or a future date) for any "date" field — never a past year.` : ""}
 - Do NOT add any field not listed above, and do NOT invent other "kind" values.
-- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.
+${UTF8_RULE}
+- Output valid JSON only.`;
+}
+
+/** System prompt for regenerating ONE slide of a generated deck whose text was lost to a format
+ *  violation (Issue #107). Paired with slideRetryRequest (the user message) + acceptSlideRetry. */
+export function slideRetrySystemPrompt(): string {
+  return `You regenerate ONE slide of an existing slide deck as a JSON Slide object. Output ONLY that one JSON object — no prose, no code fence, no "slides" array, no other slides.
+
+The Slide is exactly one of:
+${SLIDE_SHAPES}
+
+Rules:
+- Keep the slide's kind and topic as described in the request; restore the text that was lost.
+- Write EVERY field in the SAME language as the original request.
+- Each bullet is a SHORT key phrase (≤ ~20 full-width characters), no trailing "。"/".". 3-5 bullets.
+- Do NOT add any field not listed above, and do NOT invent other "kind" values.
+${UTF8_RULE}
 - Output valid JSON only.`;
 }
 
