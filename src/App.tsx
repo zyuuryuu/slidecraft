@@ -440,6 +440,7 @@ export default function App() {
         result={intakeDismissed ? null : intakeResult}
         onDismiss={() => setIntakeDismissed(true)}
         template={templateData}
+        unbound={diagnostics.filter((d) => d.id === "unbound-content")}
       />
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}

@@ -20,8 +20,8 @@ import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
 import { visualOccupancy, visualCollisions, bodyPlaceholders, nthBody, type VisualKind } from "./visual-placement";
-import { estimateTableRowHeightsIn } from "./table-layout";
-import { isBlankParagraphs } from "./placeholder-binding";
+import { tableOverflow } from "./table-fit"; // #436/#444: the SAME judgment the auto pick uses (R8)
+import { isBlankParagraphs, contentHead } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
@@ -103,16 +103,6 @@ export interface DeckIssue {
 }
 
 const VISUAL_LABEL: Record<VisualKind, string> = { diagram: "図", mermaid: "図", table: "表", code: "コード", image: "画像" };
-
-/** #436: the table's estimated rendered height vs its placed box — undefined when it fits (or has no
- *  box). `fit` = how many leading rows the estimate fits in the box (header included). */
-function tableOverflow(rows: string[][], box: { w: number; h: number }): { fit: number } | undefined {
-  const heights = estimateTableRowHeightsIn(rows, box.w);
-  if (heights.reduce((a, b) => a + b, 0) <= box.h) return undefined;
-  let used = 0;
-  const fit = heights.findIndex((h) => (used += h) > box.h);
-  return { fit };
-}
 
 /** #473: a figure at body ordinal 2+ is confined to that placeholder's box by export (placeholder-filler's
  *  `diagWantsRegion`); ordinal 1 (or an unparsable idx) fills the slide. Same predicate, same default. */
@@ -241,9 +231,10 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       // #397/#398: a field row with no slot gets its own message naming the row, so the author knows
       // WHICH line vanished and why (the template has no Callout/Source box on this layout).
       const rows = plan.unbound.filter((u) => isFieldIdx(u.idx));
-      const n = plan.unbound.length - rows.length;
-      if (n > 0) {
-        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${n} 件がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
+      const others = plan.unbound.filter((u) => !isFieldIdx(u.idx));
+      if (others.length > 0) {
+        // #97: name WHAT vanishes (head of the first unbound item), not just how many.
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${others.length} 件（先頭「${contentHead(others[0].content)}」）がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
       }
       if (rows.length > 0) {
         const names = rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ");

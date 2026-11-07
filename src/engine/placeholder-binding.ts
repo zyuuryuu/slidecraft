@@ -183,6 +183,16 @@ export function unboundContent(
     .map((c) => ({ content: c, role: slideIdxRole(c.idx, hasCtrTitle) }));
 }
 
+/**
+ * #97: a short, human-readable head of a content item — its first non-blank paragraph's text, cut to
+ * `max` chars with an ellipsis — so an unbound-content warning can NAME what vanishes, not just count it.
+ */
+export function contentHead(c: PlaceholderContent, max = 20): string {
+  const text = c.paragraphs.map((p) => p.segments.map((s) => s.text).join("").trim()).find((t) => t.length > 0) ?? "";
+  const chars = [...text];
+  return chars.length > max ? `${chars.slice(0, max).join("")}…` : text;
+}
+
 /** A slide CONTENT item tagged with the role its (canonical) idx maps to — the content side of a bind. */
 export interface ContentRef {
   idx: string; // the SlideIR content idx
