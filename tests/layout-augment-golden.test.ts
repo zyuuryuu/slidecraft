@@ -30,13 +30,16 @@ const GOLDEN: Record<string, Record<string, string>> = {
     "deck:ppt/slides/slide2.xml": "e8826e2c7d8047f2228062bbb64a505afb992a81391bb1169d30a13e3ad42bb1",
     "deck:ppt/slides/_rels/slide2.xml.rels": DECK_RELS,
   },
+  // マガジンは #589 で 13_本文（1カラム） が slideLayout18 に入ったため、合成レイアウトは 19 番・master の
+  // sldLayoutIdLst／rels・[Content_Types]・書き出した slide2 の rels（layout 参照）が 13 レイアウト fixture と
+  // 異なる。slide2.xml 本体（3 列の配置・文字）は #589 の前後で同一（再固定 2026-11-07・統括）。
   "ビジュアルデッキ_マガジン_全レイアウト見本.pptx": {
-    "ppt/slideLayouts/slideLayout18.xml": "cdcc64144368994d6779b7e1ac320029761cfd6de738e373a402c05c04b1627d",
-    "ppt/slideMasters/slideMaster1.xml": "49164143af9fb9a53f68eb3166303efa7ca56738cdae7e9dd2dcd4e13ecdfe8e",
-    "ppt/slideMasters/_rels/slideMaster1.xml.rels": MASTER_RELS,
-    "[Content_Types].xml": "e725a98a40863dd9c82c50a90dfc85ff7f6c28df808000787d77ebdb3350c534",
+    "ppt/slideLayouts/slideLayout19.xml": "c428bb612fb5489282e426d10a1ca1bd1314b17bb8bc8d0c4aa1cadde51d4614",
+    "ppt/slideMasters/slideMaster1.xml": "33aa6884b756121ddd72fa3860e7d62dbca4bdc36be23e6ceb3bcbff634d9516",
+    "ppt/slideMasters/_rels/slideMaster1.xml.rels": "0b92822145151e8553afb945a8e06145bd3f303e027b699b5545e3a4fd7b2b20",
+    "[Content_Types].xml": "281351ad7a8048b4cbbd8934477cd3d8cd82b6ea0428529601e68f494a72955e",
     "deck:ppt/slides/slide2.xml": "d5e3b59611af90cbc84e4666b8f8b0ef2b9a998af1d84f06a7d2b919fb722016",
-    "deck:ppt/slides/_rels/slide2.xml.rels": DECK_RELS,
+    "deck:ppt/slides/_rels/slide2.xml.rels": "2ebad57f4acacdd5b85424d8e80e535a3785b00a7805f8eb367b7a406d278df4",
   },
   "技術報告_スタンダード水色_全レイアウト見本.pptx": {
     "ppt/slideLayouts/slideLayout18.xml": "89501151cad165521522c37de2a969cbde4fd2a95aa46c5393a43848f9f7b72b",
@@ -56,7 +59,10 @@ describe("layout augmentation golden (synthesized layout XML + exported 3-column
     it(file, async () => {
       const r = await augmentAndVerify(readFileSync(resolve(DIR, file)));
       expect(r.applied).toBe(true);
-      expect(r.added[0].part).toBe("ppt/slideLayouts/slideLayout18.xml");
+      // the synthesized layout takes the next free slideLayoutN — 18 for the 13-layout fixtures, 19 for
+      // マガジン since #589 added 13_本文（1カラム） as slideLayout18
+      const part = Object.keys(golden).find((k) => k.startsWith("ppt/slideLayouts/"))!;
+      expect(r.added[0].part).toBe(part);
       const z = await JSZip.loadAsync(r.bytes);
       const deck = await JSZip.loadAsync(await generatePptx(parseMd(DECK_MD), await loadTemplate(r.bytes)));
       for (const [key, hash] of Object.entries(golden)) {
