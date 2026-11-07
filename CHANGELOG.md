@@ -14,6 +14,7 @@
 - **Windows / Linux のインストーラも `slidecraft-mcp` ランチャを PATH に置く** — macOS cask と同じ `claude mcp add slidecraft -- slidecraft-mcp` の 1 行で登録できる。Windows は `slidecraft-mcp.cmd`（同梱 `node.exe` で `cli.cjs` を起動）をインストール先に同梱し、NSIS（インストーラフック）/ MSI（WiX フラグメント）が**ユーザ PATH** に追加・アンインストールで除去。Linux の `.deb`/`.rpm`/AppImage は `/usr/bin/slidecraft-mcp` を同梱。CI の Linux smoke が実 `.deb` を展開してランチャ起動まで検査する（[#519](https://github.com/zyuuryuu/slidecraft/issues/519)・ADR-0022・ADR-0038 D5）
 
 - **PPTX のグラフをネイティブ chart で書き出すオプション**（段 1）— MCP `export_pptx` に `charts: "native"` を渡すと `pie` / `xychart`（棒・折れ線・混在）/ `radar` が PowerPoint のネイティブグラフ（データ埋め込み・「データの編集」で数値や色を直せる）になり、結果に `charts: {native, shapes}` の件数が載る。既定 `"shapes"` は従来どおり（byte-identical）。プレビュー・HTML・`get_slide_image` は図形描画のままで近似（[#554](https://github.com/zyuuryuu/slidecraft/issues/554)）
+- **テンプレ調整（書体・文字サイズの一括調整）**（段 2）— マスター選択メニューの「テンプレ調整（書体・サイズ）…」で、今のテンプレートの見出し／本文の書体と、タイトル・本文・その他の文字サイズの倍率を選ぶと、プレビューに即反映された派生テンプレートを「（調整）」として追加できる。書体はテーマ（`script="Jpan"` を含む）に加え、既定ではレイアウトに実名で直書きされた同じ書体も置き換え（「テーマのみ」も選べる）、テーマと違う書体（Consolas 等）は残す。サイズはマスター `txStyles` とマスター／レイアウトの全 `defRPr@sz` に掛け、0.5pt 単位・1〜400pt に収める。元テンプレートは変更せず、調整しなければ byte-identical。診断・自動分割はテンプレート側のサイズを読む従来の 1 経路のまま（[#570](https://github.com/zyuuryuu/slidecraft/issues/570)）
 
 ### Changed
 
