@@ -7,8 +7,8 @@
  * the slide's existing diagram.
  */
 import type { SlideIR } from "./slide-schema";
-import { validateDiagramSource } from "./mermaid-to-diagram";
-import { figureSourceToYaml, placeFigureYaml } from "./apply-slide-edit";
+import { figureSourceToYaml, placeFigureYaml, resolvedBodyCount, editedDiagramError } from "./apply-slide-edit";
+import type { LayoutCatalog } from "./template-catalog";
 import { parseMd } from "./md-parser";
 import { serializeMd, type SerializeTemplate } from "./md-serializer";
 import { reconcileEdit } from "./ai-reconcile";
@@ -42,15 +42,17 @@ function sanitizeFigureSource(raw: string): string {
  * If `raw` is (or wraps) a valid DiagramSpec YAML, apply it as the slide's figure; otherwise null (not
  * a figure-YAML edit — the caller falls back to the Markdown path). The raw is first sanitized (fence
  * unwrap + prose-preamble strip) so a ```yaml-fenced or "はい、図です:"-prefixed edit still applies
- * instead of leaking to the code path. Three cases:
- * replace / graduate / add-and-coexist — see placeFigureYaml (apply-slide-edit.ts), shared with MCP.
+ * instead of leaking to the code path. Placement (replace / graduate / add-and-coexist, pin kept) is
+ * placeFigureYaml, shared with MCP. GUI-shell rescue (#220 A2, needs `ctx`): an ADD onto a pin with NO body
+ * region re-autos — where MCP set_diagram rejects, the adoption path has no reject channel.
  */
-export function applyFigureYaml(slide: SlideIR, raw: string): SlideIR | null {
+export interface FigureLayoutCtx { index: number; total: number; catalog: LayoutCatalog }
+export function applyFigureYaml(slide: SlideIR, raw: string, ctx?: FigureLayoutCtx): SlideIR | null {
   const src = figureSourceToYaml(sanitizeFigureSource(raw), "yaml");
   if ("error" in src) return null; // invalid → not a figure-YAML edit
-  // The placement itself is shared with MCP set_diagram (#220). addLayout "auto": a figure added to a
-  // figureless slide lets the engine pick a fitting (single-body or 2-column) layout.
-  return placeFigureYaml(slide, src.yaml, { addLayout: "auto" });
+  const adding = !slide.diagram && !slide.mermaidBlock;
+  const bodyless = adding && ctx && slide.layout !== "auto" && resolvedBodyCount(slide, ctx.index, ctx.total, ctx.catalog).bodyCount < 1;
+  return placeFigureYaml(bodyless ? { ...slide, layout: "auto" } : slide, src.yaml);
 }
 
 /** A slide's current figure as its fenced source block (```diagram / ```mermaid), or undefined. */
@@ -75,8 +77,8 @@ export interface FigureEditPreview {
  * the diagram change. Returns null when `raw` is not a figure-YAML edit (caller uses the Markdown diff).
  * Pure (R2).
  */
-export function previewFigureEdit(slide: SlideIR, raw: string): FigureEditPreview | null {
-  const applied = applyFigureYaml(slide, raw);
+export function previewFigureEdit(slide: SlideIR, raw: string, ctx?: FigureLayoutCtx): FigureEditPreview | null {
+  const applied = applyFigureYaml(slide, raw, ctx);
   if (!applied) return null;
   return { beforeMd: figureFence(slide) ?? "", afterMd: figureFence(applied) ?? raw.trim() };
 }
@@ -105,7 +107,7 @@ export function reconcileSlideEdit(old: SlideIR, rawMd: string, tpl?: SerializeT
   // across the whole edit round (#453) — without tpl, all three fall back to the name rule as before.
   const newSlide = parseMd(rawMd, tpl?.catalog).slides[0];
   if (!newSlide) return null;
-  const figErr = newSlide.diagram ? validateDiagramSource(newSlide.diagram.yaml, "yaml") : null;
+  const figErr = editedDiagramError(newSlide); // shared with MCP set_slide_markdown (which rejects instead)
   const edited = figErr ? { ...newSlide, diagram: undefined } : newSlide;
   const reconciled = reconcileEdit(old, edited, tpl?.catalog);
   const verdict = validateStructure(old, edited, "edit", tpl?.catalog);

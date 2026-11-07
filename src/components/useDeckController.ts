@@ -474,7 +474,7 @@ export function useDeckController() {
       // it straight to the slide's diagram — parsing it as Markdown yields no diagram, so the figure
       // edit would be silently dropped and the OLD diagram kept ("採用しても反映されない").
       if (old) {
-        const fig = applyFigureYaml(old, raw);
+        const fig = applyFigureYaml(old, raw, catalog && { index: activeSlide, total: deck.slides.length, catalog });
         if (fig) { handleSlideUpdate(activeSlide, fig, "commit"); return; }
       }
       // ① Figure CONTENT ops (部分生成・ADR-0019): the model emitted a diagram-edit ops array (ONLY the
@@ -545,7 +545,7 @@ export function useDeckController() {
       }
       // Figure edit (bare DiagramSpec YAML): diff the figure SOURCE (YAML-vs-YAML), not the whole
       // slide's Markdown against raw YAML — the latter misaligns visually.
-      const fig = previewFigureEdit(s, raw);
+      const fig = previewFigureEdit(s, raw, catalog && { index: activeSlide, total: deck!.slides.length, catalog });
       if (fig) return { afterMd: fig.afterMd, warnings: [], beforeMd: fig.beforeMd };
       if (parseDesignIntent(raw)) return null; // design → raw diff
       const rec = reconcileSlideEdit(s, raw, serializeTpl(catalog, templateData));

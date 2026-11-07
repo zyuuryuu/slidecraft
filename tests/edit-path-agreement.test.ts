@@ -13,7 +13,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import * as S from "../src/mcp/session";
+import { buildServer } from "../src/mcp/server";
 import { applyFigureYaml, reconcileSlideEdit } from "../src/engine/ai-apply";
 import { distillDeck } from "../src/engine/distill";
 import { parseMd } from "../src/engine/md-parser";
@@ -47,6 +50,17 @@ describe("#220 delegation: both doors apply figures through the shared engine mo
     expect(src("engine/ai-apply.ts")).toMatch(/import \{[^}]*\bplaceFigureYaml\b[^}]*\} from "\.\/apply-slide-edit"/);
     expect(src("engine/ai-apply.ts")).toMatch(/import \{[^}]*\bfigureSourceToYaml\b[^}]*\} from "\.\/apply-slide-edit"/);
   });
+  it("B3: both doors carry omitted blocks / reject a broken diagram through the shared helpers", () => {
+    expect(src("mcp/session.ts")).toMatch(/import \{[^}]*\bcarryOmittedBlocks\b[^}]*\} from "\.\.\/engine\/apply-slide-edit"/);
+    expect(src("mcp/session.ts")).toMatch(/import \{[^}]*\beditedDiagramError\b[^}]*\} from "\.\.\/engine\/apply-slide-edit"/);
+    expect(src("engine/ai-reconcile.ts")).toMatch(/import \{[^}]*\bcarryOmittedBlocks\b[^}]*\} from "\.\/apply-slide-edit"/);
+    expect(src("engine/ai-apply.ts")).toMatch(/import \{[^}]*\beditedDiagramError\b[^}]*\} from "\.\/apply-slide-edit"/);
+  });
+  it("A2: the add-layout knob is gone — one placement rule (pin kept) for both doors", () => {
+    expect(src("engine/apply-slide-edit.ts")).not.toMatch(/\baddLayout\b/);
+    expect(src("mcp/session.ts")).not.toMatch(/\baddLayout\b/);
+    expect(src("engine/ai-apply.ts")).not.toMatch(/\baddLayout\b/);
+  });
   it("neither door re-implements the coexist placement (applyRegionSplit) itself any more", () => {
     expect(src("mcp/session.ts")).not.toMatch(/\bapplyRegionSplit\b/);
     expect(src("engine/ai-apply.ts")).not.toMatch(/\bapplyRegionSplit\b/);
@@ -62,6 +76,8 @@ describe("#220 agreement: set_diagram (MCP) ≡ applyFigureYaml (GUI) on the sam
     // Was a divergence (MCP silently dropped the coexisting Mermaid figure); unified to the GUI's
     // keep — the Issue's invariant 'native figure を無言で落とさない'.
     ["replace the diagram of a slide that ALSO carries a Mermaid block (Mermaid kept)", (sl) => ({ ...sl, diagram: { yaml: OLD_YAML, placeholderIdx: "1" }, mermaidBlock: { mermaid: MERMAID, placeholderIdx: "2" } })],
+    // Was a KNOWN DIVERGENCE (MCP kept the pin, GUI reset to auto); 統括裁定 A2 → both keep the user's pin.
+    ["add to a pinned slide whose body is EMPTY → the pin is kept", (sl) => ({ ...bodyless(sl), layout: "Content.1Body.Single" })],
   ];
   for (const [name, patch] of cases) {
     it(name, async () => {
@@ -82,17 +98,25 @@ describe("#220 agreement: set_diagram (MCP) ≡ applyFigureYaml (GUI) on the sam
   });
 });
 
-describe("#220 KNOWN DIVERGENCE (統括裁定待ち): add a figure to a pinned slide whose body is EMPTY", () => {
-  // MCP keeps the pin (it validated the body ordinal against THAT resolved layout); the GUI re-autos the
-  // layout. Pinned exactly so a change on either side is a deliberate, reviewed edit of this list.
-  it("MCP keeps layout pin, GUI resets to auto — otherwise identical", async () => {
+describe("#220 A2: pin kept on add; the GUI shell rescues only a pin with NO body region", () => {
+  it("the pinned-empty-body add keeps the pin on both doors (no re-auto)", async () => {
     const { s, old } = await session((sl) => ({ ...bodyless(sl), layout: "Content.1Body.Single" }));
-    const gui = applyFigureYaml(old, NEW_YAML)!;
     expect(S.setDiagram(s, 1, NEW_YAML, "yaml").ok).toBe(true);
-    const mcp = s.deck!.slides[1];
-    expect(mcp.layout).toBe("Content.1Body.Single");
-    expect(gui.layout).toBe("auto");
-    expect({ ...mcp, layout: "auto" }).toEqual(gui);
+    expect(s.deck!.slides[1].layout).toBe("Content.1Body.Single");
+    expect(applyFigureYaml(old, NEW_YAML)!.layout).toBe("Content.1Body.Single");
+  });
+  // INTENDED shell difference (裁定 A2): a pin whose layout has NO body region can't host the figure. MCP
+  // rejects (never-silent, the agent re-pins); the GUI has no reject channel at adoption, so its shell
+  // re-autos — judged by the SAME resolved-layout body count the MCP guard uses (resolvedBodyCount).
+  it("a bodyless pin: MCP rejects, the GUI shell (with layout context) re-autos", async () => {
+    const { s, old } = await session((sl) => ({ ...bodyless(sl), layout: "Section.1Title.Single" }));
+    expect(S.setDiagram(s, 1, NEW_YAML, "yaml").ok).toBe(false);
+    const ctx = { index: 1, total: s.deck!.slides.length, catalog: s.catalog! };
+    expect(applyFigureYaml(old, NEW_YAML, ctx)!.layout).toBe("auto");
+    expect(applyFigureYaml(old, NEW_YAML, ctx)!.diagram).toEqual({ yaml: NEW_YAML, placeholderIdx: "1" });
+    // a pin WITH a body region is kept even with the context (the rescue is only for bodyless pins)
+    const pinned = { ...old, layout: "Content.1Body.Single" };
+    expect(applyFigureYaml(pinned, NEW_YAML, ctx)!.layout).toBe("Content.1Body.Single");
   });
 });
 
@@ -115,9 +139,53 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
     expect(s.deck!.slides[1].diagram).toEqual({ yaml: OLD_YAML, placeholderIdx: "2" });
   });
 
-  // KNOWN DIVERGENCES (統括裁定待ち): the GUI door runs reconcileEdit (structure restore + table/code carry +
-  // broken-figure drop + meltdown guard); the MCP door only carries diagram/mermaid. Pinned per-door.
-  it("KNOWN DIVERGENCE: edit drops the title — GUI restores it, MCP applies the drop", async () => {
+  // Was a KNOWN DIVERGENCE (MCP silently dropped the table); 統括裁定 B3 → both carry it (shared carryOmittedBlocks).
+  it("an edit that omits the table carries it on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, "# 表紙\n\n---\n\n# 中身\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+    const old = s.deck!.slides[1];
+    expect(old.table).toBeDefined();
+    const gui = reconcileSlideEdit(old, "# 中身\n\n- 表は消した", tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, "# 中身\n\n- 表は消した").ok).toBe(true);
+    expect(gui.slide.table).toEqual(old.table);
+    expect(s.deck!.slides[1]).toEqual(gui.slide);
+  });
+  it("an edit that omits the code block carries it on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, "# 表紙\n\n---\n\n# 中身\n\n```ts\nconst a = 1;\n```");
+    const old = s.deck!.slides[1];
+    expect(old.code).toBeDefined();
+    const gui = reconcileSlideEdit(old, "# 中身\n\n- コードは消した", tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, "# 中身\n\n- コードは消した").ok).toBe(true);
+    expect(gui.slide.code).toEqual(old.code);
+    expect(s.deck!.slides[1]).toEqual(gui.slide);
+  });
+  it("an edit that REPLACES the table applies the new one on both doors (carry is only for omission)", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, "# 表紙\n\n---\n\n# 中身\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+    const old = s.deck!.slides[1];
+    const edit = "# 中身\n\n| x | y |\n|---|---|\n| 3 | 4 |";
+    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
+    expect(s.deck!.slides[1].table).not.toEqual(old.table);
+    expect(s.deck!.slides[1]).toEqual(gui.slide);
+  });
+  // Was a KNOWN DIVERGENCE (MCP stored the broken YAML). 裁定 B3: neither door stores it — the GUI keeps the
+  // old valid figure + an advisory (its adoption gate), MCP rejects the whole edit (never-silent, nothing saved).
+  it("an edit carrying a BROKEN diagram: GUI keeps the old one, MCP rejects and saves nothing", async () => {
+    const { s, old } = await session((sl) => ({ ...sl, diagram: { yaml: OLD_YAML, placeholderIdx: "2" } }));
+    const edit = "# 中身\n\n- 一\n\n```diagram\ntype: flowchart\nnodes: [oops\n```";
+    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
+    expect(gui.slide.diagram?.yaml).toBe(OLD_YAML);
+    const deckBefore = s.deck, dirtyBefore = s.dirty;
+    expect(() => S.applySlideMarkdown(s, 1, edit)).toThrow(expect.objectContaining({ name: "GuardError", code: "invalid-argument" }));
+    expect(s.deck).toBe(deckBefore); // nothing saved (same deck object, not even a re-write)
+    expect(s.dirty).toBe(dirtyBefore);
+  });
+
+  // INTENDED DIVERGENCES (統括裁定 B3 — GUI shell only): restoring a dropped title and keeping the old slide on
+  // a content-less edit would override what the upstream (MCP) agent deliberately sent, so MCP applies as-is.
+  it("INTENDED: edit drops the title — GUI restores it, MCP applies the drop", async () => {
     const { s, old } = await session();
     const gui = reconcileSlideEdit(old, "- 一だけ", tplOf(s))!;
     S.applySlideMarkdown(s, 1, "- 一だけ");
@@ -125,25 +193,7 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
     expect(title(gui.slide)?.paragraphs[0].segments[0].text).toBe("中身");
     expect(title(s.deck!.slides[1])).toBeUndefined();
   });
-  it("KNOWN DIVERGENCE: edit omits the table — GUI carries it, MCP drops it", async () => {
-    const s = S.createSession(null);
-    await S.newProject(s, templateBytes, "# 表紙\n\n---\n\n# 中身\n\n| a | b |\n|---|---|\n| 1 | 2 |");
-    const old = s.deck!.slides[1];
-    expect(old.table).toBeDefined();
-    const gui = reconcileSlideEdit(old, "# 中身\n\n- 表は消した", tplOf(s))!;
-    S.applySlideMarkdown(s, 1, "# 中身\n\n- 表は消した");
-    expect(gui.slide.table).toEqual(old.table);
-    expect(s.deck!.slides[1].table).toBeUndefined();
-  });
-  it("KNOWN DIVERGENCE: edit carries a BROKEN diagram — GUI keeps the old valid one, MCP stores the broken YAML", async () => {
-    const { s, old } = await session((sl) => ({ ...sl, diagram: { yaml: OLD_YAML, placeholderIdx: "2" } }));
-    const edit = "# 中身\n\n- 一\n\n```diagram\ntype: flowchart\nnodes: [oops\n```";
-    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
-    S.applySlideMarkdown(s, 1, edit);
-    expect(gui.slide.diagram?.yaml).toBe(OLD_YAML);
-    expect(s.deck!.slides[1].diagram?.yaml).toBe("type: flowchart\nnodes: [oops");
-  });
-  it("KNOWN DIVERGENCE: a content-less edit — GUI keeps the old slide (meltdown guard), MCP empties it", async () => {
+  it("INTENDED: a content-less edit — GUI keeps the old slide (meltdown guard), MCP empties it", async () => {
     const { s, old } = await session();
     const gui = reconcileSlideEdit(old, "<!-- slide: auto -->\n", tplOf(s))!;
     S.applySlideMarkdown(s, 1, "<!-- slide: auto -->\n");
@@ -163,5 +213,44 @@ describe("#220 agreement: distill (MCP) ≡ distillDeck (GUI)", () => {
     const r = S.distill(s);
     expect(r.changed).toBe(true); // the overflowing slide really split
     expect(s.deck).toEqual(gui);
+  });
+});
+
+describe("#220 B3 through the MCP envelope (set_slide_markdown)", () => {
+  type CallRes = { content: Array<{ text?: string }>; isError?: boolean };
+  async function client(): Promise<Client> {
+    const server = buildServer(S.createSession(null));
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st);
+    const c = new Client({ name: "test", version: "1.0.0" });
+    await c.connect(ct);
+    return c;
+  }
+  async function call(c: Client, name: string, args: Record<string, unknown> = {}) {
+    const res = (await c.callTool({ name, arguments: args })) as unknown as CallRes;
+    const text = res.content[0]?.text ?? "null";
+    return { isError: !!res.isError, data: res.isError ? undefined : (JSON.parse(text) as Record<string, unknown>) };
+  }
+  const DECK = "# 表紙\n\n---\n\n# 中身\n\n| a | b |\n|---|---|\n| 1 | 2 |";
+
+  it("a broken diagram YAML → modeled reject {ok:false, code:'invalid-argument'}, nothing saved", async () => {
+    const c = await client();
+    await call(c, "new_project", { templateBase64: templateBytes.toString("base64"), markdown: DECK });
+    const before = (await call(c, "get_slide_markdown", { index: 1 })).data;
+    const r = await call(c, "set_slide_markdown", { index: 1, markdown: "# 中身\n\n```diagram\ntype: flowchart\nnodes: [oops\n```" });
+    expect(r.isError).toBe(false);
+    expect(r.data).toMatchObject({ ok: false, code: "invalid-argument" });
+    expect(String(r.data!.error)).toContain("diagram");
+    expect(r.data).not.toHaveProperty("rev"); // not committed
+    expect((await call(c, "get_slide_markdown", { index: 1 })).data).toEqual(before);
+  });
+
+  it("a text edit that omits the table keeps the table (ok:true envelope, table in afterMd)", async () => {
+    const c = await client();
+    await call(c, "new_project", { templateBase64: templateBytes.toString("base64"), markdown: DECK });
+    const r = await call(c, "set_slide_markdown", { index: 1, markdown: "# 中身改\n\n- 表は消した" });
+    expect(r.data).toMatchObject({ ok: true, changed: true });
+    expect(String(r.data!.afterMd)).toContain("| a | b |");
+    expect(String(r.data!.afterMd)).toContain("表は消した");
   });
 });
