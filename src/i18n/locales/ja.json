@@ -312,7 +312,10 @@
     "previewTitle": "レイアウトのプレビュー（ダミー内容）",
     "moreLayouts": "ほか {{count}} レイアウト",
     "sampleTitle": "タイトル",
-    "sampleBody": "本文テキストの例"
+    "sampleBody": "本文テキストの例",
+    "unboundChip": "未束縛の内容があるスライド {{count}} 枚（出力時に消えます）",
+    "unboundTitle": "どの枠にも入らない内容（このテンプレでは出力時に消えます）",
+    "unboundItem": "スライド {{slide}}: {{message}}"
   },
   "lang": {
     "name": "日本語",
