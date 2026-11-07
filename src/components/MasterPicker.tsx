@@ -17,6 +17,8 @@ interface MasterPickerProps {
   /** Re-make (ADR-0027): import a .pptx keeping the source's DESIGN (decorations/layouts) and normalising
    *  only the fonts. Omit → SELECT only. */
   onRemake?: () => void;
+  /** テンプレ調整 (#570): adjust the ACTIVE master's fonts / sizes into a derived master. Omit → hidden. */
+  onAdjust?: () => void;
   /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
   onCreate?: () => void;
   /** Re-show the last intake result summary (the transparency bar). Omit → no ⓘ (nothing imported yet). */
@@ -26,7 +28,7 @@ interface MasterPickerProps {
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onCreate, onShowInfo, onRemove, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onAdjust, onCreate, onShowInfo, onRemove, disabled }: MasterPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -104,7 +106,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
               );
             })}
           </div>
-          {(onImport || onRemake || onCreate) && <div className="my-1 h-px bg-edge" />}
+          {(onImport || onRemake || onAdjust || onCreate) && <div className="my-1 h-px bg-edge" />}
           {onImport && (
             <button
               onClick={() => { onImport(); setOpen(false); }}
@@ -123,6 +125,16 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
             >
               <span className="w-3 shrink-0 text-center">＋</span>
               <span>{t("masterPicker.remakeLabel")}</span>
+            </button>
+          )}
+          {onAdjust && (
+            <button
+              onClick={() => { onAdjust(); setOpen(false); }}
+              title={t("masterPicker.adjustTitle")}
+              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
+            >
+              <span className="w-3 shrink-0 text-center">🔤</span>
+              <span>{t("masterPicker.adjustLabel")}</span>
             </button>
           )}
           {onCreate && (
