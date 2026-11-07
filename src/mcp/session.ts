@@ -19,11 +19,10 @@ import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue, ty
 import { withoutDisabledRules as rulesOn, disabledRuleIds } from "../engine/review-rule-toggle";
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
-import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
-import { diagramSpecToYaml } from "../engine/diagram-serialize";
-import { DiagramSpecSchema } from "../engine/schema";
+import { mermaidToDiagramSpec, type DiagramFormat } from "../engine/mermaid-to-diagram";
+import { figureSourceToYaml, placeFigureYaml } from "../engine/apply-slide-edit";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
-import { parseDesignIntent, applyDesignIntentReport, applyRegionSplit } from "../engine/design-intent";
+import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
 import type { ChartsMode } from "../engine/pptx-native-chart";
 import { GuardError } from "./guard-errors";
@@ -302,7 +301,7 @@ export function visualizeKeyValue(s: Session, i: number) {
 }
 
 /** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
- *  YAML. Replaces an existing diagram / GRADUATES a Mermaid block to a native diagram, OR — for a
+ *  YAML. Replaces an existing diagram (a coexisting Mermaid block is kept) / GRADUATES a Mermaid block to a native diagram, OR — for a
  *  text-only slide (S5) — ADDS a figure into a body region of the RESOLVED layout: the placeholder is a
  *  1-based body ORDINAL resolved role-wise from the catalog (alien-safe, mirrors the GUI's nthBody),
  *  defaulting to the 1st body region; `placeholderIdxArg` targets another region on a multi-body layout.
@@ -311,12 +310,10 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const slide = deck.slides[i];
-  const existingIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
-  const created = existingIdx === undefined;
-  // Resolve PLACEMENT first — a figureless slide with no body region rejects with 配置先 BEFORE any
-  // source-parse error (pre-S5 order). For created, require a body region on the resolved layout
-  // (role-based = alien-safe) and remember whether the body already holds text.
-  let ord = "1", hasBodyText = false;
+  const created = !slide.diagram && !slide.mermaidBlock;
+  // Placement guard first — a figureless slide with no body region rejects with 配置先 BEFORE any
+  // source-parse error (pre-S5 order): require a body region on the resolved layout (role-based = alien-safe).
+  let placeholderIdx = placeholderIdxArg; // replace: optional retarget to another region
   if (created) {
     const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog); // = export's layout, unknown pins included (#435)
     const bodyCount = catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0;
@@ -324,37 +321,15 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
     if (bodyCount < 1 || !Number.isInteger(n) || n < 1 || n > bodyCount) {
       return { ok: false as const, error: `このスライドのレイアウト（${layoutName}）に図の配置先（body 領域）がありません、または placeholderIdx が範囲外です（1..${bodyCount}）。` };
     }
-    ord = String(n);
-    hasBodyText = slide.placeholders.some((p) => /^[1-9]$/.test(p.idx) && p.paragraphs.some((par) => par.segments.some((seg) => seg.text.trim())));
+    placeholderIdx = String(n);
   }
-  const verr = validateDiagramSource(source, format);
-  if (verr) return { ok: false as const, error: verr };
-  let diagramYaml: string;
-  if (format === "mermaid") {
-    const spec = mermaidToDiagramSpec(source);
-    if (!spec) return { ok: false as const, error: "この Mermaid はネイティブ図に変換できません（gitGraph / sankey / C4 等）。" };
-    diagramYaml = diagramSpecToYaml(spec);
-  } else if (format === "json") {
-    diagramYaml = diagramSpecToYaml(DiagramSpecSchema.parse(JSON.parse(source)));
-  } else {
-    diagramYaml = source; // already-valid YAML, stored verbatim (matches the GUI)
-  }
+  const src = figureSourceToYaml(source, format);
+  if ("error" in src) return { ok: false as const, error: src.error };
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  let next: SlideIR;
-  if (!created) {
-    const placeholderIdx = placeholderIdxArg ?? existingIdx; // replace (optionally retarget to another region)
-    next = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx } };
-    delete next.mermaidBlock; // a Mermaid slide graduates to a native diagram
-  } else {
-    const withFigure: SlideIR = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx: ord } };
-    delete withFigure.mermaidBlock;
-    // COEXIST with existing body text: relocate it to the other column (regionSplit) rather than let the
-    // render clobber the bullets (the body placeholder at the figure's ordinal is skipped). Mirrors the
-    // GUI's applyFigureYaml (ai-apply.ts). A body region with no text just takes the figure directly.
-    next = hasBodyText ? applyRegionSplit(withFigure, "text-left") : withFigure;
-  }
+  // Replace / graduate / add-and-coexist is shared with the GUI's applyFigureYaml (#220). addLayout "keep":
+  // the guard above validated the ordinal against THIS slide's resolved layout.
   const slides = [...deck.slides];
-  slides[i] = next;
+  slides[i] = placeFigureYaml(slide, src.yaml, { placeholderIdx, addLayout: "keep" });
   s.deck = { ...deck, slides };
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
