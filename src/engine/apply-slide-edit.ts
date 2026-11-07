@@ -1,12 +1,14 @@
 /**
- * apply-slide-edit.ts — the ONE inner "apply a figure edit to a SlideIR" logic that both deck-editing
+ * apply-slide-edit.ts — the ONE inner "apply an AI edit to a SlideIR" logic that both deck-editing
  * doors share (#220, R8 option a). Pure logic (R2): no DOM / Tauri / MCP.
  *
- *   MCP door : src/mcp/session.ts setDiagram     (shell: placement guard + mutation envelope)
- *   GUI door : src/engine/ai-apply.ts applyFigureYaml (shell: raw-AI-output sanitizing + adoption gate)
+ *   figure edit   — MCP setDiagram ⇄ GUI applyFigureYaml (ai-apply.ts)
+ *   Markdown edit — MCP applySlideMarkdown ⇄ GUI reconcileSlideEdit (ai-apply.ts → reconcileEdit)
  *
- * Each door keeps its outer shell; the canonicalization (source → stored YAML) and the placement
- * (replace / graduate / add-and-coexist) live here so the two can't drift. Agreement is pinned by
+ * Each door keeps its outer shell (MCP: placement guard / reject + mutation envelope; GUI: raw-AI-output
+ * sanitizing, title restore + meltdown guard, adoption gate). The canonicalization (source → stored YAML),
+ * the placement (replace / graduate / add-and-coexist), the block carry (an omitted figure/table/code is
+ * kept) and the broken-figure check live here so the doors can't drift. Agreement is pinned by
  * tests/edit-path-agreement.test.ts.
  */
 import type { SlideIR } from "./slide-schema";
@@ -14,7 +16,9 @@ import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from 
 import { diagramSpecToYaml } from "./diagram-serialize";
 import { DiagramSpecSchema } from "./schema";
 import { applyRegionSplit } from "./design-intent";
-import { hasText } from "./ai-reconcile";
+import { hasText } from "./slide-roles";
+import { autoSelectLayout } from "./template-loader";
+import type { LayoutCatalog } from "./template-catalog";
 
 /** True when any body region (idx 1..9) carries text — the trigger for coexist placement. */
 export function hasBodyText(slide: SlideIR): boolean {
@@ -35,13 +39,35 @@ export function figureSourceToYaml(source: string, format: DiagramFormat): { yam
   return { yaml: source };
 }
 
+/** The layout slide `i` resolves to (= export's choice, unknown pins included #435) and its body-region
+ *  count — the ONE "can this slide host an added figure" judgment: MCP's set_diagram guard rejects on 0,
+ *  the GUI shell re-autos a bodyless pin (#220 A2). */
+export function resolvedBodyCount(slide: SlideIR, i: number, total: number, catalog: LayoutCatalog): { layoutName: string; bodyCount: number } {
+  const layoutName = autoSelectLayout(slide, i, total, catalog);
+  return { layoutName, bodyCount: catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0 };
+}
+
+/** Carry the blocks an edit OMITTED (diagram / Mermaid / table / code) from the old slide — a text edit
+ *  that leaves a block out keeps it (no silent drop); a block the edit carries is respected (#220 B3). */
+export function carryOmittedBlocks(old: SlideIR, edited: SlideIR): SlideIR {
+  return {
+    ...edited,
+    diagram: edited.diagram ?? old.diagram,
+    mermaidBlock: edited.mermaidBlock ?? old.mermaidBlock,
+    table: edited.table ?? old.table,
+    code: edited.code ?? old.code,
+  };
+}
+
+/** The validation error of the ```diagram an edit carries, or null (none / valid). Neither door stores a
+ *  broken figure: the GUI keeps the old one + an advisory, MCP rejects the edit (#220 B3). */
+export function editedDiagramError(edited: SlideIR): string | null {
+  return edited.diagram ? validateDiagramSource(edited.diagram.yaml, "yaml") : null;
+}
+
 export interface PlaceFigureOptions {
   /** Target region. Replace: retarget (default = the existing figure's). Add: body ordinal (default "1"). */
   placeholderIdx?: string;
-  /** Layout when ADDING to a figureless slide whose body has no text (with body text, regionSplit always
-   *  re-autos). MCP "keep" (its guard validated the ordinal against the pinned layout) vs GUI "auto" (let
-   *  the engine pick a fitting layout). A known divergence, pinned in edit-path-agreement — #220. */
-  addLayout: "keep" | "auto";
 }
 
 /**
@@ -49,18 +75,15 @@ export interface PlaceFigureOptions {
  *   1. a native diagram exists → replace its YAML (a coexisting Mermaid block is KEPT — never a silent drop);
  *   2. only a Mermaid block → it GRADUATES to a native diagram in the same region;
  *   3. figureless → ADD it; existing body text moves to the other column (regionSplit text-left) so the
- *      bullets are never clobbered.
+ *      bullets are never clobbered. With an empty body the layout pin is KEPT (#220 A2: a figure add never
+ *      silently unpins the user's layout; with body text regionSplit re-autos as part of the split).
  */
-export function placeFigureYaml(slide: SlideIR, yaml: string, opts: PlaceFigureOptions): SlideIR {
+export function placeFigureYaml(slide: SlideIR, yaml: string, opts: PlaceFigureOptions = {}): SlideIR {
   if (slide.diagram) return { ...slide, diagram: { yaml, placeholderIdx: opts.placeholderIdx ?? slide.diagram.placeholderIdx } };
   if (slide.mermaidBlock) {
     const { mermaidBlock, ...rest } = slide;
     return { ...rest, diagram: { yaml, placeholderIdx: opts.placeholderIdx ?? mermaidBlock.placeholderIdx } };
   }
-  const withFigure: SlideIR = {
-    ...slide,
-    layout: opts.addLayout === "auto" ? "auto" : slide.layout,
-    diagram: { yaml, placeholderIdx: opts.placeholderIdx ?? "1" },
-  };
+  const withFigure: SlideIR = { ...slide, diagram: { yaml, placeholderIdx: opts.placeholderIdx ?? "1" } };
   return hasBodyText(slide) ? applyRegionSplit(withFigure, "text-left") : withFigure;
 }

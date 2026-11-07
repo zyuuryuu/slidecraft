@@ -20,7 +20,7 @@ import { withoutDisabledRules as rulesOn, disabledRuleIds } from "../engine/revi
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { mermaidToDiagramSpec, type DiagramFormat } from "../engine/mermaid-to-diagram";
-import { figureSourceToYaml, placeFigureYaml } from "../engine/apply-slide-edit";
+import { figureSourceToYaml, placeFigureYaml, resolvedBodyCount, carryOmittedBlocks, editedDiagramError } from "../engine/apply-slide-edit";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
@@ -222,15 +222,12 @@ export function applySlideMarkdown(s: Session, i: number, markdown: string) {
   const { deck: parsedDeck, notices: parsedNotices } = parseMdReport(markdown, catalog);
   const parsedSlide = parsedDeck.slides[0];
   if (!parsedSlide) return { ok: false as const, error: "Markdown からスライドを解釈できませんでした（空？）。" };
-  const old = deck.slides[i];
-  // Preserve a diagram/mermaid the text edit doesn't carry (mirrors the GUI apply).
-  const merged: SlideIR = {
-    ...parsedSlide,
-    diagram: parsedSlide.diagram ?? old.diagram,
-    mermaidBlock: parsedSlide.mermaidBlock ?? old.mermaidBlock,
-  };
+  // #220 B3 (shared with the GUI's reconcileSlideEdit): a broken ```diagram is never stored — rejected
+  // whole (modeled, nothing saved); a figure/table/code block the edit omits is carried from the old slide.
+  const figErr = editedDiagramError(parsedSlide);
+  if (figErr) throw new GuardError(`\`\`\`diagram の YAML が不正なため適用しません（スライドは変更していません）: ${figErr}`, "invalid-argument");
   const slides = [...deck.slides];
-  slides[i] = merged;
+  slides[i] = carryOmittedBlocks(deck.slides[i], parsedSlide);
   const check = DeckIRSchema.safeParse({ ...deck, slides });
   if (!check.success) return { ok: false as const, error: zodErr(check.error.issues) };
   s.deck = check.data;
@@ -315,8 +312,7 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   // source-parse error (pre-S5 order): require a body region on the resolved layout (role-based = alien-safe).
   let placeholderIdx = placeholderIdxArg; // replace: optional retarget to another region
   if (created) {
-    const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog); // = export's layout, unknown pins included (#435)
-    const bodyCount = catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0;
+    const { layoutName, bodyCount } = resolvedBodyCount(slide, i, deck.slides.length, catalog); // shared with the GUI rescue (#220 A2)
     const n = Number(placeholderIdxArg ?? "1");
     if (bodyCount < 1 || !Number.isInteger(n) || n < 1 || n > bodyCount) {
       return { ok: false as const, error: `このスライドのレイアウト（${layoutName}）に図の配置先（body 領域）がありません、または placeholderIdx が範囲外です（1..${bodyCount}）。` };
@@ -326,10 +322,10 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const src = figureSourceToYaml(source, format);
   if ("error" in src) return { ok: false as const, error: src.error };
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  // Replace / graduate / add-and-coexist is shared with the GUI's applyFigureYaml (#220). addLayout "keep":
-  // the guard above validated the ordinal against THIS slide's resolved layout.
+  // Replace / graduate / add-and-coexist is shared with the GUI's applyFigureYaml (#220); the pin is kept
+  // (A2) — the guard above validated the ordinal against THIS slide's resolved layout.
   const slides = [...deck.slides];
-  slides[i] = placeFigureYaml(slide, src.yaml, { placeholderIdx, addLayout: "keep" });
+  slides[i] = placeFigureYaml(slide, src.yaml, { placeholderIdx });
   s.deck = { ...deck, slides };
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
