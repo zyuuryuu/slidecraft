@@ -135,6 +135,7 @@ export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opt
         masterImages={template.masterImages}
         masterStaticTexts={template.masterStaticTexts}
         themeColors={template.themeColors}
+        themeFonts={template.themeFonts}
         scale={SCALE}
         sectionFooterText={sectionFooterFor(prepared, i)}
         exportMode
