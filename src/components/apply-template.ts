@@ -15,6 +15,7 @@ import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template
 import { masterToTemplateSpec, extractLogo, logoForDarkLayouts } from "../engine/master-remake";
 import { faithfulRemake } from "../engine/faithful-remake";
 import { writeTemplate } from "../engine/template-writer";
+import { adjustTemplate, type TemplateAdjustRecipe } from "../engine/template-adjust";
 
 export interface TemplateSetters {
   setTemplateData: (t: TemplateData) => void;
@@ -239,6 +240,43 @@ export async function applyTemplateBytesAsFaithfulRemake(
   }
 }
 
+
+export interface AdjustResult extends ApplyTemplateResult {
+  adjustedBytes?: Uint8Array; // the derived template — register THESE bytes (the source stays as it was)
+}
+
+/**
+ * テンプレ調整（#570 段 2）: 元テンプレ bytes にレシピ（書体置換 → サイズ倍率）を掛けた**派生**を、faithful
+ * Re-make と同じゲート（loadTemplate → assessTemplateHealth）で適用する。元 bytes は書き換えない。GUI は
+ * スライダを動かすたびに「元テンプレ＋レシピ」からこれを呼び直す（調整の上塗りをしない）。
+ */
+export async function applyTemplateBytesAsAdjusted(
+  source: ArrayBuffer | Uint8Array,
+  recipe: TemplateAdjustRecipe,
+  name: string,
+  setters: TemplateSetters,
+): Promise<AdjustResult> {
+  try {
+    const adjustedBytes = await adjustTemplate(source, recipe);
+    const adjusted = await loadTemplate(adjustedBytes);
+    const health = assessTemplateHealth(buildCatalog(adjusted));
+    if (health.status === "rejected") {
+      setters.setParseError(i18n.t("applyTemplate.remakeFailedValidation"));
+      return { ok: false, health };
+    }
+    setters.setTemplateData(adjusted);
+    setters.setTemplateName(name);
+    return {
+      ok: true,
+      health,
+      adjustedBytes,
+      summary: { layoutCount: adjusted.layouts.length, status: health.status, findings: health.findings.map((f) => f.message) },
+    };
+  } catch (err) {
+    setters.setParseError(i18n.t("templateAdjust.failed", { error: err instanceof Error ? err.message : String(err) }));
+    return { ok: false };
+  }
+}
 
 /** 修復プランを確認ダイアログ向けの短い日本語に要約する（純粋・UI 非依存）。 */
 export function describeRepairPlan(plan: RepairPlan): string {

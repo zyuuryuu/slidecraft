@@ -82,6 +82,12 @@ Re-make does **not replace** faithful import. Both intake points are in the impo
 
 ---
 
+## 1-c. Adjusting fonts and text sizes in one go (Adjust template)
+
+**"🔤 Adjust template (fonts / sizes)…"** in the master menu makes a **derived template** of the one in use with its fonts and text sizes changed together. A control strip opens under the toolbar: pick the heading / body font (a single shared font when the template uses the same font name for both), where to replace it (**Theme + inline** — the theme plus the same font named directly in layouts, the default — or **Theme only**), and a size factor for title / body / other text (50–150%); the preview follows right away. Sizes are rounded to 0.5pt and kept within 1–400pt, and fonts that are not the theme's (such as Consolas in code frames) stay as they are. **Apply adjustment** adds it to the master list as "original name (adjusted)" — the original template is not changed, and Cancel restores it. Because the sizes change in the template itself, overflow diagnostics and automatic splitting use the new sizes.
+
+---
+
 ## 2. Repair-importing a broken template
 
 A `.pptx` whose title or body placeholders have **lost their role (type)** cannot be poured into correctly as-is (because it can't tell which is the title and which is the body). SlideCraft diagnoses this at import time and rescues it via **"clean up and import."**
