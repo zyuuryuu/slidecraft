@@ -152,6 +152,7 @@ function renderSlideBody(p: ReturnType<typeof preparedDeck>, index: number): str
       masterImages={template.masterImages}
       masterStaticTexts={template.masterStaticTexts}
       themeColors={template.themeColors}
+      themeFonts={template.themeFonts}
       scale={SCALE}
       sectionFooterText={sectionFooterFor(prepared, index)}
       exportMode
