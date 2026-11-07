@@ -10,7 +10,96 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Exactly ONE job creates the draft (#501). Previously every matrix leg ran tauri-action with
+  # releaseDraft: true, whose find-or-create-by-tag is not atomic: parallel legs each saw "no draft
+  # yet" and created their own, so v0.5.0 got two drafts (macOS assets on one, Linux on the other)
+  # and SHA256SUMS/SBOM landed on neither. This serial job creates (or, on a re-run, reuses) the
+  # single draft and hands its id to the matrix, which only uploads to that id.
+  create-release:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the draft GitHub Release
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 20
+
+      # Release notes = the tagged version's own CHANGELOG.md section (Keep a Changelog headings,
+      # "## [x.y.z] - date" through the next heading), not a fixed string that never reflected the
+      # actual per-version changes (#258). On a real tag push a missing/empty section is a hard
+      # error (forces CHANGELOG.md discipline before tagging); workflow_dispatch test runs build an
+      # arbitrary ref that isn't a tagged entry, so they fall back to an explicit placeholder
+      # instead of failing the test build.
+      #
+      # The empty-body check below is a deliberate belt-and-suspenders re-check of extract-changelog-
+      # section.mjs's own exit code: #316 caught windows-latest's `bash` completing this step as
+      # "success" with an empty $body on a missing section (an OS-specific exit-code-propagation
+      # quirk). This step now runs once on ubuntu (#501), but re-validating the actual content — not
+      # trusting the subprocess exit status — still fails never-silently regardless of the runner.
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [ "$REF_TYPE" = "tag" ]; then
+            body="$(node scripts/extract-changelog-section.mjs "$TAG" || true)"
+            if [ -z "$body" ]; then
+              echo "::error::No CHANGELOG.md section found for $TAG (or extraction failed) — see RELEASING.md." >&2
+              exit 1
+            fi
+          else
+            body="$(node scripts/extract-changelog-section.mjs "$TAG" --allow-missing)"
+          fi
+          # shellcheck disable=SC2016 # the backticks are literal Markdown code in the notes
+          footer='Download the installer for your OS below. macOS is ad-hoc signed (not notarized) — install via `brew install --cask zyuuryuu/slidecraft/slidecraft` for a clean first run, or right-click → Open on a direct .dmg download (Apple Silicon only; Intel Macs build from source). SHA256SUMS, SBOM, and build provenance attestations are attached below. See README for details.'
+          printf '%s\n\n---\n\n%s\n' "$body" "$footer" > "$RUNNER_TEMP/release-notes.md"
+
+      # Find-or-create the single draft for this tag. A re-run of the whole workflow reuses the
+      # existing draft (as tauri-action did) instead of adding a second one. Ambiguous states fail
+      # loudly rather than picking one: more than one draft for the tag (e.g. leftovers of the
+      # #501 race — delete the extras first) or a release for the tag that is already published.
+      # Title = "SlideCraft v<version from tauri.conf.json>" (tauri-action's former __VERSION__);
+      # target = this run's commit (tauri-action's former releaseCommitish default).
+      - name: Create (or reuse) the draft release
+        id: draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          published="$(gh api --paginate "repos/$REPO/releases" --jq '.[] | select((.draft | not) and .tag_name == env.TAG) | .id')"
+          if [ -n "$published" ]; then
+            echo "::error::A release for $TAG is already published (id $published) — refusing to upload new installers to it." >&2
+            exit 1
+          fi
+          drafts="$(gh api --paginate "repos/$REPO/releases" --jq '.[] | select(.draft and .tag_name == env.TAG) | .id')"
+          count="$(printf '%s' "$drafts" | grep -c . || true)"
+          if [ "$count" -gt 1 ]; then
+            echo "::error::Found more than one draft release for $TAG (ids: $(printf '%s' "$drafts" | tr '\n' ' ')) — delete the extras, then re-run." >&2
+            exit 1
+          elif [ "$count" -eq 1 ]; then
+            id="$drafts"
+            echo "Reusing existing draft release $id for $TAG."
+          else
+            id="$(gh api -X POST "repos/$REPO/releases" \
+              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" -f name="SlideCraft v${version}" \
+              -F body=@"$RUNNER_TEMP/release-notes.md" -F draft=true -F prerelease=false --jq '.id')"
+            echo "Created draft release $id for $TAG."
+          fi
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: create-release
     permissions:
       contents: write # create/update the GitHub Release + upload installers
       attestations: write # actions/attest-build-provenance
@@ -84,60 +173,22 @@ jobs:
           codesign --verify --verbose "src-tauri/binaries/node-${{ matrix.triple }}"
           codesign --verify --verbose "src-tauri/binaries/llamafile-${{ matrix.triple }}"
 
-      # Release notes = the tagged version's own CHANGELOG.md section (Keep a Changelog headings,
-      # "## [x.y.z] - date" through the next heading), not a fixed string that never reflected the
-      # actual per-version changes (#258). On a real tag push a missing/empty section is a hard
-      # error (forces CHANGELOG.md discipline before tagging); workflow_dispatch test runs build an
-      # arbitrary ref that isn't a tagged entry, so they fall back to an explicit placeholder
-      # instead of failing the test build.
-      #
-      # The empty-body check below is a deliberate belt-and-suspenders re-check of extract-changelog-
-      # section.mjs's own exit code: #316 caught windows-latest's `bash` completing this step as
-      # "success" with an empty $body on a missing section, while macOS/Ubuntu correctly failed on
-      # the identical script + input (an OS-specific exit-code-propagation quirk, likely Node's
-      # process.exit() racing an async stdio flush on Windows). Re-validating the actual content —
-      # not trusting the subprocess exit status — fails never-silently regardless of that quirk.
-      - name: Extract release notes from CHANGELOG.md
-        id: changelog
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}" || true)"
-            if [ -z "$body" ]; then
-              echo "::error::No CHANGELOG.md section found for ${{ github.ref_name }} (or extraction failed) — see RELEASING.md." >&2
-              exit 1
-            fi
-          else
-            body="$(node scripts/extract-changelog-section.mjs "${{ github.ref_name }}" --allow-missing)"
-          fi
-          {
-            echo "body<<CHANGELOG_EOF"
-            echo "$body"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
-
       # tauri-action runs the tauri.conf beforeBuildCommand (npm run build && npm run build:host).
       # `--config` applies the release-only overlay (externalBin node + host.cjs resource + macOS
       # ad-hoc signing) so the PACKAGED collab + offline AI work; the overlay is kept out of the base
       # config so `tauri dev` needs no staged node/signing. macOS: the overlay sets
       # macOS.signingIdentity="-" (ad-hoc) + hardenedRuntime=false, so Tauri signs the .app itself and
       # the already-signed sidecars are sealed inside it. Not notarized — install via `brew` cask.
-      - name: Build + publish (draft release)
+      #
+      # releaseId (not tagName/releaseDraft): upload to the single draft create-release made. With
+      # releaseId set, tauri-action skips its find-or-create-by-tag entirely (src/index.ts at the
+      # pinned commit: `if (tagName && !releaseId) getOrCreateRelease(...)`), which is the #501 race.
+      - name: Build + upload to the draft release
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "SlideCraft v__VERSION__"
-          releaseBody: |
-            ${{ steps.changelog.outputs.body }}
-
-            ---
-
-            Download the installer for your OS below. macOS is ad-hoc signed (not notarized) — install via `brew install --cask zyuuryuu/slidecraft/slidecraft` for a clean first run, or right-click → Open on a direct .dmg download (Apple Silicon only; Intel Macs build from source). SHA256SUMS, SBOM, and build provenance attestations are attached below. See README for details.
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           # matrix.overlay: Linux adds tauri.bundle.linux.conf.json (sidecar → /usr/bin/slidecraft-node, never
           # /usr/bin/node, #527). Must match scripts/node-sidecar.mjs bundleConfigArgs (pinned by tests).
           args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json ${{ matrix.overlay }}
@@ -179,7 +230,9 @@ jobs:
 
   checksums-and-sbom:
     name: SHA256SUMS + SBOM
-    needs: release
+    # create-release guarantees exactly one draft for the tag (#501), so the tag-based
+    # `gh release download/upload` below resolves to that single release unambiguously.
+    needs: [create-release, release]
     runs-on: ubuntu-latest
     permissions:
       contents: write # upload SHA256SUMS + SBOM as release assets

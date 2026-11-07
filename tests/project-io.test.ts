@@ -5,7 +5,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { bundleProject, openProject } from "../src/engine/project-io";
+import JSZip from "jszip";
+import { bundleProject, openProject, PROJECT_VERSION, ProjectVersionError, migrateProjectDeck } from "../src/engine/project-io";
 import { parseMd } from "../src/engine/md-parser";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
 
@@ -59,5 +60,100 @@ describe("project-io (.scft bundle)", () => {
     }
     // the mermaid SOURCE is preserved — only the render cache is dropped
     expect(opened.deck.slides[0].mermaidBlock?.mermaid).toBe("gitGraph\n  commit");
+  });
+});
+
+// ── #121: meta.json.version 互換ゲート（未来 version は拒否・旧 version は移行表・同一は従来どおり） ──
+/** Re-pack a valid bundle with a replaced meta.json (string = raw text; null = remove) and,
+ *  optionally, a replaced deck.json (raw text). */
+async function repack(bytes: Uint8Array, meta: string | null, deckJson?: string): Promise<Uint8Array> {
+  const zip = await JSZip.loadAsync(bytes);
+  if (meta === null) zip.remove("meta.json");
+  else zip.file("meta.json", meta);
+  if (deckJson !== undefined) zip.file("deck.json", deckJson);
+  return zip.generateAsync({ type: "uint8array" });
+}
+const metaJson = (version: unknown) => JSON.stringify({ version, templateName: "T", savedAt: "x" });
+
+describe("project-io version gate (#121)", () => {
+  const MD = "# 表紙\n\n---\n\n# 中身\n\n- a";
+  let valid: Uint8Array;
+  beforeAll(async () => {
+    valid = await bundleProject(parseMd(MD), template, { templateName: "T", savedAt: "x" });
+  });
+
+  it("bundleProject embeds the current PROJECT_VERSION", async () => {
+    const zip = await JSZip.loadAsync(valid);
+    expect(JSON.parse(await zip.file("meta.json")!.async("string")).version).toBe(PROJECT_VERSION);
+  });
+
+  it("current version opens exactly as before (deck + meta unchanged)", async () => {
+    const opened = await openProject(await repack(valid, metaJson(PROJECT_VERSION)));
+    expect(opened.deck).toEqual(parseMd(MD));
+    expect(opened.meta).toEqual({ version: PROJECT_VERSION, templateName: "T", savedAt: "x" });
+  });
+
+  it("a FUTURE version is rejected never-silently with code PROJECT_VERSION_TOO_NEW", async () => {
+    const p = openProject(await repack(valid, metaJson(PROJECT_VERSION + 1)));
+    await expect(p).rejects.toBeInstanceOf(ProjectVersionError);
+    await expect(p).rejects.toMatchObject({
+      code: "PROJECT_VERSION_TOO_NEW",
+      fileVersion: PROJECT_VERSION + 1,
+      supportedVersion: PROJECT_VERSION,
+    });
+    await expect(p).rejects.toThrow(/新しいバージョン.*アプリを更新/);
+  });
+
+  it("the future-version gate runs BEFORE deck.json schema validation (no cryptic zod error)", async () => {
+    // A newer app may write a deck shape this build cannot parse — the user must see "update the app".
+    const p = openProject(await repack(valid, metaJson(PROJECT_VERSION + 5), JSON.stringify({ futureShape: true })));
+    await expect(p).rejects.toMatchObject({ code: "PROJECT_VERSION_TOO_NEW", fileVersion: PROJECT_VERSION + 5 });
+  });
+
+  it("an OLD version with no migration path is rejected explicitly (PROJECT_VERSION_UNSUPPORTED)", async () => {
+    const p = openProject(await repack(valid, metaJson(0)));
+    await expect(p).rejects.toBeInstanceOf(ProjectVersionError);
+    await expect(p).rejects.toMatchObject({ code: "PROJECT_VERSION_UNSUPPORTED", fileVersion: 0, supportedVersion: PROJECT_VERSION });
+    await expect(p).rejects.toThrow(/v0/);
+  });
+
+  it("a non-integer version is never treated as current (1.5 → too new)", async () => {
+    await expect(openProject(await repack(valid, metaJson(PROJECT_VERSION + 0.5)))).rejects.toMatchObject({ code: "PROJECT_VERSION_TOO_NEW" });
+  });
+
+  it("corrupt / missing meta.json keeps the existing path (opens with default meta)", async () => {
+    const defaults = { version: 0, templateName: "", savedAt: "" };
+    for (const meta of ["{not json", metaJson("1"), null]) {
+      const opened = await openProject(await repack(valid, meta));
+      expect(opened.deck).toEqual(parseMd(MD));
+      expect(opened.meta).toEqual(defaults);
+    }
+  });
+});
+
+describe("migrateProjectDeck (#121 migration table)", () => {
+  it("same version → returns the raw deck untouched (identity)", () => {
+    const raw = { slides: [] };
+    expect(migrateProjectDeck(raw, 3, 3, {})).toBe(raw);
+  });
+
+  it("applies the v→v+1 steps IN ORDER up to the current version", () => {
+    const table = {
+      1: (d: unknown) => ({ ...(d as object), trail: [...((d as { trail?: string[] }).trail ?? []), "1→2"] }),
+      2: (d: unknown) => ({ ...(d as object), trail: [...((d as { trail: string[] }).trail), "2→3"] }),
+    };
+    expect(migrateProjectDeck({ slides: [] }, 1, 3, table)).toEqual({ slides: [], trail: ["1→2", "2→3"] });
+  });
+
+  it("a gap in the chain throws PROJECT_VERSION_UNSUPPORTED (never a partial migration)", () => {
+    const table = { 2: (d: unknown) => d };
+    expect(() => migrateProjectDeck({}, 1, 3, table)).toThrow(ProjectVersionError);
+    try { migrateProjectDeck({}, 1, 3, table); } catch (e) {
+      expect(e).toMatchObject({ code: "PROJECT_VERSION_UNSUPPORTED", fileVersion: 1, supportedVersion: 3 });
+    }
+  });
+
+  it("a newer-than-supported version throws PROJECT_VERSION_TOO_NEW", () => {
+    expect(() => migrateProjectDeck({}, 4, 3, {})).toThrow(/アプリを更新/);
   });
 });

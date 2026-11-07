@@ -15,14 +15,14 @@ import { openProject, bundleProject } from "../engine/project-io";
 import { parseMdReport } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { distillDeckReport, contentBodyBox, buildIndexMap } from "../engine/distill";
-import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue } from "../engine/deck-diagnostics";
+import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue, type ReviewRuleId } from "../engine/deck-diagnostics";
+import { withoutDisabledRules as rulesOn, disabledRuleIds } from "../engine/review-rule-toggle";
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
-import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
-import { diagramSpecToYaml } from "../engine/diagram-serialize";
-import { DiagramSpecSchema } from "../engine/schema";
+import { mermaidToDiagramSpec, type DiagramFormat } from "../engine/mermaid-to-diagram";
+import { figureSourceToYaml, placeFigureYaml } from "../engine/apply-slide-edit";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
-import { parseDesignIntent, applyDesignIntentReport, applyRegionSplit } from "../engine/design-intent";
+import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
 import type { ChartsMode } from "../engine/pptx-native-chart";
 import { GuardError } from "./guard-errors";
@@ -38,10 +38,11 @@ export interface Session {
   // reconstruct these from s.deck alone, so they're captured at parse time and merged into every
   // later diagnostics read (getDiagnostics / fitTail) until the affected slide is re-parsed.
   parseNotices: SlideParseNotice[];
+  disabledReviewRules: Set<ReviewRuleId>; // #247: off にしたレビュー規則（MCP set_review_rules・deck には保存しない）
 }
 
 export function createSession(root: string | null = null): Session {
-  return { root, deck: null, template: null, catalog: undefined, meta: { templateName: "" }, dirty: false, parseNotices: [] };
+  return { root, deck: null, template: null, catalog: undefined, meta: { templateName: "" }, dirty: false, parseNotices: [], disabledReviewRules: new Set() };
 }
 
 interface Loaded {
@@ -98,7 +99,7 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
   s.meta = { templateName: meta.templateName, savedAt: meta.savedAt };
   s.dirty = false;
   s.parseNotices = []; // an opened .pptx isn't Markdown-parsed — no parse-time notices apply
-  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog, template.layouts) };
+  return { slideCount: deck.slides.length, diagnostics: rulesOn(diagnoseDeck(deck, s.catalog, template.layouts), s.disabledReviewRules) };
 }
 
 /** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses the exact
@@ -120,7 +121,7 @@ export async function newProject(s: Session, templateBytes: Uint8Array, markdown
   s.meta = { templateName: "", savedAt: undefined };
   s.dirty = true; // a fresh, unsaved project
   s.parseNotices = notices.map((n) => ({ ...n, slideIndex: offsets[n.slideIndex] ?? n.slideIndex }));
-  const diagnostics = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, offsets)];
+  const diagnostics = rulesOn([...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, offsets)], s.disabledReviewRules);
   return { slideCount: deck.slides.length, diagnostics };
 }
 
@@ -147,13 +148,14 @@ function budgetOf(catalog: LayoutCatalog): { maxBullets: number; charsPerBullet:
   return box ? { maxBullets: box.maxLines, charsPerBullet: box.charsPerLine } : null;
 }
 
-export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[] } {
+export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[]; disabledReviewRules?: ReviewRuleId[] } {
   const { deck, catalog, template } = requireLoaded(s);
   // ADR-0030 stage A: pass the raw layouts so diagnoseDeck can surface unbound content (#97 ②a / #135).
   // #148: parseNotices (e.g. a dropped 2nd table) live on the session — deck-diagnostics can't
   // reconstruct them from `deck` alone, so every read merges the persisted notices back in.
-  const issues = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices)];
-  return { budget: budgetOf(catalog), issues };
+  // #247: off の規則は落とし、何が off かを添える（未指定＝空なら key ごと無し → payload は従来と byte-identical）。
+  const issues = rulesOn([...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices)], s.disabledReviewRules);
+  return s.disabledReviewRules.size ? { budget: budgetOf(catalog), issues, disabledReviewRules: disabledRuleIds(s.disabledReviewRules) } : { budget: budgetOf(catalog), issues };
 }
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);
@@ -209,7 +211,7 @@ function fitTail(s: Session, deck: DeckIR, catalog: LayoutCatalog, layouts: Temp
   // ADR-0030 stage A: pass the raw layouts so every mutation's tail surfaces unbound content too — the
   // new_project → edit → get_deck_issues loop must not have a blind spot vs get_deck_issues (#97 ②a / #135).
   // #148: same for the session's persisted parse notices (a dropped 2nd table etc.).
-  const diagnostics = [...diagnoseDeck(deck, catalog, layouts), ...parseNoticesToIssues(deck, s.parseNotices)];
+  const diagnostics = rulesOn([...diagnoseDeck(deck, catalog, layouts), ...parseNoticesToIssues(deck, s.parseNotices)], s.disabledReviewRules);
   return { diagnostics, budget: budgetOf(catalog) };
 }
 
@@ -299,7 +301,7 @@ export function visualizeKeyValue(s: Session, i: number) {
 }
 
 /** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
- *  YAML. Replaces an existing diagram / GRADUATES a Mermaid block to a native diagram, OR — for a
+ *  YAML. Replaces an existing diagram (a coexisting Mermaid block is kept) / GRADUATES a Mermaid block to a native diagram, OR — for a
  *  text-only slide (S5) — ADDS a figure into a body region of the RESOLVED layout: the placeholder is a
  *  1-based body ORDINAL resolved role-wise from the catalog (alien-safe, mirrors the GUI's nthBody),
  *  defaulting to the 1st body region; `placeholderIdxArg` targets another region on a multi-body layout.
@@ -308,12 +310,10 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const slide = deck.slides[i];
-  const existingIdx = slide.diagram?.placeholderIdx ?? slide.mermaidBlock?.placeholderIdx;
-  const created = existingIdx === undefined;
-  // Resolve PLACEMENT first — a figureless slide with no body region rejects with 配置先 BEFORE any
-  // source-parse error (pre-S5 order). For created, require a body region on the resolved layout
-  // (role-based = alien-safe) and remember whether the body already holds text.
-  let ord = "1", hasBodyText = false;
+  const created = !slide.diagram && !slide.mermaidBlock;
+  // Placement guard first — a figureless slide with no body region rejects with 配置先 BEFORE any
+  // source-parse error (pre-S5 order): require a body region on the resolved layout (role-based = alien-safe).
+  let placeholderIdx = placeholderIdxArg; // replace: optional retarget to another region
   if (created) {
     const layoutName = autoSelectLayout(slide, i, deck.slides.length, catalog); // = export's layout, unknown pins included (#435)
     const bodyCount = catalog.find((e) => e.name === layoutName)?.bodyCount ?? 0;
@@ -321,37 +321,15 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
     if (bodyCount < 1 || !Number.isInteger(n) || n < 1 || n > bodyCount) {
       return { ok: false as const, error: `このスライドのレイアウト（${layoutName}）に図の配置先（body 領域）がありません、または placeholderIdx が範囲外です（1..${bodyCount}）。` };
     }
-    ord = String(n);
-    hasBodyText = slide.placeholders.some((p) => /^[1-9]$/.test(p.idx) && p.paragraphs.some((par) => par.segments.some((seg) => seg.text.trim())));
+    placeholderIdx = String(n);
   }
-  const verr = validateDiagramSource(source, format);
-  if (verr) return { ok: false as const, error: verr };
-  let diagramYaml: string;
-  if (format === "mermaid") {
-    const spec = mermaidToDiagramSpec(source);
-    if (!spec) return { ok: false as const, error: "この Mermaid はネイティブ図に変換できません（gitGraph / sankey / C4 等）。" };
-    diagramYaml = diagramSpecToYaml(spec);
-  } else if (format === "json") {
-    diagramYaml = diagramSpecToYaml(DiagramSpecSchema.parse(JSON.parse(source)));
-  } else {
-    diagramYaml = source; // already-valid YAML, stored verbatim (matches the GUI)
-  }
+  const src = figureSourceToYaml(source, format);
+  if ("error" in src) return { ok: false as const, error: src.error };
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  let next: SlideIR;
-  if (!created) {
-    const placeholderIdx = placeholderIdxArg ?? existingIdx; // replace (optionally retarget to another region)
-    next = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx } };
-    delete next.mermaidBlock; // a Mermaid slide graduates to a native diagram
-  } else {
-    const withFigure: SlideIR = { ...slide, diagram: { yaml: diagramYaml, placeholderIdx: ord } };
-    delete withFigure.mermaidBlock;
-    // COEXIST with existing body text: relocate it to the other column (regionSplit) rather than let the
-    // render clobber the bullets (the body placeholder at the figure's ordinal is skipped). Mirrors the
-    // GUI's applyFigureYaml (ai-apply.ts). A body region with no text just takes the figure directly.
-    next = hasBodyText ? applyRegionSplit(withFigure, "text-left") : withFigure;
-  }
+  // Replace / graduate / add-and-coexist is shared with the GUI's applyFigureYaml (#220). addLayout "keep":
+  // the guard above validated the ordinal against THIS slide's resolved layout.
   const slides = [...deck.slides];
-  slides[i] = next;
+  slides[i] = placeFigureYaml(slide, src.yaml, { placeholderIdx, addLayout: "keep" });
   s.deck = { ...deck, slides };
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
@@ -400,7 +378,7 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
 export function getSlideFix(s: Session, i: number) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
-  const issues = diagnoseDeck(deck, catalog, template.layouts).filter((d) => d.slideIndex === i);
+  const issues = rulesOn(diagnoseDeck(deck, catalog, template.layouts), s.disabledReviewRules).filter((d) => d.slideIndex === i);
   const fix = buildSlideFix(slideToMarkdown(deck, i, catalog, template.layouts), issues, contentBodyBox(catalog));
   return { requestText: slideFixRequest(fix), currentMarkdown: fix.currentMarkdown, issues, budget: fix.budget };
 }
