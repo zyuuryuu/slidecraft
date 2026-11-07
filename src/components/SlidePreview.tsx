@@ -125,7 +125,7 @@ const NEST_INDENT_PT = 18;
 function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scale: number, num = 0) {
   const level = para.bullet ? (para.level ?? 0) : 0;
   // Font size for a nested level: the layout/master's own lvl2-4 style when extractStyle found one,
-  // else its computed step-down fallback (template-loader.nestedFallbackFontSize) — level 0 is
+  // else its computed step-down fallback (nested-level-font.nestedLevelFontSize) — level 0 is
   // untouched (no override), keeping a flat deck's preview byte-identical to before #103.
   const nestedSize = level > 0 ? s.levelFontSizes?.[level - 1] : undefined;
   return (

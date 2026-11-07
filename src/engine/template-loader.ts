@@ -12,6 +12,7 @@ import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle,
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { preferFieldVariant } from "./field-variant";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
+import { nestedLevelFontSize } from "./nested-level-font";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
 
@@ -305,12 +306,6 @@ function parseLevelFontSizes(xml: string): (number | undefined)[] {
   });
 }
 
-/** Step-down fallback when neither the placeholder's own lstStyle nor the master's bodyStyle style a
- *  nested level explicitly (#103: "無ければ段階縮小"). ~12%/level, floored at 60% of the level-1 size. */
-function nestedFallbackFontSize(level1Size: number, level: number): number {
-  return Math.max(level1Size * 0.88 ** level, level1Size * 0.6);
-}
-
 function parseMasterStyle(xml: string | undefined, fallback: MasterStyle, theme: Record<string, string>): MasterStyle {
   if (!xml) return fallback;
   const szMatch = xml.match(/defRPr[^>]*sz="(\d+)"/);
@@ -418,7 +413,7 @@ function extractStyle(sp: string, masterTitle: MasterStyle, masterBody: MasterSt
   // body should shrink its nested levels off its own base, matching how lvl1 itself is resolved above).
   const ownLevelSizes = parseLevelFontSizes(sp);
   const levelFontSizes = [0, 1, 2].map(
-    (i) => ownLevelSizes[i] ?? master.levelFontSizes?.[i] ?? nestedFallbackFontSize(fontSize, i + 1),
+    (i) => ownLevelSizes[i] ?? master.levelFontSizes?.[i] ?? nestedLevelFontSize(fontSize, i + 1),
   );
 
   return {

@@ -1,7 +1,7 @@
 /**
  * nested-bullets-preview.test.tsx — #103 SSR preview of nested bullets: 3-level indentation renders,
  * and font size follows the master's lvl2-4 style when the master defines one, else a step-down
- * fallback (template-loader.nestedFallbackFontSize / extractStyle) — never a flat, un-indented list.
+ * fallback (nested-level-font.nestedLevelFontSize / extractStyle) — never a flat, un-indented list.
  * Level 0 stays byte-identical to the pre-#103 render (no marginLeft/fontSize override at all).
  */
 import { describe, it, expect, beforeAll } from "vitest";
