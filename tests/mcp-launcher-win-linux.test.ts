@@ -3,7 +3,8 @@
 // other two OSes: (1) a Windows `.cmd` launcher that resolves the bundled node.exe + cli.cjs relative
 // to itself (Tauri's NSIS/WiX put `resources` and `externalBin` sidecars FLAT in the install dir),
 // (2) the POSIX launcher ALSO working from the Linux .deb/.rpm/AppImage layout (/usr/bin/slidecraft-mcp
-// next to the node sidecar, cli.cjs under /usr/lib/<productName>/), (3) the installer-side PATH wiring
+// next to the /usr/bin/slidecraft-node sidecar — never /usr/bin/node, #527 / tests/linux-node-sidecar.test.ts —
+// cli.cjs under /usr/lib/<productName>/), (3) the installer-side PATH wiring
 // (NSIS hooks + WiX fragment: USER scope, removed on uninstall, visible in the installer UI), and (4) the
 // CI artifact check that proves the built .deb really contains a working /usr/bin/slidecraft-mcp.
 //
@@ -159,27 +160,27 @@ describe.skipIf(skipPosix)("slidecraft-mcp (sh) — resolves the bundled node + 
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("Linux .deb/.rpm layout: /usr/bin/slidecraft-mcp → sibling /usr/bin/node + /usr/lib/<productName>/cli.cjs", () => {
+  it("Linux .deb/.rpm layout: /usr/bin/slidecraft-mcp → sibling /usr/bin/slidecraft-node + /usr/lib/<productName>/cli.cjs", () => {
     const r = join(tmp, "deb root");
     installLauncher(join(r, "usr/bin/slidecraft-mcp"));
-    writeFakeNode(join(r, "usr/bin/node"));
+    writeFakeNode(join(r, "usr/bin/slidecraft-node"));
     writeFakeCli(join(r, `usr/lib/${productName}/cli.cjs`));
     const res = run(join(r, "usr/bin/slidecraft-mcp"), ["--root", "/tmp/with space", "a b", "--flag"]);
     expect(res.stderr).toBe("");
     expect(res.status).toBe(0);
     expect(res.out?.argv).toEqual(["--root", "/tmp/with space", "a b", "--flag"]);
-    expect(res.out?.node).toBe(join(r, "usr/bin/node")); // the SIDECAR, not a PATH node
+    expect(res.out?.node).toBe(join(r, "usr/bin/slidecraft-node")); // the SIDECAR, not a PATH node
   });
 
-  it("Linux resource copy: /usr/lib/<productName>/slidecraft-mcp also works (node via ../../bin/node)", () => {
+  it("Linux resource copy: /usr/lib/<productName>/slidecraft-mcp also works (node via ../../bin/slidecraft-node)", () => {
     const r = join(tmp, "deb root 2");
     installLauncher(join(r, `usr/lib/${productName}/slidecraft-mcp`));
-    writeFakeNode(join(r, "usr/bin/node"));
+    writeFakeNode(join(r, "usr/bin/slidecraft-node"));
     writeFakeCli(join(r, `usr/lib/${productName}/cli.cjs`));
     const res = run(join(r, `usr/lib/${productName}/slidecraft-mcp`), ["x"]);
     expect(res.status).toBe(0);
     expect(res.out?.argv).toEqual(["x"]);
-    expect(realpathSync(res.out!.node)).toBe(realpathSync(join(r, "usr/bin/node"))); // reached via ../../bin/node
+    expect(realpathSync(res.out!.node)).toBe(realpathSync(join(r, "usr/bin/slidecraft-node"))); // reached via ../../bin/slidecraft-node
   });
 
   it("macOS layout through the Homebrew bin symlink: Contents/MacOS/node + Contents/Resources/cli.cjs (unchanged)", () => {
@@ -211,7 +212,7 @@ describe.skipIf(skipPosix)("slidecraft-mcp (sh) — resolves the bundled node + 
   it("propagates the server's exit code (exec, no wrapper shell left behind)", () => {
     const r = join(tmp, "exit code");
     installLauncher(join(r, "usr/bin/slidecraft-mcp"));
-    writeFakeNode(join(r, "usr/bin/node"));
+    writeFakeNode(join(r, "usr/bin/slidecraft-node"));
     writeFakeCli(join(r, `usr/lib/${productName}/cli.cjs`));
     const res = run(join(r, "usr/bin/slidecraft-mcp"), [], { SLIDECRAFT_TEST_EXIT: "7" });
     expect(res.status).toBe(7);
@@ -441,7 +442,7 @@ describe.skipIf(skipPosix || !hasDpkg)("verify-deb-launcher.mjs — inspects a .
     mkdirSync(join(pkg, "usr/bin"), { recursive: true });
     mkdirSync(join(pkg, `usr/lib/${productName}`), { recursive: true });
     copyFileSync(cliCjs, join(pkg, `usr/lib/${productName}/cli.cjs`));
-    writeFakeNode(join(pkg, "usr/bin/node"));
+    writeFakeNode(join(pkg, "usr/bin/slidecraft-node")); // #527: never usr/bin/node
     if (opts.launcher) installLauncher(join(pkg, "usr/bin/slidecraft-mcp"));
     const deb = join(tmp, `${name}.deb`);
     execFileSync("dpkg-deb", ["-Znone", "-b", pkg, deb], { stdio: "pipe" });

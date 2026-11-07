@@ -7,20 +7,24 @@
 // when a user runs `claude mcp add`. So CI's Linux smoke extracts the artifact and checks, for each
 // package handed to it:
 //   1. usr/bin/slidecraft-mcp exists and is executable (the PATH launcher),
-//   2. usr/bin/node (bundled Node sidecar) and usr/lib/<productName>/cli.cjs (bundled MCP server) exist,
+//   2. usr/bin/slidecraft-node (bundled Node sidecar) and usr/lib/<productName>/cli.cjs (bundled MCP
+//      server) exist, and usr/bin/node does NOT (#527: that path belongs to the distro `nodejs` package —
+//      shipping it makes dpkg/rpm refuse the install next to a system Node),
 //   3. the launcher, run from the extracted tree with NO system Node, answers an MCP `initialize`
 //      request over stdio with serverInfo.name === "slidecraft" — i.e. the relative path resolution in
 //      scripts/slidecraft-mcp holds for the layout Tauri actually produced.
 // Exit code 0 = all packages OK; 1 = a check failed (printed on stderr, never silent).
 // No npm deps: runs on a bare CI runner / dev box with dpkg-deb (and an AppImage's own --appimage-extract).
-import { existsSync, mkdtempSync, mkdirSync, rmSync, statSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, statSync, readFileSync, readdirSync, writeFileSync, chmodSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { nodeSidecarName } from "./node-sidecar.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const productName = JSON.parse(readFileSync(join(here, "..", "src-tauri", "tauri.conf.json"), "utf8")).productName;
+const linuxNode = nodeSidecarName("x86_64-unknown-linux-gnu"); // every Linux triple shares the name
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
@@ -113,7 +117,15 @@ for (const arg of args) {
   try {
     const root = extract(pkg, scratch);
     const launcher = join(root, "usr/bin/slidecraft-mcp");
-    const node = join(root, "usr/bin/node");
+    const node = join(root, `usr/bin/${linuxNode}`);
+    // Ask the directory listing, not existsSync: existsSync follows symlinks, and even a dangling
+    // usr/bin/node link is a file conflict for dpkg.
+    const usrBin = join(root, "usr/bin");
+    if (existsSync(usrBin) && readdirSync(usrBin).includes("node")) {
+      fail("package ships usr/bin/node — that path is owned by the distro `nodejs` package, so dpkg/rpm refuse the install on any machine with a system Node (#527). The sidecar must be usr/bin/" + linuxNode);
+    } else {
+      console.log("ok  no usr/bin/node (no file conflict with the distro nodejs package, #527)");
+    }
     const cli = join(root, `usr/lib/${productName}/cli.cjs`);
     for (const [label, p, exec] of [
       ["PATH launcher", launcher, true],
