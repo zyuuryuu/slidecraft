@@ -42,20 +42,32 @@ function quoteFor(os: Os, p: string): string {
   return os === "windows" ? quoteWindows(p) : quotePosix(p);
 }
 
+/** An argv as one shell line for `os` — each element quoted only when it needs to be. */
+export function formatArgv(os: Os, argv: readonly string[]): string {
+  return argv.map((a) => quoteFor(os, a)).join(" ");
+}
+
+/**
+ * What a registration points the MCP client at: launcher on PATH → the one word; otherwise the bundled node +
+ * cli.cjs real paths. `null` (no install facts) → the launcher word. Mirrors Rust `server_argv`
+ * (claude_register.rs, the one-click run, #530) — both are locked by tests/fixtures/mcp-server-argv.json (R8).
+ */
+export function serverArgv(info: Info | null): string[] {
+  return !info || info.launcherOnPath ? [LAUNCHER] : [info.nodePath, info.cliPath];
+}
+
 /**
  * Build the three registration forms from the install facts. `null` (browser dev mode / IPC unavailable)
  * yields the launcher form — the static text the panel showed before #520 — so a missing fact never
  * produces a half-made path.
  */
 export function buildRegistrationSnippets(info: Info | null): RegistrationSnippets {
-  const useLauncher = !info || info.launcherOnPath;
-  const entry: { command: string; args?: string[] } = useLauncher
-    ? { command: LAUNCHER }
-    : { command: info.nodePath, args: [info.cliPath] };
-  const argv = useLauncher ? [LAUNCHER] : [info.nodePath, info.cliPath];
+  const argv = serverArgv(info);
+  const [command, ...args] = argv;
+  const entry: { command: string; args?: string[] } = args.length ? { command, args } : { command };
   const os: Os = info?.os ?? "linux";
   return {
-    claudeCode: `claude mcp add slidecraft -- ${argv.map((a) => quoteFor(os, a)).join(" ")}`,
+    claudeCode: `claude mcp add slidecraft -- ${formatArgv(os, argv)}`,
     // Compact single-line form (matches DESKTOP_JSON_SNIPPET byte-for-byte in the launcher case).
     desktopJson: `{${Object.entries(entry).map(([k, v]) => `"${k}": ${JSON.stringify(v)}`).join(", ")}}`,
     mcpJson: JSON.stringify({ mcpServers: { slidecraft: entry } }, null, 2),

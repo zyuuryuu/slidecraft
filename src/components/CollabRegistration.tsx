@@ -4,13 +4,19 @@
  * via ipc/mcp-install.ts): launcher on PATH → one word; otherwise the bundled node + cli.cjs paths, quoted
  * per OS. In a plain browser (dev/demo) or on IPC failure it shows the launcher form and SAYS why.
  *
- * "Claude Code に登録" copies the command (never runs anything, never writes a config file): what was
- * copied stays visible in the field below, and a clipboard failure is reported, not swallowed.
+ * "Claude Code に登録" (#530): on desktop with `claude` found, it shows the EXACT command (built in Rust —
+ * the webview passes no strings) in a confirm dialog and runs it only on OK (`claude mcp add --scope user`),
+ * then shows the exit code + stdout/stderr. Otherwise — browser build, `claude` missing, spawn/IPC error, or a
+ * failed run — it copies the command shown in the field below (the #520 path) and says why. A clipboard
+ * failure is reported, not swallowed.
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { lookupMcpInstall, type McpInstallLookup } from "../ipc/mcp-install";
+import { planClaudeRegister, runClaudeRegister, type RegisterPlanLookup } from "../ipc/claude-register";
 import { buildRegistrationSnippets } from "./collab-panel-snippets";
+import { outcomeView, planAction, type OutcomeView } from "./claude-register-view";
+import { RegisterConfirm, RegisterResult } from "./ClaudeRegisterFlow";
 
 export function CopyButton({ value }: { value: string }) {
   const { t } = useTranslation();
@@ -61,13 +67,58 @@ function useMcpInstall(): McpInstallLookup | null {
   return lookup;
 }
 
+/** Read-only plan lookup at mount — only to label the button (a click re-plans before confirming). */
+function useRegisterPlan(): RegisterPlanLookup | null {
+  const [plan, setPlan] = useState<RegisterPlanLookup | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void planClaudeRegister().then((r) => { if (alive) setPlan(r); });
+    return () => { alive = false; };
+  }, []);
+  return plan;
+}
+
+type Flow =
+  | { step: "idle" }
+  | { step: "confirm"; command: string; busy: boolean }
+  | { step: "done"; view: OutcomeView; copy: "copied" | "failed" | null };
+
 export default function CollabRegistration() {
   const { t } = useTranslation();
   const lookup = useMcpInstall();
   const info = lookup?.kind === "resolved" ? lookup.info : null;
   const snippets = buildRegistrationSnippets(info);
-  const [registerState, setRegisterState] = useState<"idle" | "copied" | "failed">("idle");
+  const mountPlan = useRegisterPlan();
+  const [flow, setFlow] = useState<Flow>({ step: "idle" });
   const [jsonOpen, setJsonOpen] = useState(false);
+
+  /** The #520 path: copy the command shown in the field below. Reports a blocked clipboard. */
+  const finish = async (view: OutcomeView) => {
+    let copy: "copied" | "failed" | null = null;
+    if (view.copyFallback) {
+      try {
+        await navigator.clipboard.writeText(snippets.claudeCode);
+        copy = "copied";
+      } catch {
+        copy = "failed";
+      }
+    }
+    setFlow({ step: "done", view, copy });
+  };
+
+  /** Click: re-plan (fresh `claude` lookup) → confirm dialog, or straight to the copy fallback with the reason. */
+  const start = async () => {
+    const action = planAction(await planClaudeRegister(), info?.os ?? "linux");
+    if (action.kind === "confirm") setFlow({ step: "confirm", command: action.command, busy: false });
+    else await finish(action.view);
+  };
+
+  /** Confirm OK: the only path that executes anything. */
+  const run = async () => {
+    if (flow.step !== "confirm") return;
+    setFlow({ ...flow, busy: true });
+    await finish(outcomeView(await runClaudeRegister()));
+  };
 
   const sourceHint =
     lookup === null ? null
@@ -78,27 +129,15 @@ export default function CollabRegistration() {
 
   return (
     <div className="space-y-2">
-      {/* Primary action: copy the exact command shown in the field below (default = copy; running
-          `claude mcp add` itself needs a fixed-arg Rust command — pending review, see PR #520). */}
-      <button
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(snippets.claudeCode);
-            setRegisterState("copied");
-          } catch {
-            setRegisterState("failed");
-          }
-        }}
-        className="w-full py-1.5 rounded bg-edge hover:bg-accent/50 text-fg text-xs font-medium"
-      >
-        {t("collabPanel.registerClaudeCode")}
-      </button>
-      {registerState === "copied" && (
-        <p role="status" className="text-[10px] text-emerald-300/80 leading-relaxed">{t("collabPanel.registerCopiedNotice")}</p>
+      {/* Primary action (#530): run `claude mcp add --scope user` after an explicit confirm, else copy. */}
+      {flow.step === "confirm" ? (
+        <RegisterConfirm command={flow.command} busy={flow.busy} onCancel={() => setFlow({ step: "idle" })} onRun={run} />
+      ) : (
+        <button onClick={start} className="w-full py-1.5 rounded bg-edge hover:bg-accent/50 text-fg text-xs font-medium">
+          {mountPlan?.kind === "ready" ? t("collabPanel.registerClaudeCodeRun") : t("collabPanel.registerClaudeCode")}
+        </button>
       )}
-      {registerState === "failed" && (
-        <p role="alert" className="text-[10px] text-amber-300/80 leading-relaxed">{t("collabPanel.copyFailedNotice")}</p>
-      )}
+      {flow.step === "done" && <RegisterResult view={flow.view} copy={flow.copy} />}
 
       <Field label={t("collabPanel.addToClaudeCode")} value={snippets.claudeCode} />
       <Field label={t("collabPanel.desktopClientsLabel")} value={snippets.desktopJson} />
