@@ -23,7 +23,7 @@ import { visualOccupancy, visualCollisions, bodyPlaceholders, nthBody, type Visu
 import { tableOverflow } from "./table-fit"; // #436/#444: the SAME judgment the auto pick uses (R8)
 import { isBlankParagraphs, contentHead } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
-import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml } from "./diagram-node-shrink";
+import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
@@ -51,6 +51,7 @@ export type ReviewRuleId =
   | "visual-collision"
   | "table-overflow"
   | "diagram-node-shrink"
+  | "diagram-invalid"
   | "table-dropped"
   | "image-dropped"
   | "meta-key-dropped"
@@ -79,6 +80,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "visual-collision", level: "warn" },
   { id: "table-overflow", level: "warn" },
   { id: "diagram-node-shrink", level: "warn" },
+  { id: "diagram-invalid", level: "warn" },
   { id: "table-dropped", level: "info" },
   { id: "image-dropped", level: "info" },
   { id: "meta-key-dropped", level: "warn" },
@@ -181,6 +183,11 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const key = unrecognizedMetaKey(textOf(p));
       if (key) add("unrecognized-meta-key", `「${key}:」は認識されないメタキーのため本文テキスト化されました（Category/Date/Footer のみ対応）`, []);
     }
+
+    // #587 never-silent: a figure DiagramSpecSchema rejects (e.g. `type: flow`) renders as nothing —
+    // report the zod reason instead of skipping it as "not a figure" (same parse path as export, R8).
+    const invalid = slide.diagram && diagramInvalidReason(slide.diagram.yaml);
+    if (invalid) add("diagram-invalid", invalid, []);
 
     // #473 never-silent: a SOLO figure (body ordinal 1) fills the slide as laid out — export paints
     // computeLayout's result as-is, so the shrink is readable without a template. Read off that same
