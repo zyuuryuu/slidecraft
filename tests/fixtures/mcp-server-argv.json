@@ -1,0 +1,36 @@
+{
+  "_comment": "#530 agreement fixture (R8): the MCP server argv that a registration points at. Read by BOTH the Rust unit tests (src-tauri/src/claude_register.rs: server_argv — what the one-click register runs) and the TS tests (tests/claude-register.test.ts: serverArgv — what the copy snippet shows). Same input → same argv on both sides.",
+  "cases": [
+    {
+      "name": "launcher on PATH → the one-word launcher (paths ignored)",
+      "launcherOnPath": true,
+      "nodePath": "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\node.exe",
+      "cliPath": "C:\\Users\\A B\\AppData\\Local\\SlideCraft\\cli.cjs",
+      "expected": ["slidecraft-mcp"]
+    },
+    {
+      "name": "Windows, no launcher, spaces → bundled node.exe + cli.cjs, unquoted argv elements",
+      "launcherOnPath": false,
+      "nodePath": "C:\\Program Files\\SlideCraft\\node.exe",
+      "cliPath": "C:\\Program Files\\SlideCraft\\cli.cjs",
+      "expected": ["C:\\Program Files\\SlideCraft\\node.exe", "C:\\Program Files\\SlideCraft\\cli.cjs"]
+    },
+    {
+      "name": "macOS, no launcher, spaces and a quote",
+      "launcherOnPath": false,
+      "nodePath": "/Users/o'neil b/Applications/SlideCraft.app/Contents/MacOS/node",
+      "cliPath": "/Users/o'neil b/Applications/SlideCraft.app/Contents/Resources/cli.cjs",
+      "expected": [
+        "/Users/o'neil b/Applications/SlideCraft.app/Contents/MacOS/node",
+        "/Users/o'neil b/Applications/SlideCraft.app/Contents/Resources/cli.cjs"
+      ]
+    },
+    {
+      "name": "Linux, no launcher, plain",
+      "launcherOnPath": false,
+      "nodePath": "/usr/bin/node",
+      "cliPath": "/usr/lib/slidecraft/cli.cjs",
+      "expected": ["/usr/bin/node", "/usr/lib/slidecraft/cli.cjs"]
+    }
+  ]
+}

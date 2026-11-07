@@ -3,6 +3,7 @@
 // paths to the fs scope at runtime), instead of the old hand-rolled read_file/
 // read_file_bytes/write_file commands that took an arbitrary absolute path — which
 // let a compromised webview read/write anywhere. That arbitrary-fs hole is now closed.
+mod claude_register; // #530: one-click `claude mcp add --scope user` (fixed args, confirm first)
 mod collab; // P2.3: spawn / supervise / reap the Node collab sidecar (start_collab/stop_collab)
 mod local_ai; // roadmap #2: spawn / supervise / reap the bundled llamafile in-app AI runtime
 mod secret_store; // ADR-0016 F3: OS keychain for the BYOK API key (secret_set/get/delete)
@@ -38,6 +39,8 @@ pub fn run() {
             collab::start_collab,
             collab::stop_collab,
             collab::mcp_install_info,
+            claude_register::claude_register_plan,
+            claude_register::register_claude_code,
             local_ai::start_local_ai,
             local_ai::stop_local_ai,
             local_ai::local_ai_status,
