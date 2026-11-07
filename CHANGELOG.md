@@ -15,6 +15,10 @@
 
 - **PPTX のグラフをネイティブ chart で書き出すオプション**（段 1）— MCP `export_pptx` に `charts: "native"` を渡すと `pie` / `xychart`（棒・折れ線・混在）/ `radar` が PowerPoint のネイティブグラフ（データ埋め込み・「データの編集」で数値や色を直せる）になり、結果に `charts: {native, shapes}` の件数が載る。既定 `"shapes"` は従来どおり（byte-identical）。プレビュー・HTML・`get_slide_image` は図形描画のままで近似（[#554](https://github.com/zyuuryuu/slidecraft/issues/554)）
 
+### Changed
+
+- **既定テンプレートが「技術報告 スタンダード水色」に変わり、内蔵テンプレートは 3 本に** — 開発用だった Midnight Executive（canonical 30 レイアウト）は同梱をやめ、入力サンプル `samples/templates/` に移した（MasterPicker「＋取込」で従来どおり使える）。起動時の読み込みはマスターレジストリ経由の 1 本にまとめ、読み込みに失敗したら黙らずにトーストで知らせる（以前は失敗すると通知なしでテンプレの無い白いプレビューになっていた）。テンプレが無いときのレイアウト選択欄は「自動」だけを出し、Markdown の `<!-- slide: -->` 補完は読み込み中テンプレのレイアウト名を出す。自分のテンプレートを使う場合の出力は従来と同一（[#117](https://github.com/zyuuryuu/slidecraft/issues/117)）
+
 ### Fixed
 
 - **明朝テンプレの HTML 書き出し・`get_slide_image` で、ゴシックの埋め込みフォントだけが入る問題** — マスターの書体はテーマ参照（`+mj-lt` 等）のまま保持されるが、書き出しと MCP の画像化はそれを解決せずに書体分類していたため常にゴシック扱いだった（プレビューは解決済み＝明朝）。分類の入口を 1 関数（`cjkClassForStyle`：テーマ解決→分類）にまとめ、プレビュー・HTML 書き出し・画像化の 3 経路が同じ関数を呼ぶ。マガジン型（見出し＝Yu Mincho）で明朝（Noto Serif CJK JP）のサブセットも埋め込まれる。ゴシックのテンプレの出力は従来と同一（[#573](https://github.com/zyuuryuu/slidecraft/issues/573)）

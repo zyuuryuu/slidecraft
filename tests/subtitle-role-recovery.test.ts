@@ -133,7 +133,8 @@ describe("#125 束縛: subtitle が出る／箇条書きを吸わない", () => 
 // ── コーパス全体: 同梱テンプレ＋ fixture のロールが 1 件も変化しないこと ──
 const REPO_ROOT = resolve(__dirname, "..");
 // Template dirs RELATIVE to the repo root (git ls-files speaks repo-relative paths).
-const TEMPLATE_DIRS = ["public/templates/slide", "tests/fixtures/templates", "test-data/master-intake"];
+// #117: samples/templates（入力サンプル。旧 public 同梱の Midnight）も走査し、コーパスを縮めない。
+const TEMPLATE_DIRS = ["public/templates/slide", "samples/templates", "tests/fixtures/templates", "test-data/master-intake"];
 
 describe("#125 コーパス: ロール変化ゼロ（byte-identical の直接ゲート）", () => {
   let files: string[] = [];

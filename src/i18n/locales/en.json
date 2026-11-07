@@ -130,6 +130,8 @@
     "draftLockedTitle": "Editing is locked while collaborating",
     "draftButtonTitle": "Create or import slides from a draft (text)",
     "viewForm": "Form",
+    "defaultTemplateLoadFailed": "Couldn't load the default template \"{{name}}\": {{detail}}",
+    "defaultTemplateRejected": "it can't be used as a template",
     "helpUrlFallback": "Couldn't open the docs — use this URL instead: {{url}}"
   },
   "applyTemplate": {

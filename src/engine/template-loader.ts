@@ -7,8 +7,7 @@
 
 import JSZip from "jszip";
 import { loadZipSafe, readCappedString, readEntryString, ZIP_LIMITS } from "./zip-safe";
-import type { SlideIR } from "./slide-schema";
-import { LAYOUT_NAMES } from "./slide-schema";
+import type { SlideIR, LayoutName } from "./slide-schema";
 import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, recoverLayoutSubtitle, placeholderRole, CLOSING_RE, BUILTIN_ROLE_DESCR_PREFIX, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { preferFieldVariant } from "./field-variant";
@@ -834,6 +833,19 @@ const GROUP_MATCH: Record<NonNullable<SlideIR["groupKind"]>, Array<"card" | "ste
 
 interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
 
+/** The no-template answer of autoSelectLayout, keyed by the slide's role (+ region count) in the
+ *  canonical vocabulary — NOT by index into LAYOUT_NAMES' file order, which encoded the 30-layout
+ *  development master's ordering (#117). `satisfies` keeps every entry a real canonical name. */
+const CANONICAL_FALLBACK = {
+  title: "Title.1Title.Single",
+  section: "Section.1Title.Single",
+  content: "Content.1Body.Single", // also code (1 body) and the catch-all
+  columns2: "Column.2Body.Equal",
+  columns3: "Column.3Body.Equal",
+  closing: "Closing.1Message.Single",
+  closingWithBody: "Closing.1Steps.Single+1Notes",
+} as const satisfies Record<string, LayoutName>;
+
 /** Classify a slide → the ideal layout ROLE + body-region count (+ a canonical fallback name).
  *  Shared by autoSelectLayout (pick the single best) and suggestLayouts (rank candidates), so the
  *  auto pick and the suggestion list can never disagree about the slide's intent. */
@@ -878,23 +890,23 @@ function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: numbe
   // (idx0/ctrTitle) can't carry the idx15 title serializeSlide reads, so the title silently vanishes
   // on round-trip. sectionBreak is only ever set by the explicit marker (md-slide-parser.ts), so
   // unmarked decks are unaffected — byte-identical.
-  if (slideIndex === 0 && !hasVisual && !slide.sectionBreak && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: LAYOUT_NAMES[0] };
+  if (slideIndex === 0 && !hasVisual && !slide.sectionBreak && !(hasBody && !hasCtrTitle)) return { role: "title", regions: undefined, fallback: CANONICAL_FALLBACK.title };
   // #153: a closing slide with body content (bullets) needs the body-bearing closing layout
   // (Closing.1Steps.Single+1Notes), not the ctrTitle-only one — pickLayout's closing-role filter
   // does the actual routing/degrade; regions:1 just signals "this closing has body content".
   if (isClosing && slideIndex === totalSlides - 1) {
     return hasBody
-      ? { role: "closing", regions: 1, fallback: LAYOUT_NAMES[29] }
-      : { role: "closing", regions: undefined, fallback: LAYOUT_NAMES[28] };
+      ? { role: "closing", regions: 1, fallback: CANONICAL_FALLBACK.closingWithBody }
+      : { role: "closing", regions: undefined, fallback: CANONICAL_FALLBACK.closing };
   }
   // A code block beside body text (#390: moved to ordinal 2) needs a 2-region layout, not the 1-body
   // code layout — fall through to the columns classification below, the same way a diagram does.
-  if (slide.code && slide.code.placeholderIdx === "1") return { role: "code", regions: 1, fallback: LAYOUT_NAMES[6] };
-  if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: LAYOUT_NAMES[12] };
-  if (hasTitle && hasBody && hasIdx2) return { role: "columns", regions: 2, fallback: LAYOUT_NAMES[10] };
-  if ((hasTitle || hasCtrTitle) && hasBody) return { role: "content", regions: 1, fallback: LAYOUT_NAMES[6] };
-  if (hasTitle && !hasBody) return { role: "section", regions: undefined, fallback: LAYOUT_NAMES[3] };
-  return { role: "content", regions: 1, fallback: LAYOUT_NAMES[6] };
+  if (slide.code && slide.code.placeholderIdx === "1") return { role: "code", regions: 1, fallback: CANONICAL_FALLBACK.content };
+  if (hasTitle && hasBody && hasIdx2 && hasIdx3) return { role: "columns", regions: 3, fallback: CANONICAL_FALLBACK.columns3 };
+  if (hasTitle && hasBody && hasIdx2) return { role: "columns", regions: 2, fallback: CANONICAL_FALLBACK.columns2 };
+  if ((hasTitle || hasCtrTitle) && hasBody) return { role: "content", regions: 1, fallback: CANONICAL_FALLBACK.content };
+  if (hasTitle && !hasBody) return { role: "section", regions: undefined, fallback: CANONICAL_FALLBACK.section };
+  return { role: "content", regions: 1, fallback: CANONICAL_FALLBACK.content };
 }
 
 export function autoSelectLayout(

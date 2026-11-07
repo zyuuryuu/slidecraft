@@ -130,6 +130,8 @@
     "draftLockedTitle": "協働接続中は編集ロック中",
     "draftButtonTitle": "原稿（テキスト）からスライドを作る・取り込む",
     "viewForm": "フォーム",
+    "defaultTemplateLoadFailed": "既定テンプレート「{{name}}」を読み込めませんでした: {{detail}}",
+    "defaultTemplateRejected": "テンプレートとして使えません",
     "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}"
   },
   "applyTemplate": {

@@ -23,15 +23,16 @@ describe("uniqueName (master registry display-name dedup)", () => {
   });
 
   it("the bundled sample is the default builtin entry", () => {
-    expect(BUILTIN_MASTER).toMatchObject({ id: "builtin", builtin: true });
+    expect(BUILTIN_MASTER).toMatchObject({ id: "builtin-gijutsu", builtin: true }); // 統括裁定 #117 A-1: 既定＝技術報告
     expect(BUILTIN_MASTER.name.length).toBeGreaterThan(0);
   });
 });
 
 describe("BUILTIN_MASTERS (bundled built-in templates)", () => {
-  it("bundles Midnight (default, first) plus the 3 promoted designs, with unique ids", () => {
-    expect(BUILTIN_MASTERS.length).toBe(4);
-    expect(BUILTIN_MASTERS[0].id).toBe("builtin"); // Midnight is the default (App's initial masterId)
+  // 統括裁定 #117 による改訂: Midnight は入力サンプル（samples/templates/）へ移り、出荷は 3 本。
+  it("bundles the 3 shipped designs (技術報告 = default, first), with unique ids", () => {
+    expect(BUILTIN_MASTERS.length).toBe(3);
+    expect(BUILTIN_MASTERS[0].id).toBe("builtin-gijutsu"); // 技術報告 is the default (App's initial masterId)
     expect(BUILTIN_MASTER.id).toBe(BUILTIN_MASTERS[0].id); // the exported default == the first built-in
     const ids = BUILTIN_MASTERS.map((b) => b.id);
     expect(new Set(ids).size).toBe(ids.length); // ids unique
