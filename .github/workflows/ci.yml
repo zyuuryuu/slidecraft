@@ -120,10 +120,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --config src-tauri/tauri.bundle.conf.json
+          # The Linux overlay renames the Node sidecar to slidecraft-node so the .deb never ships
+          # /usr/bin/node (owned by the distro nodejs package, #527) — same args as release.yml's Linux leg.
+          args: --config src-tauri/tauri.bundle.conf.json --config src-tauri/tauri.bundle.linux.conf.json
       # #519 acceptance: the built .deb (and AppImage) must contain /usr/bin/slidecraft-mcp, and that
       # launcher must start the bundled MCP server with the bundled node (no system Node on PATH).
-      - name: Verify the bundled MCP launcher in the Linux packages (#519)
+      # #527: the packages must also NOT contain usr/bin/node (file conflict with the nodejs package).
+      - name: Verify the bundled MCP launcher in the Linux packages (#519, #527)
         run: node scripts/verify-deb-launcher.mjs src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/appimage/*.AppImage
 
   # ── Real-Chrome rasterization smoke (get_slide_image #109) — NON-REQUIRED, skipped on docs-only ──
