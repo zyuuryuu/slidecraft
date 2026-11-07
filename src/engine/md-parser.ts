@@ -19,6 +19,7 @@
 
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { parseSlideBlock } from "./md-slide-parser";
+import { commentUnitEnd } from "./md-comments";
 import type { LayoutRoleLookup } from "./slide-roles";
 import type { ParseNotice, SlideParseNotice } from "./parse-notice";
 
@@ -69,8 +70,19 @@ export function parseMdReport(rawMd: string, catalog?: LayoutRoleLookup): { deck
     : 1;
 
   let inFence = false;
+  let commentEnd = -1; // #591: last line of the wholly-comment unit we are inside (−1 = none)
   for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i];
+
+    // #591: a multi-line comment confirmed to close (#588's unit, shared judgment — R8) is comment
+    // content through its closer: its `---` / ``` neither split nor toggle a fence. An UNCLOSED `<!--`
+    // is not a unit, so its `---` still splits (one missing `-->` must not swallow the deck).
+    if (!inFence && i > commentEnd) commentEnd = commentUnitEnd(allLines, i);
+    if (i <= commentEnd) {
+      if (currentLines.length === 0) currentStart = lineOffset + i;
+      currentLines.push(line);
+      continue;
+    }
 
     // Track fenced code blocks so a "---" INSIDE a ```diagram/```mermaid block
     // (a YAML document marker, or Mermaid frontmatter "---\ntitle:…\n---") is NOT
