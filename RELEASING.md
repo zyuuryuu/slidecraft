@@ -24,6 +24,10 @@
    > 引数無しを publish 前に叩くと 404 になる。draft の .dmg のバイト列は publish 後と同一なので、上の 1・2 で先に確定してよい。更新後は tap リポ `zyuuryuu/homebrew-slidecraft` にも反映（[#288](https://github.com/zyuuryuu/slidecraft/issues/288) で自動化予定）。
 7. **publish**: draft を publish。自動更新（軽量通知）が新版を検知できる状態にする。
 
+## 依存の更新（lockfile を書き換える操作）
+
+npm 10.8.x〜11.0.x は、この repo の依存ツリーで lockfile を作り直す操作（`npm install <pkg>`・`npm audit fix`・`npm install --package-lock-only`）を `Cannot read properties of null (reading 'edgesOut')` で落とす（npm 本体のバグ・[#495](https://github.com/zyuuryuu/slidecraft/issues/495)）。node 20 に同梱の npm 10.8.2 もこの範囲に入る。lockfile どおりに入れるだけの `npm ci` は落ちないので、CI と通常の開発には影響しない。**依存を更新するときは、修正済みの npm を固定した `npm run npm:pinned -- <npm の引数>` を使う**。例: `npm run npm:pinned -- install vite@^8.4.0`・`npm run npm:pinned -- audit fix`・`npm run npm:pinned -- install --package-lock-only`。固定版（npm 11.21.2）は node 20 で動き、`lockfileVersion: 3` を書き、その lockfile は npm 10.8.2 の `npm ci` でも受理される（2026-11-07 実測）。`npx npm@latest` は使わない（npm 12 は node 20 に対応していない）。固定版を上げるときは [`tests/npm-pinned.test.ts`](tests/npm-pinned.test.ts) の前提も確認する。
+
 ## 自動更新について
 
 初回リリースでは **完全な署名付き Tauri Updater を導入しない**。理由＝アップデート署名鍵は一度配布すると**回転不可**（既存クライアントが孤立する不可逆判断）。v0.1.0 は GitHub Releases API のポーリングで「新版あり」を**通知するだけ**とし（ROADMAP M12）、mac は `brew upgrade`、Windows/Linux は手動再DL で更新する。完全版 Updater は出荷後に別途 ADR で判断する（ROADMAP バックログ）。
