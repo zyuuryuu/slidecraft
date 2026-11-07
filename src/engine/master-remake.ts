@@ -12,8 +12,8 @@
  * header/background, body/emphasis read on the light canvas), so a re-made template can't reproduce
  * the invisible-text failures a raw master can. Pure logic (R2): no DOM / Tauri.
  *
- * v1 carries fonts + palette. Logo / background-image injection is a follow-up (needs the writer to
- * accept image parts); until then a re-made deck uses the extracted colors + fonts on clean layouts.
+ * Carries fonts + palette, plus the source logo (extractLogo → per-background variants, #118) which
+ * writeTemplate injects onto the dark-family layouts. Background-image injection is not carried.
  */
 import { isDark, luminance } from "./ooxml-resolve";
 import type { TemplateData, ThemeFonts } from "./template-loader";
@@ -145,19 +145,46 @@ export function masterToTemplateSpec(tpl: TemplateData, opts: { name?: string } 
 
 const RASTER_EXT: Record<string, LogoSpec["ext"]> = { png: "png", jpg: "jpeg", jpeg: "jpeg", gif: "gif" };
 
+/** Logo candidates per background (#118). Corporate masters often ship a dark-ink logo for light
+ *  slides and a white knock-out for dark ones; a single most-used pick can put an invisible logo on a
+ *  dark cover. One image used on both backgrounds fills both slots. */
+export interface LogoVariants {
+  dark?: LogoSpec; // the image most used on DARK-background layouts
+  light?: LogoSpec; // the image most used on LIGHT-background layouts
+}
+
+/** The logo to put on the dark-family layouts (cover/section/closing): the dark variant, else the
+ *  light one — which, when no image sits on a dark background, IS the overall most-used image, so a
+ *  single-variant master re-makes byte-identically to the pre-#118 behavior. */
+export function logoForDarkLayouts(v: LogoVariants | undefined): LogoSpec | undefined {
+  return v?.dark ?? v?.light;
+}
+
+type Usage = { aspect: number; dark: number; light: number };
+
+/** Most-used image on one background (stable on layout order for ties); undefined if none. */
+function topFor(hits: Map<string, Usage>, key: "dark" | "light"): string | undefined {
+  const used = [...hits.entries()].filter(([, u]) => u[key] > 0);
+  return used.length ? used.sort((a, b) => b[1][key] - a[1][key])[0][0] : undefined;
+}
+
 /**
- * Extract the source master's LOGO — the raster image referenced by the most `<p:pic>` shapes across
- * its layouts (a logo recurs on cover/section/closing; a one-off illustration doesn't). Reads the
- * bytes from the source zip so writeTemplate can re-embed it. Async (zip I/O). Returns undefined when
- * there's no usable raster logo (e.g. only SVG/EMF, or none). v1: raster only.
+ * Extract the source master's LOGO variants — per background, the raster image referenced by the most
+ * `<p:pic>` shapes on layouts of that background (a logo recurs on cover/section/closing; a one-off
+ * illustration doesn't). A layout's background is its own solid `<p:bg>`, else the master's, judged
+ * with the SAME `isDark` as the palette's brandDark (R8; picture/gradient backgrounds fall back to that
+ * solid color). Reads the bytes from the source zip so writeTemplate can re-embed them. Async (zip
+ * I/O). Returns undefined when there's no usable raster logo (e.g. only SVG/EMF, or none). Raster only.
  */
-export async function extractLogo(tpl: TemplateData): Promise<LogoSpec | undefined> {
+export async function extractLogo(tpl: TemplateData): Promise<LogoVariants | undefined> {
   const zip = tpl.zip;
-  const hits = new Map<string, { count: number; aspect: number }>(); // media target → usage
+  const masterBg = norm(tpl.masterBgColor) ?? "FFFFFF";
+  const hits = new Map<string, Usage>(); // media target → usage per background
   for (const layout of tpl.layouts) {
     const relsFile = zip.file(`ppt/slideLayouts/_rels/slideLayout${layout.index}.xml.rels`);
     const xmlFile = zip.file(`ppt/slideLayouts/slideLayout${layout.index}.xml`);
     if (!relsFile || !xmlFile) continue;
+    const bg = isDark(norm(layout.background) ?? masterBg) ? "dark" : "light";
     const rels = await relsFile.async("string");
     const xml = await xmlFile.async("string");
     const relMap = new Map<string, string>();
@@ -171,15 +198,19 @@ export async function extractLogo(tpl: TemplateData): Promise<LogoSpec | undefin
       if (!target || !RASTER_EXT[target.split(".").pop()?.toLowerCase() ?? ""]) continue;
       const ext = pic.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
       const aspect = ext && +ext[2] > 0 ? +ext[1] / +ext[2] : 3;
-      const cur = hits.get(target);
-      hits.set(target, { count: (cur?.count ?? 0) + 1, aspect: cur?.aspect ?? aspect });
+      // aspect = the image's FIRST occurrence in layout order (whatever its background), as before.
+      const cur = hits.get(target) ?? { aspect, dark: 0, light: 0 };
+      cur[bg] += 1;
+      hits.set(target, cur);
     }
   }
-  if (hits.size === 0) return undefined;
-  const [target, meta] = [...hits.entries()].sort((a, b) => b[1].count - a[1].count)[0];
-  const file = zip.file(target.replace(/^\.\.\//, "ppt/"));
-  if (!file) return undefined;
-  const bytes = await file.async("uint8array");
-  const ext = RASTER_EXT[target.split(".").pop()!.toLowerCase()];
-  return { bytes, ext, aspect: meta.aspect };
+  const read = async (target: string | undefined): Promise<LogoSpec | undefined> => {
+    const file = target ? zip.file(target.replace(/^\.\.\//, "ppt/")) : null;
+    if (!target || !file) return undefined;
+    const ext = RASTER_EXT[target.split(".").pop()!.toLowerCase()];
+    return { bytes: await file.async("uint8array"), ext, aspect: hits.get(target)!.aspect };
+  };
+  const dark = await read(topFor(hits, "dark"));
+  const light = await read(topFor(hits, "light"));
+  return dark || light ? { ...(dark ? { dark } : {}), ...(light ? { light } : {}) } : undefined;
 }

@@ -137,7 +137,7 @@ seed する」**。**幾何/スタイルは canonical ライブラリ（決定�
 - **Phase-1 MVP** — 案 C を実装（LayoutInventory 抽出＋新プロンプト＋検証＋決定論フォールバック）。
   UI は Re-make の第3選択肢（「AI で作り直す」）。best-of-N は既存機構を流用。
 - **Phase-2 磨き込み** — 案 B の部分導入（canonical に無い固有構造の合成）、EA/CJK フォント連携
-  （Re-make 残 A）、per-background ロゴ（残 B）。
+  （Re-make 残 A）、per-background ロゴ（残 B → 実装済・§9.5）。
 
 ## 6. 検証・テスト（harness over model）
 
@@ -210,3 +210,16 @@ Phase-1 MVP（単発 callAI → 写像 → 決定論フォールバック）に2
 - **案 B の部分導入** — canonical に無い source 固有構造を AI が幾何ごと合成（§4 B）。
 - **per-layout「なぜ」パネル** — `mappings`（reason 付き）の可視化 UI。
 - weaker-model の更なる緩和（プロンプト few-shot 化 等）。
+
+### 9.5 背景ごとのロゴ変種（#118・実装済）
+
+企業テンプレは「明背景用の濃色ロゴ」と「暗背景用の白抜きロゴ」の 2 変種を持つことが多い。以前の
+`extractLogo` は全レイアウトで最も参照回数の多い 1 枚を選んだため、濃色ロゴが最頻だと暗い表紙に
+見えないロゴが載った。現在は画像ごとに「載っていたレイアウトの背景（自身の単色 `<p:bg>`、無ければ
+マスターの背景色）」が暗いか明るいかを集計し、`{ dark?, light? }`（`LogoVariants`）を返す。明暗判定は
+パレット抽出（`brandDark`）と同じ `isDark`（`ooxml-resolve.ts`）で、第 2 の判定は作らない（R8）。
+dark 系レイアウト（表紙・章扉・締め）には `logoForDarkLayouts` = `dark ?? light` を載せる。暗背景に
+画像が無いテンプレでは `light` が全体の最頻 1 枚と一致するので、変種が 1 枚のテンプレ・ロゴ無しの
+テンプレは従来と byte-identical（aspect も従来どおり画像の初出から取る）。light 系レイアウトへの
+`light` 変種の注入はしていない（ヘッダーバーと干渉するため従来から載せていない・必要なら別 Issue）。
+背景が画像／グラデーションのみのレイアウトは、その下の単色（マスター背景）で判定する。
