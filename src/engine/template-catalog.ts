@@ -33,6 +33,9 @@ export type LayoutRole =
   | "summary"
   | "closing"
   | "code"
+  // #589: a big one-sentence layout (title-dominant, ~2-line body) — classified apart so a GENERIC
+  // body slide never lands in it. No slide role targets it; explicit layout / suggestLayouts only.
+  | "statement"
   | "other";
 
 export type PlaceholderRole =
@@ -150,6 +153,7 @@ const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\bsection\b|\bdivider\b|\bchapter\b|\bagenda\b|章扉|セクション|区切り|中扉/i, "section"],
   [/\bcode\b|\blog\b|\bsource\b|コード|ログ|ソース/i, "code"],
   [CLOSING_RE, "closing"],
+  [/\bstatement\b|ステートメント/i, "statement"], // #589: before content — not a generic body
   [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
   [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b|表紙|タイトル|扉絵/i, "title"],
 ];
@@ -724,7 +728,8 @@ export function pickLayout(
       // (e.g. an alien template's "Two Pictures" with maxLines=0) — they break split + bind.
       s += 1000;
     }
-    if (role === "content" && !/content|body|text/i.test(e.name)) s += 1; // tie-break to an obviously-named one
+    // Tie-break to an obviously-named one (#589: + JA 本文 — e.g. 13_本文（1カラム） over 08_目次 by name, not file order).
+    if (role === "content" && !/content|body|text|本文/i.test(e.name)) s += 1;
     // #444: demote a layout whose box (the ordinal box export places the table in) the table is
     // estimated to overflow — the SAME judgment as the table-overflow warn (tableOverflow, R8). Weaker
     // than one body-count step (10), stronger than the addon/name tie-breaks; a table overflowing

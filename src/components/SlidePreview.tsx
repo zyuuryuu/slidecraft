@@ -30,6 +30,7 @@ import BeforeAfterOverlay from "./BeforeAfterOverlay";
 import { useSlideImageLayer } from "./SlideImageLayer";
 import { orderedNumbers } from "../engine/list-markers";
 import { titleFontPt } from "../engine/title-fit";
+import { nestedLevelIndentPt } from "../engine/nested-level-font";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -115,9 +116,8 @@ function renderCell(cell: string) {
   return segs.length === 1 && Object.keys(segs[0]).length === 1 ? cell : renderSegments(segs);
 }
 
-// Nested-bullet indent step (#103), in points — scaled the same way font sizes are (pt × scale/72) so
-// it stays proportional at every zoom level. ~0.25in/level, matching a typical PowerPoint list indent.
-const NEST_INDENT_PT = 18;
+// Nested-bullet indent (#103), in points — engine rule nested-level-font.nestedLevelIndentPt, shared with
+// the generated template's master marL (#577, R8); scaled like font sizes (pt × scale/72).
 
 /** `num` — the item's number when it is an ordered (#394) bullet (list-markers.orderedNumbers, the same
  *  count the serializer writes), else 0. A numbered item shows `N.` even when the master has no glyph,
@@ -133,7 +133,7 @@ function renderParagraph(para: Paragraph, idx: number, s: PlaceholderStyle, scal
       key={idx}
       style={{
         marginBottom: "0.15em",
-        ...(level > 0 ? { marginLeft: `${level * NEST_INDENT_PT * (scale / 72)}px` } : {}),
+        ...(level > 0 ? { marginLeft: `${nestedLevelIndentPt(level) * (scale / 72)}px` } : {}),
         ...(nestedSize ? { fontSize: nestedSize * (scale / 72) } : {}),
         ...(para.heading ? { fontWeight: "bold" } : {}),
       }}
@@ -477,7 +477,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
             >
               {/* #443: font size / line height / cell padding all derive from TABLE_CELL (table-layout)
                   so a row is the same height here and in the export's overflow estimate (R8).
-                  pt → px is pt × scale/72 (NEST_INDENT_PT's convention); in → px is in × scale. */}
+                  pt → px is pt × scale/72 (nestedLevelIndentPt's convention); in → px is in × scale. */}
               <table
                 style={{
                   width: "100%",

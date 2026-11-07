@@ -21,6 +21,9 @@ import { applyFigureYaml, reconcileSlideEdit } from "../src/engine/ai-apply";
 import { distillDeck } from "../src/engine/distill";
 import { parseMd } from "../src/engine/md-parser";
 import type { SlideIR } from "../src/engine/slide-schema";
+import { applyFieldEdit } from "../src/engine/placeholder-binding";
+import { textToParagraphs } from "../src/engine/field-text";
+import { routeFieldEdit } from "../src/engine/field-edit-ops";
 
 let templateBytes: Buffer;
 beforeAll(() => {
@@ -253,4 +256,46 @@ describe("#220 B3 through the MCP envelope (set_slide_markdown)", () => {
     expect(String(r.data!.afterMd)).toContain("| a | b |");
     expect(String(r.data!.afterMd)).toContain("表は消した");
   });
+});
+
+// ── #106 P2: placeholder TEXT edits — the AI setField ops door ≡ the GUI field-editor door ──
+// Both write one placeholder's text through applyFieldEdit(textToParagraphs(text)): the field editor
+// (SlideEditor.updatePlaceholder) by hand, the AI panel (useDeckController handleApplySlide /
+// previewSlideEdit → routeFieldEdit) from a setField ops array. No MCP door here (統括裁定 2026-11-07:
+// no placeholder-level MCP tool — set_slide_markdown covers it).
+describe("#106 P2 delegation: the setField door goes through the field editor's primitive", () => {
+  const src = (p: string) => readFileSync(resolve(__dirname, "../src", p), "utf8");
+  it("field-edit-ops.ts applies via applyFieldEdit + textToParagraphs (no own merge)", () => {
+    expect(src("engine/field-edit-ops.ts")).toMatch(/import \{[^}]*\bapplyFieldEdit\b[^}]*\} from "\.\/placeholder-binding"/);
+    expect(src("engine/field-edit-ops.ts")).toMatch(/import \{[^}]*\btextToParagraphs\b[^}]*\} from "\.\/field-text"/);
+    expect(src("components/SlideEditor.tsx")).toMatch(/applyFieldEdit\(slide\.placeholders, idx, textToParagraphs\(text\)\)/);
+  });
+  it("the GUI controller routes AI output through routeFieldEdit in BOTH apply and preview", () => {
+    const ctl = src("components/useDeckController.ts");
+    expect(ctl).toMatch(/import \{[^}]*\brouteFieldEdit\b[^}]*\} from "\.\.\/engine\/field-edit-ops"/);
+    expect(ctl.match(/\brouteFieldEdit\(/g)?.length).toBe(2);
+  });
+});
+
+describe("#106 P2 agreement: setField ops (AI door) ≡ field editor (GUI door) on a real parsed slide", () => {
+  const slide = parseMd(MD).slides[1]; // content slide: title + 3 bullets
+  const fieldEditor = (sl: SlideIR, idx: string, text: string): SlideIR => ({
+    ...sl, placeholders: applyFieldEdit(sl.placeholders, idx, textToParagraphs(text)),
+  });
+  const bodyIdx = slide.placeholders.find((p) => p.idx !== "0" && p.idx !== "15")!.idx;
+  const titleIdx = slide.placeholders.find((p) => p.idx === "0" || p.idx === "15")!.idx;
+  const cases: Array<[string, string, string]> = [
+    ["retitle", titleIdx, "中身（改訂）"],
+    ["rewrite the bullets", bodyIdx, "- 一\n- 二改\n  - 補足"],
+    ["clear the body", bodyIdx, ""],
+  ];
+  for (const [name, idx, text] of cases) {
+    it(name, () => {
+      const r = routeFieldEdit(slide, JSON.stringify([{ op: "setField", idx, text }]));
+      expect(r?.kind).toBe("ops");
+      if (r?.kind !== "ops") return;
+      expect(r.notices).toEqual([]);
+      expect(r.slide).toEqual(fieldEditor(slide, idx, text));
+    });
+  }
 });

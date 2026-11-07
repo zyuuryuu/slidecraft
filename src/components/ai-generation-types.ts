@@ -7,7 +7,7 @@
  * (classifyAiFailure) live here as plain functions.
  */
 import type { LayoutCatalog } from "../engine/template-catalog";
-import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence } from "../engine/deck-plan";
+import { extractDeckPlan, deckPlanToDeck, stripMarkdownFence, type ParseResult } from "../engine/deck-plan";
 import { sanitizeSlideEditOutput } from "../engine/edit-sanitize";
 import { serializeMd } from "../engine/md-serializer";
 import { DiagramSpecSchema } from "../engine/schema";
@@ -114,19 +114,22 @@ export function loadSavedConfig(): { localOnly: boolean; bestOfN: number; provid
   }
 }
 
+/** A parsed DeckPlan → the "slides" surface result (engine Markdown + joined notices). Shared by the
+ *  plain path below and the regenerate-violations path (deck-retry.ts, #107) so both shape identically. */
+export function shapeDeckResult(parsed: ParseResult, catalog?: LayoutCatalog): { result?: string; error?: string; notice?: string } {
+  // Pass the catalog so a kind the master can't express (table/columns/diagram) is degraded to
+  // content bullets deterministically, instead of emitting an unrenderable slide (#11).
+  if (!parsed.ok) return { error: `Couldn't read the generated plan: ${parsed.error}` };
+  const notice = parsed.notices?.length ? parsed.notices.join(" / ") : undefined;
+  return { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)), ...(notice ? { notice } : {}) };
+}
+
 /** Mode-specific post-processing: the model's raw text → the form each surface uses
  *  (slides → engine Markdown, slide → fenced Markdown, diagram-edit → validated YAML). Returns
  *  either a result or a human error — centralised so every task path (foreground + loop) treats
  *  responses identically. Pure (no state); the hook wraps it in a useCallback bound to `catalog`. */
 export function postProcessAiResult(mode: AiMode, raw: string, catalog?: LayoutCatalog): { result?: string; error?: string; notice?: string } {
-  if (mode === "slides") {
-    const parsed = extractDeckPlan(raw);
-    // Pass the catalog so a kind the master can't express (table/columns/diagram) is degraded to
-    // content bullets deterministically, instead of emitting an unrenderable slide (#11).
-    if (!parsed.ok) return { error: `Couldn't read the generated plan: ${parsed.error}` };
-    const notice = parsed.notices?.length ? parsed.notices.join(" / ") : undefined;
-    return { result: serializeMd(deckPlanToDeck(parsed.plan, catalog)), ...(notice ? { notice } : {}) };
-  }
+  if (mode === "slides") return shapeDeckResult(extractDeckPlan(raw), catalog);
   if (mode === "slide" || mode === "condense") {
     // Strip the meta-chatter a weak offline model leaks (format label / echoed Instruction / prose
     // note) BEFORE the diff/reconcile sees it — harness over model (ADR-0016 の相談メモ・edit-sanitize).

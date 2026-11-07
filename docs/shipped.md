@@ -68,6 +68,7 @@
 - **AI 単一スライド編集＝構造化 ops → 決定論マージ（部分生成）** — AI は変更フィールドのみ ops を出力しエンジンが決定論マージ（P1：DiagramEditOp/applyDiagramEditOps・drift ゼロ）、full-regen フォールバック保全 （ADR-0019・2026-07-05）
 - **AI 編集の検証は採用ゲート（描画は止めない）** — `reconcileSlideEdit` は常に描画可能なスライド＋警告を返し、`previewSlideEdit` が AiPanel DiffView＋amber バナーで accept/reject、advisory は editNotice へ（有効なスライドを空白化しない） （ADR-0018・2026-07-04）
 - **AI 編集の構造保全ハーネス** — `reconcileEdit`（存在時のみ restore・idx-Map 全単射保全）＋`validateStructure`/`mergeVerdicts` を 3 apply パス全てに配線、ロール規約を `slide-roles.ts` に集約、serializer round-trip の pinned figure/table/code 消失を修正 （ADR-0012・2026-07-03）
+- **AI 単一スライド編集の文面 ops（部分生成 P2）** — 既存欄の書き換えは `setField` ops（idx＋全文）でエンジンがフィールドエディタと同じ `applyFieldEdit` で決定論マージ・無い idx は skip＋告知・不正 ops は全文フォールバック＋告知 （ADR-0019・PR #586・2026-11-07）
 - **whole-deck refine と batch 一括編集に best-of-N** — まとめて整える／複数選択一括編集に best-of-N（N候補生成→採用ゲート）を展開 （ADR-0019・2026-07-06）
 - **Best-of-N（単一スライド編集）** — N候補生成→採用ゲート＋候補ピッカー（Option B・clamp[1,5]） （ADR-0019・2026-07-05）
 - **図編集 drift の単発自己修復リテイク** — 全文逸れ検出時に ops 再試行を 1x 自動発火（Option A・`buildOpsRetryInstruction`） （ADR-0019・2026-07-05）

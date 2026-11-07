@@ -25,6 +25,7 @@ import { isBlankParagraphs, contentHead } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
+import { columnAugmentHint } from "./layout-augment-plan";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -57,7 +58,8 @@ export type ReviewRuleId =
   | "meta-key-dropped"
   | "figure-dropped"
   | "pre-separator-dropped"
-  | "section-footer-injected";
+  | "section-footer-injected"
+  | "missing-column-layout";
 
 export interface ReviewRule {
   id: ReviewRuleId;
@@ -87,6 +89,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "figure-dropped", level: "info" },
   { id: "pre-separator-dropped", level: "warn" },
   { id: "section-footer-injected", level: "info" },
+  { id: "missing-column-layout", level: "info" },
 ];
 
 const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
@@ -308,6 +311,10 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
           });
         }
       }
+
+      // #568: an N-column slide on a template with no N-column layout → guide to 「テンプレを強化」 (guide only).
+      const hint = columnAugmentHint(slide, i, deck.slides.length, catalog, layouts, layout.name);
+      if (hint) issues.push({ slideIndex: i, title: slideTitle(slide), id: "missing-column-layout", level: RULE_LEVEL["missing-column-layout"], message: hint, levers: [] });
 
       // #437 never-silent: an over-long title is SHRUNK to its box by export/preview (title-fit, R7) —
       // this warns only when even the floor (TITLE_MIN_SCALE) leaves it overflowing. Same box (the

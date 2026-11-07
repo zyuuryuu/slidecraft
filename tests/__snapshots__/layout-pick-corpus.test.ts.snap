@@ -1,0 +1,273 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > Dirty_Adversarial_TemplateOnly.pptx 1`] = `
+{
+  "closing": "レイアウト 3 ×1",
+  "columns": "Custom Layout 2 ×1",
+  "diagram": "レイアウト 3 ×1",
+  "fiveBullets": "レイアウト 3 ×1",
+  "image": "レイアウト 3 ×1",
+  "oneBullet": "レイアウト 3 ×1",
+  "paragraph": "レイアウト 3 ×1",
+  "section": "カスタム 4 ×1",
+  "table": "レイアウト 3 ×1",
+  "twelveBullets": "レイアウト 3 ×2",
+  "twoBullets": "レイアウト 3 ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > Dirty_AllBody_TemplateOnly.pptx 1`] = `
+{
+  "closing": "2 つのコンテンツ ×1",
+  "columns": "2 つのコンテンツ ×1",
+  "diagram": "2 つのコンテンツ ×1",
+  "fiveBullets": "2 つのコンテンツ ×1",
+  "image": "2 つのコンテンツ ×1",
+  "oneBullet": "2 つのコンテンツ ×1",
+  "paragraph": "2 つのコンテンツ ×1",
+  "section": "クロージング ×1",
+  "table": "2 つのコンテンツ ×1",
+  "twelveBullets": "2 つのコンテンツ ×1",
+  "twoBullets": "2 つのコンテンツ ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > Dirty_Grouped_TemplateOnly.pptx 1`] = `
+{
+  "closing": "本文 ×1",
+  "columns": "本文 ×1",
+  "diagram": "本文 ×1",
+  "fiveBullets": "本文 ×1",
+  "image": "本文 ×1",
+  "oneBullet": "本文 ×1",
+  "paragraph": "本文 ×1",
+  "section": "本文 ×1",
+  "table": "本文 ×1",
+  "twelveBullets": "本文 ×1",
+  "twoBullets": "本文 ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > Dirty_Legacy43_TemplateOnly.pptx 1`] = `
+{
+  "closing": "図表 ×1",
+  "columns": "図表 ×1",
+  "diagram": "図表 ×1",
+  "fiveBullets": "図表 ×1",
+  "image": "図表 ×1",
+  "oneBullet": "図表 ×1",
+  "paragraph": "図表 ×1",
+  "section": "図表 ×1",
+  "table": "図表 ×1",
+  "twelveBullets": "図表 ×1",
+  "twoBullets": "図表 ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > Midnight_Executive_30_Template.pptx 1`] = `
+{
+  "closing": "Closing.1Steps.Single+1Notes ×1",
+  "columns": "Column.2Body.Equal ×1",
+  "diagram": "Content.1Body.Single ×1",
+  "fiveBullets": "Content.1Body.Single ×1",
+  "image": "Content.1Body.Single ×1",
+  "oneBullet": "Content.1Body.Single ×1",
+  "paragraph": "Content.1Body.Single ×1",
+  "section": "Section.1Title.Single ×1",
+  "table": "Content.1Body.Single ×1",
+  "twelveBullets": "Content.1Body.Single ×1",
+  "twoBullets": "Content.1Body.Single ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > Midnight_Executive_30_TemplateOnly.pptx 1`] = `
+{
+  "closing": "Closing.1Steps.Single+1Notes ×1",
+  "columns": "Column.2Body.Equal ×1",
+  "diagram": "Content.1Body.Single ×1",
+  "fiveBullets": "Content.1Body.Single ×1",
+  "image": "Content.1Body.Single ×1",
+  "oneBullet": "Content.1Body.Single ×1",
+  "paragraph": "Content.1Body.Single ×1",
+  "section": "Section.1Title.Single ×1",
+  "table": "Content.1Body.Single ×1",
+  "twelveBullets": "Content.1Body.Single ×1",
+  "twoBullets": "Content.1Body.Single ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > lrk-slides-velis_CC0.pptx 1`] = `
+{
+  "closing": "Title and Content ×1",
+  "columns": "Two Columns ×1",
+  "diagram": "Title and Content ×1",
+  "fiveBullets": "Title and Content ×1",
+  "image": "Two Pictures ×1",
+  "oneBullet": "Title and Content ×1",
+  "paragraph": "Title and Content ×1",
+  "section": "Section Title ×1",
+  "table": "Title and Content ×1",
+  "twelveBullets": "Title and Content ×1",
+  "twoBullets": "Title and Content ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_エディトリアル_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_スタンダード水色_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_マガジン_生成りコーラル_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_公文書_白紺_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_官公庁_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 技術報告_スタンダード水色_TemplateOnly.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 技術報告_スタンダード水色_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "03_本文（2カラム） ×1",
+  "diagram": "02_本文（1カラム） ×1",
+  "fiveBullets": "02_本文（1カラム） ×1",
+  "image": "02_本文（1カラム） ×1",
+  "oneBullet": "02_本文（1カラム） ×1",
+  "paragraph": "02_本文（1カラム） ×1",
+  "section": "01_章扉 ×1",
+  "table": "02_本文（1カラム） ×1",
+  "twelveBullets": "02_本文（1カラム） ×1",
+  "twoBullets": "02_本文（1カラム） ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 配布資料_公文書高密度_TemplateOnly.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "04_図＋説明 ×1",
+  "diagram": "08_目次 ×1",
+  "fiveBullets": "08_目次 ×1",
+  "image": "08_目次 ×1",
+  "oneBullet": "08_目次 ×1",
+  "paragraph": "08_目次 ×1",
+  "section": "01_章扉 ×1",
+  "table": "08_目次 ×1",
+  "twelveBullets": "08_目次 ×1",
+  "twoBullets": "08_目次 ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 配布資料_公文書高密度_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "06_まとめ ×1",
+  "columns": "04_図＋説明 ×1",
+  "diagram": "08_目次 ×1",
+  "fiveBullets": "08_目次 ×1",
+  "image": "08_目次 ×1",
+  "oneBullet": "08_目次 ×1",
+  "paragraph": "08_目次 ×1",
+  "section": "01_章扉 ×1",
+  "table": "08_目次 ×1",
+  "twelveBullets": "08_目次 ×1",
+  "twoBullets": "08_目次 ×1",
+}
+`;

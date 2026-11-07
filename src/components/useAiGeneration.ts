@@ -11,16 +11,17 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import i18n from "../i18n";
 import type { LayoutCatalog } from "../engine/template-catalog";
-import { generateWithAI, listProviderModels, providerPreset, isLocalTarget, type ProviderId } from "../ipc/ai";
+import { generateWithAI, listProviderModels, providerPreset, isLocalTarget, type ProviderId, type AiRequest } from "../ipc/ai";
 import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
 import { runningInTauri } from "../ipc/commands";
 import { ensureEgressConsent } from "../ipc/egress-consent";
 import { saveAiConfig, loadAiConfig, clearAiConfig } from "../ipc/key-store";
 import {
   type AiProviderConfig, type AiConfigMap, type AiMode, type AiTask, type DiagramTypeChoice,
-  LOCAL_ONLY_STORAGE, BEST_OF_N_STORAGE, clampBestOfN, MAX_TASKS, modeLabel, defaultConfigs, loadSavedConfig, postProcessAiResult, computeConnection, freshBuiltin,
+  LOCAL_ONLY_STORAGE, BEST_OF_N_STORAGE, clampBestOfN, MAX_TASKS, modeLabel, defaultConfigs, loadSavedConfig, computeConnection, freshBuiltin,
 } from "./ai-generation-types";
 import { useBuiltinRuntime } from "./useBuiltinRuntime";
+import { postProcessWithRetry, type RetryContext } from "./deck-retry";
 
 // Backward-compatible surface: these used to be declared here, so re-export them for existing importers.
 export type { DiagramTypeChoice, AiProviderConfig, AiConfigMap, BuiltinModelInfo, AiMode, AiTaskStatus, AiTask } from "./ai-generation-types";
@@ -193,7 +194,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
 
   // Mode-specific post-processing centralised in ai-generation-types (pure); bind it to `catalog`
   // so every task path (foreground + loop) shapes responses identically.
-  const postProcess = useCallback((mode: AiMode, raw: string) => postProcessAiResult(mode, raw, catalog), [catalog]);
+  const postProcess = useCallback((mode: AiMode, raw: string, ctx: RetryContext) => postProcessWithRetry(mode, raw, catalog, ctx), [catalog]);
 
   const patchTask = useCallback((id: string, patch: Partial<AiTask>) => {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -227,31 +228,26 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
         // explicit OK (the request carries the API key); preset/local hosts pass silently, and a
         // trusted host is remembered. Runs BEFORE any generateWithAI, so no key is sent unapproved.
         await ensureEgressConsent(baseURL);
+        // Every call of this task (route / main / #107 slide-retry) goes through ONE builder; `extra` comes
+        // FIRST so it can never override the signal or the local-only hard egress block at the chokepoint.
+        const ask = (mode: AiRequest["mode"], userRequest: string, extra?: Pick<AiRequest, "diagramType" | "onText">) => generateWithAI({
+          ...extra, provider, apiKey: cfg.apiKey, baseURL, model: cfg.model, mode, userRequest, signal: controller.signal, localOnly: localModelOnly,
+        });
         // Stage 1 (diagram, おまかせ): resolve the TYPE with a quick route call so Stage 2 sends ONLY that
         // type's shape prompt. A concrete user choice skips the call; a parse miss falls back to flowchart.
         let diagramType: DiagramType | undefined;
         if (task.mode === "diagram" && task.diagramType) {
           if (task.diagramType === "auto") {
-            const routed = await generateWithAI({
-              provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
-              mode: "diagram-route", userRequest: task.prompt,
-              signal: controller.signal, localOnly: localModelOnly,
-            });
+            const routed = await ask("diagram-route", task.prompt);
             diagramType = parseDiagramType(routed) ?? "flowchart";
             patchTask(task.id, { diagramType });
           } else {
             diagramType = task.diagramType;
           }
         }
-        const raw = await generateWithAI({
-          provider, apiKey: cfg.apiKey, baseURL, model: cfg.model,
-          mode: task.mode, userRequest: task.prompt,
-          ...(diagramType ? { diagramType } : {}),
-          onText: (t) => patchTask(task.id, { result: t }),
-          signal: controller.signal,
-          localOnly: localModelOnly, // hard egress block at the chokepoint
-        });
-        const pp = postProcess(task.mode, raw);
+        const raw = await ask(task.mode, task.prompt, { ...(diagramType ? { diagramType } : {}), onText: (t) => patchTask(task.id, { result: t }) });
+        // slides: regenerate ONLY the slides the floor had to strip, once each (#107).
+        const pp = await postProcess(task.mode, raw, { userRequest: task.prompt, regenerate: (req) => ask("slide-retry", req), signal: controller.signal });
         if (pp.error) {
           patchTask(task.id, { status: "error", error: pp.error, finishedAt: Date.now() });
           throw new Error(pp.error);

@@ -3,6 +3,17 @@
  * + edit. Split from deck-plan.ts (R1); re-exported from it so importers are
  * unchanged. Pure strings (R2): no DOM / Tauri, no deck-plan internals.
  */
+// The Slide vocabulary + the encoding rule, shared by the whole-deck prompt and the one-slide
+// regeneration prompt (Issue #107) so the two can never drift apart (R8).
+const SLIDE_SHAPES = `- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}  // opening slide; all but title optional
+- {"kind":"section","title":"..."}                                                                // a section divider
+- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}                       // a normal slide; subtitle optional
+- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
+- {"kind":"table","title":"...","subtitle":"...","headers":["列A","列B"],"rows":[["a1","b1"],["a2","b2"]]}  // a DATA TABLE: pricing, metric comparisons, schedules
+- {"kind":"diagram","title":"...","subtitle":"...","mermaid":"flowchart LR\\n  A[開始] --> B[次] --> C[完了]"}  // a FIGURE: emit a small Mermaid diagram
+- {"kind":"closing","title":"...","subtitle":"...","bullets":["..."]}                             // closing slide; subtitle + bullets optional`;
+const UTF8_RULE = `- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.`;
+
 // ── System prompt the model fills (tiny vocabulary — no Markdown DSL) ──
 
 export function deckPlanSystemPrompt(today?: string): string {
@@ -12,13 +23,7 @@ Shape:
 { "slides": [ Slide, ... ] }
 
 Each Slide is exactly one of:
-- {"kind":"title","title":"...","subtitle":"...","category":"...","date":"...","footer":"..."}  // opening slide; all but title optional
-- {"kind":"section","title":"..."}                                                                // a section divider
-- {"kind":"content","title":"...","subtitle":"...","bullets":["...","..."]}                       // a normal slide; subtitle optional
-- {"kind":"columns","title":"...","subtitle":"...","columns":[{"heading":"...","bullets":["..."]}, ...]}  // 2 or 3 columns for comparison; subtitle/heading optional
-- {"kind":"table","title":"...","subtitle":"...","headers":["列A","列B"],"rows":[["a1","b1"],["a2","b2"]]}  // a DATA TABLE: pricing, metric comparisons, schedules
-- {"kind":"diagram","title":"...","subtitle":"...","mermaid":"flowchart LR\\n  A[開始] --> B[次] --> C[完了]"}  // a FIGURE: emit a small Mermaid diagram
-- {"kind":"closing","title":"...","subtitle":"...","bullets":["..."]}                             // closing slide; subtitle + bullets optional
+${SLIDE_SHAPES}
 
 Rules:
 - Write EVERY field in the SAME language as the user's request, and keep that ONE
@@ -41,7 +46,24 @@ Rules:
 - The "closing" title is a CONCISE takeaway in ONE short line (not a single word like
   "Summary"/"まとめ", and not a long sentence that overflows).${today ? `\n- Use ${today} (or a future date) for any "date" field — never a past year.` : ""}
 - Do NOT add any field not listed above, and do NOT invent other "kind" values.
-- Write non-ASCII text (Japanese, etc.) DIRECTLY as UTF-8 characters. NEVER use \\uXXXX escape sequences.
+${UTF8_RULE}
+- Output valid JSON only.`;
+}
+
+/** System prompt for regenerating ONE slide of a generated deck whose text was lost to a format
+ *  violation (Issue #107). Paired with slideRetryRequest (the user message) + acceptSlideRetry. */
+export function slideRetrySystemPrompt(): string {
+  return `You regenerate ONE slide of an existing slide deck as a JSON Slide object. Output ONLY that one JSON object — no prose, no code fence, no "slides" array, no other slides.
+
+The Slide is exactly one of:
+${SLIDE_SHAPES}
+
+Rules:
+- Keep the slide's kind and topic as described in the request; restore the text that was lost.
+- Write EVERY field in the SAME language as the original request.
+- Each bullet is a SHORT key phrase (≤ ~20 full-width characters), no trailing "。"/".". 3-5 bullets.
+- Do NOT add any field not listed above, and do NOT invent other "kind" values.
+${UTF8_RULE}
 - Output valid JSON only.`;
 }
 
@@ -55,9 +77,10 @@ export function slideMarkdownEditPrompt(): string {
   return `You revise ONE slide. You are given the current slide's Markdown and an instruction. Reply in the ONE format that matches the kind of change — no prose, never both formats.
 
 Choose the format:
-- Change to WHAT the slide says — text, bullets, title, meta — or ADD / REMOVE a whole figure (none↔one)? → (A) Markdown.
+- Only rewording text that is ALREADY in a field (title / subtitle / bullets / meta — the ones listed under "Fields")? → (B) TEXT ops (setField), one op per changed field. If the request has no "Fields" list, never use setField — use (A).
+- Any other change to WHAT the slide says — filling a field that isn't listed, restructuring the slide — or ADD / REMOVE a whole figure (none↔one)? → (A) Markdown.
 - Change to an EXISTING figure — its CONTENT (rename/relabel a node, change a value, ADD or REMOVE a node/edge, change its direction) OR its ARRANGEMENT (move/place it, emphasize a node)? → (B) a JSON array of ops.
-- Adding or removing a NODE or EDGE inside an existing figure is (B), NOT (A). Prefer (B) for any change to an existing figure's nodes/edges/labels/direction; use (A) only when the slide's TEXT changes, or a figure is added/removed as a whole.
+- Adding or removing a NODE or EDGE inside an existing figure is (B), NOT (A). Prefer (B) for any change to an existing figure's nodes/edges/labels/direction; use (A) only when the slide's structure changes beyond rewording listed fields, or a figure is added/removed as a whole.
 
 (A) CONTENT change — return the FULL revised slide as MARKDOWN:
 - Keep the first line \`<!-- slide: LayoutName -->\` EXACTLY as given (do not delete, rename, or reorder it). If the input has none, do not add one.
@@ -66,9 +89,13 @@ Choose the format:
 - "Category: …" / "Date: …" / "Footer: …" are metadata — keep them.
 - Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
 
-(B) FIGURE change — return ONLY a JSON array of ops. Use ids EXACTLY as in the \`\`\`diagram block, and
-emit ONLY the ops the change needs (unchanged nodes/labels/values stay — the engine keeps them, so
-never re-list them). Emit ONE kind per reply (CONTENT ops or ARRANGEMENT ops), not both.
+(B) OPS — return ONLY a JSON array of ops. Use ids EXACTLY as in the \`\`\`diagram block (idx EXACTLY as
+under "Fields"), and emit ONLY the ops the change needs (unchanged fields/nodes/labels/values stay — the
+engine keeps them, so never re-list them). Emit ONE kind per reply (TEXT, CONTENT or ARRANGEMENT ops), never mixed.
+
+TEXT ops (reword an existing field's text):
+[ {"op":"setField","idx":"<idx>","text":"<the field's WHOLE new text>"} ]
+- "text" uses the field's line syntax as shown under "Fields": "- " bullet, "  - " nested bullet, "### " heading line, "\\n" between lines. "" clears the field.
 
 CONTENT ops (change the figure's data — this is how you rename/relabel/add/remove/redirect):
 [ {"op":"nodeUpdate","id":"<id>","label"?:"…","sublabel"?:"…","value"?:<number>,"icon"?:"…","shape"?:"…"},
@@ -88,6 +115,8 @@ ARRANGEMENT ops (change only WHERE it sits / what's focal):
   {"op":"relayout","direction":"TB"|"LR"|"RL"|"BT"} ]
 - "text-left" = figure on the right, text on the left; "text-right" = figure on the left.
 
+Example (B) — instruction "タイトルに年度を入れて"（wording only → setField）:
+[{"op":"setField","idx":"15","text":"売上の推移（2026年度）"}]
 Example (B) — instruction "DBノードを PostgreSQL にして、後ろにキャッシュを追加":
 [{"op":"nodeUpdate","id":"db","label":"PostgreSQL"},{"op":"addNode","id":"cache","label":"Redis"},{"op":"addEdge","from":"db","to":"cache"}]
 Example (B) — instruction "存在しない Cache ノードを削除"（emit the named id even if absent — the engine skips + reports it; do NOT delete a different node）:
@@ -111,6 +140,16 @@ Output:
 Rules:
 - Apply ONLY what the instruction asks; keep everything else as-is.
 - Reply with EITHER the Markdown (A) OR the JSON array (B) — nothing else.`;
+}
+
+/**
+ * The per-slide edit request (AiPanel generate + ops auto-retry). `fields` is describeEditableFields(slide)
+ * — the idx list a setField op names (#106 P2); omitted when empty so a field-less slide's request is
+ * unchanged. Pure string (R2).
+ */
+export function slideEditUserPrompt(slideMd: string, fields: string, instruction: string): string {
+  const f = fields ? `\n\nFields (setField idx: current text):\n${fields}` : "";
+  return `Current slide:\n${slideMd}${f}\n\nInstruction: ${instruction}`;
 }
 
 /**
