@@ -13,7 +13,7 @@ import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
 // Distinct, dark-theme-friendly slice colours (cycled).
-const PIE_COLORS = [
+export const PIE_COLORS = [
   "#3B82F6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444",
   "#8B5CF6", "#EC4899", "#F97316", "#14B8A6", "#A3A3A3",
 ];

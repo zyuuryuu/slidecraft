@@ -223,6 +223,14 @@ radar:
     - { name: 競合, values: [3, 3, 5, 2] }
 ```
 
+::: tip PowerPoint のネイティブグラフで書き出す（`pie` / `xychart` / `radar`）
+既定ではグラフも図形の集まりとして書き出され、プレビューと PPTX の見た目が一致します。MCP の `export_pptx` に
+`charts: "native"` を渡すと、この 3 種は PowerPoint のネイティブグラフ（データ埋め込み）になり、受け手が
+PowerPoint 上で「データの編集」から数値や色を直せます。ただしプレビュー・HTML 書き出し・`get_slide_image` は
+図形描画のままなので、PowerPoint 上の見た目とは**近似**です（ネイティブグラフは PowerPoint が描きます）。
+それ以外の図は従来どおり図形で出ます。現在は MCP からのみ指定できます。
+:::
+
 ### kpi — KPI カード
 
 `nodes: []` とし、`kpi` オブジェクトの `cards` に大きな数字タイルを並べます。`value` / `delta` は文字列（単位込みで可）、`trend` は `up` / `down`。

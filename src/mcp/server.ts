@@ -230,13 +230,13 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     "export_pptx",
     {
       description: ".pptx を native-vector で headless 生成（変換不能 mermaid は default reject / skip）。既定は base64（{dataBase64, skipped}）。サーバが --root（scope）起動時は scope 配下へファイル出力し {path, skipped} を返す（filename 省略時は自動命名）",
-      inputSchema: { onUnsupportedMermaid: z.enum(["reject", "skip"]).optional(), filename: z.string().optional().describe("scope 配下のファイル名（scope 起動時のみ有効・拡張子 .pptx 必須・サブディレクトリ/絶対パス不可）"), ...doc },
+      inputSchema: { onUnsupportedMermaid: z.enum(["reject", "skip"]).optional(), charts: z.enum(["shapes", "native"]).optional().describe("native＝pie/xychart/radar を PowerPoint ネイティブ chart で出す（編集可・プレビューは近似）。結果に charts:{native,shapes}。既定 shapes"), filename: z.string().optional().describe("scope 配下のファイル名（scope 起動時のみ有効・拡張子 .pptx 必須・サブディレクトリ/絶対パス不可）"), ...doc },
     },
     (a, extra) =>
       run(async () => {
         const s = sessionOf(extra, a.docId);
-        const { bytes, skipped } = await S.exportPptxBytes(s, a.onUnsupportedMermaid ?? "reject");
-        return { ...persistScopedOrBase64(s, bytes, "pptx", a.filename), skipped };
+        const { bytes, skipped, charts } = await S.exportPptxBytes(s, a.onUnsupportedMermaid ?? "reject", a.charts ?? "shapes");
+        return { ...persistScopedOrBase64(s, bytes, "pptx", a.filename), skipped, ...(charts ? { charts } : {}) };
       }),
   );
 
