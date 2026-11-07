@@ -25,6 +25,7 @@
  * (fs-scope.ts). --no-fs (base64) stays the byte-identical default when --root is absent. Input-side
  * fs (open_project/new_project) and the loopback-binary data plane remain follow-up work.
  */
+import { resolve as resolvePath } from "path";
 import { createSession } from "./session";
 import { buildServer } from "./server";
 import { createSoloHostContext } from "./host-core";
@@ -32,34 +33,39 @@ import { resolveHostJsonPath, discoverLiveHost } from "./host-discovery";
 import { runRelay } from "./mcp-relay";
 import { resolveScopeRoot } from "./fs-scope";
 import { createProbeAwareStdio } from "./discover-probe";
+import { createFileMetricsRecorder } from "./metrics-sink";
 
-async function runSolo(root: string | null): Promise<void> {
+async function runSolo(root: string | null, metricsPath: string | undefined): Promise<void> {
   const session = createSession(root); // root===null: --no-fs, bytes flow as base64; else scoped fs (ADR-0035)
   const host = createSoloHostContext(session); // solo control plane: one doc, sole-doc resolution, no token
-  const server = buildServer(session, { host, registerResources: true });
+  // #512: --metrics <path> opts into a LOCAL JSONL call log (no egress — ADR-0016). Absent = OFF:
+  // no recorder, handlers unwrapped, nothing written anywhere.
+  const metrics = metricsPath ? createFileMetricsRecorder(resolvePath(metricsPath)) : undefined;
+  const server = buildServer(session, { host, registerResources: true, metrics });
   // #518: the 2026-07-28 `server/discover` probe is answered in front of the SDK (discover-probe.ts);
   // every other line reaches the SDK transport byte-for-byte, so the legacy handshake is unchanged.
   await server.connect(createProbeAwareStdio());
-  process.stderr.write(`slidecraft mcp: ready (solo stdio, ${root ? `scoped fs — root=${root}` : "--no-fs / base64"})\n`);
+  process.stderr.write(`slidecraft mcp: ready (solo stdio, ${root ? `scoped fs — root=${root}` : "--no-fs / base64"}${metricsPath ? `, metrics → ${resolvePath(metricsPath)}` : ""})\n`);
 }
 
-/** `--root <dir>` — the flag's argument, or undefined if the flag wasn't passed. A present-but-empty
+/** `--<flag> <value>` — the flag's argument, or undefined if the flag wasn't passed. A present-but-empty
  *  argument (missing value / another flag right after) is a usage error, never-silently ignored. */
-function parseRootArg(argv: string[]): string | undefined {
-  const idx = argv.indexOf("--root");
+function parseValueFlag(argv: string[], flag: string, usage: string): string | undefined {
+  const idx = argv.indexOf(flag);
   if (idx === -1) return undefined;
-  const dir = argv[idx + 1];
-  if (!dir || dir.startsWith("--")) {
-    process.stderr.write("slidecraft serve: --root にはディレクトリパスが必要です（例: --root /path/to/scope）。\n");
+  const v = argv[idx + 1];
+  if (!v || v.startsWith("--")) {
+    process.stderr.write(`slidecraft serve: ${usage}\n`);
     process.exit(2);
   }
-  return dir;
+  return v;
 }
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   let root: string | null = null;
-  const rootArg = parseRootArg(argv);
+  const rootArg = parseValueFlag(argv, "--root", "--root にはディレクトリパスが必要です（例: --root /path/to/scope）。");
+  const metricsPath = parseValueFlag(argv, "--metrics", "--metrics には JSONL の出力ファイルパスが必要です（例: --metrics ./mcp-calls.jsonl）。");
   if (rootArg !== undefined) {
     try {
       root = resolveScopeRoot(rootArg);
@@ -74,11 +80,12 @@ async function main(): Promise<void> {
     // Forward mode hands the session to the GUI host's own control plane — this stdio process
     // writes nothing, so a --root scope has no effect there (never-silently dropped: told, not hidden).
     if (root) process.stderr.write("slidecraft mcp: note — --root is ignored while forwarding to a live GUI host (deck state lives in the host process).\n");
+    if (metricsPath) process.stderr.write("slidecraft mcp: note — --metrics is ignored while forwarding (calls are logged by the host when it was started with SLIDECRAFT_MCP_METRICS).\n");
     process.stderr.write(`slidecraft mcp: forwarding to live host at ${live.url}\n`);
     await runRelay(live);
     return;
   }
-  await runSolo(root);
+  await runSolo(root, metricsPath);
 }
 
 main().catch((e: unknown) => {

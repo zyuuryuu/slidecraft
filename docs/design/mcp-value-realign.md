@@ -191,6 +191,22 @@ redo 74・close_document 72・list_documents 57。§4 どおり削除しない�
 md-DSL で代替不能）・set_slide_diagram と apply_design_intent（重複はあるが検証・座標計算という
 エンジン価値が残る。まず説明文圧縮で固定費だけ削る）・出口 3 本・人間側 6 本（D2 で削除しないと決定済み）。
 
+### 7.5 計測の手段（#512・2026-11-07 追記）
+
+§7.4 の証拠と D5 の 3 指標は、MCP サーバのローカル呼出ログ（`--metrics` / `SLIDECRAFT_MCP_METRICS`・
+既定 OFF・外部送信なし）と集計スクリプト `scripts/mcp-metrics-report.ts` で取る。使い方は
+[mcp-server.md](../mcp-server.md)「呼出ログ」節。
+
+- **「実セッション」は時間窓で読み替える**: stateless の MCP にはセッションが無い（ADR-0038）ので、
+  無呼出が一定時間（既定 30 分）続いたら次の窓とし、「実セッション N 本」＝窓 N 個として数える。
+- **トークンは実測しない**: サーバからはクライアントの文脈長が見えない。説明文＋スキーマの固定費は §7 の
+  o200k 計測を使い、可変費は呼出数（往復数）と入出力の文字数（`inChars`/`outChars`）で代理する。
+  #516 の実測どおり費用は「要求回数 × 文脈長」なので、往復数が主たる代理指標になる。
+- **集計が直接出す比率**: get_slide_fix_request / get_slide・get_slide_markdown の併用率・get_project_info の
+  窓あたり呼出・convert_bullets_to_table の呼出数・旧ガイド 4 本の呼出率（対 bootstrap）・丸ごと再生成の比率。
+- **ログだけでは出ないもの**: 「fix packet 経由の編集の成功率」（呼出の因果を結ばない）と
+  「AI 自書きの表化との品質一致」（R8 の一致比較）は別途の評価が要る。
+
 ## References
 
 - ADR-0008（ツール面監査・互換性フロア）・ADR-0009（協働ホスト）・ADR-0015（brushup）・

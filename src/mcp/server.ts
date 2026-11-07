@@ -29,6 +29,8 @@ import { type HostContext, type DocEntry, type TemplateStore, commitMutation, ch
 import { GuardError } from "./guard-errors";
 import { getBootstrap } from "./bootstrap";
 import { gatedToolRegistrar } from "./tool-profiles";
+import type { MetricsRecorder } from "./metrics-sink";
+import { instrumentTool, noteDoc, noteChange } from "./metrics-probe";
 import { registerVisualTools } from "./visual-tools";
 import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
 // The ONE result envelope (tool-result.ts): ok / fail (GuardError → {ok:false,code}; else isError) / run.
@@ -51,6 +53,8 @@ export interface BuildServerOptions {
   onMutate?: (tool: string) => void;
   registerResources?: boolean;
   host?: HostContext;
+  /** #512: 呼出ログの記録先。省略＝計測 OFF（handler は包まれず応答は byte-identical）。 */
+  metrics?: MetricsRecorder;
 }
 
 export function buildServer(session: Session, opts: BuildServerOptions = {}): McpServer {
@@ -59,7 +63,9 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // (stdio and any caller that doesn't bring its own multi-doc registry).
   const host: HostContext = opts.host ?? createSoloHostContext(session);
   // ADR-0037 D2 (#465): どのプロファイルに見せるかは tool-profiles.ts の表 1 箇所が決める（R8）— 以下の全登録はこのゲートを通る。
-  const tool = gatedToolRegistrar(server, host);
+  // #512: 計測 ON のときだけ同じゲートで全 handler を包む（差し込み点はここ 1 箇所）。
+  const rec = opts.metrics;
+  const tool = gatedToolRegistrar(server, host, rec ? (name, profile, cfg, cb) => instrumentTool(name, profile, cfg.inputSchema !== undefined, cb, rec) : undefined);
   // ADR-0035 stage 1: the fs scope (--root) is a per-SERVER-PROCESS setting, not per-doc — every doc
   // minted later (open/new/use_template → S.createSession below) must inherit the SAME scope the
   // process was started with, not silently reset to --no-fs.
@@ -81,7 +87,9 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   const entryOf = (extra: unknown, docId?: string): DocEntry => {
     const id = docId ?? host.active(extra) ?? host.registry.soleDocId();
     if (!id) throw new GuardError("ドキュメントが選択されていません（select_document か docId を指定してください）。", "document-not-selected");
-    return host.registry.get(id);
+    const entry = host.registry.get(id);
+    noteDoc(entry.docId);
+    return entry;
   };
   const sessionOf = (extra: unknown, docId?: string): Session => entryOf(extra, docId).session;
 
@@ -104,9 +112,11 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         return ok({ ok: false as const, stale: true as const, expectedRev: cc.expectedRev, currentRev: entry.rev, docId: entry.docId });
       }
       const { result, changed, rev } = await commitMutation(entry, fn);
+      const changedIndices = changed ? changedIndicesOf(tool, cc?.index, result) : undefined;
+      noteChange("edit", changed, changedIndices); // #512: 増分性（D5-3）は GUI 追随と同じ写像から
       if (changed) {
         opts.onMutate?.(tool);
-        host.onMutated?.(entry, tool, cc?.opId, changedIndicesOf(tool, cc?.index, result)); // fan out deckChanged (opId: echo suppression; changedIndices: GUI follow #407); no-op in solo
+        host.onMutated?.(entry, tool, cc?.opId, changedIndices); // fan out deckChanged (opId: echo suppression; changedIndices: GUI follow #407); no-op in solo
       }
       if (changed && result && typeof result === "object") return ok(withHints({ ...(result as object), rev, docId: entry.docId, opId: cc?.opId }));
       return ok(withHints(result));
@@ -130,6 +140,8 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         for (const d of host.registry.list()) if (d.docId !== entry.docId) host.registry.remove(d.docId);
       }
       host.setActive(extra, entry.docId);
+      noteDoc(entry.docId);
+      noteChange("mint", true);
       host.notifyOpened?.(entry);
       opts.onMutate?.(tool); // minting a doc always changes state — unlike an in-place edit, there's no no-op case here
       return { ...(res as object), docId: entry.docId };
@@ -272,6 +284,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     run(() => {
       const e = entryOf(extra, a.docId);
       const r = undoDoc(e);
+      noteChange("undo", r.ok);
       if (r.ok) {
         opts.onMutate?.("undo");
         host.onMutated?.(e, "undo");
@@ -283,6 +296,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     run(() => {
       const e = entryOf(extra, a.docId);
       const r = redoDoc(e);
+      noteChange("undo", r.ok);
       if (r.ok) {
         opts.onMutate?.("redo");
         host.onMutated?.(e, "redo");
