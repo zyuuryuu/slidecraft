@@ -19,6 +19,7 @@ import type { PlaceholderInfo } from "./template-loader";
 import { placeholderRole, isContentBody } from "./template-catalog";
 import { sortByIdx } from "./placeholder-binding";
 import { intrinsicImageSize } from "./image-intrinsic";
+import { bodyOrdinalIndex } from "./body-ordinal";
 
 /**
  * The layout's BODY placeholders in stable order — a figure/table rides the Nth of these.
@@ -49,7 +50,7 @@ export function bodyPlaceholders(layoutPlaceholders: readonly PlaceholderInfo[])
 /** The BODY placeholder a visual targets: placeholderIdx "1"→1st body, "2"→2nd, … (1-based). */
 export function nthBody(bodyPhs: readonly PlaceholderInfo[], placeholderIdx?: string): PlaceholderInfo | undefined {
   if (!placeholderIdx) return undefined;
-  return bodyPhs[Math.max(1, parseInt(placeholderIdx) || 1) - 1];
+  return bodyPhs[bodyOrdinalIndex(placeholderIdx)];
 }
 
 /**

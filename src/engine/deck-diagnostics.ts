@@ -20,7 +20,7 @@ import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
 import { visualOccupancy, visualCollisions, bodyPlaceholders, nthBody, type VisualKind } from "./visual-placement";
-import { estimateTableRowHeightsIn } from "./table-layout";
+import { tableOverflow } from "./table-fit"; // #436/#444: the SAME judgment the auto pick uses (R8)
 import { isBlankParagraphs } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml } from "./diagram-node-shrink";
@@ -103,16 +103,6 @@ export interface DeckIssue {
 }
 
 const VISUAL_LABEL: Record<VisualKind, string> = { diagram: "図", mermaid: "図", table: "表", code: "コード", image: "画像" };
-
-/** #436: the table's estimated rendered height vs its placed box — undefined when it fits (or has no
- *  box). `fit` = how many leading rows the estimate fits in the box (header included). */
-function tableOverflow(rows: string[][], box: { w: number; h: number }): { fit: number } | undefined {
-  const heights = estimateTableRowHeightsIn(rows, box.w);
-  if (heights.reduce((a, b) => a + b, 0) <= box.h) return undefined;
-  let used = 0;
-  const fit = heights.findIndex((h) => (used += h) > box.h);
-  return { fit };
-}
 
 /** #473: a figure at body ordinal 2+ is confined to that placeholder's box by export (placeholder-filler's
  *  `diagWantsRegion`); ordinal 1 (or an unparsable idx) fills the slide. Same predicate, same default. */

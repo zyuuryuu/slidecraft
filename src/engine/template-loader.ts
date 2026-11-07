@@ -933,13 +933,13 @@ export function autoSelectLayout(
     // ideal role → content → any layout. Never returns a name not in the template.
     const hasImage = !!slide.image; // an image slide prefers a layout with a real picture frame
     const picked =
-      pickLayout(catalog, role, regions, hasImage) ??
-      pickLayout(catalog, "content", regions, hasImage) ??
-      pickLayout(catalog, "content", undefined, hasImage) ??
+      pickLayout(catalog, role, regions, hasImage, slide.table) ??
+      pickLayout(catalog, "content", regions, hasImage, slide.table) ??
+      pickLayout(catalog, "content", undefined, hasImage, slide.table) ??
       // No content role at all — try columns, then rank ANY body-bearing layout by suitability rather
       // than falling to catalog[0] (the first layout by file order). Gated: canonical/healthy templates
       // always expose a content role, so these tiers never fire for them → byte-identical.
-      pickLayout(catalog, "columns", regions, hasImage) ??
+      pickLayout(catalog, "columns", regions, hasImage, slide.table) ??
       bestBodyBearing(catalog, regions, hasImage) ??
       catalog[0];
     // #397/#398: a `Takeaway:`/`Source:` row prefers a variant with a slot for it (no row → `picked`).
