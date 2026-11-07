@@ -236,7 +236,7 @@ export function isNoopRecipe(r: TemplateAdjustRecipe): boolean {
 /** Write `xml` back only when it changed, keeping the entry's original date (deterministic bytes). */
 function put(zip: JSZip, path: string, before: string, after: string): boolean {
   if (after === before) return false;
-  zip.file(path, after, { date: zip.file(path)!.date });
+  zip.file(path, after, { date: zip.file(path)!.date, createFolders: false });
   return true;
 }
 
