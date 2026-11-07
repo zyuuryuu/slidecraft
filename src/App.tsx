@@ -62,7 +62,7 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     handleGenerateToc, handleRegenerateStaticToc,
-    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
+    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
@@ -561,6 +561,7 @@ export default function App() {
           <AiPanel
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
+            currentSlideFields={currentSlideFields}
             onApplySlide={handleApplySlide}
             onPreviewSlideEdit={previewSlideEdit}
             activeSlideNum={activeSlide + 1}

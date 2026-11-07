@@ -12,6 +12,7 @@ import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/
 import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
+import { routeFieldEdit, describeEditableFields } from "../engine/field-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
@@ -490,6 +491,15 @@ export function useDeckController() {
           return;
         }
       }
+      // ①' Placeholder TEXT ops (#106 P2・ADR-0019): only the rewritten fields, merged by the field
+      // editor's own primitive. Unknown idx → skipped + announced; malformed → full-text path + notice.
+      const field = old ? routeFieldEdit(old, raw) : null;
+      if (field?.kind === "ops") {
+        setEditNotice(field.notices.length > 0 ? field.notices.join(" ｜ ") : null);
+        handleSlideUpdate(activeSlide, field.slide, "commit");
+        return;
+      }
+      const fallbackNotice = field?.kind === "fallback" ? field.notice : null;
       // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
       // The engine maps it to clamped geometry on the current slide, and reports any op that
       // couldn't take effect (e.g. an emphasize whose node id the AI renamed away) so it's ANNOUNCED
@@ -512,8 +522,8 @@ export function useDeckController() {
         return;
       }
       const rec = reconcileSlideEdit(old, raw, serializeTpl(catalog, templateData));
-      if (!rec) return; // unparseable AI output — keep the slide as-is
-      setEditNotice(null); // clear any stale advisory banner
+      if (!rec) { if (fallbackNotice) setEditNotice(fallbackNotice); return; } // unparseable — keep the slide as-is
+      setEditNotice(fallbackNotice); // a malformed-ops fallback is announced; else clear any stale banner
       handleSlideUpdate(activeSlide, rec.slide, "commit"); // AI edit = one discrete undo step
     },
     [deck, activeSlide, catalog, templateData, handleSlideUpdate, setEditNotice],
@@ -538,6 +548,12 @@ export function useDeckController() {
         ];
         return { afterMd: figureFence(merged) ?? "", warnings, beforeMd: figureFence(s) ?? "" };
       }
+      // Placeholder TEXT ops (#106 P2): review the merged slide's Markdown (before = currentSlideMd).
+      const field = routeFieldEdit(s, raw);
+      if (field?.kind === "ops") {
+        const layout = autoSelectLayout(field.slide, activeSlide, deck!.slides.length, catalog);
+        return { afterMd: slideMarkdown({ ...field.slide, layout }, catalog, templateData), warnings: field.notices };
+      }
       // Figure edit (bare DiagramSpec YAML): diff the figure SOURCE (YAML-vs-YAML), not the whole
       // slide's Markdown against raw YAML — the latter misaligns visually.
       const fig = previewFigureEdit(s, raw, catalog && { index: activeSlide, total: deck!.slides.length, catalog });
@@ -555,7 +571,7 @@ export function useDeckController() {
       const shouldRetry = hadFigure && rec.warnings.length > 0;
       return {
         afterMd: slideMarkdown({ ...rec.slide, layout: resolved }, catalog, templateData),
-        warnings: figureFallbackTag(hadFigure, rec.warnings),
+        warnings: [...(field?.kind === "fallback" ? [field.notice] : []), ...figureFallbackTag(hadFigure, rec.warnings)],
         ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
       };
     },
@@ -588,6 +604,8 @@ export function useDeckController() {
     // serialize showed a title-less md here, and one keystroke's parse-back made the loss REAL.
     return slideMarkdown({ ...s, layout: resolved }, catalog, templateData);
   })();
+  // The idx list a setField op can name (#106 P2) — sent to the model next to currentSlideMd.
+  const currentSlideFields = deck?.slides[activeSlide] ? describeEditableFields(deck.slides[activeSlide]) : "";
 
   // Per-slide Markdown editing: the Markdown is the full source for this slide,
   // so parse it and replace the active slide (coalesced for live typing).
@@ -676,7 +694,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, handleSlideMdChange,
+    handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields, handleSlideMdChange,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     handleGenerateToc, handleRegenerateStaticToc,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
