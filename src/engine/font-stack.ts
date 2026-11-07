@@ -64,9 +64,11 @@ function quoteFont(name: string): string {
  * their exact brand font), then the East-Asian typeface if the template declared one, then a
  * gothic/mincho-classified fallback chain (classified from the ea name when present, else from the
  * Latin name itself) ending in the matching CSS generic. Deduplicated case-insensitively.
+ * `cjkClass` lets a template-aware caller pass the class from cjk-class.ts's single entry (#573,
+ * R8) so the chain it builds matches what the exports embed; omitted → classified from the names.
  */
-export function cjkFontFamily(fontName: string, eaFontName?: string): string {
-  const fallback = classifyCjkFont(eaFontName ?? fontName) === "mincho" ? MINCHO_FALLBACK : GOTHIC_FALLBACK;
+export function cjkFontFamily(fontName: string, eaFontName?: string, cjkClass: CjkClass = classifyCjkFont(eaFontName ?? fontName)): string {
+  const fallback = cjkClass === "mincho" ? MINCHO_FALLBACK : GOTHIC_FALLBACK;
   const latin = fontName.includes("Georgia") ? "Georgia" : fontName;
   const ordered = [latin, ...(eaFontName ? [eaFontName] : []), ...fallback];
 

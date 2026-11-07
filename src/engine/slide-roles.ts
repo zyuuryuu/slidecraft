@@ -13,6 +13,13 @@
  * while the parser also promotes a slide to the title namespace when it carries meta fields). Centralize
  * it here so every module derives the convention from one place. Pure logic (R2): no DOM / Tauri.
  */
+import type { PlaceholderContent } from "./slide-schema";
+
+/** True when a placeholder carries any non-whitespace text. Lives in this leaf (moved from ai-reconcile)
+ *  so ai-reconcile can import apply-slide-edit's shared carry without an import cycle (#220). */
+export function hasText(ph: PlaceholderContent | undefined): boolean {
+  return !!ph && ph.paragraphs.some((p) => p.segments.some((s) => s.text.trim().length > 0));
+}
 
 /** Title/Closing layouts use the ctrTitle namespace (title idx 0, subtitle idx 1). */
 export function isTitleLayout(layout: string): boolean {

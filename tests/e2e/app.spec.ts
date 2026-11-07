@@ -235,6 +235,42 @@ test.describe("SlideCraft", () => {
     }).toPass({ timeout: 3000 });
   });
 
+  test("image: a BEHIND (最背面) image is dragged via its frontmost chrome → Markdown gets x/y (#122)", async ({ page }) => {
+    await page.waitForTimeout(1500);
+    await page.getByTitle("ドラッグで並べ替え").nth(1).click(); // slide 2 has body text → a drop goes BEHIND it
+    await page.evaluate(() => {
+      const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], "x.png", { type: "image/png" }));
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+    await expect(page.getByText(/最背面レイヤー/)).toBeVisible({ timeout: 5000 });
+    // The chrome (outline + handles) sits IN FRONT of the content, so its frame is grabbable.
+    const chrome = page.locator('[data-image-chrome="true"]');
+    await expect(chrome).toBeVisible();
+    await expect(chrome.locator("[data-image-handle]")).toHaveCount(4);
+    const before = (await chrome.boundingBox())!;
+    // The grabbed point must hit the chrome (not the content above the picture) — the whole point of #122.
+    const eb = (await chrome.locator('[data-image-edge="top"]').boundingBox())!;
+    const gx = eb.x + eb.width / 2, gy = eb.y + eb.height / 2;
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("[data-image-chrome]"), [gx, gy])).toBe(true);
+    // POINTER drag the frame down/right (move). A move is clamped onto the slide, so keep it small
+    // (the box is the body region, not full-bleed — there is room to move down).
+    await page.mouse.move(gx, gy);
+    await page.mouse.down();
+    await page.mouse.move(gx + 20, gy + 30, { steps: 10 });
+    await page.mouse.up();
+    await expect(async () => {
+      const after = (await chrome.boundingBox())!;
+      expect(Math.abs(after.y - before.y) + Math.abs(after.x - before.x)).toBeGreaterThan(5); // it moved
+    }).toPass({ timeout: 3000 });
+    // …and the move was written back to the slide's Markdown as {x,y,w,h} + behind=1 (same path as front).
+    await page.getByRole("button", { name: "Markdown", exact: true }).click();
+    // The per-slide Markdown view is a plain monospace <textarea> (SlideMarkdownEditor).
+    await expect(page.locator("textarea.font-mono")).toHaveValue(/\{x=[\d.]+,y=[\d.]+,w=[\d.]+,h=[\d.]+.*behind=1\}/, { timeout: 3000 });
+  });
+
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark"); // default

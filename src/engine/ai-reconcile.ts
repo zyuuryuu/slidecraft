@@ -14,12 +14,8 @@
  */
 
 import type { SlideIR, PlaceholderContent } from "./slide-schema";
-import { titleSubtitleIdx, META_IDXS, type LayoutRoleLookup } from "./slide-roles";
-
-/** True when a placeholder carries any non-whitespace text. */
-export function hasText(ph: PlaceholderContent | undefined): boolean {
-  return !!ph && ph.paragraphs.some((p) => p.segments.some((s) => s.text.trim().length > 0));
-}
+import { titleSubtitleIdx, hasText, META_IDXS, type LayoutRoleLookup } from "./slide-roles";
+import { carryOmittedBlocks } from "./apply-slide-edit";
 
 /** Group column idxs are the single-digit body/column indices 1..9. */
 const GROUP_IDX = /^[1-9]$/;
@@ -84,15 +80,11 @@ export function reconcileEdit(old: SlideIR, edited: SlideIR, catalog?: LayoutRol
   }
 
   return {
-    ...edited,
+    // Figures/table/code: respect an edited block, else carry the old one — the SAME carry MCP
+    // set_slide_markdown applies (shared, apply-slide-edit.ts #220).
+    ...carryOmittedBlocks(old, edited),
     layout,
     placeholders: [...byIdx.values()],
-    // Figures: respect an edited figure, else carry the old one (matches the pre-existing
-    // diagram/mermaid carry in handleApplySlide, generalized to table/code).
-    diagram: edited.diagram ?? old.diagram,
-    mermaidBlock: edited.mermaidBlock ?? old.mermaidBlock,
-    table: edited.table ?? old.table,
-    code: edited.code ?? old.code,
     // groupKind rides the SAME signal as the layout pin (a dropped header → restore), but never on a
     // deliberate flattening (editedFlat) — else a cards→bullets edit would be forced back into a card.
     groupKind: edited.groupKind ?? (edited.layout === "auto" && !editedFlat ? old.groupKind : undefined),

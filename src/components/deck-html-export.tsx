@@ -22,7 +22,8 @@ import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-secti
 import { serializeParagraphs } from "../engine/md-serializer-shared";
 import { collectDeckText, deckUsesBold, deckHasCjkText } from "../engine/deck-text-collect";
 import { resolveFontSubsetSource } from "../engine/font-subset-plan";
-import { classifyCjkFont, embedFallbackFamily, type CjkClass } from "../engine/font-stack";
+import { embedFallbackFamily, type CjkClass } from "../engine/font-stack";
+import { cjkClassesForTemplate } from "../engine/cjk-class";
 import { subsetFontToTtf } from "./font-subsetter";
 import type { DeckIR } from "../engine/slide-schema";
 
@@ -93,10 +94,8 @@ async function buildEmbeddedFonts(deck: DeckIR, template: TemplateData): Promise
   const text = collectDeckText(deck);
   if (!deckHasCjkText(text)) return [];
 
-  const classes = new Set<CjkClass>([
-    classifyCjkFont(template.masterTitleStyle.eaFontName ?? template.masterTitleStyle.fontName),
-    classifyCjkFont(template.masterBodyStyle.eaFontName ?? template.masterBodyStyle.fontName),
-  ]);
+  // #573: the ONE resolve→classify entry (R8) — the same class the painter's font-family asks for.
+  const classes = cjkClassesForTemplate(template);
   const boldFlags = deckUsesBold(deck) ? [false, true] : [false];
 
   const faces: EmbeddedFontFace[] = [];

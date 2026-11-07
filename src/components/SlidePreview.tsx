@@ -16,17 +16,18 @@ import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
 import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL, TABLE_CELL_IN } from "../engine/table-layout";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, imageObjectFit, dragImageRect } from "../engine/visual-placement";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
 import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
 import { renderPaintToSvg } from "../engine/svg-writer";
-import { imageCaption } from "../engine/image-caption";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { cjkFontFamily } from "../engine/font-stack";
+import { cjkClassForStyle } from "../engine/cjk-class";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
 import BeforeAfterOverlay from "./BeforeAfterOverlay";
+import { useSlideImageLayer } from "./SlideImageLayer";
 import { orderedNumbers } from "../engine/list-markers";
 import { titleFontPt } from "../engine/title-fit";
 
@@ -276,116 +277,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
-  // Image drag/resize (案B, 段階2): while a gesture is live, render from a LOCAL rect (smooth, no deck
-  // churn); commit ONCE on release (one undo entry). Pointer events (not HTML5 DnD — unreliable in the
-  // Tauri webview). Only on the active, editable card (onImageRectChange set = single-slide edit view).
-  const [dragRect, setDragRect] = useState<ImageRect | null>(null);
-  const dragRef = useRef<{ mode: "move" | "nw" | "ne" | "sw" | "se"; sx: number; sy: number; base: ImageRect; latest: ImageRect; moved: boolean } | null>(null);
-  const imgWrapRef = useRef<HTMLDivElement | null>(null);
-  // Preview drag/resize handles are for a BODY-FIGURE image. A BEHIND backdrop's handles would sit
-  // UNDER the content (unreachable), so it is fine-tuned via the form's numeric X/Y/W/H instead.
-  const imgEditable = !!(isActive && onImageRectChange && slide.image && imageBodyIdx);
-  // Aspect to preserve on resize — the SHARED helper (imageAspectRatio) so preview drag and the form
-  // lock to the identical ratio (WYSIWYG on resize too). Uses the bound placeholder box as the fallback.
-  const imgAspect = slide.image
-    ? imageAspectRatio(slide.image, imageRect(slide.image, layoutPhs.find((p) => p.idx === imageBodyIdx)))
-    : 1;
-  const beginImageDrag = (mode: "move" | "nw" | "ne" | "sw" | "se", base: ImageRect) => (e: React.PointerEvent) => {
-    if (!imgEditable) return;
-    e.stopPropagation(); e.preventDefault();
-    imgWrapRef.current?.setPointerCapture?.(e.pointerId);
-    dragRef.current = { mode, sx: e.clientX, sy: e.clientY, base, latest: base, moved: false };
-  };
-  const onImagePointerMove = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    if (!d) return;
-    if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) < 3) return; // click threshold
-    d.moved = true;
-    d.latest = dragImageRect(d.mode, d.base, (e.clientX - d.sx) / scale, (e.clientY - d.sy) / scale, imgAspect, SLIDE_W, SLIDE_H);
-    setDragRect(d.latest);
-  };
-  const endImageDrag = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    if (!d) return;
-    dragRef.current = null;
-    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-    if (d.moved) onImageRectChange!(d.latest);
-    setDragRect(null);
-  };
-  // The image box (drag-move + corner-resize when editable). Shared by the inline body-figure render and
-  // the behind (backmost) layer so both look/behave identically. `resolved` = the committed rect (live
-  // drag overrides it). object-fit comes from the SAME aspect resolver as the PPTX math (imageObjectFit ↔
-  // drawnImage) so preview == export — incl. an `ar`-less image (#417).
-  const renderImageBox = (resolved: ImageRect) => {
-    const img = slide.image!;
-    const box = dragRect ?? resolved;
-    const HANDLES: { c: "nw" | "ne" | "sw" | "se"; cursor: string; pos: React.CSSProperties }[] = [
-      { c: "nw", cursor: "nwse-resize", pos: { left: -5, top: -5 } },
-      { c: "ne", cursor: "nesw-resize", pos: { right: -5, top: -5 } },
-      { c: "sw", cursor: "nesw-resize", pos: { left: -5, bottom: -5 } },
-      { c: "se", cursor: "nwse-resize", pos: { right: -5, bottom: -5 } },
-    ];
-    return (
-      <div
-        key="image-layer"
-        ref={imgWrapRef}
-        onPointerDown={imgEditable ? beginImageDrag("move", resolved) : undefined}
-        onPointerMove={imgEditable ? onImagePointerMove : undefined}
-        onPointerUp={imgEditable ? endImageDrag : undefined}
-        style={{
-          position: "absolute",
-          left: `${(box.x / SLIDE_W) * 100}%`,
-          top: `${(box.y / SLIDE_H) * 100}%`,
-          width: `${(box.w / SLIDE_W) * 100}%`,
-          height: `${(box.h / SLIDE_H) * 100}%`,
-          cursor: imgEditable ? "move" : undefined,
-          touchAction: imgEditable ? "none" : undefined,
-          outline: imgEditable ? "1px solid rgba(59,130,246,0.7)" : undefined,
-        }}
-      >
-        <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-          <img src={img.src} alt={img.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: imageObjectFit(img), pointerEvents: "none" }} />
-        </div>
-        {imgEditable && HANDLES.map((h) => (
-          <div
-            key={h.c}
-            data-image-handle={h.c}
-            onPointerDown={beginImageDrag(h.c, resolved)}
-            style={{ position: "absolute", width: 9, height: 9, background: "#3B82F6", border: "1px solid #fff", borderRadius: 2, cursor: h.cursor, ...h.pos }}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  // The alt caption under a BODY-FIGURE image (#399) — the SAME imageCaption geometry the PPTX export
-  // uses (R8), following the live drag box so it stays under the image while it moves.
-  const renderImageCaption = (resolved: ImageRect, textColor: string) => {
-    const cap = imageCaption(slide.image!, dragRect ?? resolved, textColor);
-    if (!cap) return null;
-    const r = cap.rect;
-    return (
-      <div
-        key="image-caption"
-        data-image-caption="true"
-        style={{
-          position: "absolute",
-          left: `${(r.x / SLIDE_W) * 100}%`,
-          top: `${(r.y / SLIDE_H) * 100}%`,
-          width: `${(r.w / SLIDE_W) * 100}%`,
-          height: `${(r.h / SLIDE_H) * 100}%`,
-          fontSize: cap.fontPt * (scale / 72),
-          color: `#${cap.color}`,
-          textAlign: "center",
-          lineHeight: 1.2,
-          overflow: "hidden",
-          pointerEvents: "none",
-        }}
-      >
-        {cap.text}
-      </div>
-    );
-  };
+  // Image box + drag/resize editing (案B) — one gesture path for a body figure AND a behind layer (#122).
+  const { renderImageBox, renderImageChrome, renderImageCaption } = useSlideImageLayer({
+    slide, layoutPhs, scale, isActive, onImageRectChange, slideW: SLIDE_W, slideH: SLIDE_H,
+  });
+  const behindRect = slide.image?.behind ? imageRect(slide.image, imagePlaceholder(layoutPhs, slide.image.placeholderIdx)) : undefined;
 
   // Background = the LAYOUT's own <p:bg> fill if it declares one (a full-bleed cover panel — solid
   // color, brand IMAGE, or GRADIENT), else the master's. A <p:bg> is exactly one fill, so a layout
@@ -479,7 +375,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
       {/* BEHIND (最背面) image: a normal-sized figure painted AFTER the master/layout decorations but
           BEFORE the placeholder shapes, so existing title/body/figures stay on top (never the slide bg,
           never full-bleed — it rides its placeholder box). */}
-      {slide.image?.behind && renderImageBox(imageRect(slide.image, imagePlaceholder(layoutPhs, slide.image.placeholderIdx))!)}
+      {behindRect && renderImageBox(behindRect)}
 
       {/* SOLO diagram on a layout with NO body region: it is full-slide by design and needs no
           placeholder, but the loop below can only draw a diagram anchored on one — so without this it
@@ -681,7 +577,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               fontSize: (titlePt ?? s.fontSize) * (scale / 72),
               color: `#${s.fontColor}`,
               fontWeight: s.bold ? "bold" : "normal",
-              fontFamily: cjkFontFamily(resolveFontToken(s.fontName, themeFonts), s.eaFontName),
+              fontFamily: cjkFontFamily(resolveFontToken(s.fontName, themeFonts), s.eaFontName, cjkClassForStyle(s, themeFonts)),
               textAlign: s.align === "ctr"
                 ? "center"
                 : s.align === "r"
@@ -706,6 +602,9 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
       )}
       {/* #402 Before/After arrow + role labels — frontmost, the export's geometry (renders null otherwise) */}
       <BeforeAfterOverlay slide={slide} layout={layout} themeColors={themeColors} scale={scale} slideW={SLIDE_W} slideH={SLIDE_H} />
+
+      {/* #122: a BEHIND image's editing chrome (outline + handles) — frontmost so it stays grabbable. */}
+      {behindRect && renderImageChrome(behindRect)}
 
       {/* Slide number — preview only; the standalone-HTML shell provides its own counter */}
       {!exportMode && (

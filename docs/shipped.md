@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **`.scft` 開封時の version 互換ゲート** — `meta.json.version` を deck.json の検証より先に読み、現行より新しい版は `PROJECT_VERSION_TOO_NEW`（「アプリを更新してください」）で拒否、古い版は `PROJECT_MIGRATIONS` の表を順に適用し途中の段が欠ければ `PROJECT_VERSION_UNSUPPORTED` で明示。黙ってフォールバックしない。meta 破損は従来どおり既定値で開く。判定は純関数 `migrateProjectDeck` に一本化 （#121・PR #559・2026-11-07）
 - **長タイトルを枠に収まるまで縮小（R7 事前計算）＋下限でも溢れたら warn `title-overflow`** — title-fit.ts の `fitTitle` がテンプレのタイトルサイズから 1pt 刻みで下げ、収まる最大サイズを返す（下限＝元サイズ×0.7・幅見積りは図ラベル縮小と共有の draw-target #228）。export（run に `sz` を焼く）・preview・診断の 3 経路が同じ関数を読む（R8）。収まるタイトルは byte-identical。Issue repro は Midnight 28→22pt で全文表示、全角 36 字以上で warn（#437 案b・PR #552・2026-11-07）
 - **図の自動縮小が可読限界を割ったら warn `diagram-node-shrink`** — WBS 級 20 ノードの orgchart がノード 0.68×0.24in（ラベル 5pt）まで黙って縮んでいたのを、export と同じ `computeLayout`／`fitTransform`／`scaledFontSize` の結果を読むだけの観測モジュール（`diagram-node-shrink.ts`・R8 一致テスト）で検出し、分割・LR⇄TB・mindmap・表化を添えて警告。しきい値 7pt は描画器自身が意図して置く最小フォント（sublabel の floor）に根拠。単独図はテンプレ無しでも判定・本文横の図は枠 fit 込みで判定。配置・出力は不変 （#473・PR #523・2026-11-06）
 - **内蔵レイアウトに `+1Kicker` 変種を追加（`Kicker:` 行が既定テンプレで描画される）** — #404 のフィールド行機構は枠が無く同梱テンプレで未描画だったのを、`Content.1Body.Single+1Kicker`（`+1Callout` と同じ型・ヘッダ帯内でタイトルを下げ最上段に `Kicker.Top` idx40/fs13）を BUILTIN_LAYOUTS と Midnight 実体（再生成スクリプト `add-kicker-variant-layout.ts`・冪等）に追加して解消。既存レイアウト無改変・行なしデッキのスライド出力不変・レイアウト数 31→32 の golden 更新（ユーザ承認済） （#447・PR #472・2026-10-06）
@@ -77,6 +78,9 @@
 ## テンプレ・マスター
 
 - **開発用 Midnight 30 レイアウトのビルトイン同梱をやめ入力サンプル化（既定＝技術報告 スタンダード水色・内蔵 3 本）** — .pptx は `samples/templates/` へ。起動時の既定テンプレ読み込みをレジストリ経由の 1 本に統合（固定パス fetch と URL 二重定義を解消）し、失敗はトースト通知（never-silent）。テンプレ無し時の fallback から 30 種名の index 引きを除去（role で引く canonical 表・出力は不変）。Midnight を patch していた開発スクリプト 6 本を引退。#117／2026-11-07
+- **表スライドの自動レイアウト選択が表の推定高を見る** — マガジン型テンプレで表スライドが 0.9in の本文枠（`02_ステートメント`）に落ちて table-overflow になっていた（同点をカタログ順で決めていた）。`table-fit.ts` の `tableOverflow` を `table-overflow` 警告と自動選択の**両方**が使い（R8）、推定上溢れる候補の優先度を下げる。corpus 1072 枚の選択で変わったのは該当 3 枚だけ・table-overflow 3 → 0 （#444・PR #562・2026-11-07）
+- **未束縛の内容を取り込み結果バーに強警告で出し、診断で先頭テキストを名指す** — どの枠にも入らず出力時に消える内容（`unboundContent`）が、取り込みバーのチップ（スライド数）と詳細（スライド番号＋内容）に出る。`unbound-content` 診断は件数だけでなく先頭 20 字を言う。検出経路は増やさず既存の診断から拾う（R8） （#97・PR #561・2026-11-07）
+- **Re-make のロゴを背景ごとの変種（dark / light）で選ぶ** — 明背景用の濃色ロゴと暗背景用の白抜きロゴを持つマスターで、最頻出 1 枚を暗い表紙に載せて見えなくなっていた。`extractLogo` が載っていたレイアウトの背景輝度（パレット抽出と同じ `isDark`・R8）で集計し、dark 系レイアウトには dark 変種を使う。変種 1 枚のテンプレは byte-identical（fixture 16 本で実測） （#118・PR #569・2026-11-07）
 - **Midnight Executive の白タイトル不可視を修正** — 同梱テンプレの31レイアウト中19レイアウトが白タイトル背後のダーク下地を欠き、白×白で不可視だった（パーサ/束縛は正常＝テンプレアセットのみの不備）。正常12レイアウトと同一の `TitleBackdrop`（#1E2761）を title 幾何に合わせ最背面へ冪等移植（フォント/プレースホルダ/他テンプレ非改変）。「明色タイトルには暗色下地必須」を全同梱テンプレで恒久ガードする回帰テスト付き （#274・PR #278・2026-07-20）
 - **先頭章扉の表紙誤解決を根治** — `<!-- section -->` を先頭に書いた title-only 章扉が表紙レイアウトに auto 解決され round-trip でタイトルが消える既存バグを、`slideRoleRegions` の表紙分岐に `!sectionBreak` ゲート1本で選出側から根治（マーカー無しデッキは byte-identical） （#195・PR #199・2026-07-19）
 - **staticText のグループ変換合成（census 盲点の解消）** — `extractStaticTexts` がグループ（`<p:grpSp>` chOff/chExt スケール）内の生テキスト見出しを子座標のまま返し、幾何ベースの病理検出・ロール推定が「見た目キレイだがツールだけ誤読」する盲点を解消。`walkShapes` と同じ `composeXf` 合成則を共有（R8）し、副産物として walkShapes の自己マッチ再帰でグループ内装飾が全滅していた先在バグも `groupChildren` で根治。Dirty_Grouped の GAP テストをスライド座標側へ反転 （#142・PR #181・2026-07-19）
@@ -127,6 +131,7 @@
 
 ## スライド編集・画像
 
+- **最背面（`behind=1`）画像もプレビュー上で直接ドラッグ／リサイズ** — 編集 chrome（枠線＋角ハンドル）だけを最前面 overlay に描き、画像本体は最背面のまま。枠線の帯で移動・角で拡縮し、前面画像と同じジェスチャ経路（`image-gesture.ts`）と同じ編集幾何（`imageEditGeometry`・フォームの数値入力と一致テスト）を使う（R8）。前面画像の markup は byte-identical。e2e 1 本追加 （#122・PR #571・2026-11-07）
 - **便利スライド生成メニュー＝目次 live/static（ADR-0034）** — GUI から「既存コンテンツから便利スライドを生成」する枠を新設。目次を **live**（`derived:"toc"`・章に自動追随・直接編集不可）か **static**（章から1回焼いた普通の編集可能スライド・「作り直す」で明示再生成）で選んで挿入。導出は `tocPlaceholders`（scanSections/tocParagraphs）の単一経路を両モードが再利用（R8）。schema 非変更（live=既存 derived・static=通常スライド）。ADR-0032 D2 の「生成却下」をモード選択で解消（ADR-0034） （#277・PR #280・2026-07-20）
 - **目次タイトルの言語自動切替（目次／Table of Contents）** — `<!-- toc -->` 導出スライドの見出しが `目次` 固定だったのを、章タイトル群の文字種で切替（CJK を含めば「目次」・英語のみなら "Table of Contents"・章なしは既定「目次」）。判定は既存の `deckHasCjkText` を再利用し重複を作らない（R8）。engine 純関数で react-i18next を持ち込まず（R2）、派生タイトルは md へ書き戻さない（round-trip 不変） （#184・PR #234・2026-07-20）
 - **クロス doc 切替の snapshot データ損失を修正** — 複数ドキュメント切替時に他 doc の snapshot が現 doc の状態で上書きされ編集が失われる GUI コントローラのバグを修正 （#160・PR #173・2026-07-19）
@@ -140,6 +145,8 @@
 
 ## 協働・MCP
 
+- **MCP 編集経路と GUI 内蔵 AI 編集経路の一本化（R8）** — 図適用（`set_diagram` ⇄ `applyFigureYaml`）を `apply-slide-edit.ts` に共有し、一致テスト `edit-path-agreement` が両経路を同一入力で突き合わせる。残る差は裁定で統一: 図の追加でユーザの layout pin を外さない（A2）、`set_slide_markdown` が省かれた表・コードを旧スライドから持ち越し、壊れた図 YAML は `invalid-argument` で拒否して保存しない（B3）。タイトル自動復元・空編集の旧スライド維持は GUI の外殻に残す （#220・PR #564 #567・2026-11-07）
+- **レビュー規則の on/off トグル `set_review_rules`** — 句読点規則などを規則 id 単位で off にでき、off の規則は `get_deck_issues`・mutation の diagnostics・`get_slide_fix_request` に出ず、`activeReviewRules` には `level:"off"` で状態が見える（guide↔診断の一致を on/off 両方で固定）。既定は全 on で byte-identical。置き場は MCP パラメータ（deck 構造には入れない） （#247・PR #563・2026-11-07）
 - **PPTX 書き出しにネイティブ chart オプション（`export_pptx` の `charts: "native"`・段 1）** — pie / xychart（棒・折れ線・混在）/ radar を PptxGenJS `addChart` のネイティブ chart（埋め込みワークブック付き＝受け手が PowerPoint で「データの編集」できる）として出す。既定 `"shapes"` は従来の図形描画で byte-identical。マッパーは純関数 `pptx-native-chart.ts`、painter の layout とラベル・系列・値の一致テスト（R8）、chart XML は golden。プレビュー・HTML・`get_slide_image` は図形描画のまま＝近似と docs に明記。段 2（種類と記法の拡張）・段 3（既定切替）は実機確認後（ROADMAP「表現力の出口」） （#554・PR #556・2026-11-07）
 - **協働パネル「Claude Code に登録」をワンクリック実行に** — 固定引数の Rust コマンド（`claude mcp add --scope user slidecraft -- …`・webview から文字列を受けない）を、実行コマンド全文の確認ダイアログの後にだけ実行し、終了コードと stdout/stderr を表示。`claude` 未検出・失敗時は従来のコピーにフォールバックし理由を表示（never-silent）。Windows は `CREATE_NO_WINDOW`・60 秒打ち切り・出力 16KiB 制限。サーバ引数は `mcp_install_info` と同じ解決を共有（R8・fixture で TS と一致テスト） （#530・PR #555・2026-11-07）
 - **ホット系 MCP ツールの説明文を圧縮（tools/list 全体 −24%・ホット 16 本 −37%）** — 毎セッション送られる固定費のうち説明文を削り、削った契約（design-intent の op・docId/opId/expectedRev の扱い等）は `bootstrap.toolNotes` へ**移動**（削除ではない・ADR-0037「契約はサーバが語る」）。対応表 20 項目のチェックリストテストと文字数 ratchet（ホット 7,950 字・全体 17,800 字）で固定。ツール名・inputSchema の形は不変（スナップショット） （#513・PR #549・2026-11-07）
@@ -185,6 +192,8 @@
 
 ## リリース・配布
 
+- **release.yml が draft を 1 つだけ作る** — 3-OS matrix の各 leg が `tauri-action` の find-or-create で draft を競合作成していた（v0.5.0 で 2 draft）。先行ジョブ `create-release` が CHANGELOG 抽出と空ボディ検査を 1 回だけ行い draft を作成（再実行は再利用・複数 draft や公開済みタグは明示エラー）、matrix は `releaseId` で upload のみ。workflow の pin テスト 6 件 （#501・PR #560・2026-11-07）
+- **lockfile 更新用の npm を 11.21.2 に固定（`npm run npm:pinned`）** — npm 10.8.x〜11.0.0 が `edgesOut` クラッシュで `audit fix` / `install --package-lock-only` を実行できない。実測で 11.21.2 以降は正常、`npm@latest`（12 系）は node 20 非対応のため採らず。CI の `npm ci`（npm 10.8.2）が受理する lockfileVersion 3 を維持 （#495・PR #565・2026-11-07）
 - **Linux の .deb/.rpm が同梱 Node を `/usr/bin/slidecraft-node` として入れる（`/usr/bin/node` を占有しない）** — Tauri の externalBin が distro の `nodejs` パッケージと同じパスに入り衝突し得た。Linux だけ 2 枚目の overlay `tauri.bundle.linux.conf.json` でサイドカー名を変え、名前は `scripts/node-sidecar.mjs` に一本化（collab.rs・ランチャ・ci/release.yml は一致テストで固定）。CI の `verify-deb-launcher.mjs` が `usr/bin/node` の混入を失敗にする。v0.5.0 で `/usr/bin/node` を直接登録していた人の移行手順は docs/mcp-server.md （#527・PR #550・ADR-0022 Addendum・2026-11-07）
 - **v0.5.0 リリース** — Markdown 語彙の大幅拡張（インライン書式・番号付きリスト・フィールド行3種・比較/Before-After・カードアイコン・現在ステップ強調）・「黙って消える」挙動の一掃（never-silent 診断の面展開）・プレビュー忠実度（WYSIWYG）の底上げ・MCP の bootstrap（コールド1発読み）＋プロファイル別登録を束ねたマイナー版。3-OS installer＋`SHA256SUMS`/SBOM/build provenance を添付（**コード署名なし**・mac=ad-hoc/Win=未署名）、Homebrew cask（正典＋tap `homebrew-slidecraft`）を実 dmg の sha256 に更新。リリース直前に vite(high)/hono(moderate) をセキュリティ bump（PR #494）。工程で踏んだ穴は #476（bump-version が lockfile 群の自己 version を同期せず）/#495（ローカル npm 10.8.2 の edgesOut で install/audit-fix 不能）/#497（`extract-changelog-section` の main-module 判定が Windows で偽＝初回 cut の Windows leg を落とした根因・修正済）/#501（tauri-action の matrix 並列で draft 複数作成 race）に起票・対処 （CHANGELOG [0.5.0]／2026-10-22）
 - **v0.4.0 リリース** — MCP 視覚レビュー（`get_slide_image`/`get_slide_html`）・接続の単一化（adaptive front・ADR-0033）・便利スライド生成（目次 live/static・ADR-0034）・Mermaid 図の大幅拡張（矢印/generics/ノード形状/シーケンス注釈）・CJK フォント埋め込み・リリース完全性シグナルを束ねたマイナー版。v0.3.0（公開取消）の存続機能を畳み、AI 非決定 Re-make は撤去（ADR-0028）。3-OS installer＋`SHA256SUMS`/SBOM/build provenance を添付、Homebrew cask（正典＋tap `homebrew-slidecraft`）を実 dmg の sha256 に更新（**コード署名なし**・mac=ad-hoc/Win=未署名）。工程で踏んだ穴は #287（cask sha↔version セーフティ）/#288（tap ミラー自動化）/#289（リリースノート ADR リンク）/#290（タグ発火）に起票 （CHANGELOG [0.4.0]／2026-07-20）
