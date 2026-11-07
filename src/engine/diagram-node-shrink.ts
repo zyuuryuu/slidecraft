@@ -11,6 +11,7 @@
 
 import { loadYaml } from "./yaml-io";
 import { DiagramSpecSchema, type DiagramSpec } from "./schema";
+import type { SlideIR } from "./slide-schema";
 import { computeLayout } from "./layout-engine";
 import { fitTransform, scaledFontSize, type Box } from "./draw-target";
 import { resolveNodeStyle } from "./diagram-painter";
@@ -40,15 +41,43 @@ export interface DiagramNodeShrink {
   minLabelPt: number;
 }
 
-/** Parse a slide's ```diagram YAML the way export does (loadYaml + DiagramSpecSchema); undefined when
- *  it would not render. */
-export function parseDiagramYaml(yaml: string): DiagramSpec | undefined {
+export type DiagramParseResult = { ok: true; spec: DiagramSpec } | { ok: false; error: string };
+
+/** #587: parse a slide's ```diagram YAML the way export does (loadYaml + DiagramSpecSchema), KEEPING the
+ *  failure reason (zod `path: message` per issue, or the YAML load error) so a figure that would not
+ *  render is reported, never silently skipped. The ONE parse path — parseDiagramYaml wraps it (R8). */
+export function parseDiagramYamlResult(yaml: string): DiagramParseResult {
+  let raw: unknown;
   try {
-    const r = DiagramSpecSchema.safeParse(loadYaml(yaml));
-    return r.success ? r.data : undefined;
-  } catch {
-    return undefined;
+    raw = loadYaml(yaml);
+  } catch (e) {
+    return { ok: false, error: `YAML: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}` };
   }
+  const r = DiagramSpecSchema.safeParse(raw);
+  if (r.success) return { ok: true, spec: r.data };
+  return { ok: false, error: r.error.issues.map((x) => `${x.path.join(".") || "(root)"}: ${x.message}`).join(" / ") };
+}
+
+/** Parse a slide's ```diagram YAML; undefined when it would not render (reason: parseDiagramYamlResult). */
+export function parseDiagramYaml(yaml: string): DiagramSpec | undefined {
+  const r = parseDiagramYamlResult(yaml);
+  return r.ok ? r.spec : undefined;
+}
+
+/** #587: the never-silent message for a figure DiagramSpecSchema rejects, or undefined when it parses.
+ *  Shared by get_deck_issues and validate_deck so the judgment and wording are defined once (R8). */
+export function diagramInvalidReason(yaml: string): string | undefined {
+  const r = parseDiagramYamlResult(yaml);
+  return r.ok ? undefined : `図（\`\`\`diagram）が不正なため描画されません: ${r.error}（構文は get_diagram_guide）`;
+}
+
+/** #587: every slide whose ```diagram would not render, with the same message (validate_deck's gate;
+ *  get_deck_issues reports the same per slide as diagram-invalid). slideIndex is 0-based like theirs. */
+export function invalidDiagrams(slides: readonly SlideIR[]): { slideIndex: number; message: string }[] {
+  return slides.flatMap((sl, i) => {
+    const message = sl.diagram && diagramInvalidReason(sl.diagram.yaml);
+    return message ? [{ slideIndex: i, message }] : [];
+  });
 }
 
 /**

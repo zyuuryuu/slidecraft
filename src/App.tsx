@@ -28,7 +28,8 @@ import { useDeckRefine } from "./components/useDeckRefine";
 import { pickBinaryFile, confirmDialog, runningInTauri } from "./ipc/commands";
 import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { openDocs } from "./ipc/docs";
-import { describeRepairPlan } from "./components/apply-template";
+import { describeRepairPlan, describeAugmentPlan } from "./components/apply-template";
+import type { AugmentPlan } from "./engine/layout-augment-plan";
 import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
 import UpdateBanner from "./components/UpdateBanner";
 import { useUpdateBanner } from "./components/useUpdateBanner";
@@ -58,13 +59,13 @@ export default function App() {
     subMode, showLlmAssist, setShowLlmAssist, showAiPanel, setShowAiPanel,
     slideEditView, setSlideEditView, mdText, deck, templateData, parseError, editNotice, setEditNotice, generating,
     filePath, activeSlide, setActiveSlide, selected, setSelected, selectSlide, gotoLine, templateName,
-    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsAdjusted,
+    undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsAugmented, applyMasterBytesAsAdjusted,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleStartEditing, handleEnterImport, handleCancelInitialize,
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     handleGenerateToc, handleRegenerateStaticToc,
-    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd,
+    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
   } = useDeckController();
@@ -137,6 +138,21 @@ export default function App() {
       setIntakeBusy(null);
     }
   }, [intakeBusy, registerMaster, applyMasterBytesAsRemake, showIntake, t]);
+  // #568「テンプレを強化」: 有効なテンプレに無い N 列レイアウトを合成 → 確認 → 検査ゲート → 派生 bytes を登録。
+  const handleAugmentMaster = useCallback(async (plan: AugmentPlan) => {
+    if (intakeBusy || !templateData) return;
+    if (!(await confirmDialog(describeAugmentPlan(plan), t("app.augmentTemplateTitle")))) return;
+    setIntakeBusy({ mode: "augment", phase: { phase: "composing" } });
+    try {
+      const name = templateName || "template";
+      const r = await applyMasterBytesAsAugmented(await templateData.zip.generateAsync({ type: "uint8array" }), name);
+      if (!r.ok || !r.augmentedBytes) { if (r.reason) setEditNotice(r.reason); return; }
+      setMasterId(registerMaster(name + t("app.augmentSuffix"), r.augmentedBytes).id);
+      if (r.summary) showIntake({ mode: "augment", name, summary: r.summary, ts: Date.now() });
+    } finally {
+      setIntakeBusy(null);
+    }
+  }, [intakeBusy, templateData, templateName, applyMasterBytesAsAugmented, registerMaster, showIntake, setEditNotice, t]);
   // テンプレ調整（#570 段 2）: 今のマスター＋レシピ → 派生をプレビューに即反映し、適用で「（調整）」として登録。
   const adjust = useTemplateAdjust({
     masters, masterId, getMasterBytes, registerMaster, setMasterId, deck,
@@ -458,6 +474,7 @@ export default function App() {
         onDismiss={() => setIntakeDismissed(true)}
         template={templateData}
         unbound={diagnostics.filter((d) => d.id === "unbound-content")}
+        onAugment={editLocked || !!adjust.session ? undefined : handleAugmentMaster}
       />
       {adjust.session && (
         <TemplateAdjustPanel session={adjust.session} busy={adjust.busy} onPreview={adjust.preview}
@@ -573,6 +590,7 @@ export default function App() {
           <AiPanel
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
+            currentSlideFields={currentSlideFields}
             onApplySlide={handleApplySlide}
             onPreviewSlideEdit={previewSlideEdit}
             activeSlideNum={activeSlide + 1}

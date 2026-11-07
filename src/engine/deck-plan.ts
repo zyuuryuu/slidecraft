@@ -14,6 +14,7 @@ import type { DeckIR, SlideIR, PlaceholderContent, Paragraph } from "./slide-sch
 import { parseJsonLoose } from "./json-salvage";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { templateKinds, type LayoutCatalog } from "./template-catalog";
+import { stripViolations, stripDeck, finalizeDeckDraft, type DraftResult } from "./deck-plan-violations";
 
 /** A Mermaid string → a native diagram block (if it parses) or an image fallback. */
 function mermaidToFigure(mmd: string): Pick<SlideIR, "diagram" | "mermaidBlock"> {
@@ -218,6 +219,13 @@ export function parseDeckPlan(input: unknown): ParseResult {
  * round-trip.)
  */
 export function extractDeckPlan(text: string): ParseResult {
+  const d = draftDeckPlan(text);
+  return d.ok ? finalizeDeckDraft(d.draft) : d;
+}
+
+/** The validated + violation-stripped deck BEFORE noise pruning, with per-slide violation records —
+ *  the hook point for regenerating only the violating slides (Issue #107). */
+export function draftDeckPlan(text: string): DraftResult {
   const r = parseJsonLoose(text);
   if (!r.ok) return { ok: false, error: "Invalid JSON: " + r.error };
   const rec = asRecord(r.value);
@@ -238,125 +246,33 @@ export function extractDeckPlan(text: string): ParseResult {
     const title = rec2 && rec2.title != null ? String(rec2.title) : "";
     if (title) slides.push({ kind: "content", title, bullets: [] }); // keep the slide, drop the broken body
   }
-  // Reject text units poisoned by an unrecoverable character (violation-drop), THEN prune the noise.
-  let dropped = 0;
-  const stripped = slides.map((s) => {
-    const r = stripViolations(s);
-    dropped += r.dropped;
-    return r.slide;
-  });
-  const cleaned = cleanupSlidePlans(stripped);
-  if (cleaned.length === 0) return { ok: false, error: "No usable slides in the generated plan." };
-  const notices = dropped > 0 ? [`書式違反（復元不能な文字）により ${dropped} か所を除外しました。`] : undefined;
-  return { ok: true, plan: { slides: cleaned }, ...(notices ? { notices } : {}) };
-}
-
-// U+FFFD is json-salvage's marker for an unrecoverable character (a malformed \uXXXX or a lone
-// surrogate). It must NEVER reach a slide — treat any text carrying it as a format violation.
-const CORRUPT = "�";
-const hasCorrupt = (v: string | undefined): boolean => !!v && v.includes(CORRUPT);
-
-/**
- * Drop, at the SMALLEST grain, any text unit poisoned by U+FFFD. A weak model that violated the
- * "raw UTF-8, never \uXXXX" instruction produced untrustworthy text — reject the offending bullet /
- * field (a scalar field is blanked; a list item is removed; a table cell is blanked to keep the grid)
- * rather than ship a `�` marker or a silently-wrong word. Returns the cleaned slide + units dropped.
- */
-function stripViolations(s: SlidePlan): { slide: SlidePlan; dropped: number } {
-  let dropped = 0;
-  const scalar = (v: string): string => {
-    if (hasCorrupt(v)) { dropped++; return ""; }
-    return v;
-  };
-  const opt = (v: string | undefined): string | undefined => (v === undefined ? undefined : scalar(v));
-  const list = (arr: string[]): string[] => {
-    const kept = arr.filter((x) => !hasCorrupt(x));
-    dropped += arr.length - kept.length;
-    return kept;
-  };
-  let slide: SlidePlan;
-  switch (s.kind) {
-    case "title":
-      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle), category: opt(s.category), date: opt(s.date), footer: opt(s.footer) };
-      break;
-    case "section":
-      slide = { ...s, title: scalar(s.title) };
-      break;
-    case "content":
-      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle), bullets: list(s.bullets) };
-      break;
-    case "columns":
-      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle),
-        columns: s.columns.map((c) => ({ heading: opt(c.heading), bullets: list(c.bullets) })) };
-      break;
-    case "table":
-      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle),
-        headers: s.headers.map(scalar), rows: s.rows.map((r) => r.map(scalar)) };
-      break;
-    case "diagram":
-      // mermaid is structural (a corrupt char can't be removed without breaking syntax) — left intact.
-      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle) };
-      break;
-    case "closing":
-      slide = { ...s, title: scalar(s.title), subtitle: opt(s.subtitle), bullets: list(s.bullets) };
-      break;
-  }
-  return { slide, dropped };
-}
-
-/** A slide carries no content — pure noise a weak model emitted. Title-only slides are NOT empty
- *  (a title/section IS the content); this only catches slides with neither a title nor a body. */
-function isEmptyPlan(s: SlidePlan): boolean {
-  if (s.title.trim()) return false;
-  switch (s.kind) {
-    case "title": return !s.subtitle && !s.category && !s.date && !s.footer;
-    case "section": return true; // no title → an empty divider
-    case "content": return s.bullets.length === 0 && !s.subtitle;
-    case "columns": return s.columns.every((c) => !c.heading && c.bullets.length === 0);
-    case "table": return s.headers.length === 0 && s.rows.length === 0;
-    case "diagram": return !s.mermaid.trim();
-    case "closing": return !s.subtitle && s.bullets.length === 0;
-  }
-}
-
-/** Drop noise a weak model repeats: empty-title section dividers and slides with no content at all,
- *  and collapse consecutive duplicate section titles (`第1部` / `第1部` → one). Preserves everything
- *  that carries data. */
-function cleanupSlidePlans(slides: SlidePlan[]): SlidePlan[] {
-  const out: SlidePlan[] = [];
-  for (const s of slides) {
-    if (isEmptyPlan(s)) continue;
-    if (s.kind === "section") {
-      const prev = out[out.length - 1];
-      if (prev && prev.kind === "section" && prev.title.trim() === s.title.trim()) continue;
-    }
-    out.push(s);
-  }
-  return out;
+  // Reject text units poisoned by an unrecoverable character (violation-drop); pruning is in finalize.
+  return { ok: true, draft: stripDeck(slides) };
 }
 
 export type SlideParseResult =
   | { ok: true; slide: SlidePlan }
   | { ok: false; error: string };
 
-/**
- * Parse + validate ONE slide from raw model output (a single JSON Slide object).
- * Used by per-slide AI edits, where only that slide is sent + returned — far
- * cheaper in tokens than regenerating the whole deck.
- */
-export function extractSlidePlan(text: string): SlideParseResult {
+/** Parse + validate ONE slide (a single JSON Slide object, or a {slides:[one]} wrapper) WITHOUT
+ *  the violation-drop — callers decide what a violation means (strip it, or reject the slide). */
+export function parseSlidePlanRaw(text: string): SlideParseResult {
   const jr = parseJsonLoose(text);
   if (!jr.ok) return { ok: false, error: "Invalid JSON: " + jr.error };
-  const data = jr.value;
-  // Tolerate a {slides:[one]} wrapper or a bare slide object.
-  const rec = asRecord(data);
-  const candidate = rec && Array.isArray(rec.slides) ? rec.slides[0] : data;
+  const rec = asRecord(jr.value);
+  const candidate = rec && Array.isArray(rec.slides) ? rec.slides[0] : jr.value;
   const r = SlidePlanSchema.safeParse(coerceSlide(candidate));
-  if (r.success) return { ok: true, slide: stripViolations(r.data).slide };
+  if (r.success) return { ok: true, slide: r.data };
   return {
     ok: false,
     error: r.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "),
   };
+}
+
+/** Parse + validate ONE slide from raw model output, dropping violating text units (the floor). */
+export function extractSlidePlan(text: string): SlideParseResult {
+  const r = parseSlidePlanRaw(text);
+  return r.ok ? { ok: true, slide: stripViolations(r.slide).slide } : r;
 }
 
 // ── Deterministic salvage of common weak-model mistakes ──

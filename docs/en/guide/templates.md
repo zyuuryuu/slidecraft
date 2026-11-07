@@ -114,6 +114,12 @@ Each placeholder in a PPTX carries a role, such as `<p:ph type="title">`. When t
 
 ---
 
+## 2-b. Adding missing column layouts (Augment template)
+
+If an imported template has **no 3-column (or 2-column) body layout**, a 3-column slide is placed on the closest 2-box layout and some content may not fit. The intake bar's **"Augment template (add 3-column)"** copies the template's basic title-plus-one-body layout, splits the body into equal-width columns and **adds only that new layout** (named `<original layout name> +3Body`). Fonts, colors, decorations and the footer are inherited from the master; the body text size steps down the PowerPoint size list by one step for 2 columns and two steps for 3 columns (e.g. 16pt → 12pt in 3 columns). Existing layouts are left untouched; before applying, the result is reloaded and checked that the existing layouts read the same, the new layout reads as N columns, and the editor fields map 1:1 to its boxes. The original `.pptx` is not rewritten — the augmented template is registered as a separate master marked "(augmented)". When the template has no basic layout to build from, the reason is shown instead of the button. The review panel's "this template has no 3-column layout" hint (rule `missing-column-layout`) points to the same feature.
+
+---
+
 ## 3. Creating a template from scratch
 
 Even without a template on hand, you can generate and register a new template `.pptx` from zero **just by picking colors and fonts**. Open the creation modal from **"＋ Create a template…"** in the master picker.

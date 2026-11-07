@@ -9,6 +9,7 @@
  * plain Node and stays out of the Vite/R5 golden surface.
  */
 import { DeckIRSchema, type DeckIR, type SlideIR } from "../engine/slide-schema";
+import { invalidDiagrams } from "../engine/diagram-node-shrink";
 import { type TemplateData, autoSelectLayout, loadTemplate } from "../engine/template-loader";
 import { buildCatalog, deckCapabilities, assessTemplateHealth, type LayoutCatalog } from "../engine/template-catalog";
 import { openProject, bundleProject } from "../engine/project-io";
@@ -384,9 +385,11 @@ export function validate(s: Session) {
   const check = DeckIRSchema.safeParse(deck);
   const deckErrors = check.success ? [] : check.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`);
   const blocked = unconvertibleMermaidSlides(deck);
+  const diagramErrors = invalidDiagrams(deck.slides); // #587: a rejected ```diagram exports empty → not ok
   return {
-    ok: deckErrors.length === 0,
+    ok: deckErrors.length === 0 && diagramErrors.length === 0,
     deckErrors,
+    diagramErrors,
     exportReadiness: blocked.length ? ("blocked" as const) : ("native-ok" as const),
     unconvertibleMermaidSlides: blocked,
   };
