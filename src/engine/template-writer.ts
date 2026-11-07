@@ -146,14 +146,16 @@ const BODY_BULLET = `<a:buFont typeface="Arial" pitchFamily="34" charset="0"/><a
 // lvl1 だけは段落間スペーシングも焼き、長文箇条書きが「壁テキスト」に見えるのを防ぐ。
 export const BODY_BULLET_PPR = `<a:spcBef><a:spcPts val="600"/></a:spcBef>` + BODY_BULLET;
 
-// #577: 箇条の字下げ。書かないと入れ子段が字下げ 0・記号なしの組み込み既定に戻り、lvl1 の本文より左に出る。
-// lvl1 は修正前の描画位置（LibreOffice 実測: 記号 +0.3cm・本文 +1.2cm）と等価な値を明示して位置を保ち、
-// lvl2〜5 は 1 段ごとに nestedLevelIndentPt（プレビューと同じ規則・R8）だけ右へずらす。吊り下げ（indent）は全段同じ。
-const BODY_LVL1_MARL = 431800; // 1.2cm（本文の開始位置）
+// #577: 入れ子段（lvl2〜5）の字下げ。書かないと字下げ 0・記号なしの組み込み既定に戻り、lvl1 の本文より左に出る。
+// lvl1 には書かない（修正前と byte-identical・PR #584 裁定 E）: md-to-ooxml は記号なし段落に buNone しか
+// 書かない（#103）ので、lvl1 に marL/indent を書くと見出し（SlideTitle.Header）等の記号なし段落まで +8.5pt ずれる。
+// 基準は lvl1 の描画位置（marL 省略時の既定・LibreOffice 実測で記号 0.3cm・本文 1.2cm）と等価な値で、
+// 1 段ごとに nestedLevelIndentPt（プレビューと同じ規則・R8）だけ右へずらす。吊り下げ（indent）は全段同じ。
+const BODY_LVL1_MARL = 431800; // 1.2cm（lvl1 本文の描画位置）
 const BODY_HANGING_INDENT = -323850; // 記号を本文の 0.9cm 左（＝0.3cm）に吊り下げる
 const EMU_PER_PT = 12700;
 
-/** bodyStyle の lvl`n`pPr の字下げ属性（n = 1〜5）。 */
+/** bodyStyle の lvl`n`pPr の字下げ属性（n = 2〜5）。 */
 function bodyIndentAttrs(n: number): string {
   return ` marL="${BODY_LVL1_MARL + Math.round(nestedLevelIndentPt(n - 1) * EMU_PER_PT)}" indent="${BODY_HANGING_INDENT}"`;
 }
@@ -177,10 +179,10 @@ function nestedLevelsXml(level1Sz: number, master = false): string {
 }
 
 function masterStyleXml(tag: string, base: MasterStyle, spec: TemplateSpec): string {
-  // タイトルは単一行想定のためバレットを明示的に抑制。本文（bodyStyle）のみ既定バレットと字下げを持つ。
+  // タイトルは単一行想定のためバレットを明示的に抑制。本文（bodyStyle）のみ既定バレットを持つ（字下げは lvl2〜5 だけ）。
   const isBody = tag === "bodyStyle";
   const pPrExtra = isBody ? BODY_BULLET_PPR : `<a:buNone/>`;
-  return `<p:${tag}><a:lvl1pPr algn="l"${isBody ? bodyIndentAttrs(1) : ""}>${pPrExtra}<a:defRPr sz="${base.sz}"${base.bold ? ` b="1"` : ""}>` +
+  return `<p:${tag}><a:lvl1pPr algn="l">${pPrExtra}<a:defRPr sz="${base.sz}"${base.bold ? ` b="1"` : ""}>` +
     `<a:solidFill><a:srgbClr val="${spec.palette[base.color]}"/></a:solidFill>` +
     `<a:latin typeface="${escXml(spec.fonts[base.font])}"/></a:defRPr></a:lvl1pPr>` +
     `${isBody ? nestedLevelsXml(base.sz, true) : ""}</p:${tag}>`;
