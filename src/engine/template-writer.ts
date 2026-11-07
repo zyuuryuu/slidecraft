@@ -15,6 +15,7 @@ import {
   type PaletteKey,
 } from "./template-layout-library";
 import { BUILTIN_ROLE_DESCR_PREFIX } from "./template-catalog";
+import { nestedLevelFontSize } from "./nested-level-font";
 
 /** A logo image lifted from a source master (Re-make). Injected onto the dark-family layouts
  *  (cover/section/closing) — where corporate templates show their logo — as a native <p:pic>. */
@@ -145,12 +146,27 @@ export const BODY_BULLET_PPR =
   `<a:spcBef><a:spcPts val="600"/></a:spcBef>` +
   `<a:buFont typeface="Arial" pitchFamily="34" charset="0"/><a:buChar char="•"/>`;
 
+// #574: 入れ子箇条の段（lvl2〜5）のサイズ。書かないと presentation 既定（PowerPoint 組み込み 18pt）に
+// 戻り、本文 14pt より大きく描かれる。値はプレビューと同じ段階縮小の規則（nested-level-font.ts）から導く。
+// sz 以外（色・フォント・字下げ・記号）は従来どおり継承に任せる（md-to-ooxml は lvl 属性だけを書く）。
+const NESTED_BODY_LEVELS = [2, 3, 4, 5];
+
+/** lvl1 の sz（centipoints）から導いた lvl2〜5 の `<a:lvlNpPr>`（sz のみ）。 */
+function nestedLevelsXml(level1Sz: number): string {
+  return NESTED_BODY_LEVELS.map((n) => {
+    const sz = Math.round(nestedLevelFontSize(level1Sz / 100, n - 1) * 100);
+    return `<a:lvl${n}pPr><a:defRPr sz="${sz}"/></a:lvl${n}pPr>`;
+  }).join("");
+}
+
 function masterStyleXml(tag: string, base: MasterStyle, spec: TemplateSpec): string {
   // タイトルは単一行想定のためバレットを明示的に抑制。本文（bodyStyle）のみ既定バレットを持つ。
-  const pPrExtra = tag === "bodyStyle" ? BODY_BULLET_PPR : `<a:buNone/>`;
+  const isBody = tag === "bodyStyle";
+  const pPrExtra = isBody ? BODY_BULLET_PPR : `<a:buNone/>`;
   return `<p:${tag}><a:lvl1pPr algn="l">${pPrExtra}<a:defRPr sz="${base.sz}"${base.bold ? ` b="1"` : ""}>` +
     `<a:solidFill><a:srgbClr val="${spec.palette[base.color]}"/></a:solidFill>` +
-    `<a:latin typeface="${escXml(spec.fonts[base.font])}"/></a:defRPr></a:lvl1pPr></p:${tag}>`;
+    `<a:latin typeface="${escXml(spec.fonts[base.font])}"/></a:defRPr></a:lvl1pPr>` +
+    `${isBody ? nestedLevelsXml(base.sz) : ""}</p:${tag}>`;
 }
 
 // マスターの標準 placeholder 5種（継承の祖先）。レイアウト側 ph は全て明示 xfrm を持つため
@@ -199,8 +215,11 @@ function phLstStyle(ph: LayoutPhDef, spec: TemplateSpec): string {
   if (ph.color !== base.color) rPrChildren += `<a:solidFill><a:srgbClr val="${spec.palette[ph.color]}"/></a:solidFill>`;
   if (ph.font !== base.font) rPrChildren += `<a:latin typeface="${escXml(spec.fonts[ph.font])}"/>`;
   if (ph.align !== "l") pPrAttrs += ` algn="${ph.align}"`;
-  if (!rPrAttrs && !rPrChildren && !pPrAttrs) return `<a:lstStyle/>`;
-  return `<a:lstStyle><a:defPPr${pPrAttrs}><a:defRPr${rPrAttrs}>${rPrChildren}</a:defRPr></a:defPPr></a:lstStyle>`;
+  // #574: 本文系の枠が lvl1 サイズを master から変えるなら、入れ子段もその枠の lvl1 から導いて書く。
+  // 書かないと master の lvl2〜5（14pt 基準）を継承し、10〜12pt の枠では入れ子が親より大きくなる（#449 と同じ逆転）。
+  const nested = !isTitleType && sz !== base.sz ? nestedLevelsXml(sz) : "";
+  if (!rPrAttrs && !rPrChildren && !pPrAttrs) return `<a:lstStyle/>`; // nested は sz 差があるときだけ＝ここには来ない
+  return `<a:lstStyle><a:defPPr${pPrAttrs}><a:defRPr${rPrAttrs}>${rPrChildren}</a:defRPr></a:defPPr>${nested}</a:lstStyle>`;
 }
 
 function phShapeXml(ph: LayoutPhDef, spec: TemplateSpec, shapeId: number): string {
