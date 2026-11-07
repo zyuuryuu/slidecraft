@@ -52,9 +52,11 @@ Prerequisites: Node.js 20+ / Rust 1.70+ / on Linux, `libgtk-3-dev libwebkit2gtk-
 
 ```bash
 git clone git@github.com:zyuuryuu/slidecraft.git
-cd slidecraft && npm install
+cd slidecraft && npm ci
 npm run tauri dev    # Launches Tauri + Vite together (npm run dev is the browser demo)
 ```
+
+To add or update dependencies (anything that rewrites `package-lock.json`), use `npm run npm:pinned -- <npm args>` — npm 10.8–11.0 (including the npm bundled with Node 20) crash on this repo's tree ([#495](https://github.com/zyuuryuu/slidecraft/issues/495)). See [RELEASING.md](RELEASING.md#依存の更新lockfile-を書き換える操作).
 
 ## Development commands
 

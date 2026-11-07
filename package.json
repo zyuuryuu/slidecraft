@@ -27,6 +27,7 @@
     "sbom": "npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json",
     "version:check": "node scripts/bump-version.mjs --check",
     "version:set": "node scripts/bump-version.mjs",
+    "npm:pinned": "npx -y npm@11.21.2",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
