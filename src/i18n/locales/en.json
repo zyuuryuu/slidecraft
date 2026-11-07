@@ -312,7 +312,10 @@
     "previewTitle": "Layout previews (dummy content)",
     "moreLayouts": "+{{count}} more layouts",
     "sampleTitle": "Title",
-    "sampleBody": "Sample body text"
+    "sampleBody": "Sample body text",
+    "unboundChip": "{{count}} slide(s) with unbound content (dropped on export)",
+    "unboundTitle": "Content no placeholder can hold (dropped on export with this template)",
+    "unboundItem": "Slide {{slide}}: {{message}}"
   },
   "lang": {
     "name": "English",

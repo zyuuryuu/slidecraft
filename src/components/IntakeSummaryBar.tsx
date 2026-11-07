@@ -7,6 +7,10 @@
  *    「詳細」toggle that expands the full breakdown: the AI mapping table (source → canonical base + the
  *    reason, the data plumbed in ADR-0026 §9.1), extracted theme (fonts + palette + logo), repairs, and
  *    any health findings. Dismissable; re-openable from the MasterPicker ⓘ.
+ *  - #97 (master-intake.md §2 部品2・P1 可視性不変条件): if the current deck has content that no
+ *    placeholder of the applied template can hold (it would vanish on export), a STRONG warning chip in
+ *    the summary row + the per-slide list in 「詳細」. The data is the deck diagnostics' own
+ *    `unbound-content` issues, passed in as-is — no second detection path (R8).
  *
  * Pure presentation — all data comes from apply-template's IntakeSummary + the AI result fields.
  */
@@ -17,6 +21,7 @@ import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
 import { findLayout, type TemplateData } from "../engine/template-loader";
 import { parseMd } from "../engine/md-parser";
 import type { DeckIR } from "../engine/slide-schema";
+import type { DeckIssue } from "../engine/deck-diagnostics";
 
 // A mini WYSIWYG preview of a re-made layout: the SAME SlideCard the editor uses, rendered tiny with a
 // dummy-filled sample slide — so the user SEES what each mapped layout looks like, not just its name.
@@ -108,7 +113,10 @@ function Swatches({ palette }: { palette: string[] }) {
   );
 }
 
-export function Detail({ result, template, sample }: { result: IntakeResult; template?: TemplateData | null; sample?: DeckIR | null }) {
+/** How many distinct slides carry an unbound-content issue (a slide may have both a row and a body one). */
+const unboundSlideCount = (unbound: readonly DeckIssue[]) => new Set(unbound.map((u) => u.slideIndex)).size;
+
+export function Detail({ result, template, sample, unbound = [] }: { result: IntakeResult; template?: TemplateData | null; sample?: DeckIR | null; unbound?: readonly DeckIssue[] }) {
   const { t } = useTranslation();
   const s = result.summary;
   const layouts = template?.layouts ?? [];
@@ -116,6 +124,14 @@ export function Detail({ result, template, sample }: { result: IntakeResult; tem
   const showThumbs = !!template && !!sample && sample.slides.length > 0 && shown.length > 0;
   return (
     <div className="px-3 pb-2.5 pt-1 text-xs text-fg2 space-y-2 max-h-[46vh] overflow-y-auto">
+      {unbound.length > 0 && (
+        <div>
+          <div className="text-red-400">{t("intake.unboundTitle")}</div>
+          <ul className="list-disc list-inside text-red-300/90 space-y-0.5">
+            {unbound.map((u, i) => <li key={i}>{t("intake.unboundItem", { slide: u.slideIndex + 1, message: u.message })}</li>)}
+          </ul>
+        </div>
+      )}
       {s.theme && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-muted">{t("intake.theme")}:</span>
@@ -151,13 +167,15 @@ export function Detail({ result, template, sample }: { result: IntakeResult; tem
 }
 
 export default function IntakeSummaryBar({
-  busy, result, onDismiss, template,
+  busy, result, onDismiss, template, unbound = [],
 }: {
   busy: IntakeBusy | null;
   result: IntakeResult | null;
   onDismiss: () => void;
   /** The active (just-intaken) template — used to render mini WYSIWYG previews of its layouts. */
   template?: TemplateData | null;
+  /** #97: the deck's `unbound-content` diagnostics under this template (content that would vanish). */
+  unbound?: readonly DeckIssue[];
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -176,6 +194,7 @@ export default function IntakeSummaryBar({
     !!s?.theme ||
     (result.mode === "import" && (s?.repairs ?? 0) > 0) ||
     (s?.findings.length ?? 0) > 0 ||
+    unbound.length > 0 ||
     (template?.layouts?.length ?? 0) > 0 // mini-previews of the template's layouts
   );
 
@@ -202,6 +221,11 @@ export default function IntakeSummaryBar({
                 {result.summary.status === "ok" ? "✓" : result.summary.status === "degraded" ? "△" : "✕"} {t(`intake.status.${result.summary.status}`)}
               </span>
               <span className="text-fg2">{t("intake.layoutCount", { count: result.summary.layoutCount })}</span>
+              {unbound.length > 0 && (
+                <span data-testid="intake-unbound" className="text-red-400 font-semibold">
+                  ⚠ {t("intake.unboundChip", { count: unboundSlideCount(unbound) })}
+                </span>
+              )}
               <div className="flex-1" />
               {hasDetail && (
                 <button onClick={() => setOpen((v) => !v)} className="text-accent-soft hover:text-fg px-1">
@@ -210,7 +234,7 @@ export default function IntakeSummaryBar({
               )}
               <button onClick={onDismiss} title={t("intake.dismiss")} className="text-muted hover:text-fg text-base leading-none px-1">×</button>
             </div>
-            {open && hasDetail && <Detail result={result} template={template} sample={sample} />}
+            {open && hasDetail && <Detail result={result} template={template} sample={sample} unbound={unbound} />}
           </>
         ) : null}
       </div>
