@@ -15,7 +15,8 @@ import { openProject, bundleProject } from "../engine/project-io";
 import { parseMdReport } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { distillDeckReport, contentBodyBox, buildIndexMap } from "../engine/distill";
-import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue } from "../engine/deck-diagnostics";
+import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue, type ReviewRuleId } from "../engine/deck-diagnostics";
+import { withoutDisabledRules as rulesOn, disabledRuleIds } from "../engine/review-rule-toggle";
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { mermaidToDiagramSpec, validateDiagramSource, type DiagramFormat } from "../engine/mermaid-to-diagram";
@@ -38,10 +39,11 @@ export interface Session {
   // reconstruct these from s.deck alone, so they're captured at parse time and merged into every
   // later diagnostics read (getDiagnostics / fitTail) until the affected slide is re-parsed.
   parseNotices: SlideParseNotice[];
+  disabledReviewRules: Set<ReviewRuleId>; // #247: off にしたレビュー規則（MCP set_review_rules・deck には保存しない）
 }
 
 export function createSession(root: string | null = null): Session {
-  return { root, deck: null, template: null, catalog: undefined, meta: { templateName: "" }, dirty: false, parseNotices: [] };
+  return { root, deck: null, template: null, catalog: undefined, meta: { templateName: "" }, dirty: false, parseNotices: [], disabledReviewRules: new Set() };
 }
 
 interface Loaded {
@@ -98,7 +100,7 @@ export async function openProjectBytes(s: Session, bytes: Uint8Array) {
   s.meta = { templateName: meta.templateName, savedAt: meta.savedAt };
   s.dirty = false;
   s.parseNotices = []; // an opened .pptx isn't Markdown-parsed — no parse-time notices apply
-  return { slideCount: deck.slides.length, diagnostics: diagnoseDeck(deck, s.catalog, template.layouts) };
+  return { slideCount: deck.slides.length, diagnostics: rulesOn(diagnoseDeck(deck, s.catalog, template.layouts), s.disabledReviewRules) };
 }
 
 /** Start a FRESH project from the agent's own .pptx template + optional Markdown. Reuses the exact
@@ -120,7 +122,7 @@ export async function newProject(s: Session, templateBytes: Uint8Array, markdown
   s.meta = { templateName: "", savedAt: undefined };
   s.dirty = true; // a fresh, unsaved project
   s.parseNotices = notices.map((n) => ({ ...n, slideIndex: offsets[n.slideIndex] ?? n.slideIndex }));
-  const diagnostics = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, offsets)];
+  const diagnostics = rulesOn([...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...splitInfoIssues(deck, offsets)], s.disabledReviewRules);
   return { slideCount: deck.slides.length, diagnostics };
 }
 
@@ -147,13 +149,14 @@ function budgetOf(catalog: LayoutCatalog): { maxBullets: number; charsPerBullet:
   return box ? { maxBullets: box.maxLines, charsPerBullet: box.charsPerLine } : null;
 }
 
-export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[] } {
+export function getDiagnostics(s: Session): { budget: { maxBullets: number; charsPerBullet: number } | null; issues: DeckIssue[]; disabledReviewRules?: ReviewRuleId[] } {
   const { deck, catalog, template } = requireLoaded(s);
   // ADR-0030 stage A: pass the raw layouts so diagnoseDeck can surface unbound content (#97 ②a / #135).
   // #148: parseNotices (e.g. a dropped 2nd table) live on the session — deck-diagnostics can't
   // reconstruct them from `deck` alone, so every read merges the persisted notices back in.
-  const issues = [...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices)];
-  return { budget: budgetOf(catalog), issues };
+  // #247: off の規則は落とし、何が off かを添える（未指定＝空なら key ごと無し → payload は従来と byte-identical）。
+  const issues = rulesOn([...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices)], s.disabledReviewRules);
+  return s.disabledReviewRules.size ? { budget: budgetOf(catalog), issues, disabledReviewRules: disabledRuleIds(s.disabledReviewRules) } : { budget: budgetOf(catalog), issues };
 }
 export function getCatalog(s: Session) {
   const { catalog } = requireLoaded(s);
@@ -209,7 +212,7 @@ function fitTail(s: Session, deck: DeckIR, catalog: LayoutCatalog, layouts: Temp
   // ADR-0030 stage A: pass the raw layouts so every mutation's tail surfaces unbound content too — the
   // new_project → edit → get_deck_issues loop must not have a blind spot vs get_deck_issues (#97 ②a / #135).
   // #148: same for the session's persisted parse notices (a dropped 2nd table etc.).
-  const diagnostics = [...diagnoseDeck(deck, catalog, layouts), ...parseNoticesToIssues(deck, s.parseNotices)];
+  const diagnostics = rulesOn([...diagnoseDeck(deck, catalog, layouts), ...parseNoticesToIssues(deck, s.parseNotices)], s.disabledReviewRules);
   return { diagnostics, budget: budgetOf(catalog) };
 }
 
@@ -400,7 +403,7 @@ export function applyDesignIntent(s: Session, i: number, intentRaw: string) {
 export function getSlideFix(s: Session, i: number) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
-  const issues = diagnoseDeck(deck, catalog, template.layouts).filter((d) => d.slideIndex === i);
+  const issues = rulesOn(diagnoseDeck(deck, catalog, template.layouts), s.disabledReviewRules).filter((d) => d.slideIndex === i);
   const fix = buildSlideFix(slideToMarkdown(deck, i, catalog, template.layouts), issues, contentBodyBox(catalog));
   return { requestText: slideFixRequest(fix), currentMarkdown: fix.currentMarkdown, issues, budget: fix.budget };
 }
