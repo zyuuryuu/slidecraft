@@ -13,7 +13,7 @@
    > **注（verify-cask・#287）**: `version:set` は cask の `version` 行も進めるが `sha256` は旧版のまま残る。このため `version:set` 以降〜手順 6 の cask 更新までの間、`verify-cask` workflow が**赤になるのが正常**（「cask が未更新」という可視シグナル・非必須チェックなのでマージは阻まれない）。手順 6 を終えると緑に戻る。
 2. **CHANGELOG.md を更新**: `## [Unreleased]` の内容を `## [0.2.0] - YYYY-MM-DD` に移し、新しい空の Unreleased を作る。**このセクションがそのままリリースノートになる**（`release.yml` がタグの版に一致する `## [x.y.z]` 見出しを抽出して `releaseBody` に使う。無いと release ジョブが失敗する — never-silent）。
 3. **ローカル検証**: `npm test`・`npm run build`・`npm run typecheck:mcp` が全緑。
-4. **コミット & タグ**: `chore(release): v0.2.0` → `git tag v0.2.0 && git push origin main --tags`。→ `release.yml` が **3-OS**（macOS arm64・Windows・Linux。Intel Mac インストーラは廃止済み — [#112](https://github.com/zyuuryuu/slidecraft/issues/112)）installer をビルドして **draft** リリースを作成する。続けて `SHA256SUMS`・SBOM（npm＋cargo、CycloneDX）をリリースアセットとして添付し、各インストーラに `actions/attest-build-provenance` で build provenance attestation を付与する（署名の代わりの完全性シグナル — 署名自体は導入しない）。
+4. **コミット & タグ**: `chore(release): v0.2.0` → `git tag v0.2.0 && git push origin main --tags`。→ `release.yml` が **3-OS**（macOS arm64・Windows・Linux。Intel Mac インストーラは廃止済み — [#112](https://github.com/zyuuryuu/slidecraft/issues/112)）installer をビルドして **draft** リリースに添付する。draft は先行の直列ジョブ `create-release` が**1 つだけ**作り（同タグの draft が既にあれば再利用・2 つ以上あるか publish 済みならエラーで停止）、3-OS の matrix はその release id へ upload するだけ（[#501](https://github.com/zyuuryuu/slidecraft/issues/501)：以前は各 leg が並列に draft を作り、v0.5.0 で draft が 2 つできた）。続けて `SHA256SUMS`・SBOM（npm＋cargo、CycloneDX）をリリースアセットとして添付し、各インストーラに `actions/attest-build-provenance` で build provenance attestation を付与する（署名の代わりの完全性シグナル — 署名自体は導入しない）。
 
    > **タグ push は push 権のある環境（メンテナの手元）で行う。** リリースの起点は `v*` タグ push（`release.yml` の `on: push: tags`）。Claude Code の管制セッション（GitHub App 連携）は **`refs/tags/*` の push も `workflow_dispatch` の起動も 403**（App に該当 write 権が無い）なので、**タグ push は人間が実行**する。将来 workflow_dispatch を実リリース経路に昇格する案（#290 (b)）は、セッションから叩けない以上メリットが薄く見送り。App に `actions: write` を付与できるようになったら再検討。
 5. **成果物レビュー（実機）**: draft の installer を Windows / macOS 実機で起動確認（M9）。macOS は ad-hoc 署名 `.dmg` が `killed:9` せず開くこと・keychain 往復・モデル自動DL を確認。
@@ -23,6 +23,10 @@
    - `node scripts/update-cask.mjs <version>`（引数無し）は**公開 URL から自動 DL**するので **publish 後**のみ有効（draft のうちは 404）。
    > 引数無しを publish 前に叩くと 404 になる。draft の .dmg のバイト列は publish 後と同一なので、上の 1・2 で先に確定してよい。更新後は tap リポ `zyuuryuu/homebrew-slidecraft` にも反映（[#288](https://github.com/zyuuryuu/slidecraft/issues/288) で自動化予定）。
 7. **publish**: draft を publish。自動更新（軽量通知）が新版を検知できる状態にする。
+
+## 依存の更新（lockfile を書き換える操作）
+
+npm 10.8.x〜11.0.x は、この repo の依存ツリーで lockfile を作り直す操作（`npm install <pkg>`・`npm audit fix`・`npm install --package-lock-only`）を `Cannot read properties of null (reading 'edgesOut')` で落とす（npm 本体のバグ・[#495](https://github.com/zyuuryuu/slidecraft/issues/495)）。node 20 に同梱の npm 10.8.2 もこの範囲に入る。lockfile どおりに入れるだけの `npm ci` は落ちないので、CI と通常の開発には影響しない。**依存を更新するときは、修正済みの npm を固定した `npm run npm:pinned -- <npm の引数>` を使う**。例: `npm run npm:pinned -- install vite@^8.4.0`・`npm run npm:pinned -- audit fix`・`npm run npm:pinned -- install --package-lock-only`。固定版（npm 11.21.2）は node 20 で動き、`lockfileVersion: 3` を書き、その lockfile は npm 10.8.2 の `npm ci` でも受理される（2026-11-07 実測）。`npx npm@latest` は使わない（npm 12 は node 20 に対応していない）。固定版を上げるときは [`tests/npm-pinned.test.ts`](tests/npm-pinned.test.ts) の前提も確認する。
 
 ## 自動更新について
 

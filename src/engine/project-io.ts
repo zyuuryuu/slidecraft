@@ -16,7 +16,56 @@ import { DeckIRSchema, type DeckIR } from "./slide-schema";
 import { loadTemplate, type TemplateData } from "./template-loader";
 import { loadZipSafe, readCappedString, readCappedBytes, readEntryString, ZIP_LIMITS } from "./zip-safe";
 
-const PROJECT_VERSION = 1;
+/** The `.scft` format version this build writes and reads natively (meta.json.version).
+ *  Bump it ONLY together with a `PROJECT_MIGRATIONS[old]` step so older files stay openable. */
+export const PROJECT_VERSION = 1;
+
+/** Why a `.scft` was refused on its meta.json.version (#121). `code` is stable for callers/tests;
+ *  `message` is the user-facing text shown by the existing never-silent open-error path. */
+export type ProjectVersionErrorCode = "PROJECT_VERSION_TOO_NEW" | "PROJECT_VERSION_UNSUPPORTED";
+
+export class ProjectVersionError extends Error {
+  readonly code: ProjectVersionErrorCode;
+  readonly fileVersion: number;
+  readonly supportedVersion: number;
+  constructor(code: ProjectVersionErrorCode, fileVersion: number, supportedVersion: number) {
+    super(
+      code === "PROJECT_VERSION_TOO_NEW"
+        ? `このファイルは新しいバージョンの SlideCraft で作成されています（ファイル形式 v${fileVersion} ＞ 対応 v${supportedVersion}）。アプリを更新してから開いてください`
+        : `このファイルの形式（v${fileVersion}）はこのバージョンの SlideCraft では開けません（対応 v${supportedVersion}・移行手段がありません）`,
+    );
+    this.name = "ProjectVersionError";
+    this.code = code;
+    this.fileVersion = fileVersion;
+    this.supportedVersion = supportedVersion;
+  }
+}
+
+/** One step per OLD version: `PROJECT_MIGRATIONS[v]` converts a raw (pre-zod) deck.json of
+ *  version v into version v+1. Empty today — v1 is the first format; add a step when bumping. */
+export type ProjectMigrations = Readonly<Record<number, (rawDeck: unknown) => unknown>>;
+export const PROJECT_MIGRATIONS: ProjectMigrations = {};
+
+/** Bring a raw deck.json of `fileVersion` up to `current` (pure; #121). Same version → the input
+ *  itself. Newer than `current`, or any missing step in the chain → ProjectVersionError (never a
+ *  silent fallback, never a partial migration). Non-integer versions never count as current. */
+export function migrateProjectDeck(
+  rawDeck: unknown,
+  fileVersion: number,
+  current: number = PROJECT_VERSION,
+  migrations: ProjectMigrations = PROJECT_MIGRATIONS,
+): unknown {
+  if (fileVersion === current) return rawDeck;
+  if (fileVersion > current) throw new ProjectVersionError("PROJECT_VERSION_TOO_NEW", fileVersion, current);
+  if (!Number.isInteger(fileVersion)) throw new ProjectVersionError("PROJECT_VERSION_UNSUPPORTED", fileVersion, current);
+  const steps: Array<(d: unknown) => unknown> = [];
+  for (let v = fileVersion; v < current; v++) {
+    const step = Object.prototype.hasOwnProperty.call(migrations, v) ? migrations[v] : undefined;
+    if (!step) throw new ProjectVersionError("PROJECT_VERSION_UNSUPPORTED", fileVersion, current);
+    steps.push(step);
+  }
+  return steps.reduce((d, step) => step(d), rawDeck);
+}
 
 /** The project file extension (no dot). One constant so the picker, save name, and
  *  the OS file-association / launch-open path can never drift apart. */
@@ -77,8 +126,9 @@ export async function bundleProject(
   return zip.generateAsync({ type: "uint8array" });
 }
 
-/** Open a `.scft` zip → the full editing state. Throws on a malformed bundle or a
- *  deck.json that doesn't match the current schema. */
+/** Open a `.scft` zip → the full editing state. Throws on a malformed bundle, on a meta.json
+ *  version this build can't open (ProjectVersionError, #121), or on a deck.json that doesn't match
+ *  the current schema (after migration). */
 export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ deck: DeckIR; template: TemplateData; meta: ProjectMeta }> {
   const zip = await loadZipSafe(bytes); // input-size + entry-count guard (cheap header parse)
   const deckFile = zip.file("deck.json");
@@ -86,16 +136,21 @@ export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ de
   if (!deckFile || !tplFile) {
     throw new Error("不正な .scft ファイルです（deck.json / template.pptx が見つかりません）");
   }
-  // Stream-capped decompression (zip-bomb safe) → schema validation → bounds.
-  const parsed = DeckIRSchema.parse(JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson)));
+  // meta is read FIRST so the version gate (migrateProjectDeck) runs before deck.json schema validation (a newer app's
+  // deck shape must surface as "update the app", not a cryptic zod error).
+  // A corrupt / missing meta.json is non-critical — keep defaults and open as the current format
+  // (pre-#121 behaviour); only a VALID meta's version is gated.
+  let meta: ProjectMeta = { version: 0, templateName: "", savedAt: "" };
+  let fileVersion = PROJECT_VERSION;
+  try {
+    const parsedMeta = ProjectMetaSchema.safeParse(JSON.parse((await readEntryString(zip, "meta.json", 64 * 1024)) || "{}"));
+    if (parsedMeta.success) { meta = parsedMeta.data; fileVersion = meta.version; }
+  } catch { /* malformed meta.json → keep defaults, still open the deck */ }
+  // Stream-capped decompression (zip-bomb safe) → version gate/migration → schema validation → bounds.
+  const rawDeck = JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson));
+  const parsed = DeckIRSchema.parse(migrateProjectDeck(rawDeck, fileVersion));
   assertDeckBounds(parsed);
   const deck = stripSvgCache(parsed); // untrusted svgCache is an XSS carrier — force fresh re-render (ADR-0016 F2)
   const template = await loadTemplate(await readCappedBytes(tplFile, ZIP_LIMITS.templatePptx));
-  // meta is non-critical — validate, but fall back to defaults rather than reject the file.
-  let meta: ProjectMeta = { version: 0, templateName: "", savedAt: "" };
-  try {
-    const parsed = ProjectMetaSchema.safeParse(JSON.parse((await readEntryString(zip, "meta.json", 64 * 1024)) || "{}"));
-    if (parsed.success) meta = parsed.data;
-  } catch { /* malformed meta.json → keep defaults, still open the deck */ }
   return { deck, template, meta };
 }
