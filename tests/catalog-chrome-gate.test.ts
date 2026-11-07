@@ -25,8 +25,9 @@ import { buildCatalog, placeholderRole, type LayoutCatalog } from "../src/engine
 import { bodyPlaceholders } from "../src/engine/visual-placement";
 import type { SlideIR } from "../src/engine/slide-schema";
 
-const pub = (p: string) => resolve(__dirname, "../public/templates/slide", p);
-// The 4 bundled (git-tracked) masters. The invariant is fixed across ALL of them.
+// #117（統括裁定 C）: Midnight は出荷物でなく入力サンプル（samples/templates/）に移った — 走査対象は縮めずパスだけ追随。
+const pub = (p: string) => resolve(__dirname, p.startsWith("Midnight_") ? "../samples/templates" : "../public/templates/slide", p);
+// The 3 shipped masters + the Midnight input sample (all git-tracked). The invariant is fixed across ALL of them.
 const BUNDLED = [
   "Midnight_Executive_30_TemplateOnly.pptx",
   "技術報告_スタンダード水色_TemplateOnly.pptx",

@@ -21,18 +21,19 @@ export interface MasterEntry {
 /** A bundled built-in template: id + display name + the public URL of its TemplateOnly .pptx. */
 export interface BuiltinDef { id: string; name: string; url: string; }
 
-/** The bundled built-in templates. The FIRST is the default (a first-run draft starts on it).
- *  All are content-free "TemplateOnly" masters served from public/templates/slide/. */
+/** The bundled built-in templates. The FIRST is the default: the app loads it at startup through
+ *  this registry (default-master.ts) — this list is the ONLY place a template URL is written (R8).
+ *  All are content-free "TemplateOnly" masters served from public/templates/slide/. The former
+ *  development master (30 canonical layouts) is an input sample under samples/templates/ (#117). */
 export const BUILTIN_MASTERS: readonly BuiltinDef[] = [
-  { id: "builtin", name: "Midnight Executive", url: "/templates/slide/Midnight_Executive_30_TemplateOnly.pptx" },
+  { id: "builtin-gijutsu", name: "技術報告 スタンダード水色", url: "/templates/slide/技術報告_スタンダード水色_TemplateOnly.pptx" },
   { id: "builtin-koubunsho", name: "配布資料 公文書高密度", url: "/templates/slide/配布資料_公文書高密度_TemplateOnly.pptx" },
   { id: "builtin-magazine", name: "ビジュアルデッキ マガジン", url: "/templates/slide/ビジュアルデッキ_マガジン_TemplateOnly.pptx" },
-  { id: "builtin-gijutsu", name: "技術報告 スタンダード水色", url: "/templates/slide/技術報告_スタンダード水色_TemplateOnly.pptx" },
 ];
 const BUILTIN_URLS: ReadonlyMap<string, string> = new Map(BUILTIN_MASTERS.map((b) => [b.id, b.url]));
 const BUILTIN_ENTRIES: MasterEntry[] = BUILTIN_MASTERS.map((b) => ({ id: b.id, name: b.name, builtin: true }));
 
-/** The default built-in (first entry) — App uses this as the initial masterId. */
+/** The default built-in (first entry) — App's initial masterId and the template loaded at startup. */
 export const BUILTIN_MASTER: MasterEntry = BUILTIN_ENTRIES[0];
 
 /** Disambiguate a display name against the ones already registered: "Deck" → "Deck (2)". Pure. */

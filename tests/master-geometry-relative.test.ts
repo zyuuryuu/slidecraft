@@ -15,7 +15,8 @@ import { placeholderRole } from "../src/engine/template-catalog";
 import type { PlaceholderInfo } from "../src/engine/template-loader";
 
 const fx = (p: string) => resolve(__dirname, "fixtures/templates", p);
-const pub = (p: string) => resolve(__dirname, "../public/templates/slide", p);
+// #117（統括裁定 C）: Midnight は出荷物でなく入力サンプル（samples/templates/）に移った — 走査対象は縮めずパスだけ追随。
+const pub = (p: string) => resolve(__dirname, p.startsWith("Midnight_") ? "../samples/templates" : "../public/templates/slide", p);
 
 // 非慣習 idx の typeless ph（→ 幾何回収ラダーに落ちる）。上部の広幅・低背の帯。
 const mk = (slideSize?: { w: number; h: number }): PlaceholderInfo =>

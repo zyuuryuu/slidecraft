@@ -62,7 +62,9 @@ function invisibleTitleLayouts(template: { layouts: LayoutInfo[]; masterBgColor:
 describe("bundled template title contrast (#274)", () => {
   for (const file of BUNDLED) {
     it(`${file}: every light title has a dark backdrop`, async () => {
-      const template = await loadTemplate(readFileSync(resolve(__dirname, "../public/templates/slide", file)));
+      // #117（統括裁定 C）: Midnight は入力サンプル（samples/templates/）へ移った — 検査対象は縮めずパスだけ追随。
+      const dir = file.startsWith("Midnight_") ? "../samples/templates" : "../public/templates/slide";
+      const template = await loadTemplate(readFileSync(resolve(__dirname, dir, file)));
       expect(invisibleTitleLayouts(template)).toEqual([]);
     });
   }

@@ -22,6 +22,7 @@ import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
 import { renderPaintToSvg } from "../engine/svg-writer";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { cjkFontFamily } from "../engine/font-stack";
+import { cjkClassForStyle } from "../engine/cjk-class";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
@@ -576,7 +577,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               fontSize: (titlePt ?? s.fontSize) * (scale / 72),
               color: `#${s.fontColor}`,
               fontWeight: s.bold ? "bold" : "normal",
-              fontFamily: cjkFontFamily(resolveFontToken(s.fontName, themeFonts), s.eaFontName),
+              fontFamily: cjkFontFamily(resolveFontToken(s.fontName, themeFonts), s.eaFontName, cjkClassForStyle(s, themeFonts)),
               textAlign: s.align === "ctr"
                 ? "center"
                 : s.align === "r"
