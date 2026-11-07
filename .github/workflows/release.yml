@@ -25,12 +25,15 @@ jobs:
           - platform: macos-latest # Apple Silicon (arm64 runner)
             args: "--target aarch64-apple-darwin"
             triple: aarch64-apple-darwin
+            overlay: ""
           - platform: ubuntu-latest # .deb + .AppImage
             args: ""
             triple: x86_64-unknown-linux-gnu
+            overlay: "--config src-tauri/tauri.bundle.linux.conf.json"
           - platform: windows-latest # .msi + .exe (NSIS)
             args: ""
             triple: x86_64-pc-windows-msvc
+            overlay: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -135,7 +138,9 @@ jobs:
             Download the installer for your OS below. macOS is ad-hoc signed (not notarized) — install via `brew install --cask zyuuryuu/slidecraft/slidecraft` for a clean first run, or right-click → Open on a direct .dmg download (Apple Silicon only; Intel Macs build from source). SHA256SUMS, SBOM, and build provenance attestations are attached below. See README for details.
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json
+          # matrix.overlay: Linux adds tauri.bundle.linux.conf.json (sidecar → /usr/bin/slidecraft-node, never
+          # /usr/bin/node, #527). Must match scripts/node-sidecar.mjs bundleConfigArgs (pinned by tests).
+          args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json ${{ matrix.overlay }}
 
       # Provenance attestation for the installers this job just built (#257) — ties each artifact
       # back to this workflow run/commit via the GitHub attestations API (`gh attestation verify`).

@@ -1,11 +1,14 @@
 /**
  * bump-version.mjs — the ONE place the app version is propagated (M0: version single-sourcing).
  *
- * The version lives in seven places that MUST agree: package.json, src-tauri/tauri.conf.json (drives the
- * installer metadata — the de-facto canonical), src-tauri/Cargo.toml, three hardcoded server/client
- * version strings (mcp/server.ts, collab-client.ts, app-version.ts), and the Homebrew cask. This script
- * reads/writes all seven via targeted regex (so file formatting is preserved) and is imported by
- * tests/version-sync.test.ts as the CI drift gate.
+ * The version lives in eight places that MUST agree: package.json, src-tauri/tauri.conf.json (drives the
+ * installer metadata — the de-facto canonical), src-tauri/Cargo.toml, the app crate's entry in
+ * src-tauri/Cargo.lock, three hardcoded server/client version strings (mcp/server.ts, collab-client.ts,
+ * app-version.ts), and the Homebrew cask. This script reads/writes all eight via targeted regex (so file
+ * formatting is preserved) and is imported by tests/version-sync.test.ts as the CI drift gate.
+ *
+ * Cargo.lock is edited by string replacement, not `cargo update -p`: it must work offline / without a Rust
+ * toolchain, and only the app crate's own version line changes on a bump (no dependency resolution needed).
  *
  * Usage:
  *   node scripts/bump-version.mjs 0.2.0   # set ALL to 0.2.0
@@ -24,6 +27,13 @@ export const TARGETS = [
   { label: "tauri.conf.json", path: "src-tauri/tauri.conf.json", re: /("version":\s*")([^"]*)(")/ },
   // Cargo.toml: the [package] version only (NOT the many `version = "2"` under [dependencies]).
   { label: "Cargo.toml", path: "src-tauri/Cargo.toml", re: /(\[package\][\s\S]*?\nversion = ")([^"]*)(")/ },
+  // Cargo.lock: ONLY the app crate's [[package]] block (exact name match — never another crate's version
+  // line). Issue #476: without this the lock kept the old version after a bump.
+  {
+    label: "Cargo.lock",
+    path: "src-tauri/Cargo.lock",
+    re: /(\[\[package\]\]\nname = "diagram-pipeline-desktop"\nversion = ")([^"]*)(")/,
+  },
   { label: "mcp/server.ts", path: "src/mcp/server.ts", re: /(new McpServer\(\{[^)]*?version:\s*")([^"]*)(")/ },
   { label: "collab-client.ts", path: "src/ipc/collab-client.ts", re: /(new Client\(\{[^)]*?version:\s*")([^"]*)(")/ },
   { label: "app-version.ts", path: "src/ipc/app-version.ts", re: /(export const APP_VERSION = ")([^"]*)(")/ },

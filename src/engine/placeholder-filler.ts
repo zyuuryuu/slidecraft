@@ -21,6 +21,7 @@ import { isEmptyOverlay, paintGroupOverlay, withLeftInset } from "./group-overla
 import { beforeAfterOverlay, beforeAfterShapesXml } from "./before-after";
 import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
 import { createLinkRegistry } from "./hyperlink-rels";
+import { titleFontPt } from "./title-fit";
 import { paintToShapeXml, renumberShapeIds } from "./pptx-writer";
 import type { ChartsMode } from "./pptx-native-chart";
 import { nativeChartPartsForYaml, writeNativeChart, maxChartNumber, XLSX_CT, type NativeChartParts } from "./pptx-native-chart-parts";
@@ -49,8 +50,9 @@ function replaceTextInShape(
   shapeXml: string,
   content: PlaceholderContent,
   link?: LinkResolver,
+  szPt?: number, // #437: pre-computed title size (title-fit) baked into the runs; absent → inherit
 ): string {
-  const newParagraphs = paragraphsToOoxml(content.paragraphs, link);
+  const newParagraphs = paragraphsToOoxml(content.paragraphs, link, szPt);
 
   const txStart = shapeXml.indexOf("<p:txBody>");
   const txEnd = shapeXml.indexOf("</p:txBody>");
@@ -214,7 +216,8 @@ async function buildSlideXml(
     }
     if (!content) continue;
 
-    let shapeXml = replaceTextInShape(ph.shapeXml, content, links.rIdFor);
+    // #437 (R7): an over-long title is shrunk to its box here — the SAME fitTitle preview and review read.
+    let shapeXml = replaceTextInShape(ph.shapeXml, content, links.rIdFor, titleFontPt(slide, content, ph.style));
     const inset = overlay?.insets.get(ph.idx);
     if (inset !== undefined) shapeXml = withLeftInset(shapeXml, inset); // room for the #400 icon
     // Update shape ID to be unique within the slide

@@ -132,9 +132,24 @@ pub fn mcp_install_info(app: tauri::AppHandle) -> Result<McpInstallInfo, String>
     })
 }
 
+/// File name of the bundled Node externalBin as installed next to the main exe (Tauri strips the
+/// `-<target-triple>` suffix). Linux ships it as `slidecraft-node` so the .deb/.rpm never claim
+/// /usr/bin/node, which the distro `nodejs` package owns (#527); the name must agree with
+/// scripts/node-sidecar.mjs and tauri.bundle.linux.conf.json (tests/linux-node-sidecar.test.ts).
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn node_sidecar_file_name() -> &'static str {
+    if cfg!(windows) {
+        "node.exe"
+    } else if cfg!(target_os = "linux") {
+        "slidecraft-node"
+    } else {
+        "node"
+    }
+}
+
 /// Resolve the `node` runtime. Dev: from PATH. Release: the bundled externalBin sits next to the main
-/// exe (Tauri strips the `-<target-triple>` suffix at install → `node.exe`/`node`), staged by
-/// scripts/stage-node.ps1. Falls back to PATH if current_exe() is somehow unavailable.
+/// exe (`node_sidecar_file_name`), staged by scripts/stage-node.mjs. Falls back to PATH if
+/// current_exe() is somehow unavailable.
 fn resolve_node() -> std::path::PathBuf {
     #[cfg(debug_assertions)]
     {
@@ -142,10 +157,9 @@ fn resolve_node() -> std::path::PathBuf {
     }
     #[cfg(not(debug_assertions))]
     {
-        let name = if cfg!(windows) { "node.exe" } else { "node" };
         std::env::current_exe()
             .ok()
-            .and_then(|p| p.parent().map(|d| d.join(name)))
+            .and_then(|p| p.parent().map(|d| d.join(node_sidecar_file_name())))
             .unwrap_or_else(|| std::path::PathBuf::from("node"))
     }
 }

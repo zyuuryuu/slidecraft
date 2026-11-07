@@ -18,6 +18,7 @@ import { buildServer } from "./server";
 import { DocRegistry, MemTemplateStore, deckChangedPayload, type HostContext } from "./host-core";
 import { mintToken, checkRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type SecurityConfig } from "./host-security";
 import { writeHostJson, clearHostJson, type HostHandshake } from "./host-json";
+import { createFileMetricsRecorder } from "./metrics-sink";
 
 const NOTIFY = "notifications/slidecraft/";
 
@@ -30,6 +31,8 @@ export interface CollabHostOptions {
   host?: string;
   /** where to publish the handshake; null = don't write (tests). */
   hostJsonPath?: string | null;
+  /** #512: local JSONL call log for every connection (collab-gui and collab-ai); null/absent = OFF. */
+  metricsPath?: string | null;
 }
 
 export interface CollabHost {
@@ -57,6 +60,8 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
   };
 
   const registry = new DocRegistry();
+  // ONE recorder shared by all connections (one append stream; each line carries its profile).
+  const metrics = opts.metricsPath ? createFileMetricsRecorder(opts.metricsPath) : undefined;
   // ONE template store shared across connections: the gui-role client uploads the master registry
   // (register_templates), AI-role clients read it (list_templates / use_template). S2 増分2.
   const templates = new MemTemplateStore();
@@ -105,7 +110,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
         let transport = existing ? conns.get(existing)?.transport : undefined;
         if (!transport) {
           if (!isInitializeRequest(body)) { res.writeHead(400, { "content-type": "text/plain" }).end("no session"); return; }
-          const server = buildServer(createSession(null), { host: makeHostCtx(aiClient), registerResources: false });
+          const server = buildServer(createSession(null), { host: makeHostCtx(aiClient), registerResources: false, metrics });
           const t = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (id) => { conns.set(id, { server, transport: t }); },

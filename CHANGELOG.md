@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **Linux の `.deb`/`.rpm` が同梱 Node を `/usr/bin/node` に置き、system の `nodejs` パッケージと衝突する問題** — `/usr/bin/node` は distro の `nodejs` パッケージ（NodeSource 版も）の持ち物なので、system Node のあるマシンで dpkg/rpm がインストールを拒否し得た。Linux だけ同梱 Node を **`/usr/bin/slidecraft-node`** として同梱し、`/usr/bin/slidecraft-mcp` ランチャと GUI（協働ホスト）もそれを使う。macOS / Windows の同梱 Node の名前は不変。v0.5.0 の `/usr/bin/node` を直接登録していた場合は `slidecraft-mcp` の 1 行登録に切り替えてください。CI の Linux smoke は `.deb`/AppImage に `usr/bin/node` が無いことも検査する（[#527](https://github.com/zyuuryuu/slidecraft/issues/527)・ADR-0022）
 - **Windows のインストール先に POSIX sh 版 `slidecraft-mcp` が入り、PATH 上で `slidecraft-mcp.cmd` と並ぶ問題**（`where slidecraft-mcp` が実行できない sh 版を先頭に返していた）— sh ランチャは macOS 専用のプラットフォーム設定 `tauri.macos.conf.json`（Tauri が自動マージ）へ移し、Windows / Linux の resources から外した。macOS cask の `Contents/Resources/slidecraft-mcp` と Linux の `/usr/bin/slidecraft-mcp` は不変。GUI の PATH 判定も Windows では `.cmd` のみを探す（[#537](https://github.com/zyuuryuu/slidecraft/issues/537)）
 - **協働パネルの登録コマンドで `cli.cjs` のパスだけ `\\?\C:\…`（拡張長パス形式）になる問題**（Windows・node.exe 側は普通の形）— 表示用パスを `dunce::simplified` で正規化し、2 つのパスが同じ形になる（[#538](https://github.com/zyuuryuu/slidecraft/issues/538)）
 

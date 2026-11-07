@@ -55,7 +55,7 @@ claude mcp add slidecraft -- slidecraft-mcp
 |---|---|---|
 | Windows NSIS（`*_x64-setup.exe`） | インストール先フォルダ（既定 `%LOCALAPPDATA%\SlideCraft`）を**ユーザ PATH**（`HKCU\Environment\Path`）に追加。インストーラの「詳細」に表示され、アンインストールで除去 | `slidecraft-mcp.cmd` — 同じフォルダの `node.exe` で `cli.cjs` を実行（Tauri は resources と sidecar をインストール先に**平置き**する） |
 | Windows MSI（`*_x64_en-US.msi`） | インストール先（既定 `C:\Program Files\SlideCraft\`）をユーザ PATH に追加（Windows Installer の Environment テーブル＝アンインストール/失敗時ロールバックで除去） | 同上 |
-| Linux `.deb` / `.rpm` | `/usr/bin/slidecraft-mcp`（sh） | `/usr/bin/node`（同梱 sidecar）で `/usr/lib/SlideCraft/cli.cjs` を実行 |
+| Linux `.deb` / `.rpm` | `/usr/bin/slidecraft-mcp`（sh） | `/usr/bin/slidecraft-node`（同梱 sidecar）で `/usr/lib/SlideCraft/cli.cjs` を実行。同梱 Node は `node` ではなく `slidecraft-node` という名前で入る — `/usr/bin/node` は distro の `nodejs` パッケージの持ち物で、同名だと system Node のあるマシンで dpkg/rpm がインストールを拒否するため（#527） |
 | Linux AppImage | 自動では載らない（マウント先が起動ごとに変わる）。`./SlideCraft_<ver>_amd64.AppImage --appimage-extract` で展開し、`squashfs-root/usr/bin/slidecraft-mcp` の**絶対パス**を `command` に登録する | 同上（展開先相対で解決） |
 
 Windows の注意点：
@@ -67,6 +67,8 @@ Windows の注意点：
 - ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
 
 > **v0.5.0 以前**のインストーラにはランチャが入っていません（`.deb` に `/usr/bin/slidecraft-mcp` は無い）。その場合は上の直接パス指定（Linux: `/usr/bin/node` ＋ `/usr/lib/SlideCraft/cli.cjs`）か、**ソースからの起動（B）**を使ってください。
+>
+> Linux で v0.5.0 の `/usr/bin/node` を**直接**登録していた場合、v0.5.1 以降へ更新すると `/usr/bin/node` は同梱されなくなります（#527）。登録を `slidecraft-mcp` の 1 行に切り替えてください（直接指定するなら `command` = `/usr/bin/slidecraft-node`）。macOS（`Contents/MacOS/node`）と Windows（`node.exe`）の同梱 Node の名前は変わりません。
 
 ### B. ソースから起動（開発版）
 
@@ -111,7 +113,7 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 |---|---|---|
 | 入口 | `open_project(dataBase64?, path?)` | `.scft` を読み込み。既定は base64。`--root` scope 起動時は `path`（scope 配下のファイル名）でも渡せる（両方指定はエラー・下記「scoped fs 入出力」）。`{slideCount, diagnostics, contract}` |
 | 入口 | `new_project(templateBase64?, templatePath?, markdown?)` | `.pptx` テンプレ＋（任意）Markdown から新規（GUI の Draft と同じ parseMd→distill）。既定は base64。`--root` scope 起動時は `templatePath` でも渡せる（両方指定はエラー）。`{slideCount, diagnostics, contract}` |
-| コールド一括 | `bootstrap(docId?)` | **セッション開始時に1回**：コールド系（調達・契約）を1レスポンスで返す＝`authoringGuide`・`diagramTypes`・`templateSpecGuide`・`templateCapabilities`・`templates` の各節（内容は同名の旧 `get_*`/`list_*` ツールと deep-equal 同一・R8）。図タイプ別構文のみ `get_diagram_guide(type)` で個別取得（12種同梱は実測約22,400字のため見送り・#464）。doc 未オープン時は doc 依存節（`authoringGuide`/`templateCapabilities`）が `{ok:false, code}` で埋まり他節は返る。旧6ツールは alias として存続（ADR-0037 D2/D4・ADR-0008 フロア） |
+| コールド一括 | `bootstrap(docId?)` | **セッション開始時に1回**：コールド系（調達・契約）を1レスポンスで返す＝`authoringGuide`・`diagramTypes`・`templateSpecGuide`・`templateCapabilities`・`templates` の各節（内容は同名の旧 `get_*`/`list_*` ツールと deep-equal 同一・R8）＋ `toolNotes`（ツール説明文から移したツール共通の約束＝docId 解決・opId/expectedRev・0-based・get_slide の返却項目・図/配置の op 文法・構造操作の保持規則。doc 未オープンでも返る・#513）。図タイプ別構文のみ `get_diagram_guide(type)` で個別取得（12種同梱は実測約22,400字のため見送り・#464）。doc 未オープン時は doc 依存節（`authoringGuide`/`templateCapabilities`）が `{ok:false, code}` で埋まり他節は返る。旧6ツールは alias として存続（ADR-0037 D2/D4・ADR-0008 フロア） |
 | 調達 | `create_template(spec?)` | `spec` は `TemplateSpec` の **JSON 文字列**（オブジェクト不可・例 `spec: '{}'`。name＋fonts＋9色 palette・layouts 既定30）からテンプレ PPTX を生成し `{templateBase64, health, notices}`。欠落は MIDNIGHT preset 補完＋コントラスト自動修正。返り値を `new_project` に渡す |
 | 調達 | `get_template_spec_guide()` | `create_template` 用 spec の書式ガイド＋MIDNIGHT preset 値 |
 | 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`、既定 `midnight`）を返す（#298）。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#332）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
@@ -356,6 +358,26 @@ use_template({id:"file:tech-report.potx"})    → {slideCount, diagnostics, cont
   どのエージェント（ローカル/クラウド）に繋ぐかで判断する。
 - GUI 側の AI Assist には別途「ローカルモデル限定モード」があり、そちらは GUI→LLM の
   送信を統治する（MCP 経路とは別の境界）。
+
+---
+
+## 呼出ログ（計測・既定 OFF・#512）
+
+ツール呼出 1 回を JSON Lines 1 行で**ローカルファイルに追記**するだけの監査ログ（外部送信なし）。
+ADR-0037 の指標（time-to-first-visual・往復数・増分性）と、ツール削除の証拠（呼出率）を集めるために使う。
+有効にしない限りファイルは作られず、ツールの応答も変わらない。
+
+- 有効化: solo は `slidecraft serve --metrics ./mcp-calls.jsonl`。協働ホスト（GUI の sidecar）は環境変数
+  `SLIDECRAFT_MCP_METRICS=<path>` を設定して起動する。forward モード（GUI 稼働中の stdio）では `--metrics` は
+  無視され、ホスト側のログに残る。
+- 1 行の中身: `ts`・`tool`・`profile`・`doc`（docId）・`ms`・`outcome`（ok / reject / error）・reject の `code`・
+  入出力の文字数（`inChars`/`outChars`）・mutation なら `mut`/`changed`/`changedN`/`wholeDeck`。
+  **deck 本文・Markdown・base64・エラーメッセージは載せない。**
+- 集計: `npm run mcp:metrics -- ./mcp-calls.jsonl [--window-min 30] [--profile solo,collab-ai] [--json]`。
+  ツール別呼出率・時間窓ごとの往復数と time-to-first-visual・deck 丸ごと再生成の比率・削除候補の証拠比率
+  （[design/mcp-value-realign.md](design/mcp-value-realign.md) §7.4）を Markdown で出す。
+- 単位はセッションではなく **docId × 時間窓**（ADR-0038・無呼出が `--window-min` 分続いたら次の窓）。
+  トークンはサーバから見えないため、呼出数と文字数で代理する。
 
 ---
 
