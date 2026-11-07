@@ -1,0 +1,14 @@
+{"v":1,"ts":"2026-11-07T10:00:00.000Z","tool":"bootstrap","profile":"solo","doc":null,"ms":50,"outcome":"ok","inChars":2,"outChars":1000}
+{"v":1,"ts":"2026-11-07T10:00:01.000Z","tool":"new_project","profile":"solo","doc":"doc-A","ms":100,"outcome":"ok","inChars":5000,"outChars":800,"mut":"mint","changed":true,"changedN":null,"wholeDeck":false}
+{"v":1,"ts":"2026-11-07T10:00:05.000Z","tool":"get_slide","profile":"solo","doc":"doc-A","ms":10,"outcome":"ok","inChars":12,"outChars":600}
+{"v":1,"ts":"2026-11-07T10:00:06.000Z","tool":"get_slide_fix_request","profile":"solo","doc":"doc-A","ms":10,"outcome":"ok","inChars":12,"outChars":400}
+{"v":1,"ts":"2026-11-07T10:00:10.000Z","tool":"set_slide_markdown","profile":"solo","doc":"doc-A","ms":30,"outcome":"ok","inChars":200,"outChars":300,"mut":"edit","changed":true,"changedN":1,"wholeDeck":false}
+{"v":1,"ts":"2026-11-07T10:00:20.000Z","tool":"set_deck_markdown","profile":"solo","doc":"doc-A","ms":40,"outcome":"ok","inChars":2000,"outChars":300,"mut":"edit","changed":true,"changedN":null,"wholeDeck":true}
+{"v":1,"ts":"2026-11-07T10:00:30.000Z","tool":"set_slide_markdown","profile":"solo","doc":"doc-A","ms":5,"outcome":"reject","code":"index-out-of-range","inChars":50,"outChars":120}
+{"v":1,"ts":"2026-11-07T11:00:00.000Z","tool":"get_slide_markdown","profile":"solo","doc":"doc-B","ms":8,"outcome":"ok","inChars":12,"outChars":200}
+{"v":1,"ts":"2026-11-07T11:00:02.000Z","tool":"get_slide","profile":"solo","doc":"doc-B","ms":10,"outcome":"ok","inChars":12,"outChars":600}
+{"v":1,"ts":"2026-11-07T11:00:03.000Z","tool":"set_slide_markdown","profile":"solo","doc":"doc-B","ms":20,"outcome":"ok","inChars":200,"outChars":100,"mut":"edit","changed":false,"changedN":null,"wholeDeck":false}
+{"v":1,"ts":"2026-11-07T11:00:05.000Z","tool":"convert_bullets_to_table","profile":"solo","doc":"doc-B","ms":20,"outcome":"ok","inChars":12,"outChars":300,"mut":"edit","changed":true,"changedN":1,"wholeDeck":false}
+{"v":1,"ts":"2026-11-07T11:00:06.000Z","tool":"get_project_info","profile":"solo","doc":"doc-B","ms":2,"outcome":"ok","inChars":2,"outChars":100}
+not a json line
+{"v":1,"ts":"2026-11-07T11:00:07.000Z","tool":"legacy_tool","profile":"solo","doc":"doc-B","ms":1,"outcome":"error","inChars":2,"outChars":20}

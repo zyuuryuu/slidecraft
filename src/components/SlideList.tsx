@@ -152,6 +152,7 @@ export default function SlideList({
                 masterDecorations={template?.masterDecorations}
                 masterStaticTexts={template?.masterStaticTexts}
                 themeColors={template?.themeColors}
+                themeFonts={template?.themeFonts}
                 scale={THUMB_SCALE}
                 isActive={activeIndex === i}
                 selected={selected?.has(i)}

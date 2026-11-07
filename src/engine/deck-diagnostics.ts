@@ -12,7 +12,7 @@
 
 import type { DeckIR, SlideIR, Paragraph } from "./slide-schema";
 import type { LayoutCatalog } from "./template-catalog";
-import { slideIdxRole, isSectionFooterTarget } from "./template-catalog";
+import { isSectionFooterTarget } from "./template-catalog";
 import type { LayoutInfo } from "./template-loader";
 import { autoSelectLayout, suggestLayouts } from "./template-loader";
 import { slideBindingPlan } from "./group-binding";
@@ -24,6 +24,7 @@ import { estimateTableRowHeightsIn } from "./table-layout";
 import { isBlankParagraphs } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml } from "./diagram-node-shrink";
+import { fitTitle, slideRoleContent } from "./title-fit";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -126,10 +127,7 @@ function textOf(p: Paragraph | undefined): string {
   return p ? p.segments.map((s) => s.text).join("") : "";
 }
 
-function rolePlaceholder(slide: SlideIR, role: "title" | "body") {
-  const hasCtr = slide.placeholders.some((p) => p.idx === "0");
-  return slide.placeholders.find((p) => slideIdxRole(p.idx, hasCtr) === role);
-}
+const rolePlaceholder = slideRoleContent; // #437: one definition, shared with title-fit (export/preview)
 
 /** The slide's title text, or "" — shared by every issue-producing pass (incl. ParseNotice→DeckIssue). */
 function slideTitle(slide: SlideIR): string {
@@ -236,7 +234,6 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
   // vanish. On a healthy deck all content binds → unbound is empty → not one diagnostic is added.
   if (layouts && layouts.length > 0 && catalog && catalog.length > 0) {
     const layoutByName = new Map(layouts.map((l) => [l.name, l] as const));
-    const catalogEntryByName = new Map(catalog.map((e) => [e.name, e] as const)); // #437: the fit estimates live on the catalog entry
     deck.slides.forEach((slide, i) => {
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
@@ -314,27 +311,22 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
         }
       }
 
-      // #437 案a never-silent: a title longer than the resolved layout's title box clips at the right
-      // edge in the preview (R7: no autofit pre-computation on titles; PPTX behavior depends on the
-      // template's autofit). Diagnostic ONLY — rendering is untouched. Reads the SAME fit estimate the
-      // body budget rides (placeholderFitBox via the catalog entry + paragraphLines; R8, no second
-      // capacity computation). Title bands are often shorter than one body-tuned line-height, so the
-      // estimate's maxLines floor reads 0 — a title still renders (at least) one line, hence the clamp.
-      const titleFit = catalogEntryByName.get(layout.name)?.placeholders.find((p) => p.role === "title");
-      const titlePara = rolePlaceholder(slide, "title")?.paragraphs[0];
-      if (titleFit && titleFit.charsPerLine > 0 && titlePara && textOf(titlePara).trim()) {
-        const maxLines = Math.max(1, titleFit.maxLines);
-        const lines = paragraphLines(titlePara, titleFit.charsPerLine);
-        if (lines > maxLines) {
-          issues.push({
-            slideIndex: i,
-            title: slideTitle(slide),
-            id: "title-overflow",
-            level: RULE_LEVEL["title-overflow"],
-            message: `タイトルがこのレイアウト（${layout.name}）のタイトル枠に収まりません（目安 全角${titleFit.charsPerLine}字×${maxLines}行、推定 ${lines}行）。プレビューでは右端で切れます。タイトルを短くしてください`,
-            levers: ["condense"],
-          });
-        }
+      // #437 never-silent: an over-long title is SHRUNK to its box by export/preview (title-fit, R7) —
+      // this warns only when even the floor (TITLE_MIN_SCALE) leaves it overflowing. Same box (the
+      // placeholder the title content binds to, by reference) and the same fitTitle (R8).
+      const titleC = rolePlaceholder(slide, "title");
+      const titleA = titleC && plan.assignments.find((a) => a.content.content === titleC);
+      const titlePh = titleA && layout.placeholders.find((p) => p.idx === titleA.placeholder.idx);
+      const fit = titlePh && fitTitle(titleC.paragraphs, titlePh.style);
+      if (fit && !fit.fits) {
+        issues.push({
+          slideIndex: i,
+          title: slideTitle(slide),
+          id: "title-overflow",
+          level: RULE_LEVEL["title-overflow"],
+          message: `タイトルがこのレイアウト（${layout.name}）のタイトル枠に収まりません（${fit.basePt}pt→下限 ${fit.fontPt}pt まで縮小しても推定 ${fit.lines}行 > 枠 ${fit.maxLines}行）。はみ出して表示されます。タイトルを短くしてください`,
+          levers: ["condense"],
+        });
       }
     });
   }
