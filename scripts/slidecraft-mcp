@@ -13,12 +13,14 @@
 # The MCP server talks stdio JSON-RPC (--no-fs: .slidecraft/.pptx bytes flow as base64), so the
 # trust boundary is just the agent that spawned it — no network, no filesystem writes.
 #
-# Shipped layouts this script must resolve (Tauri v2 bundler, verified against the v0.5.0 .deb):
-#   macOS .app     Contents/Resources/slidecraft-mcp  node=../MacOS/node          cli=./cli.cjs
-#   Linux /usr/bin /usr/bin/slidecraft-mcp            node=./node (sidecar)       cli=../lib/SlideCraft/cli.cjs
-#   Linux resource /usr/lib/SlideCraft/slidecraft-mcp node=../../bin/node         cli=./cli.cjs
+# Shipped layouts this script must resolve (Tauri v2 bundler, layout verified against the v0.5.0 .deb):
+#   macOS .app     Contents/Resources/slidecraft-mcp  node=../MacOS/node                cli=./cli.cjs
+#   Linux /usr/bin /usr/bin/slidecraft-mcp            node=./slidecraft-node (sidecar)  cli=../lib/SlideCraft/cli.cjs
+#   Linux resource /usr/lib/SlideCraft/slidecraft-mcp node=../../bin/slidecraft-node    cli=./cli.cjs
 #   AppImage       same as Linux, under the --appimage-extract'ed squashfs-root/
 # (/usr/lib/SlideCraft = Tauri's resource dir, /usr/lib/<productName>; tests pin the agreement.)
+# Linux names the sidecar `slidecraft-node`, NOT `node` (#527): /usr/bin/node belongs to the distro
+# `nodejs` package, so this script must never pick ./node there — it may be the SYSTEM Node.
 
 # Resolve this script's REAL path. Homebrew installs it as a symlink in <prefix>/bin, so $0 is the
 # symlink; follow the chain (POSIX, no `readlink -f` which BSD/macOS historically lacks) to the
@@ -38,13 +40,13 @@ node="$here/../MacOS/node" # macOS: the bundled Node externalBin sits in Content
 cli="$here/cli.cjs"        # the self-contained MCP server bundled next to this script (macOS, Linux resource dir)
 
 if [ ! -x "$node" ]; then
-  # Linux (.deb/.rpm/AppImage): the node sidecar is installed to /usr/bin (next to this launcher when
-  # it runs as /usr/bin/slidecraft-mcp) and cli.cjs to Tauri's resource dir /usr/lib/<productName>/.
+  # Linux (.deb/.rpm/AppImage): the node sidecar is installed as /usr/bin/slidecraft-node (next to this
+  # launcher when it runs as /usr/bin/slidecraft-mcp) and cli.cjs to Tauri's resource dir /usr/lib/<productName>/.
   [ -f "$cli" ] || cli="$here/../lib/SlideCraft/cli.cjs"
-  if [ -x "$here/node" ]; then
-    node="$here/node"
-  elif [ -x "$here/../../bin/node" ]; then
-    node="$here/../../bin/node" # launched from the resource-dir copy (/usr/lib/SlideCraft/slidecraft-mcp)
+  if [ -x "$here/slidecraft-node" ]; then
+    node="$here/slidecraft-node"
+  elif [ -x "$here/../../bin/slidecraft-node" ]; then
+    node="$here/../../bin/slidecraft-node" # launched from the resource-dir copy (/usr/lib/SlideCraft/slidecraft-mcp)
   else
     node="node" # fall back to a PATH node if the bundle layout ever differs
   fi

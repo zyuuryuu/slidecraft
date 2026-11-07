@@ -22,7 +22,7 @@
     "build:host": "esbuild src/mcp/host-main.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist/mcp/host.cjs",
     "stage-node": "node scripts/stage-node.mjs",
     "stage-llamafile": "node scripts/stage-llamafile.mjs",
-    "build:desktop": "npm run stage-node && npm run stage-llamafile && npm run tauri build -- --config src-tauri/tauri.bundle.conf.json",
+    "build:desktop": "node scripts/build-desktop.mjs",
     "sbom": "npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json",
     "version:check": "node scripts/bump-version.mjs --check",
     "version:set": "node scripts/bump-version.mjs",

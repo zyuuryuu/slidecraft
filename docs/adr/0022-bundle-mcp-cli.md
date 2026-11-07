@@ -42,6 +42,19 @@ Tauri の実配置（sidecar `/usr/bin/node`・resources `/usr/lib/<productName>
 Cargo 名だが resources ディレクトリは productName）を相対解決する。結果、全 OS で登録は
 `claude mcp add slidecraft -- slidecraft-mcp` の 1 語（ADR-0038 D5）。決定本体は不変。
 
+## Addendum（2026-11-07・#527）
+
+Linux の同梱 Node sidecar は **`/usr/bin/slidecraft-node`** に置く（Linux だけ名前を変える）。Tauri の bundler は
+`externalBin` を名前そのまま（triple 接尾辞を落とすだけ）で `usr/bin/` に入れるので、`binaries/node` だと
+`/usr/bin/node` になり、distro の `nodejs` パッケージ（NodeSource 版も）とファイル所有が衝突して dpkg/rpm が
+インストールを拒否する。Linux ビルドだけ 2 枚目の release-only overlay `src-tauri/tauri.bundle.linux.conf.json`
+（共通 overlay の**後**に `--config` で渡す。配列は JSON Merge Patch で丸ごと置換）で externalBin を
+`binaries/slidecraft-node` に差し替え、`scripts/node-sidecar.mjs` を名前と `--config` 引数の唯一の決定元にする
+（stage-node / build-desktop / CI / release / collab.rs / ランチャは `tests/linux-node-sidecar.test.ts` で一致検査・R8）。
+macOS（`Contents/MacOS/node`）と Windows（`node.exe`）は**名前を変えない**：衝突が無く、利用者がその絶対パスを
+直接登録している（`docs/mcp-server.md`）ので、全 OS 改名は無関係な OS の登録を更新時に壊すだけになる。
+Linux で v0.5.0 の `/usr/bin/node` を直接登録していた利用者は `slidecraft-mcp` への切替が必要（docs に明記）。
+
 ## References
 
 - `package.json`（`build:mcp:bundled`）, `src-tauri/tauri.conf.json`（beforeBuildCommand）, `src-tauri/tauri.bundle.conf.json`（resources）

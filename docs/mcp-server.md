@@ -55,7 +55,7 @@ claude mcp add slidecraft -- slidecraft-mcp
 |---|---|---|
 | Windows NSIS（`*_x64-setup.exe`） | インストール先フォルダ（既定 `%LOCALAPPDATA%\SlideCraft`）を**ユーザ PATH**（`HKCU\Environment\Path`）に追加。インストーラの「詳細」に表示され、アンインストールで除去 | `slidecraft-mcp.cmd` — 同じフォルダの `node.exe` で `cli.cjs` を実行（Tauri は resources と sidecar をインストール先に**平置き**する） |
 | Windows MSI（`*_x64_en-US.msi`） | インストール先（既定 `C:\Program Files\SlideCraft\`）をユーザ PATH に追加（Windows Installer の Environment テーブル＝アンインストール/失敗時ロールバックで除去） | 同上 |
-| Linux `.deb` / `.rpm` | `/usr/bin/slidecraft-mcp`（sh） | `/usr/bin/node`（同梱 sidecar）で `/usr/lib/SlideCraft/cli.cjs` を実行 |
+| Linux `.deb` / `.rpm` | `/usr/bin/slidecraft-mcp`（sh） | `/usr/bin/slidecraft-node`（同梱 sidecar）で `/usr/lib/SlideCraft/cli.cjs` を実行。同梱 Node は `node` ではなく `slidecraft-node` という名前で入る — `/usr/bin/node` は distro の `nodejs` パッケージの持ち物で、同名だと system Node のあるマシンで dpkg/rpm がインストールを拒否するため（#527） |
 | Linux AppImage | 自動では載らない（マウント先が起動ごとに変わる）。`./SlideCraft_<ver>_amd64.AppImage --appimage-extract` で展開し、`squashfs-root/usr/bin/slidecraft-mcp` の**絶対パス**を `command` に登録する | 同上（展開先相対で解決） |
 
 Windows の注意点：
@@ -67,6 +67,8 @@ Windows の注意点：
 - ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
 
 > **v0.5.0 以前**のインストーラにはランチャが入っていません（`.deb` に `/usr/bin/slidecraft-mcp` は無い）。その場合は上の直接パス指定（Linux: `/usr/bin/node` ＋ `/usr/lib/SlideCraft/cli.cjs`）か、**ソースからの起動（B）**を使ってください。
+>
+> Linux で v0.5.0 の `/usr/bin/node` を**直接**登録していた場合、v0.5.1 以降へ更新すると `/usr/bin/node` は同梱されなくなります（#527）。登録を `slidecraft-mcp` の 1 行に切り替えてください（直接指定するなら `command` = `/usr/bin/slidecraft-node`）。macOS（`Contents/MacOS/node`）と Windows（`node.exe`）の同梱 Node の名前は変わりません。
 
 ### B. ソースから起動（開発版）
 

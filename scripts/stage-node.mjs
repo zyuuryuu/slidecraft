@@ -1,18 +1,20 @@
 // stage-node.mjs — CROSS-PLATFORM: stage a pinned Node runtime as the Tauri externalBin sidecar
-// (src-tauri/binaries/node-<triple>[.exe]) so a packaged app can run the collab host (dist/mcp/
+// (src-tauri/binaries/<name>-<triple>[.exe]; <name> = `node`, or `slidecraft-node` on Linux so the .deb/.rpm
+// never claim /usr/bin/node — see node-sidecar.mjs, #527) so a packaged app can run the collab host (dist/mcp/
 // host.cjs) on a machine with NO Node. Replaces the Windows-only stage-node.ps1.
 //
 //   node scripts/stage-node.mjs [target-triple] [--force]
 //
 // Default triple = the Rust host (rustc --print host-tuple). CI passes the matrix target explicitly
 // (e.g. node scripts/stage-node.mjs aarch64-apple-darwin). Run BEFORE `tauri build` — or use
-// `npm run build:desktop`, which chains this then the build with the bundle overlay.
+// `npm run build:desktop` (scripts/build-desktop.mjs), which chains this then the build with the bundle overlays.
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, copyFileSync, chmodSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { nodeSidecarName } from "./node-sidecar.mjs";
 
 const NODE_VERSION = "v22.11.0"; // pinned LTS; host.cjs is esbuild --target=node20, so node20+ runs it
 // Pinned SHA256 of each nodejs.org archive (from https://nodejs.org/dist/<ver>/SHASUMS256.txt),
@@ -49,7 +51,7 @@ if (!m) {
   process.exit(1);
 }
 
-const dest = join(binDir, `node-${triple}${m.ext}`);
+const dest = join(binDir, `${nodeSidecarName(triple)}-${triple}${m.ext}`);
 if (existsSync(dest) && !force) {
   console.log(`node sidecar already staged: ${dest}  (use --force to re-download)`);
   process.exit(0);
