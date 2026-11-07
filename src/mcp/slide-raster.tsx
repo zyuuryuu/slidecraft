@@ -35,7 +35,8 @@ import { buildCatalog } from "../engine/template-catalog";
 import { autoSelectLayout, findLayout, type TemplateData } from "../engine/template-loader";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { assembleSlidePage, assembleContactSheetPage, type EmbeddedFontFace } from "../engine/html-shell";
-import { classifyCjkFont, embedFallbackFamily, type CjkClass } from "../engine/font-stack";
+import { embedFallbackFamily, type CjkClass } from "../engine/font-stack";
+import { cjkClassesForTemplate } from "../engine/cjk-class";
 import { resolveFontSubsetSource } from "../engine/font-subset-plan";
 import { collectDeckText, deckHasCjkText } from "../engine/deck-text-collect";
 import type { DeckIR } from "../engine/slide-schema";
@@ -113,10 +114,8 @@ function loadFontFace(cjkClass: CjkClass, env: NodeJS.ProcessEnv): EmbeddedFontF
 
 function embeddedFontsFor(deck: DeckIR, template: TemplateData, env: NodeJS.ProcessEnv): EmbeddedFontFace[] {
   if (!deckHasCjkText(collectDeckText(deck))) return [];
-  const classes = new Set<CjkClass>([
-    classifyCjkFont(template.masterTitleStyle.eaFontName ?? template.masterTitleStyle.fontName),
-    classifyCjkFont(template.masterBodyStyle.eaFontName ?? template.masterBodyStyle.fontName),
-  ]);
+  // #573: the ONE resolve→classify entry (R8) — the same class the painter's font-family asks for.
+  const classes = cjkClassesForTemplate(template);
   const faces: EmbeddedFontFace[] = [];
   for (const c of classes) {
     const f = loadFontFace(c, env);
