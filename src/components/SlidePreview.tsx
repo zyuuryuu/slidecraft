@@ -28,6 +28,7 @@ import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-di
 import DiagramSvgOverlay from "./DiagramSvgOverlay";
 import BeforeAfterOverlay from "./BeforeAfterOverlay";
 import { orderedNumbers } from "../engine/list-markers";
+import { titleFontPt } from "../engine/title-fit";
 
 // ── Mermaid initialization (shared with the PPTX export for WYSIWYG parity) ──
 mermaid.initialize(MERMAID_CONFIG);
@@ -666,6 +667,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         }
         if (!content) return null;
         const nums = orderedNumbers(content.paragraphs); // `1.` items (#394)
+        const titlePt = titleFontPt(slide, content, s); // #437: the export's shrunk title size (R8)
 
         return (
           <div
@@ -676,7 +678,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               top: `${(s.y / SLIDE_H) * 100}%`,
               width: `${(s.w / SLIDE_W) * 100}%`,
               height: `${(s.h / SLIDE_H) * 100}%`,
-              fontSize: s.fontSize * (scale / 72),
+              fontSize: (titlePt ?? s.fontSize) * (scale / 72),
               color: `#${s.fontColor}`,
               fontWeight: s.bold ? "bold" : "normal",
               fontFamily: cjkFontFamily(resolveFontToken(s.fontName, themeFonts), s.eaFontName),

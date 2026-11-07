@@ -44,8 +44,10 @@ export function segmentToRun(seg: InlineSegment, style: RunStyle = {}): string {
   return `<a:r>${rPr}<a:t>${escXml(seg.text)}</a:t></a:r>`;
 }
 
-export function paragraphToOoxml(para: Paragraph, link?: LinkResolver): string {
-  const runs = para.segments.map((seg) => segmentToRun(seg, { link })).join("");
+/** `szPt` (#437): a pre-computed run size (title-fit) — absent → no sz attribute (master inherits). */
+export function paragraphToOoxml(para: Paragraph, link?: LinkResolver, szPt?: number): string {
+  const baseAttrs = szPt !== undefined ? [`sz="${Math.round(szPt * 100)}"`] : undefined;
+  const runs = para.segments.map((seg) => segmentToRun(seg, { link, baseAttrs })).join("");
   // Follow the slide master's bullet style — never force a glyph. Bullet lines
   // inherit the placeholder/master list style; non-bullet lines suppress it.
   // Nesting (#103): lvl="1..3" selects the master's lvl2pPr..lvl4pPr list style — PowerPoint
@@ -64,6 +66,6 @@ export function paragraphToOoxml(para: Paragraph, link?: LinkResolver): string {
   return `<a:p>${pPr}${runs}</a:p>`;
 }
 
-export function paragraphsToOoxml(paragraphs: Paragraph[], link?: LinkResolver): string {
-  return paragraphs.map((p) => paragraphToOoxml(p, link)).join("");
+export function paragraphsToOoxml(paragraphs: Paragraph[], link?: LinkResolver, szPt?: number): string {
+  return paragraphs.map((p) => paragraphToOoxml(p, link, szPt)).join("");
 }
