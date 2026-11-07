@@ -12,7 +12,7 @@ import i18n from "../i18n";
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth, type TemplateHealth } from "../engine/template-catalog";
 import { planRepairs, repairTemplate, type RepairPlan } from "../engine/template-repair";
-import { masterToTemplateSpec, extractLogo } from "../engine/master-remake";
+import { masterToTemplateSpec, extractLogo, logoForDarkLayouts } from "../engine/master-remake";
 import { faithfulRemake } from "../engine/faithful-remake";
 import { writeTemplate } from "../engine/template-writer";
 
@@ -165,7 +165,8 @@ export async function applyTemplateBytesAsRemake(
     const spec = masterToTemplateSpec(source, {
       name: i18n.t("applyTemplate.remakeName", { name: cleanName }),
     });
-    const logo = await extractLogo(source); // lift the source's logo onto the minted layouts
+    // lift the source's logo onto the minted dark layouts — the variant drawn on DARK backgrounds (#118)
+    const logo = logoForDarkLayouts(await extractLogo(source));
     const remadeBytes = await writeTemplate(logo ? { ...spec, logo } : spec);
     const remade = await loadTemplate(remadeBytes);
     const health = assessTemplateHealth(buildCatalog(remade));

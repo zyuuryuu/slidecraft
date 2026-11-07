@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import JSZip from "jszip";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
-import { masterToTemplateSpec, extractLogo, resolveFontToken } from "../src/engine/master-remake";
+import { masterToTemplateSpec, extractLogo, logoForDarkLayouts, resolveFontToken } from "../src/engine/master-remake";
 import { writeTemplate, MIDNIGHT_PALETTE } from "../src/engine/template-writer";
 import { buildCatalog, assessTemplateHealth } from "../src/engine/template-catalog";
 import { generatePptx } from "../src/engine/placeholder-filler";
@@ -129,7 +129,7 @@ describe("flatContent — absorb a flat source design (CI-covered)", () => {
 
 describe.skipIf(!HAS_CX)("logo inheritance from a real master", () => {
   it("extractLogo lifts the source's raster logo", async () => {
-    const logo = await extractLogo(await loadTemplate(readFileSync(CX)));
+    const logo = logoForDarkLayouts(await extractLogo(await loadTemplate(readFileSync(CX))));
     expect(logo?.ext).toBe("png");
     expect(logo!.bytes.length).toBeGreaterThan(100);
   });
