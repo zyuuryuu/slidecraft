@@ -136,7 +136,7 @@ export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ de
   if (!deckFile || !tplFile) {
     throw new Error("不正な .scft ファイルです（deck.json / template.pptx が見つかりません）");
   }
-  // meta is read FIRST so the version gate runs before deck.json schema validation (a newer app's
+  // meta is read FIRST so the version gate (migrateProjectDeck) runs before deck.json schema validation (a newer app's
   // deck shape must surface as "update the app", not a cryptic zod error).
   // A corrupt / missing meta.json is non-critical — keep defaults and open as the current format
   // (pre-#121 behaviour); only a VALID meta's version is gated.
@@ -146,8 +146,7 @@ export async function openProject(bytes: ArrayBuffer | Uint8Array): Promise<{ de
     const parsedMeta = ProjectMetaSchema.safeParse(JSON.parse((await readEntryString(zip, "meta.json", 64 * 1024)) || "{}"));
     if (parsedMeta.success) { meta = parsedMeta.data; fileVersion = meta.version; }
   } catch { /* malformed meta.json → keep defaults, still open the deck */ }
-  if (fileVersion > PROJECT_VERSION) throw new ProjectVersionError("PROJECT_VERSION_TOO_NEW", fileVersion, PROJECT_VERSION);
-  // Stream-capped decompression (zip-bomb safe) → version migration → schema validation → bounds.
+  // Stream-capped decompression (zip-bomb safe) → version gate/migration → schema validation → bounds.
   const rawDeck = JSON.parse(await readCappedString(deckFile, ZIP_LIMITS.deckJson));
   const parsed = DeckIRSchema.parse(migrateProjectDeck(rawDeck, fileVersion));
   assertDeckBounds(parsed);
