@@ -53,7 +53,8 @@ const HOT_TOOLS = [
  *  （"minimum":-9007199254740991 等・ホットだけで 456 tok）で、これは inputSchema の形の変更になるため
  *  本 Issue の不変条件の外（Issue #513 を閉じる PR の統括相談を参照）。上限は実測値に僅かな余裕だけ乗せた ratchet。 */
 const HOT_CHAR_LIMIT = 7950;
-const ALL_CHAR_LIMIT = 17600;
+// #554（export_pptx の引数 `charts` 追加・意図した inputSchema の拡張）で全体 17,577 → 17,752 字。宣言して上限を更新。
+const ALL_CHAR_LIMIT = 17800;
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> };
 type CallRes = { content: Array<{ text?: string }>; isError?: boolean };

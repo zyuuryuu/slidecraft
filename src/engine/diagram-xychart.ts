@@ -13,7 +13,7 @@ import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
 // Distinct series colours (bars + lines share the palette by series index).
-const SERIES_COLORS = ["#3B82F6", "#06B6D4", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6"];
+export const SERIES_COLORS = ["#3B82F6", "#06B6D4", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6"];
 
 // ── parser ──
 function bracketList(s: string): string[] {

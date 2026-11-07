@@ -24,6 +24,7 @@ import { DiagramSpecSchema } from "../engine/schema";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import { parseDesignIntent, applyDesignIntentReport, applyRegionSplit } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
+import type { ChartsMode } from "../engine/pptx-native-chart";
 import { GuardError } from "./guard-errors";
 
 export interface Session {
@@ -435,11 +436,13 @@ function stripMermaid(sl: SlideIR): SlideIR {
 
 /** Native-vector-only headless export (no SVG rasterizer → all native DiagramSpec/tables
  *  become editable PPTX shapes). Unconvertible Mermaid would silently VANISH, so reject by
- *  default (never-silent); "skip" omits + reports those slides. */
+ *  default (never-silent); "skip" omits + reports those slides. charts "native" (#554) exports
+ *  pie/xychart/radar as native charts and reports {native, shapes} figure counts (never-silent). */
 export async function exportPptxBytes(
   s: Session,
   onUnsupportedMermaid: "reject" | "skip" = "reject",
-): Promise<{ bytes: Uint8Array; skipped: number[] }> {
+  charts: ChartsMode = "shapes",
+): Promise<{ bytes: Uint8Array; skipped: number[]; charts?: { native: number; shapes: number } }> {
   const { deck, template } = requireLoaded(s);
   const blocked = unconvertibleMermaidSlides(deck);
   if (blocked.length && onUnsupportedMermaid === "reject") {
@@ -451,6 +454,8 @@ export async function exportPptxBytes(
   const exportDeck = blocked.length
     ? { ...deck, slides: deck.slides.map((sl, i) => (blocked.includes(i) ? stripMermaid(sl) : sl)) }
     : deck;
-  const bytes = await generatePptx(exportDeck, template); // no rasterizer = native-vector only
-  return { bytes, skipped: blocked };
+  if (charts === "shapes") return { bytes: await generatePptx(exportDeck, template), skipped: blocked }; // native-vector only
+  const counts = { native: 0, shapes: 0 };
+  const bytes = await generatePptx(exportDeck, template, undefined, { charts, onFigure: (f) => counts[f]++ });
+  return { bytes, skipped: blocked, charts: counts };
 }

@@ -153,6 +153,13 @@
           "skip"
         ]
       },
+      "charts": {
+        "type": "string",
+        "enum": [
+          "shapes",
+          "native"
+        ]
+      },
       "filename": {
         "type": "string"
       },

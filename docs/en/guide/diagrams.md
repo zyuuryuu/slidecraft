@@ -223,6 +223,15 @@ radar:
     - { name: Competitor, values: [3, 3, 5, 2] }
 ```
 
+::: tip Exporting as native PowerPoint charts (`pie` / `xychart` / `radar`)
+By default charts are exported as groups of shapes, so the preview and the PPTX look the same. Passing
+`charts: "native"` to the MCP `export_pptx` tool turns these three types into native PowerPoint charts (with
+their data embedded), so the recipient can fix numbers or colours via "Edit Data" in PowerPoint. The preview,
+HTML export and `get_slide_image` keep drawing them as shapes, so they are an **approximation** of what
+PowerPoint shows (PowerPoint draws native charts itself). All other diagrams are still exported as shapes.
+For now this is available from MCP only.
+:::
+
 ### kpi — KPI cards
 
 Set `nodes: []`, and in the `cards` of the `kpi` object arrange large number tiles. `value` / `delta` are strings (units may be included), and `trend` is `up` / `down`.

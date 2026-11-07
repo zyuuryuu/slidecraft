@@ -23,6 +23,8 @@ import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
 import { createLinkRegistry } from "./hyperlink-rels";
 import { titleFontPt } from "./title-fit";
 import { paintToShapeXml, renumberShapeIds } from "./pptx-writer";
+import type { ChartsMode } from "./pptx-native-chart";
+import { nativeChartPartsForYaml, writeNativeChart, maxChartNumber, XLSX_CT, type NativeChartParts } from "./pptx-native-chart-parts";
 import { paintDiagram } from "./diagram-painter";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { tableGraphicFrameXml } from "./table-ooxml";
@@ -127,7 +129,8 @@ async function buildSlideXml(
   // 所属章名（#168・案A）。null＝章扉より前 or section 無しデッキ＝注入なし。chrome 経路（sldNum と
   // 同じ「テンプレに枠が無ければテンプレの意思」扱い）— 明示 Footer: が束縛済みの ftr 枠には触れない。
   sectionFooterText: string | null = null,
-): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined; linkRels: string }> {
+  charts: ChartsMode = "shapes", // #554: "native" → pie/xychart/radar as a native chart (else shapes)
+): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined; linkRels: string; chart?: NativeChartParts; figure?: "native" | "shapes" }> {
   // A Mermaid block whose content is a NATIVE diagram type exports as native,
   // editable shapes (not a rasterised mermaid.js image) — matching the preview.
   if (slide.mermaidBlock && !slide.diagram) {
@@ -262,8 +265,10 @@ async function buildSlideXml(
   // (#124 — reachable once the chrome gate removes a header band from the body ordinals).
   const diagWantsRegion = slide.diagram ? (parseInt(slide.diagram.placeholderIdx) || 1) !== 1 : false;
   const diagPh = diagWantsRegion ? visualBody(slide.diagram!.placeholderIdx) : undefined;
+  let chart: NativeChartParts | null = null;
   if (slide.diagram && (!diagWantsRegion || diagPh)) {
-    const diagramShapes = await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
+    chart = charts === "native" ? await nativeChartPartsForYaml(slide.diagram.yaml, midnightExecutive(), diagPh?.style) : null;
+    const diagramShapes = chart?.frameXml ?? await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
     // Re-number shape IDs (incl. nestShapeXml's <p:grpSp> 7000-range ids) in ONE document-order pass.
     // The old per-id global replace re-rewrote ids whose NEW value collided with a later oldId (#441).
     const r = renumberShapeIds(diagramShapes, id);
@@ -298,7 +303,8 @@ async function buildSlideXml(
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
     `</p:sld>`;
 
-  return { xml, mermaidImageRId, imageRId, linkRels: links.relsXml() };
+  const figure = slide.diagram && (!diagWantsRegion || diagPh) ? (chart ? "native" : "shapes") : undefined;
+  return { xml, mermaidImageRId, imageRId, linkRels: links.relsXml(), ...(chart ? { chart } : {}), ...(figure ? { figure } : {}) };
 }
 
 /** Fixed slide rels: rId1 layout, rId2/rId3 images, rId4 notesSlide — hyperlinks (#393) start after. */
@@ -335,6 +341,9 @@ export async function generatePptx(
   deck: DeckIR,
   template: TemplateData,
   rasterizeSvg?: SvgRasterizer,
+  // #554: charts "native" exports pie/xychart/radar as native charts; onFigure reports each DiagramSpec figure's
+  // outcome (never-silent). Omitted / "shapes" = the pre-#554 output byte for byte.
+  opts: { charts?: ChartsMode; onFigure?: (figure: "native" | "shapes") => void } = {},
 ): Promise<Uint8Array> {
   // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）。宣言なしデッキは同一参照が返る。
   deck = materializeDerivedSlides(deck);
@@ -366,6 +375,7 @@ export async function generatePptx(
   const mediaDefaults = new Map<string, string>(); // ext → ContentType, added in the FINAL CT rebuild (an
   // inline [Content_Types].xml write here would be clobbered by that rebuild, which reads the pristine CT).
   const slideIdBase = 256;
+  let chartNum = maxChartNumber(zip); // native charts are numbered above any the template already has
   // Catalog → layout selection adapts to THIS template (canonical = unchanged).
   const catalog = buildCatalog(template);
 
@@ -426,7 +436,16 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const { xml: slideXml, mermaidImageRId, imageRId, linkRels } = await buildSlideXml(layout, slide, sectionFooterFor(deck, i));
+    const built = await buildSlideXml(layout, slide, sectionFooterFor(deck, i), opts.charts);
+    const { xml: slideXml, mermaidImageRId, imageRId } = built;
+    if (built.figure) opts.onFigure?.(built.figure);
+    let linkRels = built.linkRels;
+    if (built.chart) {
+      const w = writeNativeChart(zip, built.chart, ++chartNum);
+      linkRels += w.slideRel;
+      ctEntries.push(w.ctOverride);
+      mediaDefaults.set("xlsx", XLSX_CT);
+    }
 
     // Embed each referenced image with its OWN rId (a behind backdrop can coexist with a mermaid PNG,
     // so they no longer share one slot). Mermaid SVG→PNG is rasterized by the injected UI-layer canvas.

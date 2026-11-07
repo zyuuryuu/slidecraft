@@ -144,7 +144,7 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 構造 | `duplicate_slide(index, position?)` | 複製（structuredClone で図/表/コードを byte-identical に） |
 | 検証 | `validate_deck` | deck 検証＋`exportReadiness`（変換不能 mermaid スキャン） |
 | 保存 | `save_project(filename?)` | `.scft` を生成。既定 `{dataBase64}`。`--root` scope 起動時は scope 配下へ書き出し `{path}`（下記「scoped fs 出力」） |
-| 出力 | `export_pptx(onUnsupportedMermaid?, filename?)` | `.pptx` を **native-vector で headless 生成**。既定 `{dataBase64, skipped}`。`--root` scope 起動時は `{path, skipped}` |
+| 出力 | `export_pptx(onUnsupportedMermaid?, charts?, filename?)` | `.pptx` を **native-vector で headless 生成**。既定 `{dataBase64, skipped}`。`--root` scope 起動時は `{path, skipped}`。`charts: "native"` で pie/xychart/radar をネイティブ chart にし `charts: {native, shapes}` を足す（下記） |
 | lifecycle | `list_documents` / `select_document` / `close_document` / `undo` / `redo` | 複数ドキュメント lifecycle＋サーバ側 undo/redo。各ドキュメント行/戻りに `contract` 同梱。**doc 切替 3 本（list/select/close）は collab 専用** — solo（stdio 単独）は常に 1 doc なので登録されない（プロファイル別登録・ADR-0037 D2／#465）。**`undo`/`redo` は solo でも登録され本当に効く**（ADR-0033 D1）。collab では複数 doc を跨ぐ |
 | host 専用(GUI) | `register_templates(templates[])` | GUI のみ：webview の master レジストリを host へ投入（`{id,name,builtin,bytesBase64}` の配列・呼ぶ度に全置換）。AI ロール・solo には非公開（solo は GUI が繋がらずレジストリの投入元が無い）。これで AI が `list_templates`/`use_template` で選べる |
 
@@ -243,6 +243,12 @@ deck の状態は **MCP resource** としても公開する。tool を連打せ�
 - **変換不能な Mermaid（gitGraph / sankey / C4 等）は headless では描けない**ため、
   `export_pptx` は既定で **reject**（無言消失させない）。`onUnsupportedMermaid: "skip"` を
   渡すと当該スライドを省略し `skipped` で報告する。`validate_deck` の `exportReadiness` で事前に分かる。
+- **グラフのネイティブ出力（`charts: "native"`・#554）**：既定 `"shapes"` はグラフも図形で出す（従来と
+  byte-identical）。`"native"` を渡すと `pie` / `xychart`（棒・折れ線・混在）/ `radar` を PowerPoint の
+  ネイティブ chart（埋め込みワークブック付き＝受け手が「データの編集」で数値や色を直せる）として出し、位置と
+  大きさは図形版と同じ矩形を使う。対象外の図（flowchart 等）とデータの無いグラフは図形のまま出て、結果の
+  `charts: {native, shapes}` に件数が載る（黙って変わらない）。**プレビュー・HTML・`get_slide_image` は図形描画の
+  まま**なので PowerPoint 上の見た目とは**近似**（ネイティブ chart は PowerPoint が描く）。
 
 ---
 
