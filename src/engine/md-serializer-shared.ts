@@ -10,6 +10,7 @@ import { tableToMarkdown } from "./md-table";
 import { orderedNumbers, listItemLine } from "./list-markers";
 import { FIELD_ROWS } from "./field-rows";
 import { beforeAfterRole } from "./md-separators";
+import { opensComment } from "./md-comments";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -67,7 +68,9 @@ export function serializeParagraphs(paragraphs: Paragraph[]): string {
       // #165: a GUI-authored comment-only PLAIN paragraph would otherwise emit a line #147's parser
       // drops on the next parse (silent text loss). Escape its leading `<` so the line survives —
       // md-slide-parser.ts strips exactly this one leading backslash back off.
-      if (COMMENT_ONLY_TEXT_RE.test(text.trim())) return `\\${text}`;
+      // #588: likewise a paragraph that OPENS a comment (`<!--` … unclosed) — a later `-->` paragraph would
+      // close it and the parser would drop the whole run. Same predicate as the parser (md-comments, R8).
+      if (COMMENT_ONLY_TEXT_RE.test(text.trim()) || opensComment(text.trim())) return `\\${text}`;
       return text;
     })
     .join("\n");
