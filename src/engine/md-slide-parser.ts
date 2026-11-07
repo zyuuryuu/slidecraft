@@ -15,6 +15,7 @@ import { levelFromIndent, measureIndent } from "./paragraph-nesting";
 import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
 import { parseInline } from "./md-inline";
 import { matchListItem } from "./list-markers";
+import { stripCommentOnlyLines } from "./md-comments";
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -149,19 +150,6 @@ function matchImageLine(trimmed: string): ImageBlock | null {
   return { src: m[2], alt: m[1], placeholderIdx: "1", ...parseImageAttrs(m[3]) };
 }
 
-// ── Comment-only line stripping (#147) ──
-
-/** A line that is NOTHING but comments — one or more complete `<!-- … -->` units
- *  (optionally whitespace-separated), plus the WHATWG abrupt-close forms `<!-->` /
- *  `<!--->`. All render as nothing in any HTML view. A line with visible text outside
- *  the markers never matches (inline-comment strip = #147 第2弾スコープ). */
-const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
-/** Directive comments that carry meaning — the layout pin, the group separators, the
- *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
- *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
- *  drop class — only the bare markers survive. */
-const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|compare|before|after|note|section|toc|step\s*\*)\s*-->$)/; // `step *` = #401
-
 // ── Speaker notes (#150 / ADR-0032 D1) ──
 
 /** The bare `<!-- note -->` marker: everything after it (to the slide's end) is speaker notes. */
@@ -209,38 +197,6 @@ function splitNoteLines(lines: string[]): { content: string[]; notes: string[] |
     }
   }
   return { content: lines, notes: null };
-}
-
-/**
- * #147: Drop non-directive comment-only lines (review notes / TODO markers / source IDs
- * an upstream agent or human left in the Markdown) so they never render onto a slide.
- * A dropped comment also swallows the blank lines directly ABOVE it — the comment
- * "paragraph" disappears whole (`A\n\n<!-- note -->\nB` glues to `A\nB`), while a blank
- * AFTER it still separates content as authored. Fence interiors pass through verbatim
- * (a ``` block keeps comment-looking strings), and directive comments are untouched.
- * Dropped comments do NOT round-trip: the serializer never sees them (spec'd in #147).
- */
-function stripCommentOnlyLines(lines: string[]): string[] {
-  const out: string[] = [];
-  const pendingBlanks: string[] = [];
-  let inFence = false;
-  for (const line of lines) {
-    const t = line.trim();
-    if (t.startsWith("```")) {
-      inFence = !inFence;
-      out.push(...pendingBlanks.splice(0), line);
-    } else if (inFence) {
-      out.push(line);
-    } else if (t === "") {
-      pendingBlanks.push(line);
-    } else if (COMMENT_ONLY_RE.test(t) && !DIRECTIVE_COMMENT_RE.test(t)) {
-      pendingBlanks.length = 0; // the comment paragraph swallows its leading blanks
-    } else {
-      out.push(...pendingBlanks.splice(0), line);
-    }
-  }
-  out.push(...pendingBlanks); // trailing blanks (trimBodyLines handles them downstream)
-  return out;
 }
 
 // ── Parse a single slide block ──

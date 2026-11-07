@@ -61,6 +61,7 @@ A few behaviors are worth keeping in mind.
 - Only the first `#` becomes the title. Any `#` lines beyond the first are treated as body.
 - The subtitle can be specified with either `##` or `>` (a blockquote). However, `>` only becomes a subtitle when placed **immediately after the title and before the body begins**. A `>` that appears after the body has begun becomes an ordinary body line with the quote marker stripped.
 - Only one subtitle is picked up, too.
+- A comment-only line (`<!-- memo -->`) does not appear in the output, and **neither does a multi-line comment** whose `<!--` and `-->` are on different lines. A line with body text after `-->` (or before `<!--`), or a comment never closed with `-->`, is not removed and shows as body text (directive comments such as separators are not affected).
 
 ::: warning A common mix-up
 If you put a `>` line in the middle of the body, it is displayed as "body with the `>` stripped," not as a blockquote. Note that SlideCraft's Markdown is not a general-purpose Markdown viewer but a converter into slide structure.
