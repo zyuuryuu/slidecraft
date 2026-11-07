@@ -17,7 +17,8 @@ import { detectPathologies } from "../src/engine/master-pathology";
 import { sanitizeMasterBytes, sanitizeName } from "../scripts/sanitize-master";
 
 const fx = (p: string) => resolve(__dirname, "fixtures/templates", p);
-const pub = (p: string) => resolve(__dirname, "../public/templates/slide", p);
+// #117（統括裁定 C）: Midnight は出荷物でなく入力サンプル（samples/templates/）に移った — 走査対象は縮めずパスだけ追随。
+const pub = (p: string) => resolve(__dirname, p.startsWith("Midnight_") ? "../samples/templates" : "../public/templates/slide", p);
 
 // 実物と twin で「パーサが見る構造」が完全一致することを assert
 async function assertTwinFaithful(bytes: Uint8Array, label: string) {

@@ -16,11 +16,12 @@ import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, fi
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
-import { loadTemplate, autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
+import { autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
 import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake } from "./apply-template";
 import type { RepairPlan } from "../engine/template-repair";
 import type { SlideIR, ImageRect } from "../engine/slide-schema";
 import { pickBinaryFile } from "../ipc/commands";
+import { BUILTIN_MASTER } from "./useMasterRegistry";
 import { useDeckRevise } from "./useDeckRevise";
 import { useDeckIO } from "./useDeckIO";
 import { useGenerateSlide } from "./useGenerateSlide";
@@ -68,7 +69,7 @@ export function useDeckController() {
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
     initSnapshot, setInitSnapshot,
     docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
-  } = useDocumentStore({ mdText: "", templateName: "Midnight Executive", subMode: "edit", selected: new Set([0]), title: i18n.t("controller.untitledDoc") });
+  } = useDocumentStore({ mdText: "", templateName: BUILTIN_MASTER.name, subMode: "edit", selected: new Set([0]), title: i18n.t("controller.untitledDoc") });
 
   // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
   // a broken figure kept as-is). Kept SEPARATE from parseError: the slide is valid and MUST still
@@ -154,15 +155,9 @@ export function useDeckController() {
     return () => window.removeEventListener("keydown", onKey);
   }, [subMode, undoDeck, redoDeck]);
 
-  // Load the default template for preview. The app starts EMPTY (no default sample deck) — the user
-  // writes Markdown or imports a project; the preview shows its "type Markdown…" placeholder until then.
-  useState(() => {
-    fetch("/templates/slide/Midnight_Executive_30_TemplateOnly.pptx")
-      .then((r) => r.arrayBuffer())
-      .then((buf) => loadTemplate(buf))
-      .then(setTemplateData)
-      .catch(() => {});
-  });
+  // The default template is loaded at startup by App through the master registry (default-master.ts,
+  // #117) — one path, one URL definition, never-silent on failure. The app starts EMPTY (no default
+  // sample deck); the preview shows its "type Markdown…" placeholder until the user writes or imports.
 
   // When the template (catalog) loads or changes, re-fit the current deck to it —
   // split slides that overflow the new template. Length-guarded so it only fires

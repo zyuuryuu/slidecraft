@@ -15,7 +15,7 @@ import JSZip from "jszip";
 import { loadTemplate, findLayout, type TemplateData } from "../src/engine/template-loader";
 
 const MIDNIGHT = [
-  resolve(__dirname, "../public/templates/slide/Midnight_Executive_30_TemplateOnly.pptx"),
+  resolve(__dirname, "../samples/templates/Midnight_Executive_30_TemplateOnly.pptx"), // #117: 入力サンプルへ移動（旧 public 同梱）
   resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"),
 ];
 

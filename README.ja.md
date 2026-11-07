@@ -84,7 +84,8 @@ src/
 src-tauri/           # Rust バックエンド（sidecar・keychain・モデルDL）
 tests/ · tests/e2e/  # Vitest ／ Playwright
 docs/                # ドキュメントサイト (VitePress)・ADR・設計
-public/templates/    # スライドマスター (.pptx)
+public/templates/    # 同梱スライドマスター (.pptx・内蔵 3 本)
+samples/             # 入力サンプル（Markdown デッキ・原稿・canonical 30 レイアウトのテンプレ）
 ```
 
 ## 技術スタック

@@ -2,7 +2,7 @@
  * template-layout-library.ts — 組み込みレイアウトライブラリ（テーマ2 S3・純粋データ）。
  *
  * canonical（Midnight Executive 30 レイアウト）のプレースホルダ定義を engine 型に昇格したもの。
- * 出自は scripts/rebuild-template.ts の LAYOUTS（さらに遡ると create_30_layouts.py）— 座標/idx/type は
+ * 出自は scripts/rebuild-template.ts の LAYOUTS（#117 で引退・git 履歴に残る。さらに遡ると create_30_layouts.py）— 座標/idx/type は
  * 実証済みの値をそのまま使い、フォントは major/minor・色はセマンティックなパレットキーに置き換えて
  * 任意デザインへ差し替え可能にした。template-writer.ts が TemplateSpec と組み合わせて PPTX を生成する。
  * 設計: docs/design/template-authoring.md S3。

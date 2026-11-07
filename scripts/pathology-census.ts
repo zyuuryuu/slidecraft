@@ -19,11 +19,13 @@ import { detectPathologies, type PathologyKind } from "../src/engine/master-path
 const BUNDLED = "public/templates/slide";
 const FIX = "tests/fixtures/templates";
 
-// 既定センサス対象＝同梱 4 種（クリーン基準）＋ ローカル実テンプレ（.potx／CX／velis／敵対 fixture）
+// 既定センサス対象＝同梱 3 種＋入力サンプル Midnight（クリーン基準・#117 で samples/templates へ移動）
+// ＋ ローカル実テンプレ（.potx／CX／velis／敵対 fixture）
 function defaultPaths(): string[] {
-  const bundled = ["Midnight_Executive_30", "技術報告_スタンダード水色", "配布資料_公文書高密度", "ビジュアルデッキ_マガジン"].map(
-    (n) => join(BUNDLED, `${n}_TemplateOnly.pptx`),
-  );
+  const bundled = [
+    "samples/templates/Midnight_Executive_30_TemplateOnly.pptx",
+    ...["技術報告_スタンダード水色", "配布資料_公文書高密度", "ビジュアルデッキ_マガジン"].map((n) => join(BUNDLED, `${n}_TemplateOnly.pptx`)),
+  ];
   const real = [
     "報告書テンプレート.potx",
     "報告書テンプレート_エディトリアル.potx",

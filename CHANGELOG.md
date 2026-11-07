@@ -15,6 +15,10 @@
 
 - **PPTX のグラフをネイティブ chart で書き出すオプション**（段 1）— MCP `export_pptx` に `charts: "native"` を渡すと `pie` / `xychart`（棒・折れ線・混在）/ `radar` が PowerPoint のネイティブグラフ（データ埋め込み・「データの編集」で数値や色を直せる）になり、結果に `charts: {native, shapes}` の件数が載る。既定 `"shapes"` は従来どおり（byte-identical）。プレビュー・HTML・`get_slide_image` は図形描画のままで近似（[#554](https://github.com/zyuuryuu/slidecraft/issues/554)）
 
+### Changed
+
+- **既定テンプレートが「技術報告 スタンダード水色」に変わり、内蔵テンプレートは 3 本に** — 開発用だった Midnight Executive（canonical 30 レイアウト）は同梱をやめ、入力サンプル `samples/templates/` に移した（MasterPicker「＋取込」で従来どおり使える）。起動時の読み込みはマスターレジストリ経由の 1 本にまとめ、読み込みに失敗したら黙らずにトーストで知らせる（以前は失敗すると通知なしでテンプレの無い白いプレビューになっていた）。テンプレが無いときのレイアウト選択欄は「自動」だけを出し、Markdown の `<!-- slide: -->` 補完は読み込み中テンプレのレイアウト名を出す。自分のテンプレートを使う場合の出力は従来と同一（[#117](https://github.com/zyuuryuu/slidecraft/issues/117)）
+
 ### Fixed
 
 - **Re-make（テーマだけ抽出して自前レイアウトに乗せる取り込み）で、暗い表紙に明背景用の濃色ロゴが載り見えなくなる問題** — ロゴを「最頻出の 1 枚」でなく背景ごとの変種（暗背景に載っていた画像／明背景に載っていた画像）で選び、表紙・章扉・締めには暗背景用（白抜き等）を載せる。明暗の判定はパレット抽出と同じ関数。ロゴが 1 種類だけのテンプレの出力は従来と同一（[#118](https://github.com/zyuuryuu/slidecraft/issues/118)）

@@ -13,9 +13,10 @@ import AiPanel from "./components/AiPanel";
 import CollabPanel from "./components/CollabPanel";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDeckController } from "./components/useDeckController";
 import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
+import { loadDefaultMaster } from "./components/default-master";
 import MasterPicker from "./components/MasterPicker";
 import ThemeToggle from "./components/ThemeToggle";
 import LanguageToggle from "./components/LanguageToggle";
@@ -166,6 +167,14 @@ export default function App() {
   // the collab bridge below can both depend on `notify` without a temporal-dead-zone reference.
   const [toast, setToast] = useState<{ message: string; ts: number } | undefined>(undefined);
   const notify = useCallback((message: string) => setToast({ message, ts: Date.now() }), []);
+  // Startup: load the default built-in through the registry (#117) — once (StrictMode-guarded), and
+  // never silent: a fetch/gate failure surfaces as a toast instead of a blank template-less preview.
+  const startupLoadRef = useRef(false);
+  useEffect(() => {
+    if (startupLoadRef.current) return;
+    startupLoadRef.current = true;
+    void loadDefaultMaster({ getBytes: getMasterBytes, apply: applyMasterBytes, notify });
+  }, [getMasterBytes, applyMasterBytes, notify]);
   // Help/? (issue #114) — never-silent: if opener/window.open can't actually open the docs
   // site, surface the URL instead of failing quietly.
   const handleHelp = useCallback(async () => {

@@ -16,9 +16,12 @@ SlideCraft をさまざまな入力で触って検証するためのサンプル
   `Draft → 整形 → 診断 → 修復` の通しテスト。
 - **構造化Markdown（`deck-*.md`）**：**📝 Draft** → 「📄 ファイルを開く」で読込 →（必要なら
   整形/レビュー）→ **✓ スライドにする**。Edit での図/表/レイアウト編集をテスト。
-- **テンプレ切替**：ツールバー **Template** で `public/templates/slide/` の別 .pptx を読込。
-  - `Midnight_Executive_30_TemplateOnly.pptx`（標準）
-  - `lrk-slides-velis_CC0.pptx`（**別マスター** = "alien" テンプレ検証・CC0）
+- **テンプレ切替**：ツールバーのテンプレ選択（MasterPicker）で内蔵 3 本（既定＝技術報告 スタンダード水色）を
+  切り替えるか、「＋取込」で .pptx を取り込む。
+  - [`templates/Midnight_Executive_30_TemplateOnly.pptx`](templates/README.md)（canonical 30 レイアウト。
+    `deck-*.md` / `sample-deck.md` の `<!-- slide: Title.1Title.Single -->` 等のレイアウト指定はこの名前。
+    内蔵テンプレでは同名が無いので自動選択に degrade する）
+  - `tests/fixtures/templates/lrk-slides-velis_CC0.pptx`（**別マスター** = "alien" テンプレ検証・CC0）
 
 ## サンプル一覧
 

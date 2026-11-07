@@ -9,7 +9,6 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SlideIR } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
-import { LAYOUT_NAMES } from "../engine/slide-schema";
 import { buildFieldMap, applyFieldEdit } from "../engine/placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN } from "../engine/visual-placement";
 import { groupEditorPlan } from "../engine/group-binding";
@@ -226,7 +225,8 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
               className="w-full px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg"
             >
               <option value="auto">{resolvedLayout ? t("slideEditor.autoResolvedTo", { layout: resolvedLayout }) : t("slideEditor.auto")}</option>
-              {(layoutNames && layoutNames.length > 0 ? layoutNames : LAYOUT_NAMES).map((name) => (
+              {/* Only the LOADED template's layouts — with no template there is nothing to pin, so just Auto (#117). */}
+              {(layoutNames ?? []).map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>

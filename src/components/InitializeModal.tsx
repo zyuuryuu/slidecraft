@@ -111,7 +111,7 @@ export default function InitializeModal({
                 <span className="text-dim"> {t("initModal.editorHint")}</span>
               </div>
               <div className="flex-1 min-h-0">
-                <Editor value={mdText} onChange={onMdChange} language="markdown" onCursorLine={onCursorLine} gotoLine={gotoLine} />
+                <Editor value={mdText} onChange={onMdChange} language="markdown" onCursorLine={onCursorLine} gotoLine={gotoLine} layoutNames={templateData?.layouts.map((l) => l.name)} />
               </div>
             </>
           }

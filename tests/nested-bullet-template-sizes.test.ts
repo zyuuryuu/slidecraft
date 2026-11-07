@@ -6,7 +6,8 @@
  *
  * 受け入れ基準（Issue #449）: 同梱テンプレの本文プレースホルダで、解決後の lvl2/3/4 サイズが
  * lvl1（fontSize）以下であること — template-loader の levelFontSizes で検査する。
- * 対象は出荷している public/templates/slide の 4 本と、tests/fixtures のその対応物（全レイアウト見本）。
+ * 対象は出荷している public/templates/slide の 3 本と入力サンプル samples/templates の Midnight（#117 で
+ * 同梱から外した旧既定・統括裁定 #117 による 4 本→3 本の改訂）、および tests/fixtures のその対応物（全レイアウト見本）。
  * fixtures の 報告書テンプレート_* は出荷物ではない intake 試験コーパスなので対象外。
  */
 import { describe, it, expect } from "vitest";
@@ -16,13 +17,14 @@ import { loadTemplate } from "../src/engine/template-loader";
 
 const PUBLIC_DIR = resolve(__dirname, "../public/templates/slide");
 const FIXTURE_DIR = resolve(__dirname, "fixtures/templates");
+const SAMPLES_DIR = resolve(__dirname, "../samples/templates");
 
 const BUNDLED: Array<[string, string]> = [
-  [PUBLIC_DIR, "Midnight_Executive_30_TemplateOnly.pptx"],
+  [SAMPLES_DIR, "Midnight_Executive_30_TemplateOnly.pptx"],
   [PUBLIC_DIR, "技術報告_スタンダード水色_TemplateOnly.pptx"],
   [PUBLIC_DIR, "ビジュアルデッキ_マガジン_TemplateOnly.pptx"],
   [PUBLIC_DIR, "配布資料_公文書高密度_TemplateOnly.pptx"],
-  // public 同梱テンプレの fixtures 対応物（同じマスター/レイアウトの全レイアウト見本）
+  // 上記テンプレの fixtures 対応物（同じマスター/レイアウトの全レイアウト見本）
   [FIXTURE_DIR, "Midnight_Executive_30_TemplateOnly.pptx"],
   [FIXTURE_DIR, "技術報告_スタンダード水色_全レイアウト見本.pptx"],
   [FIXTURE_DIR, "ビジュアルデッキ_マガジン_全レイアウト見本.pptx"],

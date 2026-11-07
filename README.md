@@ -85,7 +85,8 @@ src/
 src-tauri/           # Rust backend (sidecar, keychain, model download)
 tests/ · tests/e2e/  # Vitest / Playwright
 docs/                # Documentation site (VitePress), ADRs, design
-public/templates/    # Slide masters (.pptx)
+public/templates/    # Bundled slide masters (.pptx, 3 built-ins)
+samples/             # Input samples (Markdown decks, manuscripts, the canonical 30-layout template)
 ```
 
 ## Tech stack

@@ -12,11 +12,12 @@ import {
   bracketMatching,
 } from "@codemirror/language";
 import { closeBrackets, autocompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import { LAYOUT_NAMES } from "../engine/slide-schema";
 
 // ── Layout name autocomplete for <!-- slide: ... --> ──
+// Completes the LOADED template's layout names (read through a ref so the editor isn't rebuilt when the
+// template changes). No template → no layout candidates (#117: no fixed 30-name fallback list).
 
-function layoutCompletion(context: CompletionContext): CompletionResult | null {
+const layoutCompletion = (names: { current: readonly string[] }) => (context: CompletionContext): CompletionResult | null => {
   // Match `<!-- slide: ` followed by partial layout name
   const line = context.state.doc.lineAt(context.pos);
   const textBefore = line.text.slice(0, context.pos - line.from);
@@ -28,14 +29,14 @@ function layoutCompletion(context: CompletionContext): CompletionResult | null {
 
   return {
     from,
-    options: LAYOUT_NAMES.map((name) => ({
+    options: names.current.map((name) => ({
       label: name,
       type: "keyword",
-      detail: name.split(".")[0], // category: Title, Section, Content, etc.
+      detail: name.includes(".") ? name.split(".")[0] : undefined, // canonical category: Title, Section, Content, etc.
     })),
     filter: true,
   };
-}
+};
 
 // ── Directive autocomplete for `<!-- … -->`（発見性: note/col/kpi/step/card）──
 
@@ -74,16 +75,19 @@ interface EditorProps {
   language?: "yaml" | "json" | "markdown";
   onCursorLine?: (line: number) => void;
   gotoLine?: { line: number; ts: number }; // ts forces re-trigger even for same line
+  layoutNames?: readonly string[]; // the loaded template's layouts, for `<!-- slide: -->` completion
 }
 
 // The Markdown editor owns its own undo (CodeMirror history + ⌘/Ctrl+Z), including
 // programmatic edits synced via the value prop — no host wiring needed.
-export default function Editor({ value, onChange, language = "yaml", onCursorLine, gotoLine }: EditorProps) {
+export default function Editor({ value, onChange, language = "yaml", onCursorLine, gotoLine, layoutNames }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onCursorLineRef = useRef(onCursorLine);
+  const layoutNamesRef = useRef<readonly string[]>(layoutNames ?? []);
   useEffect(() => {
     onCursorLineRef.current = onCursorLine; // keep the latest callback without re-creating the editor
+    layoutNamesRef.current = layoutNames ?? [];
   });
 
   useEffect(() => {
@@ -99,7 +103,7 @@ export default function Editor({ value, onChange, language = "yaml", onCursorLin
         history(),
         bracketMatching(),
         closeBrackets(),
-        language === "markdown" ? autocompletion({ override: [layoutCompletion, directiveCompletion] }) : [],
+        language === "markdown" ? autocompletion({ override: [layoutCompletion(layoutNamesRef), directiveCompletion] }) : [],
         syntaxHighlighting(defaultHighlightStyle),
         langExt,
         oneDark,
