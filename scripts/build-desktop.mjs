@@ -9,6 +9,7 @@ import { execSync, spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bundleConfigArgs } from "./node-sidecar.mjs";
+import { stepSpawnOptions } from "./build-desktop-steps.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const triple = execSync("rustc --print host-tuple").toString().trim();
@@ -16,8 +17,8 @@ const triple = execSync("rustc --print host-tuple").toString().trim();
 /** Run a command from the repo root, inheriting stdio; exit with its status on failure (never silent). */
 function step(cmd, args) {
   console.log(`\n> ${cmd} ${args.join(" ")}`);
-  // npm is npm.cmd on Windows, which spawn can only start through a shell; no arg here contains spaces.
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
+  // Shell only for npm on Windows (npm.cmd); the Node steps' execPath may contain spaces (#558).
+  const r = spawnSync(cmd, args, stepSpawnOptions(cmd, process.platform, root));
   if (r.status !== 0) {
     console.error(`build-desktop: '${cmd} ${args.join(" ")}' failed (${r.error?.message ?? `exit ${r.status}`})`);
     process.exit(r.status || 1);
