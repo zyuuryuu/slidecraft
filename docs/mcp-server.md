@@ -353,6 +353,26 @@ use_template({id:"file:tech-report.potx"})    → {slideCount, diagnostics, cont
 
 ---
 
+## 呼出ログ（計測・既定 OFF・#512）
+
+ツール呼出 1 回を JSON Lines 1 行で**ローカルファイルに追記**するだけの監査ログ（外部送信なし）。
+ADR-0037 の指標（time-to-first-visual・往復数・増分性）と、ツール削除の証拠（呼出率）を集めるために使う。
+有効にしない限りファイルは作られず、ツールの応答も変わらない。
+
+- 有効化: solo は `slidecraft serve --metrics ./mcp-calls.jsonl`。協働ホスト（GUI の sidecar）は環境変数
+  `SLIDECRAFT_MCP_METRICS=<path>` を設定して起動する。forward モード（GUI 稼働中の stdio）では `--metrics` は
+  無視され、ホスト側のログに残る。
+- 1 行の中身: `ts`・`tool`・`profile`・`doc`（docId）・`ms`・`outcome`（ok / reject / error）・reject の `code`・
+  入出力の文字数（`inChars`/`outChars`）・mutation なら `mut`/`changed`/`changedN`/`wholeDeck`。
+  **deck 本文・Markdown・base64・エラーメッセージは載せない。**
+- 集計: `npm run mcp:metrics -- ./mcp-calls.jsonl [--window-min 30] [--profile solo,collab-ai] [--json]`。
+  ツール別呼出率・時間窓ごとの往復数と time-to-first-visual・deck 丸ごと再生成の比率・削除候補の証拠比率
+  （[design/mcp-value-realign.md](design/mcp-value-realign.md) §7.4）を Markdown で出す。
+- 単位はセッションではなく **docId × 時間窓**（ADR-0038・無呼出が `--window-min` 分続いたら次の窓）。
+  トークンはサーバから見えないため、呼出数と文字数で代理する。
+
+---
+
 ## v1 の制限（今後の拡張）
 
 - scoped fs（`--root`）は入出力とも実装済み（ADR-0035 段階1＝出力・PR #304/#305、段階3＝入力・#306）。

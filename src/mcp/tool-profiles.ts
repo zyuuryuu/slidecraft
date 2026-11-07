@@ -97,10 +97,15 @@ export function isToolVisible(name: string, profile: McpProfile): boolean {
   return profiles.includes(profile);
 }
 
+/** 登録される handler を包む任意のフック（#512 計測）。全ツールが通るこのゲートが唯一の差し込み点。 */
+export type HandlerWrap = (name: string, profile: McpProfile, cfg: { inputSchema?: unknown }, cb: never) => unknown;
+
 /** server.registerTool と同型のゲート: 表でこのプロファイルに出すと決めたツールだけ登録する。
- *  server.ts は全登録をこれ経由にする（call site に per-tool の if を書かない — R8）。 */
-export function gatedToolRegistrar(server: McpServer, host: { solo?: boolean; sharedOnly: boolean }): McpServer["registerTool"] {
+ *  server.ts は全登録をこれ経由にする（call site に per-tool の if を書かない — R8）。
+ *  `wrap` 省略時（計測 OFF）は handler をそのまま登録する。 */
+export function gatedToolRegistrar(server: McpServer, host: { solo?: boolean; sharedOnly: boolean }, wrap?: HandlerWrap): McpServer["registerTool"] {
   const profile = profileOf(host);
   const register = server.registerTool.bind(server) as (name: string, cfg: unknown, cb: unknown) => unknown;
-  return ((name: string, cfg: unknown, cb: unknown) => (isToolVisible(name, profile) ? register(name, cfg, cb) : undefined)) as McpServer["registerTool"];
+  return ((name: string, cfg: { inputSchema?: unknown }, cb: never) =>
+    isToolVisible(name, profile) ? register(name, cfg, wrap ? wrap(name, profile, cfg, cb) : cb) : undefined) as McpServer["registerTool"];
 }
