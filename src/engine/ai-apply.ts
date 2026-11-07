@@ -8,7 +8,7 @@
  */
 import type { SlideIR } from "./slide-schema";
 import { validateDiagramSource } from "./mermaid-to-diagram";
-import { applyRegionSplit } from "./design-intent";
+import { figureSourceToYaml, placeFigureYaml } from "./apply-slide-edit";
 import { parseMd } from "./md-parser";
 import { serializeMd, type SerializeTemplate } from "./md-serializer";
 import { reconcileEdit } from "./ai-reconcile";
@@ -43,31 +43,14 @@ function sanitizeFigureSource(raw: string): string {
  * a figure-YAML edit — the caller falls back to the Markdown path). The raw is first sanitized (fence
  * unwrap + prose-preamble strip) so a ```yaml-fenced or "はい、図です:"-prefixed edit still applies
  * instead of leaking to the code path. Three cases:
- *   1. the slide already carries a figure → replace its YAML (the diagram-edit adopt path);
- *   2. a body-less slide → the figure fills the body;
- *   3. a slide WITH body text → ADD the figure and move the text to the other column (coexist, #3B) so
- *      "add a diagram" never destroys the existing bullets (preservation, same spirit as #12).
+ * replace / graduate / add-and-coexist — see placeFigureYaml (apply-slide-edit.ts), shared with MCP.
  */
 export function applyFigureYaml(slide: SlideIR, raw: string): SlideIR | null {
-  const yaml = sanitizeFigureSource(raw);
-  if (validateDiagramSource(yaml, "yaml")) return null; // truthy = invalid → not a figure-YAML edit
-
-  // 1. Replace an existing figure (diagram or mermaid).
-  if (slide.diagram) return { ...slide, diagram: { ...slide.diagram, yaml } };
-  if (slide.mermaidBlock) {
-    const { mermaidBlock: _drop, ...rest } = slide;
-    void _drop;
-    return { ...rest, diagram: { yaml, placeholderIdx: slide.mermaidBlock.placeholderIdx } };
-  }
-
-  // 2/3. Add a figure to a figureless slide. Coexist with any body text (move it to the other column);
-  // a body-less slide simply gets the figure in its body. layout → auto so the engine picks a fitting
-  // (single-body or 2-column) layout.
-  const hasBodyText = slide.placeholders.some(
-    (p) => /^[1-9]$/.test(p.idx) && p.paragraphs.some((par) => par.segments.some((s) => s.text.trim())),
-  );
-  const withFigure: SlideIR = { ...slide, layout: "auto", diagram: { yaml, placeholderIdx: "1" } };
-  return hasBodyText ? applyRegionSplit(withFigure, "text-left") : withFigure;
+  const src = figureSourceToYaml(sanitizeFigureSource(raw), "yaml");
+  if ("error" in src) return null; // invalid → not a figure-YAML edit
+  // The placement itself is shared with MCP set_diagram (#220). addLayout "auto": a figure added to a
+  // figureless slide lets the engine pick a fitting (single-body or 2-column) layout.
+  return placeFigureYaml(slide, src.yaml, { addLayout: "auto" });
 }
 
 /** A slide's current figure as its fenced source block (```diagram / ```mermaid), or undefined. */
