@@ -65,6 +65,7 @@
 
 ## AI編集の深化
 
+- **新規デッキ生成で書式違反のあった枚だけを 1 回再生成** — 弱いモデルの壊れた `\uXXXX` を floor（違反要素を除外して告知）が除外した枚だけを、1 枚専用プロンプト（`slide-retry`）で各 1 回だけ再生成し、違反ゼロで parse できた場合に限り差し替える。直らなければ floor の結果と告知を残し、再試行の有無と結果を notices に追記（never-silent）。正常デッキは byte-identical・呼び出し回数不変 （#107・PR #585・2026-11-07）
 - **AI 単一スライド編集＝構造化 ops → 決定論マージ（部分生成）** — AI は変更フィールドのみ ops を出力しエンジンが決定論マージ（P1：DiagramEditOp/applyDiagramEditOps・drift ゼロ）、full-regen フォールバック保全 （ADR-0019・2026-07-05）
 - **AI 編集の検証は採用ゲート（描画は止めない）** — `reconcileSlideEdit` は常に描画可能なスライド＋警告を返し、`previewSlideEdit` が AiPanel DiffView＋amber バナーで accept/reject、advisory は editNotice へ（有効なスライドを空白化しない） （ADR-0018・2026-07-04）
 - **AI 編集の構造保全ハーネス** — `reconcileEdit`（存在時のみ restore・idx-Map 全単射保全）＋`validateStructure`/`mergeVerdicts` を 3 apply パス全てに配線、ロール規約を `slide-roles.ts` に集約、serializer round-trip の pinned figure/table/code 消失を修正 （ADR-0012・2026-07-03）
@@ -78,6 +79,9 @@
 
 ## テンプレ・マスター
 
+- **テンプレを強化（レイアウト合成）** — 取り込んだマスターに無い N 列（2・3 列）の本文レイアウトを、そのマスターの基本レイアウト（タイトル＋本文 1 枠）を複製して等幅に分けた slideLayout として追加する。体裁（配色・書体・装飾・フッタ）は master との relation で継承、既存パーツは byte-identical（追加のみ）。縮小規則は段規則（既定）と比率の 2 択を engine に 1 箇所。検査ゲート（既存レイアウト不変・columns×N・1:1 全単射）を通ったものだけ「（強化）」付きの別マスターとして登録。診断 `missing-column-layout` が案内 （#568 段 2・PR #581・2026-11-07）
+- **テンプレ調整（書体置換・文字サイズ倍率）** — 元テンプレは不変のまま、派生テンプレに決定論の変換を掛ける: 書体は theme の latin/ea 置換（faithful Re-make の経路を流用・対象は theme のみ／theme＋lstStyle 直書きを切替）、サイズはタイトル／本文／その他の倍率で master txStyles と layout lstStyle の全 `sz` を 0.5pt 丸めで一括変換。容量見積りはマスターの sz を読む 1 経路のまま（デッキ側に第 2 の軸を持たない）。GUI は操作帯でプレビュー即反映 （#570 段 2・PR #579・2026-11-07）
+- **ビジュアルデッキ マガジンに汎用本文レイアウト `13_本文（1カラム）`** — 汎用の本文に 2 行枠の `02_ステートメント` が選ばれ、3 行以上が自動分割・図がタイトルに重なっていた。汎用本文を追加し、`ステートメント` 系は新ロール `statement` として汎用候補から外す。他 17 マスターの選択結果は snapshot で不変 （#589・PR #599・2026-11-07）
 - **開発用 Midnight 30 レイアウトのビルトイン同梱をやめ入力サンプル化（既定＝技術報告 スタンダード水色・内蔵 3 本）** — .pptx は `samples/templates/` へ。起動時の既定テンプレ読み込みをレジストリ経由の 1 本に統合（固定パス fetch と URL 二重定義を解消）し、失敗はトースト通知（never-silent）。テンプレ無し時の fallback から 30 種名の index 引きを除去（role で引く canonical 表・出力は不変）。Midnight を patch していた開発スクリプト 6 本を引退。#117／2026-11-07
 - **表スライドの自動レイアウト選択が表の推定高を見る** — マガジン型テンプレで表スライドが 0.9in の本文枠（`02_ステートメント`）に落ちて table-overflow になっていた（同点をカタログ順で決めていた）。`table-fit.ts` の `tableOverflow` を `table-overflow` 警告と自動選択の**両方**が使い（R8）、推定上溢れる候補の優先度を下げる。corpus 1072 枚の選択で変わったのは該当 3 枚だけ・table-overflow 3 → 0 （#444・PR #562・2026-11-07）
 - **未束縛の内容を取り込み結果バーに強警告で出し、診断で先頭テキストを名指す** — どの枠にも入らず出力時に消える内容（`unboundContent`）が、取り込みバーのチップ（スライド数）と詳細（スライド番号＋内容）に出る。`unbound-content` 診断は件数だけでなく先頭 20 字を言う。検出経路は増やさず既存の診断から拾う（R8） （#97・PR #561・2026-11-07）
@@ -146,6 +150,7 @@
 
 ## 協働・MCP
 
+- **不正な ```diagram を `diagram-invalid` として報告（never-silent）** — `type: flow` のようにスキーマが拒否する図は空のまま無警告で出力されていた。parse 失敗の理由を捨てない `parseDiagramYamlResult` を 1 経路にし、`get_deck_issues` が zod の理由付きで warn、`validate_deck` は `diagramErrors` を返して `ok: false`（export ゲート）。export と `schema.ts` は不変 （#587・PR #590・2026-11-07）
 - **MCP 編集経路と GUI 内蔵 AI 編集経路の一本化（R8）** — 図適用（`set_diagram` ⇄ `applyFigureYaml`）を `apply-slide-edit.ts` に共有し、一致テスト `edit-path-agreement` が両経路を同一入力で突き合わせる。残る差は裁定で統一: 図の追加でユーザの layout pin を外さない（A2）、`set_slide_markdown` が省かれた表・コードを旧スライドから持ち越し、壊れた図 YAML は `invalid-argument` で拒否して保存しない（B3）。タイトル自動復元・空編集の旧スライド維持は GUI の外殻に残す （#220・PR #564 #567・2026-11-07）
 - **レビュー規則の on/off トグル `set_review_rules`** — 句読点規則などを規則 id 単位で off にでき、off の規則は `get_deck_issues`・mutation の diagnostics・`get_slide_fix_request` に出ず、`activeReviewRules` には `level:"off"` で状態が見える（guide↔診断の一致を on/off 両方で固定）。既定は全 on で byte-identical。置き場は MCP パラメータ（deck 構造には入れない） （#247・PR #563・2026-11-07）
 - **PPTX 書き出しにネイティブ chart オプション（`export_pptx` の `charts: "native"`・段 1）** — pie / xychart（棒・折れ線・混在）/ radar を PptxGenJS `addChart` のネイティブ chart（埋め込みワークブック付き＝受け手が PowerPoint で「データの編集」できる）として出す。既定 `"shapes"` は従来の図形描画で byte-identical。マッパーは純関数 `pptx-native-chart.ts`、painter の layout とラベル・系列・値の一致テスト（R8）、chart XML は golden。プレビュー・HTML・`get_slide_image` は図形描画のまま＝近似と docs に明記。段 2（種類と記法の拡張）・段 3（既定切替）は実機確認後（ROADMAP「表現力の出口」） （#554・PR #556・2026-11-07）
