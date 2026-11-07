@@ -117,13 +117,19 @@ fn launcher_candidates(windows: bool) -> &'static [&'static str] {
 /// rooted at a canonicalized exe path on Windows, so cli.cjs comes back as `\\?\C:\…` (extended-length
 /// form) while `resolve_node()` (plain `current_exe()`) does not. `dunce::simplified` strips the `\\?\`
 /// prefix only when the plain form means the same file; on non-Windows hosts it is a pass-through.
-fn display_path(p: &std::path::Path) -> String {
+pub(crate) fn display_path(p: &std::path::Path) -> String {
     dunce::simplified(p).to_string_lossy().into_owned()
 }
 
 #[tauri::command]
 pub fn mcp_install_info(app: tauri::AppHandle) -> Result<McpInstallInfo, String> {
-    let cli = resolve_bundled(&app, "cli.cjs")?;
+    install_info(&app)
+}
+
+/// The ONE resolution of the install facts: the copy snippet (`mcp_install_info`) and the one-click register
+/// (claude_register.rs, #530) both read it, so they can never point at different servers (R8).
+pub(crate) fn install_info(app: &tauri::AppHandle) -> Result<McpInstallInfo, String> {
+    let cli = resolve_bundled(app, "cli.cjs")?;
     Ok(McpInstallInfo {
         os: std::env::consts::OS,
         launcher_on_path: launcher_on_path(),
