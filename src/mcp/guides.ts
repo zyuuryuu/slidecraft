@@ -50,9 +50,37 @@ export function getAuthoringGuide(s: Session) {
       figures: "図を入れるなら get_diagram_types で種類を選び、get_diagram_guide(type) で構文を得る",
       templateSpec: "新しいテンプレを作るなら get_template_spec_guide（→ create_template）",
       reviewRules: "activeReviewRules の各 id の詳細は get_deck_issues の指摘メッセージで実例を確認できる",
+      toolNotes: "ツール共通の約束（docId 解決・0-based・図/配置の op 文法・構造操作の保持規則）は bootstrap の toolNotes 節",
     },
   };
 }
+
+/** #513 (ADR-0037 D2/D3): the per-tool notes MOVED OUT of the hot tool descriptions — tools/list is
+ *  re-sent every session, so each description keeps only "what it does + a pointer", and the detail
+ *  lives here ONCE (R8: the shared docId/opId/expectedRev notes used to repeat on every tool). Served
+ *  as bootstrap's first section (available before a doc is open). tests/mcp-tool-descriptions.test.ts
+ *  holds the moved-item checklist and the design-intent grammar agreement with DesignIntentSchema. */
+export const TOOL_NOTES = {
+  docId:
+    "docId は省略可：省略時はこのコネクションの選択 doc → 唯一の open doc の順に解決。どちらも無ければ document-not-selected で拒否（select_document か docId を指定）",
+  concurrency:
+    "opId / expectedRev は GUI クライアント用（host のみ・AI は省略）：opId はクライアント生成の操作 ID（自分の deckChanged の echo 抑制）、expectedRev が現在 rev と不一致なら {ok:false, stale:true} で拒否（新しい rev を上書きしない）",
+  index: "index / fromIndex / toIndex は 0-based",
+  validation: "内容 mutation の入力は zod 検証され、不正は {ok:false} で never-silent に拒否される",
+  resources:
+    "read 系の一部は MCP resource のミラー：get_deck=deck://current・get_deck_markdown=deck://markdown・get_slide_markdown=slide://{index}/markdown（ツール版が確実）・get_deck_issues=deck://issues・get_template_capabilities=deck://capabilities・get_project_info=deck://info",
+  getSlide:
+    "get_slide(i) は 1 回で編集計画に足る：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・capacity（本文容量の実測 usedLines/maxLines）・predictedSplit（split_overflowing_slides の dry-run）・当該スライドの issues・markdown。素の Markdown だけなら get_slide_markdown（auto レイアウト解決済み）",
+  fixRequest: "get_slide_fix_request は修正リクエスト packet を返す。agent 自身が LLM として埋め、set_slide_markdown で適用する",
+  visual:
+    "get_slide_image / get_deck_image は共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影する。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定。get_slide_html / get_deck_html は同一描画の自己完結 HTML（script ゼロ・CSP・フォント埋め込み済）で、Chrome/Edge が無い環境では呼び出し側がラスタ化する",
+  diagram:
+    "set_slide_diagram は図の【中身】：source に DiagramSpec（yaml/json）か Mermaid を文字列で渡し format で種別を指定（検証＋native YAML 化）。図/mermaid のあるスライドは置換、text スライドは body 領域へ追加（created で判別）。placeholderIdx は multi-body レイアウトで何番目の body か（1-based・既定 1）。各図タイプの構文と JSON 例は get_diagram_guide(type)",
+  designIntent:
+    "apply_design_intent は図の【配置】：intent に ops 配列の JSON 文字列。op は regionSplit{arrangement: text-left | text-right | diagram-only}・emphasize{nodeId, level: high | medium（既定 high）}・relayout{direction: TB | LR | RL | BT}。エンジンが座標を計算＋クランプする。図/mermaid のあるスライドのみ",
+  structure:
+    "構造 4 本（insert/delete/move/duplicate_slide）は surgical：他スライドの図/レイアウトは byte-identical に保たれる（set_deck_markdown は保たない）。insert_slide の position 既定 before・duplicate_slide は structuredClone 複製で既定 after・move_slide の from===to は no-op・delete_slide は最後の 1 枚を拒否し deletedMd を返す",
+} as const;
 
 /** The contract DIGEST that rides EVERY session-entry return (open/new/select_document) — the
  *  unskippable push channel (§F ②). Anchor-type: only what the AI can't guess (this template's real

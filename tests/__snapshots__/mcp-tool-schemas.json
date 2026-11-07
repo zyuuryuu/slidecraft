@@ -1,0 +1,685 @@
+{
+  "apply_design_intent": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "intent": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index",
+      "intent"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "bootstrap": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "close_document": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      },
+      "force": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "docId"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "convert_bullets_to_table": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "create_template": {
+    "type": "object",
+    "properties": {
+      "spec": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "delete_slide": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "duplicate_slide": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "position": {
+        "type": "string",
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "export_pptx": {
+    "type": "object",
+    "properties": {
+      "onUnsupportedMermaid": {
+        "type": "string",
+        "enum": [
+          "reject",
+          "skip"
+        ]
+      },
+      "filename": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_authoring_guide": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_deck": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_deck_html": {
+    "type": "object",
+    "properties": {
+      "start": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "columns": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "maxSlides": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_deck_image": {
+    "type": "object",
+    "properties": {
+      "start": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "columns": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "maxSlides": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_deck_issues": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_deck_markdown": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_diagram_guide": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_diagram_types": {
+    "type": "object",
+    "properties": {}
+  },
+  "get_project_info": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_slide": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_slide_fix_request": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_slide_html": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_slide_image": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_slide_markdown": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "index"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_template_capabilities": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "get_template_spec_guide": {
+    "type": "object",
+    "properties": {}
+  },
+  "insert_slide": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "markdown": {
+        "type": "string"
+      },
+      "position": {
+        "type": "string",
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index",
+      "markdown"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "list_documents": {
+    "type": "object",
+    "properties": {}
+  },
+  "list_templates": {
+    "type": "object",
+    "properties": {}
+  },
+  "move_slide": {
+    "type": "object",
+    "properties": {
+      "fromIndex": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "toIndex": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "fromIndex",
+      "toIndex"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "new_project": {
+    "type": "object",
+    "properties": {
+      "templateBase64": {
+        "type": "string"
+      },
+      "templatePath": {
+        "type": "string"
+      },
+      "markdown": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "open_project": {
+    "type": "object",
+    "properties": {
+      "dataBase64": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "redo": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "register_templates": {
+    "type": "object",
+    "properties": {
+      "templates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "builtin": {
+              "type": "boolean"
+            },
+            "bytesBase64": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "builtin",
+            "bytesBase64"
+          ]
+        }
+      }
+    },
+    "required": [
+      "templates"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "save_project": {
+    "type": "object",
+    "properties": {
+      "filename": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "select_document": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "docId"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "set_deck_markdown": {
+    "type": "object",
+    "properties": {
+      "markdown": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "markdown"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "set_slide_diagram": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "source": {
+        "type": "string"
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "yaml",
+          "json",
+          "mermaid"
+        ]
+      },
+      "placeholderIdx": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index",
+      "source",
+      "format"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "set_slide_markdown": {
+    "type": "object",
+    "properties": {
+      "index": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "markdown": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "index",
+      "markdown"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "split_overflowing_slides": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      },
+      "opId": {
+        "type": "string"
+      },
+      "expectedRev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "undo": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "use_template": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "markdown": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "validate_deck": {
+    "type": "object",
+    "properties": {
+      "docId": {
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

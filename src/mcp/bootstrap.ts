@@ -37,6 +37,8 @@ const section = (fn: () => unknown): unknown => {
  *  whole call. */
 export function getBootstrap(resolveSession: () => Session, templates: TemplateStore | undefined, solo: boolean, scopeRoot: string | null) {
   return {
+    // #513: tool notes moved out of the per-session tools/list (not doc-scoped → always present).
+    toolNotes: G.TOOL_NOTES,
     authoringGuide: section(() => G.getAuthoringGuide(resolveSession())),
     diagramTypes: G.getDiagramTypes(),
     diagramGuides: { note: "各図タイプの構文＋JSON例は get_diagram_guide(type) で個別取得（type は diagramTypes 節から選ぶ）。全12種の同梱は実測約22,400字のため見送り（#464）" },
