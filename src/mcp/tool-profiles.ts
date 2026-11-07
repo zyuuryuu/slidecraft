@@ -53,6 +53,7 @@ export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
   get_deck_html: ALL,
   // 契約・ガイド
   get_authoring_guide: ALL,
+  set_review_rules: ALL, // #247: レビュー規則の on/off（診断の見え方の設定・全プロファイル）
   get_diagram_types: ALL,
   get_diagram_guide: ALL,
   // テンプレ調達

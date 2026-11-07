@@ -9,6 +9,7 @@
 
 ### Added
 
+- **MCP `set_review_rules`** — レビュー規則（句読点など）を規則 id ごとに on/off できる lint トグル。off の規則は `get_deck_issues` 等の診断に出ず、`get_authoring_guide` の `activeReviewRules` で `level:"off"`、`get_deck_issues` の `disabledReviewRules` で何が off か分かる。状態はドキュメントのセッション内だけ（deck には保存しない）。既定は全 on＝診断は従来どおり（[#247](https://github.com/zyuuryuu/slidecraft/issues/247)）
 - **MCP `get_deck_image` / `get_deck_html`** — deck 全枚のサムネイルを 1 枚の PNG（格子・各セルに 0-based index）／自己完結 HTML で返す。AI の仕上がり確認が「1 枚ずつ `get_slide_image`」の往復（#516 実測 29 回）から 1 回になる。各セルは `get_slide_image` と同一の共有描画の縮小で、既存の rasterizer で 1 回だけ撮る（合成ライブラリ・第 2 の描画経路なし）。既定 5 列・最大 30 枚・幅 1920px、超過分は `truncated`＋`nextStart`（[#522](https://github.com/zyuuryuu/slidecraft/issues/522)・[ADR-0037](docs/adr/0037-mcp-surface-realignment.md) D3）
 - **Windows / Linux のインストーラも `slidecraft-mcp` ランチャを PATH に置く** — macOS cask と同じ `claude mcp add slidecraft -- slidecraft-mcp` の 1 行で登録できる。Windows は `slidecraft-mcp.cmd`（同梱 `node.exe` で `cli.cjs` を起動）をインストール先に同梱し、NSIS（インストーラフック）/ MSI（WiX フラグメント）が**ユーザ PATH** に追加・アンインストールで除去。Linux の `.deb`/`.rpm`/AppImage は `/usr/bin/slidecraft-mcp` を同梱。CI の Linux smoke が実 `.deb` を展開してランチャ起動まで検査する（[#519](https://github.com/zyuuryuu/slidecraft/issues/519)・ADR-0022・ADR-0038 D5）
 
@@ -17,6 +18,7 @@
 ### Fixed
 
 - **未束縛の内容（どの枠にも入らず出力時に消える内容）を取り込み結果バーに強警告で表示し、診断メッセージで「どの内容か」を名指す** — マスター取り込み後、現在のデッキに適用テンプレのどの枠にも入らない内容があれば、取り込み結果バーに「未束縛の内容があるスライド N 枚」を出し、「詳細」でスライド番号つきに列挙する（データは既存の `unbound-content` 診断そのもの）。`unbound-content` の汎用メッセージは件数に加えて先頭テキスト（20 字で省略）を含むようになった（GUI の課題パネル・MCP `get_deck_issues` 共通）。束縛結果・他の診断・PPTX 出力は不変（[#97](https://github.com/zyuuryuu/slidecraft/issues/97)）
+- **`.scft` を開くとき、ファイル形式の version を確認せず黙って開いていた問題** — `meta.json.version` がこのアプリより新しいファイルは「新しいバージョンで作成されています・アプリを更新してください」と明示して拒否する（エラーコード `PROJECT_VERSION_TOO_NEW`）。古い version は移行表（`PROJECT_MIGRATIONS`）で変換し、移行手段が無ければ `PROJECT_VERSION_UNSUPPORTED` で明示して拒否する。現行 version のファイルと meta.json が壊れている／無いファイルの開き方は従来どおり（[#121](https://github.com/zyuuryuu/slidecraft/issues/121)）
 - **Linux の `.deb`/`.rpm` が同梱 Node を `/usr/bin/node` に置き、system の `nodejs` パッケージと衝突する問題** — `/usr/bin/node` は distro の `nodejs` パッケージ（NodeSource 版も）の持ち物なので、system Node のあるマシンで dpkg/rpm がインストールを拒否し得た。Linux だけ同梱 Node を **`/usr/bin/slidecraft-node`** として同梱し、`/usr/bin/slidecraft-mcp` ランチャと GUI（協働ホスト）もそれを使う。macOS / Windows の同梱 Node の名前は不変。v0.5.0 の `/usr/bin/node` を直接登録していた場合は `slidecraft-mcp` の 1 行登録に切り替えてください。CI の Linux smoke は `.deb`/AppImage に `usr/bin/node` が無いことも検査する（[#527](https://github.com/zyuuryuu/slidecraft/issues/527)・ADR-0022）
 - **Windows のインストール先に POSIX sh 版 `slidecraft-mcp` が入り、PATH 上で `slidecraft-mcp.cmd` と並ぶ問題**（`where slidecraft-mcp` が実行できない sh 版を先頭に返していた）— sh ランチャは macOS 専用のプラットフォーム設定 `tauri.macos.conf.json`（Tauri が自動マージ）へ移し、Windows / Linux の resources から外した。macOS cask の `Contents/Resources/slidecraft-mcp` と Linux の `/usr/bin/slidecraft-mcp` は不変。GUI の PATH 判定も Windows では `.cmd` のみを探す（[#537](https://github.com/zyuuryuu/slidecraft/issues/537)）
 - **協働パネルの登録コマンドで `cli.cjs` のパスだけ `\\?\C:\…`（拡張長パス形式）になる問題**（Windows・node.exe 側は普通の形）— 表示用パスを `dunce::simplified` で正規化し、2 つのパスが同じ形になる（[#538](https://github.com/zyuuryuu/slidecraft/issues/538)）

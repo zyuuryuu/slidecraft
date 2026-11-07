@@ -119,12 +119,13 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`、既定 `midnight`）を返す（#298）。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#332）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
 | 調達 | `use_template(id, markdown?)` | テンプレ（`list_templates` の id）から**新規プロジェクトを mint**（bytes 不要・GUI の Draft と同じ整形）。単独の組み込み id は `create_template` と同じハーネスで生成（R8）、**`file:` 始まりの id は `--root` 配下 `templates/` のファイルから起票**（#332）。未知 id は never-silent `{ok:false, code:"unknown-template"}`、`file:` で scope 未設定は `scope-not-configured`・不在は `scope-file-not-found`。既存 doc のテンプレ入替ではない |
 | 契約 | `get_authoring_guide()` | **著作の入口**：このテンプレのレイアウト名に解決した Markdown 書式・`<!-- col/kpi/step -->`・表/コード・`<!-- note -->` スピーカーノート・本文 budget・`activeReviewRules:[{id,level}]`（`get_deck_issues` と同一レジストリ由来のレビュー規則一覧・#244）＋図/spec ガイドへのポインタ |
+| 契約 | `set_review_rules(rules)` | レビュー規則の on/off（lint トグル・#247）。`rules` は `{規則id: "on"|"off"}`（例 `{"touten-used":"off","kuten-used":"off"}`・書かない id は現状維持）。下記「レビュー規則の on/off」 |
 | 契約 | `get_diagram_types()` | 図の種類メニュー（authorable な12種＝type/label/hint） |
 | 契約 | `get_diagram_guide(type)` | 選んだ図タイプの構文＋JSON例（`` ```diagram `` に書く DiagramSpec。他は `` ```mermaid `` で） |
 | 読む | `get_deck` / `get_deck_markdown` | deck（DeckIR JSON）/ deck 全体の round-trip Markdown |
 | 読む | `get_slide_markdown(index)` | 1スライドの素の Markdown（auto レイアウト解決済み） |
 | 読む | `get_slide(index)` | 1スライドの**構造化 read**：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・**capacity**（`{usedLines, maxLines}`＝本文容量の実測、残容量% = usedLines/maxLines。図/複数本文スライドは null）・**predictedSplit**（`{chunks, boundaries}`＝`split_overflowing_slides` を実行せず何枚に割れるかの dry-run。溢れなければ undefined。予測は distill.ts の実装関数そのものを呼ぶので実行結果と必ず一致・#149）・当該 issues・notes（`<!-- note -->` スピーカーノート本文、無ければ null）・sectionBreak（章扉宣言）・derived（`"toc"`=導出専用の目次スライド、markdown はマーカー 1 行）・markdown（1呼び出しで編集計画） |
-| 読む | `get_deck_issues` | 診断＝CONTENT レバー（split/condense/visualize/title）＋本文 `budget`＋次の一手 `hints`。※ export 可否は `validate_deck` |
+| 読む | `get_deck_issues` | 診断＝CONTENT レバー（split/condense/visualize/title）＋本文 `budget`＋次の一手 `hints`。`set_review_rules` で off にした規則があるときだけ `disabledReviewRules`（off の id 一覧）が付く。※ export 可否は `validate_deck` |
 | 読む | `get_template_capabilities` | テンプレ能力サマリ＋レイアウト一覧＋deck budget |
 | 読む | `get_project_info` | テンプレ名・スライド数・dirty 等 |
 | 読む | `get_slide_fix_request(index)` | 修正リクエスト packet（**エージェントが LLM として埋める**） |
@@ -147,6 +148,10 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 出力 | `export_pptx(onUnsupportedMermaid?, charts?, filename?)` | `.pptx` を **native-vector で headless 生成**。既定 `{dataBase64, skipped}`。`--root` scope 起動時は `{path, skipped}`。`charts: "native"` で pie/xychart/radar をネイティブ chart にし `charts: {native, shapes}` を足す（下記） |
 | lifecycle | `list_documents` / `select_document` / `close_document` / `undo` / `redo` | 複数ドキュメント lifecycle＋サーバ側 undo/redo。各ドキュメント行/戻りに `contract` 同梱。**doc 切替 3 本（list/select/close）は collab 専用** — solo（stdio 単独）は常に 1 doc なので登録されない（プロファイル別登録・ADR-0037 D2／#465）。**`undo`/`redo` は solo でも登録され本当に効く**（ADR-0033 D1）。collab では複数 doc を跨ぐ |
 | host 専用(GUI) | `register_templates(templates[])` | GUI のみ：webview の master レジストリを host へ投入（`{id,name,builtin,bytesBase64}` の配列・呼ぶ度に全置換）。AI ロール・solo には非公開（solo は GUI が繋がらずレジストリの投入元が無い）。これで AI が `list_templates`/`use_template` で選べる |
+
+### レビュー規則の on/off（`set_review_rules`・#247）
+
+句読点（読点 `touten-used`=warn／句点 `kuten-used`=info）のような規範は、配布資料など文体の違うデッキではノイズになる。`set_review_rules({rules:{"touten-used":"off"}})` で切った規則は、`get_deck_issues`・各 mutation の `diagnostics`・`get_slide(index)` の issues・`get_slide_fix_request` に出なくなり、`get_authoring_guide` の `activeReviewRules` では当該 id の `level` が `"off"` になる（どちらも `REVIEW_RULES` と同じ off 集合からの射影＝食い違わない）。`get_deck_issues` には `disabledReviewRules` が付き、何が off かが分かる。状態は**そのドキュメントのセッション内だけ**（deck には保存しない＝`save_project`/`export_pptx` に載らず、rev・undo の対象でもない）。既定は全 on で、何も off にしていなければ診断は従来と同一。未知の id は何も変えずに `{ok:false, code:"invalid-argument"}` で拒否する（有効な id は `activeReviewRules`）。戻り値は `{ok, changed, disabledReviewRules, activeReviewRules}`。
 
 ### mutation の戻り（統一 envelope）
 
