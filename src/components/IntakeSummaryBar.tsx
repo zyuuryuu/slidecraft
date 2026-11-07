@@ -22,6 +22,8 @@ import { findLayout, type TemplateData } from "../engine/template-loader";
 import { parseMd } from "../engine/md-parser";
 import type { DeckIR } from "../engine/slide-schema";
 import type { DeckIssue } from "../engine/deck-diagnostics";
+import { buildCatalog } from "../engine/template-catalog";
+import { planAugmentation, type AugmentPlan } from "../engine/layout-augment-plan";
 
 // A mini WYSIWYG preview of a re-made layout: the SAME SlideCard the editor uses, rendered tiny with a
 // dummy-filled sample slide — so the user SEES what each mapped layout looks like, not just its name.
@@ -58,7 +60,7 @@ function LayoutThumb({ template, sample, name }: { template: TemplateData; sampl
   );
 }
 
-export type IntakeMode = "import" | "remake";
+export type IntakeMode = "import" | "remake" | "augment";
 
 export interface IntakeResult {
   mode: IntakeMode;
@@ -72,7 +74,7 @@ export interface IntakeBusy {
   phase: IntakeProgress;
 }
 
-const MODE_ICON: Record<IntakeMode, string> = { import: "📥", remake: "🔁" };
+const MODE_ICON: Record<IntakeMode, string> = { import: "📥", remake: "🔁", augment: "🧩" };
 
 function ProgressRow({ busy }: { busy: IntakeBusy }) {
   const { t } = useTranslation();
@@ -154,6 +156,9 @@ export function Detail({ result, template, sample, unbound = [] }: { result: Int
           )}
         </div>
       )}
+      {(s.added?.length ?? 0) > 0 && (
+        <div><span className="text-muted">{t("intake.augmented")}:</span> {s.added!.join(" / ")}</div>
+      )}
       {result.mode === "import" && (s.repairs ?? 0) > 0 && (
         <div><span className="text-muted">{t("intake.repairs")}:</span> {t("intake.repairsCount", { count: s.repairs })}</div>
       )}
@@ -167,7 +172,7 @@ export function Detail({ result, template, sample, unbound = [] }: { result: Int
 }
 
 export default function IntakeSummaryBar({
-  busy, result, onDismiss, template, unbound = [],
+  busy, result, onDismiss, template, unbound = [], onAugment,
 }: {
   busy: IntakeBusy | null;
   result: IntakeResult | null;
@@ -176,6 +181,8 @@ export default function IntakeSummaryBar({
   template?: TemplateData | null;
   /** #97: the deck's `unbound-content` diagnostics under this template (content that would vanish). */
   unbound?: readonly DeckIssue[];
+  /** #568: 「テンプレを強化」— offered when the active template lacks an N-column layout it can synthesize. */
+  onAugment?: (plan: AugmentPlan) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -185,6 +192,8 @@ export default function IntakeSummaryBar({
     () => parseMd(`# ${t("intake.sampleTitle")}\n\n- ${t("intake.sampleBody")}\n- ${t("intake.sampleBody")}\n- ${t("intake.sampleBody")}`),
     [t],
   );
+  // #568: what 「テンプレを強化」 would add to the ACTIVE template (pure plan; nothing is written here).
+  const augment = useMemo(() => (onAugment && template ? planAugmentation(template, buildCatalog(template)) : null), [onAugment, template]);
   if (!busy && !result) return null;
 
   // Only offer 「詳細」 when there's something to expand — a clean faithful Import has no theme,
@@ -192,6 +201,7 @@ export default function IntakeSummaryBar({
   const s = result?.summary;
   const hasDetail = !!result && (
     !!s?.theme ||
+    (s?.added?.length ?? 0) > 0 ||
     (result.mode === "import" && (s?.repairs ?? 0) > 0) ||
     (s?.findings.length ?? 0) > 0 ||
     unbound.length > 0 ||
@@ -224,6 +234,20 @@ export default function IntakeSummaryBar({
               {unbound.length > 0 && (
                 <span data-testid="intake-unbound" className="text-red-400 font-semibold">
                   ⚠ {t("intake.unboundChip", { count: unboundSlideCount(unbound) })}
+                </span>
+              )}
+              {augment && augment.add.length > 0 && (
+                <button
+                  data-testid="intake-augment"
+                  onClick={() => onAugment?.(augment)}
+                  className="text-accent-soft hover:text-fg border border-accent/40 rounded px-1.5"
+                >
+                  {t("intake.augmentButton", { what: augment.add.map((a) => t("applyTemplate.augmentColumns", { n: a.columns })).join(t("applyTemplate.repairPartSeparator")) })}
+                </button>
+              )}
+              {augment && augment.add.length === 0 && augment.reason && augment.skipped.some((x) => x.reason === augment.reason) && (
+                <span data-testid="intake-augment-unavailable" className="text-muted truncate" title={augment.reason}>
+                  {t("intake.augmentUnavailable", { reason: augment.reason })}
                 </span>
               )}
               <div className="flex-1" />

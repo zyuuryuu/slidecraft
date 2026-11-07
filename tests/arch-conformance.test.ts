@@ -104,7 +104,6 @@ describe("R1: 1 ファイル 400 行以下", () => {
     "engine/template-catalog.ts", // 649（#129 補足で認知済み）
     "App.tsx", // 611
     "components/AiPanel.tsx", // 517
-    "engine/deck-plan.ts", // 479
     "components/SlideEditor.tsx", // 450
     "engine/placeholder-filler.ts", // 449
     "components/useAiGeneration.ts", // 444
