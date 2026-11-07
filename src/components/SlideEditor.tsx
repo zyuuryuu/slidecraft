@@ -11,7 +11,7 @@ import type { SlideIR } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { LAYOUT_NAMES } from "../engine/slide-schema";
 import { buildFieldMap, applyFieldEdit } from "../engine/placeholder-binding";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, imageAspectRatio, SLIDE_IN } from "../engine/visual-placement";
+import { bodyPlaceholders, nthBody, imagePlaceholder, imageEditGeometry, SLIDE_IN } from "../engine/visual-placement";
 import { groupEditorPlan } from "../engine/group-binding";
 import { paragraphsToText, textToParagraphs } from "../engine/field-text";
 import { shiftBulletIndent } from "../engine/bullet-indent-shift";
@@ -148,9 +148,10 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
   const imagePh = slide.image && !slide.image.behind && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
   // Fine-tune geometry (案B): the manual rect override, else the resolved placeholder box (a behind
   // image rides the SAME box as a body figure — normal size, just at the back). Editing promotes to rect.
-  const imageBoxPh = slide.image && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
-  const imgBox = slide.image ? imageRect(slide.image, imageBoxPh) : undefined;
-  const imgAspect = slide.image ? imageAspectRatio(slide.image, imgBox) : undefined;
+  // The SAME edit geometry the preview drag uses (imageEditGeometry — front and behind, #122 / R8).
+  const imgGeom = slide.image ? imageEditGeometry(slide.image, layout?.placeholders ?? []) : undefined;
+  const imgBox = imgGeom?.box;
+  const imgAspect = imgGeom?.aspect;
   const updateImageRect = (k: "x" | "y" | "w" | "h", val: number) => {
     if (!slide.image || !imgBox || !Number.isFinite(val)) return;
     // W/H must stay positive and X/Y non-negative — a 0/negative dimension makes the image invisible in

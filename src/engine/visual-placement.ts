@@ -119,6 +119,18 @@ export function imageAspectRatio(image: ImageBlock, box: ImageRect | undefined):
   return image.aspect && image.aspect > 0 ? image.aspect : box && box.h > 0 ? box.w / box.h : 1;
 }
 
+/** The image's EDIT geometry: the box a drag/resize/numeric edit starts from (the manual rect, else
+ *  the resolved placeholder box — a behind image rides the SAME box as a body figure) and the aspect a
+ *  resize locks to. ONE resolution shared by the preview drag (front AND behind, #122) and the form's
+ *  numeric X/Y/W/H, so both edit the identical rect (R8). Pure. */
+export function imageEditGeometry(
+  image: ImageBlock,
+  layoutPlaceholders: readonly PlaceholderInfo[],
+): { box: ImageRect | undefined; aspect: number } {
+  const box = imageRect(image, imagePlaceholder(layoutPlaceholders, image.placeholderIdx));
+  return { box, aspect: imageAspectRatio(image, box) };
+}
+
 /** The PPTX picture geometry for an image dropped in `box` (inches): the actual <p:pic> rect plus an
  *  optional crop (srcRect, fractions in 1/1000 %). PowerPoint's blipFill STRETCHES to the pic rect, so
  *  we do the aspect math here — matching the browser's object-fit so preview == export (WYSIWYG):
