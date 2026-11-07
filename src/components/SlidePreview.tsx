@@ -10,7 +10,8 @@ import { useTranslation } from "react-i18next";
 import mermaid from "mermaid";
 import type { DeckIR, SlideIR, Paragraph, InlineSegment, ImageRect } from "../engine/slide-schema";
 import { parseInline } from "../engine/md-inline";
-import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, PlaceholderStyle } from "../engine/template-loader";
+import type { TemplateData, LayoutInfo, DecoRect, StaticText, ImageDeco, PlaceholderStyle, ThemeFonts } from "../engine/template-loader";
+import { resolveFontToken } from "../engine/master-remake";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
@@ -178,6 +179,10 @@ interface SlideCardProps {
   /** The template's resolved scheme colors (TemplateData.themeColors) — the #402 Before/After overlay
    *  paints in accent1/lt1 like the export's schemeClr. Omitted → neutral fallbacks. */
   themeColors?: Record<string, string>;
+  /** The template's theme fontScheme (TemplateData.themeFonts) — resolves a master's raw `+mn-lt` /
+   *  `+mj-lt` typeface token to the real brand font before font-family CSS (#532, R8: the ONE resolver
+   *  master-remake.resolveFontToken). Omitted → a token still resolves to a real name, never emitted raw. */
+  themeFonts?: ThemeFonts;
 }
 
 // PowerPoint preset shapes → SVG polygon points (in a 0–100 box, stretched to the shape's rect).
@@ -248,7 +253,7 @@ function renderDeco(d: DecoRect, key: string, scale: number): React.ReactNode {
   );
 }
 
-function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText, themeColors }: SlideCardProps) {
+function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundImage, masterBackgroundGradient, masterDecorations, masterImages, masterStaticTexts, scale, isActive, selected, onClick, onDiagramChange, onImageRectChange, exportMode, sectionFooterText, themeColors, themeFonts }: SlideCardProps) {
   // Bind content to the layout's placeholders BY ROLE via the SAME shared function the PPTX export
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
@@ -674,7 +679,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               fontSize: s.fontSize * (scale / 72),
               color: `#${s.fontColor}`,
               fontWeight: s.bold ? "bold" : "normal",
-              fontFamily: cjkFontFamily(s.fontName, s.eaFontName),
+              fontFamily: cjkFontFamily(resolveFontToken(s.fontName, themeFonts), s.eaFontName),
               textAlign: s.align === "ctr"
                 ? "center"
                 : s.align === "r"
@@ -814,6 +819,7 @@ export default function SlidePreview({
         masterImages={template?.masterImages}
         masterStaticTexts={template?.masterStaticTexts}
         themeColors={template?.themeColors}
+        themeFonts={template?.themeFonts}
         scale={scale}
         isActive={active}
         sectionFooterText={sectionFooterFor(deck!, i)}
