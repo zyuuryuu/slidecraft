@@ -54,7 +54,9 @@ const HOT_TOOLS = [
  *  本 Issue の不変条件の外（Issue #513 を閉じる PR の統括相談を参照）。上限は実測値に僅かな余裕だけ乗せた ratchet。 */
 const HOT_CHAR_LIMIT = 7950;
 // #554（export_pptx の引数 `charts` 追加・意図した inputSchema の拡張）で全体 17,577 → 17,752 字。宣言して上限を更新。
-const ALL_CHAR_LIMIT = 17800;
+// #247（set_review_rules 追加・意図したツール面の拡張。id の enum は schema に載せずサーバ側検証＝+450 字に抑えた）で
+// 全体 17,752 → 18,202 字。宣言して上限を更新。
+const ALL_CHAR_LIMIT = 18250;
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> };
 type CallRes = { content: Array<{ text?: string }>; isError?: boolean };

@@ -9,6 +9,7 @@
 
 ### Added
 
+- **MCP `set_review_rules`** — レビュー規則（句読点など）を規則 id ごとに on/off できる lint トグル。off の規則は `get_deck_issues` 等の診断に出ず、`get_authoring_guide` の `activeReviewRules` で `level:"off"`、`get_deck_issues` の `disabledReviewRules` で何が off か分かる。状態はドキュメントのセッション内だけ（deck には保存しない）。既定は全 on＝診断は従来どおり（[#247](https://github.com/zyuuryuu/slidecraft/issues/247)）
 - **MCP `get_deck_image` / `get_deck_html`** — deck 全枚のサムネイルを 1 枚の PNG（格子・各セルに 0-based index）／自己完結 HTML で返す。AI の仕上がり確認が「1 枚ずつ `get_slide_image`」の往復（#516 実測 29 回）から 1 回になる。各セルは `get_slide_image` と同一の共有描画の縮小で、既存の rasterizer で 1 回だけ撮る（合成ライブラリ・第 2 の描画経路なし）。既定 5 列・最大 30 枚・幅 1920px、超過分は `truncated`＋`nextStart`（[#522](https://github.com/zyuuryuu/slidecraft/issues/522)・[ADR-0037](docs/adr/0037-mcp-surface-realignment.md) D3）
 - **Windows / Linux のインストーラも `slidecraft-mcp` ランチャを PATH に置く** — macOS cask と同じ `claude mcp add slidecraft -- slidecraft-mcp` の 1 行で登録できる。Windows は `slidecraft-mcp.cmd`（同梱 `node.exe` で `cli.cjs` を起動）をインストール先に同梱し、NSIS（インストーラフック）/ MSI（WiX フラグメント）が**ユーザ PATH** に追加・アンインストールで除去。Linux の `.deb`/`.rpm`/AppImage は `/usr/bin/slidecraft-mcp` を同梱。CI の Linux smoke が実 `.deb` を展開してランチャ起動まで検査する（[#519](https://github.com/zyuuryuu/slidecraft/issues/519)・ADR-0022・ADR-0038 D5）
 

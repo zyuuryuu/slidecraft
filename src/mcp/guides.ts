@@ -13,7 +13,7 @@ import * as S from "./session";
 import { slideSystemPrompt } from "../engine/llm-prompts";
 import { diagramSystemPrompt, DIAGRAM_TYPES, parseDiagramType } from "../engine/diagram-type-prompts";
 import { VALID_TYPES } from "../engine/schema-constants";
-import { REVIEW_RULES } from "../engine/deck-diagnostics";
+import { reviewRuleStates } from "../engine/review-rule-toggle";
 
 /** L1 + manifest — the slide-Markdown authoring contract for THIS template (catalog-resolved layout
  *  names + selection rules = alien-safe), the body budget to author WITHIN, and pointers to the
@@ -29,7 +29,9 @@ export function getAuthoringGuide(s: Session) {
     // #244: this deck's review rules ({id, level}), read BEFORE authoring so the first draft is already
     // clean — a literal projection of deck-diagnostics.ts's REVIEW_RULES, the SAME registry
     // get_deck_issues draws its DeckIssue.id/level from (R8: one source, no drift between the two).
-    activeReviewRules: REVIEW_RULES.map((r) => ({ id: r.id, level: r.level })),
+    // #247: a rule switched off by set_review_rules reads level:"off" (and get_deck_issues drops it) —
+    // both from the same session set via review-rule-toggle.ts. Nothing off → exactly REVIEW_RULES.
+    activeReviewRules: reviewRuleStates(s.disabledReviewRules),
     // #521 (ADR-0037 D3 "the server speaks the contract"): the result/authoring contract lines that
     // previously lived ONLY in SKILL.md. SKILL.md is now the order of operations; these ride the guide
     // (= bootstrap.authoringGuide) so the AI reads them in the same cold call. Moved, not invented —

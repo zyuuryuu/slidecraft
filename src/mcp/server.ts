@@ -23,6 +23,7 @@ import * as T from "./templates";
 import * as St from "./structure";
 import * as R from "./reads";
 import * as N from "./next-steps";
+import { setReviewRules } from "./review-rules";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
@@ -188,6 +189,8 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   // ── authoring contract (self-describing surface; T3/S1) ── the single entry the AI reads BEFORE
   // authoring: how to write this template's slide Markdown, the body budget, and pointers to figures.
   tool("get_authoring_guide", { description: "スライド Markdown の書き方（このテンプレのレイアウト名に解決した書式・`<!-- col/kpi/step -->` 区切り・表(GFM)・コード）＋本文 budget＋図/テンプレ作成ガイドへの入口。スライドを書く前にまずこれを読む", inputSchema: doc }, (a, extra) => run(() => G.getAuthoringGuide(sessionOf(extra, a.docId))));
+  // #247: レビュー規則の on/off（セッション＝doc 単位・deck には保存しない）。id の検証は review-rules.ts（REVIEW_RULES 由来・R8）。
+  tool("set_review_rules", { description: "レビュー規則の on/off（例 rules:{\"touten-used\":\"off\"}・id は activeReviewRules）。off は get_deck_issues に出ない", inputSchema: { rules: z.record(z.string(), z.enum(["on", "off"])), ...doc } }, (a, extra) => run(() => setReviewRules(sessionOf(extra, a.docId), a.rules)));
   tool("get_diagram_types", { description: "図の種類メニュー（authorable な12種＝type/label/hint）。図を入れるならまずここで種類を選ぶ（flowchart 以外に11種ある）" }, () => run(() => G.getDiagramTypes()));
   tool("get_diagram_guide", { description: "選んだ図タイプの構文＋JSON例（```diagram に書く DiagramSpec）。class/state/ER/mindmap は type ではなく ```mermaid で描く", inputSchema: { type: z.string().describe("get_diagram_types の type") } }, (a) => run(() => G.getDiagramGuide(a.type)));
 
