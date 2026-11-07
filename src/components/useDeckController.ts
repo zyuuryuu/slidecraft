@@ -17,8 +17,7 @@ import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasCo
 import { parseMd } from "../engine/md-parser";
 import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
 import { autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
-import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsAugmented } from "./apply-template";
-import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsAdjusted } from "./apply-template";
+import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsAugmented, applyTemplateBytesAsAdjusted } from "./apply-template";
 import type { TemplateAdjustRecipe } from "../engine/template-adjust";
 import type { RepairPlan } from "../engine/template-repair";
 import type { SlideIR, ImageRect } from "../engine/slide-schema";
