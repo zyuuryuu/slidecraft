@@ -12,6 +12,7 @@ import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration } from "./useAiGeneration";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
+import { slideEditUserPrompt } from "../engine/deck-plan-prompts";
 
 const AIPANEL_HEIGHT_KEY = "slidecraft_aipanel_h";
 
@@ -19,6 +20,8 @@ interface AiPanelProps {
   onClose: () => void;
   /** Markdown of the FOCUSED slide — the AI edits this one (scope = slide-list selection). */
   currentSlideMd?: string;
+  /** The focused slide's setField idx list (describeEditableFields) — sent with the slide Markdown. */
+  currentSlideFields?: string;
   /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string, instruction?: string) => void;
   /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings).
@@ -47,6 +50,7 @@ interface AiPanelProps {
 export default function AiPanel({
   onClose,
   currentSlideMd,
+  currentSlideFields = "",
   onApplySlide,
   onPreviewSlideEdit,
   activeSlideNum,
@@ -192,8 +196,8 @@ export default function AiPanel({
     if (autoRetriedRef.current || aiGenerating) return;
     autoRetriedRef.current = true;
     setRetrying(true);
-    aiRetry(`Current slide:\n${currentSlideMd}\n\nInstruction: ${editPreview.retryInstruction}`);
-  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, adopted, bestOfN]);
+    aiRetry(slideEditUserPrompt(currentSlideMd, currentSlideFields, editPreview.retryInstruction));
+  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, currentSlideFields, adopted, bestOfN]);
 
   // 却下 / 閉じる — discard the foreground result and re-arm the one-shot self-repair.
   const closePreview = useCallback(() => {
@@ -226,7 +230,7 @@ export default function AiPanel({
     setSelIdx(0);
     // One slide in, one slide out (text + any figure) — far fewer tokens than the deck. best-of-N (>1)
     // fans out N candidates and lets the adoption gate pick the best; N=1 is the plain single generate.
-    const prompt = `Current slide:\n${currentSlideMd}\n\nInstruction: ${userRequest}`;
+    const prompt = slideEditUserPrompt(currentSlideMd, currentSlideFields, userRequest);
     if (bestOfN > 1) ai.generateBest(prompt, "slide", bestOfN);
     else ai.generate(prompt, "slide");
   };

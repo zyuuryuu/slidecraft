@@ -6,7 +6,8 @@
  * edit can't silently remove it.
  */
 import { describe, it, expect } from "vitest";
-import { slideMarkdownEditPrompt, slideCondensePrompt } from "../src/engine/deck-plan-prompts";
+import { slideMarkdownEditPrompt, slideCondensePrompt, slideEditUserPrompt } from "../src/engine/deck-plan-prompts";
+import { parseFieldEditOps } from "../src/engine/field-edit-ops";
 import { parseDiagramEditOps } from "../src/engine/diagram-edit-ops";
 import { parseDesignIntent } from "../src/engine/design-intent";
 
@@ -62,10 +63,38 @@ describe("slideMarkdownEditPrompt — structure preservation + dual-mode decisio
     expect(parseDesignIntent(example)).toBeNull(); // content ops are NOT design ops (disjoint routing)
   });
 
+  it("offers placeholder TEXT ops (setField・#106 P2) for wording-only edits, with an example the engine parses", () => {
+    expect(p).toContain("setField");
+    expect(p).toMatch(/wording/i); // the selector names when setField applies
+    const example = '[{"op":"setField","idx":"15","text":"売上の推移（2026年度）"}]';
+    expect(p).toContain(example);
+    expect(parseFieldEditOps(example)).not.toBeNull();
+    expect(parseDiagramEditOps(example)).toBeNull(); // disjoint from figure ops
+    expect(parseDesignIntent(example)).toBeNull(); // and from design ops
+  });
+
+  it("setField is offered ONLY when a Fields list is given (batch edit sends none and parses Markdown only)", () => {
+    // batchEditDeck (refine.ts) reuses this prompt but its request has no "Fields" list and its output is
+    // parsed as Markdown — ops wiring there is #106 P4. Until then the prompt must steer it to (A).
+    expect(p).toMatch(/no "Fields" list.*\(A\)/);
+  });
+
   it("still offers arrangement (design) ops that route to parseDesignIntent", () => {
     expect(p).toContain("regionSplit");
     expect(parseDesignIntent('[{"op":"relayout","direction":"LR"}]')).not.toBeNull();
     expect(parseDiagramEditOps('[{"op":"relayout","direction":"LR"}]')).toBeNull(); // design op ≠ content op
+  });
+});
+
+describe("slideEditUserPrompt — the per-slide request carries the setField idx list", () => {
+  it("includes the slide Markdown, the field list, and the instruction", () => {
+    const u = slideEditUserPrompt("# 売上\n- a", '- idx "15": "売上"', "タイトルを変えて");
+    expect(u).toContain("Current slide:\n# 売上\n- a");
+    expect(u).toContain('- idx "15": "売上"');
+    expect(u).toContain("Instruction: タイトルを変えて");
+  });
+  it("without fields it is exactly the previous request shape", () => {
+    expect(slideEditUserPrompt("# 売上", "", "x")).toBe("Current slide:\n# 売上\n\nInstruction: x");
   });
 });
 

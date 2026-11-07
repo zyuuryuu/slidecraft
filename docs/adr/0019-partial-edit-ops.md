@@ -60,6 +60,15 @@ Option A（単発リテイク）でも弱モデルは複雑な構造編集で取
 - **L5 プロンプト判定強化（T2/T4a を源で減）**：`slideMarkdownEditPrompt` の (A)/(B) セレクタを書き直し — 「既存図のノード/エッジ増減も (A) 全文へ」と読める衝突を解消し、弱モデルを決定論 ops から遠ざけていた**「迷ったら (A)」を撤去**して**「既存図の変更は (B) 優先」**に。加えて (B) に**削除の安全則**（`removeNode`/`removeEdge` は指示の id を厳密に・図に無くても engine が skip＋報告するので**近い id に置換するな**）＋**削除 few-shot**（`[{"op":"removeNode","id":"cache"}]`）。プロンプトは確率的で保証ではない（弱 8B は依然揺れうる）ため L2〜L4 の決定論ガードの**補完**と位置づけ。
 - **見送り**：ops 検出の prose 許容拡大（L1）は既存の regression ガード `apply-routing.test.ts`（#3C＝prose 内の ops 配列で Markdown を破棄しない）と衝突し、かつ観測された T2 失敗は「(A) 全文選択」であって「prose 巻き ops の誤ルーティング」ではないため**却下**（R6：根本は L5 のプロンプト判定）。
 
+#### P2 placeholder テキスト ops ＝ 2026-11-07 実装（#106・統括裁定 2026-11-07）
+
+- **語彙**：`{ "op": "setField", "idx": "<idx>", "text": "<その欄の新しい全文>" }`（`src/engine/field-edit-ops.ts`・純粋 R2）。図 ops／design ops と語彙が交わらない＝1 返答はどれか 1 つの parser にだけ一致。
+- **適用＝GUI フィールドエディタと同じ一次関数**：`applyFieldEdit(placeholders, idx, textToParagraphs(text))`（R8・一致テストは `tests/field-edit-ops.test.ts`／`tests/edit-path-agreement.test.ts`）。未編集 placeholder は同一オブジェクト（byte-identical）。空文字はエディタ同様に欄を削除。
+- **対象はスライドに既にある placeholder のみ**：無い idx は skip ＋告知（`SkippedFieldOp`・never-silent）。空の欄への新規記入は binding が idx を決める (A) Markdown 経路に残す。全 op が skip なら元スライドをそのまま返す（偽 diff 無し）。
+- **モデルへの idx 提示**：単一スライド編集の依頼文に `Fields (setField idx: current text)` 一覧を添える（`describeEditableFields`・`slideEditUserPrompt`）。一覧が無い依頼（batch 一括編集）では setField を使わず (A) とプロンプトで明示 — batch/refine への ops 配線は P4。
+- **不正な setField 配列**（text 欠落・他種 op 混在）は ops として適用せず全文経路へフォールバックし、`[opsフォールバック]` 告知を editNotice／プレビュー warnings に出す。
+- **MCP ツールは増やさない**（ADR-0037「口は薄く」。`set_slide_markdown` で足りる）。
+
 ## Consequences
 
 - **未変更フィールドは再出力されない＝変わらない**（drift は op した箇所のみに局在）。オフラインでも高速（出力トークンが編集規模に比例）。
