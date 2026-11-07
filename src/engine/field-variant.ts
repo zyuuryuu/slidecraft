@@ -41,7 +41,7 @@ export function preferFieldVariant(
     const cands = catalog.filter((e) => e.role === role && coverage(e, kinds, regions) > best);
     if (cands.length === 0) continue;
     const top = Math.max(...cands.map((e) => coverage(e, kinds, regions)));
-    const e = pickLayout(cands.filter((c) => coverage(c, kinds, regions) === top), role, regions, hasImage);
+    const e = pickLayout(cands.filter((c) => coverage(c, kinds, regions) === top), role, regions, hasImage, slide.table);
     if (e) {
       winner = e;
       best = top;

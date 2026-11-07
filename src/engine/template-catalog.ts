@@ -16,6 +16,9 @@ import { detectGroups } from "./group-layout";
 import { isChromeBand } from "./master-scorer";
 import { isTitleLayout } from "./slide-roles";
 import { fieldSlotOf, isFieldIdx, type FieldKind } from "./field-rows";
+import { tableOverflow } from "./table-fit";
+import { bodyOrdinalIndex } from "./body-ordinal";
+import type { TableBlock } from "./slide-schema";
 
 export type LayoutRole =
   | "title"
@@ -74,6 +77,10 @@ export interface CatalogEntry {
   // (absent when none). bodyOrdinal = the slot's 1-based position among the content bodies, when the
   // slot is itself a content body (Midnight Callout.Top) — a visual at that ordinal would share it.
   fieldSlots?: Array<{ kind: FieldKind; bodyOrdinal?: number }>;
+  // Content-body box sizes (inches) in body-ORDINAL order — the box a visual at ordinal N lands in
+  // (= visual-placement.bodyPlaceholders/nthBody; agreement locked in table-fit-layout-pick.test, R8).
+  // Lets the auto pick see whether a table fits (#444). Read only by pickLayout's table term.
+  bodyBoxes: Array<{ w: number; h: number }>;
 }
 
 export type LayoutCatalog = CatalogEntry[];
@@ -586,6 +593,7 @@ function catalogEntry(layout: LayoutInfo): CatalogEntry {
     placeholders,
     ...(shape ? { groupKind: shape.kind, groupCount: shape.groups.length } : {}),
     ...(fieldSlots.length > 0 ? { fieldSlots } : {}),
+    bodyBoxes: bodyByIdx.map((ph) => ({ w: ph.style.w, h: ph.style.h })),
   };
 }
 
@@ -685,6 +693,7 @@ export function pickLayout(
   role: LayoutRole,
   regions?: number,
   hasImage?: boolean,
+  table?: Pick<TableBlock, "rows" | "placeholderIdx">,
 ): CatalogEntry | undefined {
   let candidates = catalog.filter((e) => e.role === role);
   if (candidates.length === 0) return undefined;
@@ -716,6 +725,12 @@ export function pickLayout(
       s += 1000;
     }
     if (role === "content" && !/content|body|text/i.test(e.name)) s += 1; // tie-break to an obviously-named one
+    // #444: demote a layout whose box (the ordinal box export places the table in) the table is
+    // estimated to overflow — the SAME judgment as the table-overflow warn (tableOverflow, R8). Weaker
+    // than one body-count step (10), stronger than the addon/name tie-breaks; a table overflowing
+    // EVERY candidate demotes them all equally → the old order (byte-identical).
+    const box = table && e.bodyBoxes[bodyOrdinalIndex(table.placeholderIdx)];
+    if (box && tableOverflow(table.rows, box)) s += 5;
     return s;
   };
   return [...candidates].sort((a, b) => score(a) - score(b))[0];
