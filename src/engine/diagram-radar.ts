@@ -15,7 +15,8 @@ import type { DrawTarget } from "./draw-target";
 import { SLIDE_W, SLIDE_H } from "./layout-engine";
 
 export const SERIES_COLORS = ["#3B82F6", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#06B6D4"];
-const RINGS = 4;
+/** Concentric grid rings (the native chart's major unit is axis top / RINGS — pptx-native-chart, #566). */
+export const RINGS = 4;
 
 type Pt = { x: number; y: number };
 

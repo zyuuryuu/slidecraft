@@ -34,11 +34,13 @@ const DEFAULT_GOLDEN: Record<string, string> = {
 };
 
 // native chart XML golden (pie / combo bar+line / radar) — pinned after a by-hand read of the XML and a
-// LibreOffice render of the deck (2026-11-07); deterministic across runs.
+// LibreOffice render of the deck (2026-11-07); deterministic across runs. #566 re-pinned chart1 (pie data labels
+// now value + %: showVal 1) and chart3 (radar <c:majorUnit val="1.5"/> = 4 rings, value labels tickLblPos none)
+// after a re-read of the XML and a LibreOffice render; chart2 did not move.
 const NATIVE_CHART_GOLDEN: Record<string, string> = {
-  "ppt/charts/chart1.xml": "f18c4e10d14c84907e11b951275f14fcf27543a74f71ed91709cc71e2b2a5613",
+  "ppt/charts/chart1.xml": "48e6edd67a2a22fd3549651ad8e7e0b8efa4731e9c222b31ba9b2c24e72e59a7",
   "ppt/charts/chart2.xml": "1006fc30f00d694691e1516ad56fb89473bea697cda5decad1cb3b2a9fb0e068",
-  "ppt/charts/chart3.xml": "aa2e086e7364ad9610837b42c7c67a464d91cc764ac1da238c96de68e82804bb",
+  "ppt/charts/chart3.xml": "5788b1358836de9ac54c6dc9baeafcc10c78758229c8c658b50e5f90fc8cfd82",
 };
 
 let tpl: TemplateData;
