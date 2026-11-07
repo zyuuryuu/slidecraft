@@ -14,6 +14,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { resolve } from "node:path";
 import { createServer, type Server } from "node:net";
+import { execFileSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createSession, newProject } from "../src/mcp/session";
@@ -78,11 +79,8 @@ function pngInfo(bytes: Buffer): { isPng: boolean; w: number; h: number } {
   return { isPng, w: bytes.readUInt32BE(16), h: bytes.readUInt32BE(20) };
 }
 
-/** Decode a Chrome-screenshot PNG (8-bit, RGB or RGBA, non-interlaced) and count the pixels that
- *  differ from the image's dominant color — "ink". Compressed-size heuristics proved encoder-
- *  dependent (CI's chrome emitted a far smaller file than the local one for the same content);
- *  counting actual non-background pixels is calibration-free. */
-function inkPixels(bytes: Buffer): number {
+/** Decode a Chrome-screenshot PNG (8-bit, RGB or RGBA, non-interlaced) to raw scanlines. */
+function decodePng(bytes: Buffer): { img: Buffer; bpp: number; w: number; h: number } {
   const colorType = bytes[25]; // IHDR: 2=RGB, 6=RGBA
   const bpp = colorType === 6 ? 4 : 3;
   const { w, h } = pngInfo(bytes);
@@ -117,6 +115,16 @@ function inkPixels(bytes: Buffer): number {
       row[x] = v & 0xff;
     }
   }
+  return { img, bpp, w, h };
+}
+
+/** Count the pixels that differ from the image's dominant color — "ink". Compressed-size heuristics
+ *  proved encoder-dependent (CI's chrome emitted a far smaller file than the local one for the same
+ *  content); counting actual non-background pixels is calibration-free. NOTE (#531): background
+ *  color blocks count as ink too, so this alone does NOT prove any text was drawn — see textInk. */
+function inkPixels(bytes: Buffer): number {
+  const { img, bpp, w } = decodePng(bytes);
+  const stride = w * bpp;
   // Dominant color (sampled) → count pixels that differ from it.
   const counts = new Map<number, number>();
   const key = (i: number) => (img[i] << 16) | (img[i + 1] << 8) | img[i + 2];
@@ -126,6 +134,52 @@ function inkPixels(bytes: Buffer): number {
   for (let i = 0; i < img.length; i += bpp) if (key(i) !== dominant) ink++;
   return ink;
 }
+
+// ── #531: "text ink" — pixels painted by GLYPHS, not by background blocks ──
+// The cover's color blocks alone exceed inkPixels' 10,000 (PR #528: CI shot with ZERO CJK glyphs
+// passed). textInk shoots the page twice — as-is and with every glyph made transparent (same
+// layout, same blocks) — and counts the pixels that differ: only glyph pixels survive the diff.
+const HIDE_TEXT = "<style>*{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}</style>";
+function withTextHidden(html: string): string {
+  expect(html).toContain("</head>"); // the injection must not silently no-op
+  return html.replace("</head>", `${HIDE_TEXT}</head>`);
+}
+/** The same page minus its embedded @font-face rules (the #528 diagnostic variant). */
+function withoutEmbeddedFonts(html: string): string {
+  expect(html).toContain("@font-face");
+  const out = html.replace(/@font-face\s*\{[^}]*\}/g, ""); // data: URIs are base64 — no '}' inside
+  expect(out).not.toContain("@font-face");
+  return out;
+}
+function differingPixels(a: Buffer, b: Buffer): number {
+  const A = decodePng(a), B = decodePng(b);
+  expect([A.w, A.h]).toEqual([B.w, B.h]);
+  let n = 0;
+  for (let i = 0; i < A.w * A.h; i++) {
+    const p = i * A.bpp, q = i * B.bpp;
+    if (A.img[p] !== B.img[q] || A.img[p + 1] !== B.img[q + 1] || A.img[p + 2] !== B.img[q + 2]) n++;
+  }
+  return n;
+}
+async function textInk(html: string): Promise<number> {
+  return differingPixels(await rasterizeHtml(TEST_BROWSER!, html), await rasterizeHtml(TEST_BROWSER!, withTextHidden(html)));
+}
+/** Cover (slide 0) text is ALL CJK (title 四半期経営レビュー + subtitle 経営企画部 — no Latin), so its
+ *  text ink is CJK ink. Measured (#531, chrome-headless-shell, 1280×720): embedded Noto drawn →
+ *  15,923 px; no CJK font at all → tofu boxes 3,956 px (DejaVu .notdef) / ~0 px (CI #528: nothing
+ *  drawn). The floor sits between, ≈ half the healthy value. */
+const CJK_TEXT_INK_MIN = 8_000;
+/** Premise of the negative control: does ANY system font cover 四 (U+56DB)? Chrome's per-character
+ *  fallback would find it and draw CJK even without the embedded fonts. undefined = can't tell
+ *  (no fontconfig, e.g. macOS) → the control is skipped, never guessed. */
+function systemHasCjkFont(): boolean | undefined {
+  try {
+    return execFileSync("fc-list", [":charset=56db", "family"], { encoding: "utf8" }).trim() !== "";
+  } catch {
+    return undefined;
+  }
+}
+const NO_CJK_SYSTEM_FONT = REAL_BROWSER && systemHasCjkFont() === false;
 
 describe("browser discovery (env → system → null)", () => {
   it("an explicit SLIDECRAFT_BROWSER wins when it exists", () => {
@@ -175,6 +229,30 @@ describe.skipIf(!REAL_BROWSER)("real headless rasterization", () => {
     expect(inkPixels(bytes)).toBeGreaterThan(10_000);
     // retry: real-Chrome render can transiently miss its deadline under load (#281); a re-spawn
     // clears it. Only reached in the non-required e2e job / locally, never the required `test`.
+  });
+
+  it("CJK glyphs are actually DRAWN: glyph-only ink (page − text-hidden page) clears the floor (#531)", { timeout: 90_000, retry: 2 }, async () => {
+    browserEnv();
+    const s = await loadedSession();
+    // Background blocks cancel out in the diff, so a CJK-less render (#528) cannot satisfy this.
+    // Where no CJK system font exists (CI's ubuntu runner) only the embedded @font-face can draw it.
+    expect(await textInk(renderSlideHtml(s, 0))).toBeGreaterThan(CJK_TEXT_INK_MIN);
+  });
+
+  it.skipIf(!NO_CJK_SYSTEM_FONT)("negative control (no CJK system font): WITHOUT the embedded @font-face the same criterion fails", { timeout: 90_000, retry: 2 }, async () => {
+    // Proves the check above has teeth in the environment that gates it: strip the embedded fonts
+    // and the CJK glyphs vanish (or degrade to tofu), so glyph ink must fall under the floor. Runs
+    // only where its premise holds (fc-list finds no font covering 四) — elsewhere system fallback
+    // would legitimately draw CJK and the control would be meaningless, not red.
+    browserEnv();
+    const s = await loadedSession();
+    expect(await textInk(withoutEmbeddedFonts(renderSlideHtml(s, 0)))).toBeLessThan(CJK_TEXT_INK_MIN);
+  });
+
+  it.skipIf(!(process.env.GITHUB_ACTIONS === "true"))("CI's browser job is the embedded-font gate: its runner has NO CJK system font (premise of the control)", () => {
+    // If the runner image ever gains a CJK font (or loses fc-list), the control above would skip and
+    // the glyph check would pass via system fallback — the gate would go blind SILENTLY. Fail loudly.
+    expect(systemHasCjkFont()).toBe(false);
   });
 
   it("the network is DEAD during rasterization: a live local listener sees zero connections", { timeout: 60_000, retry: 2 }, async () => {

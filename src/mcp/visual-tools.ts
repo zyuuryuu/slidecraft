@@ -26,7 +26,7 @@ export function registerVisualTools({ tool, sessionOf, index, doc }: VisualToolD
   // fonts embedded) in a locally installed headless Chrome/Edge, network-dead and script-free.
   tool(
     "get_slide_image",
-    { description: "1スライドの現在の描画を PNG で返す（AI の視覚デザインチェック用）。共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定。deck 全枚をまとめて見るなら get_deck_image", inputSchema: { ...index, ...doc } },
+    { description: "1スライドの描画 PNG（視覚チェック用・ローカル Chrome/Edge 要、未検出時は SLIDECRAFT_BROWSER）。全枚は get_deck_image", inputSchema: { ...index, ...doc } },
     async (a, extra) => {
       try {
         const img = await rasterizeSlide(sessionOf(extra, a.docId), a.index);
@@ -41,7 +41,7 @@ export function registerVisualTools({ tool, sessionOf, index, doc }: VisualToolD
   // path — `renderSlideHtml` IS the exact page get_slide_image screenshots.
   tool(
     "get_slide_html",
-    { description: "1スライドの現在の描画を自己完結 HTML 文字列で返す（get_slide_image と同一の共有 HTML＝script ゼロ・CSP・フォント埋め込み済）。ローカルに Chrome/Edge が無い環境向け：呼び出し側の任意の手段でラスタ化できる", inputSchema: { ...index, ...doc } },
+    { description: "get_slide_image と同一描画の自己完結 HTML（Chrome/Edge が無い環境向け）", inputSchema: { ...index, ...doc } },
     (a, extra) => run(() => renderSlideHtml(sessionOf(extra, a.docId), a.index)),
   );
   // #522 (ADR-0037 D3, hot loop): the WHOLE deck as ONE contact sheet — the finishing check that
