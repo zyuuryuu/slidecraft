@@ -167,7 +167,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
       </div>
       {!ai.preset.native && ai.provider !== "builtin" && ai.models.length === 0 && (
         <span className="text-[10px] text-faint">
-          {ai.modelsError ? t("aiSettings.modelsFetchError", { error: ai.modelsError }) : t("aiSettings.modelsEmpty")}
+          {ai.modelsError ? t("aiSettings.modelsFetchError", { error: ai.modelsError }) : t(ai.provider === "ollama" ? "aiSettings.modelsEmpty.ollama" : "aiSettings.modelsEmpty.remote")}
         </span>
       )}
     </div>

@@ -110,7 +110,7 @@ describe("#615-1 AI の接続設定は 1 か所（AiSettingsPopover）", () => {
     const html = renderToStaticMarkup(<AiSettingsPopover ai={fakeAi()} />);
     expect(html).toContain('type="password"');
     expect(html).toMatch(/<button[^>]*data-testid="ai-key-visibility"[^>]*>表示<\/button>/);
-    expect(html).toContain(ja.aiSettings.modelsEmpty);
+    expect(html).toContain(ja.aiSettings.modelsEmpty.remote); // #653: openai なので Ollama 向けでない方
     const err = renderToStaticMarkup(<AiSettingsPopover ai={fakeAi({ modelsError: "HTTP 401" })} />);
     expect(err).toContain("HTTP 401");
   });

@@ -75,7 +75,10 @@
     "apiKeyOptional": "API key (optional)",
     "rememberKey": "Remember key",
     "modelsFetchError": "Couldn't fetch the model list ({{error}}). Check the Base URL, retry with ↻, or type a name manually.",
-    "modelsEmpty": "No installed models found. Confirm a model has been pulled to this Ollama and that the Base URL points to the right Ollama, then retry with ↻.",
+    "modelsEmpty": {
+      "ollama": "No installed models found. Confirm a model has been pulled to this Ollama and that the Base URL points to the right Ollama, then retry with ↻.",
+      "remote": "This endpoint returned no models. Check the Base URL and API key, then retry with ↻, or type a model name manually."
+    },
     "baseUrlPlaceholder": "Base URL (e.g. https://api.openai.com/v1)",
     "modelPlaceholder": "Model name",
     "apiKey": "API key",
