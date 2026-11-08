@@ -393,7 +393,7 @@ export default function App() {
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
   // re-seeds even when the same issue is clicked twice.
   const [aiSeed, setAiSeed] = useState<{ prompt: string; ts: number } | undefined>(undefined);
-  const [aiSettingsTs, setAiSettingsTs] = useState<number | undefined>(undefined); // ⚙ → AI の接続設定 (#614)
+  const [aiSettingsTs, setAiSettingsTs] = useState<number | undefined>(undefined); // ⚙ → AI 接続設定 (#614)
   const handleAiFix = (slideIndex: number, prompt: string) => {
     selectSlide(slideIndex);
     setShowAiPanel(true);
