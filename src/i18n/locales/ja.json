@@ -77,7 +77,7 @@
     "modelsFetchError": "モデル一覧を取得できません（{{error}}）。Base URL を確認、↻ で再取得。手入力も可。",
     "modelsEmpty": {
       "ollama": "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。",
-      "remote": "この接続先からモデル一覧を取得できませんでした（0 件）。Base URL と API キーを確認し、↻ で再取得。モデル名の手入力も可。"
+      "remote": "この接続先のモデル一覧は 0 件でした。Base URL と API キーを確認し、↻ で再取得。モデル名の手入力も可。"
     },
     "baseUrlPlaceholder": "Base URL（例: https://api.openai.com/v1）",
     "modelPlaceholder": "モデル名",

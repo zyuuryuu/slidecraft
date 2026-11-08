@@ -44,11 +44,13 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   // The AI connection settings fold + manual copy/paste fallback (UI-only state). #653: the fold
   // starts OPEN whenever the dialog opens with an unusable connection (connection.ok=false), so a
   // first-time user lands on what to fill in; after that it is the user's to toggle.
-  const [showSettings, setShowSettings] = useState(() => !ai.connection.ok);
+  // "checking"（モデル一覧の取得中・内蔵 AI の起動中）は未設定ではないので展開しない（PR #664 レビュー B-1）。
+  const needsSetup = !ai.connection.ok && ai.connection.tone !== "checking";
+  const [showSettings, setShowSettings] = useState(() => needsSetup);
   const [wasOpen, setWasOpen] = useState(isOpen);
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen);
-    if (isOpen) setShowSettings(!ai.connection.ok);
+    if (isOpen) setShowSettings(needsSetup);
   }
   const [showManual, setShowManual] = useState(false);
   const [prompt, setPrompt] = useState("");
