@@ -6,6 +6,9 @@
  *   どれも 0 にならなければ最も減る倍率（同数なら大きい方）。1 件も減らなければ提案しない。
  * - 評価は「元テンプレ bytes → adjustTemplate（本文だけ倍率）→ loadTemplate → buildCatalog → diagnoseDeck」。
  *   容量見積りは diagnoseDeck が使う placeholderCapacity の 1 経路のまま（デッキ側に倍率を持たない・R8）。
+ *   倍率を掛ける枠の範囲も adjustTemplate の中（bodyMaxPtFor）の 1 経路: プリセット由来のテンプレでは
+ *   プリセットが倍率を掛けた枠だけ（KPI の大数字など表示用の枠は据え置き）。adjust_template／GUI の適用も
+ *   同じ関数を通るので、提案の予告件数と実際の適用結果は一致する（#670）。
  * - 溢れが無ければ何もしない（既存デッキの診断は不変）。元の bytes は書き換えない（adjustTemplate は派生を返す）。
  *
  * 純粋ロジック（R2）: JSZip と文字列処理（adjustTemplate / loadTemplate）だけ。
