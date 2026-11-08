@@ -17,7 +17,7 @@
     "resizeHint": "ドラッグで高さ変更（ダブルクリックでリセット）",
     "assistTab": "アシスト",
     "collabTab": "協働",
-    "settingsPillTitle": "{{label}}{{hint}}（クリックで AI 設定）",
+    "settingsPillTitle": "{{label}}{{hint}}（クリックで {{settings}}）",
     "close": "閉じる",
     "assistDescription": "🖊️ AI にお願いして、このアプリの中でスライドを作る・直します。",
     "collabDescription": "🤝 あなたが使っている別の AI（例：Claude Code）をこの画面につなぎ、同じ資料を一緒に編集します。（上級者向け）",
@@ -55,7 +55,7 @@
     "applyToEdit": "適用 → 編集へ"
   },
   "aiSettings": {
-    "title": "AI 設定",
+    "title": "AI 接続設定",
     "provider": "プロバイダ",
     "switchToOllama": "🦙 Ollama → 使う",
     "switchToOllamaTitle": "ローカルの Ollama に切り替え",
@@ -75,7 +75,10 @@
     "apiKeyOptional": "API キー（任意）",
     "rememberKey": "キーを記憶",
     "modelsFetchError": "モデル一覧を取得できません（{{error}}）。Base URL を確認、↻ で再取得。手入力も可。",
-    "modelsEmpty": "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。",
+    "modelsEmpty": {
+      "ollama": "インストール済みモデルが 0 件です。この Ollama に pull 済みか／Base URL が正しい Ollama か確認し、↻ で再取得。",
+      "remote": "この接続先のモデル一覧は 0 件でした。Base URL と API キーを確認し、↻ で再取得。モデル名の手入力も可。"
+    },
     "baseUrlPlaceholder": "Base URL（例: https://api.openai.com/v1）",
     "modelPlaceholder": "モデル名",
     "apiKey": "API キー",
@@ -413,11 +416,10 @@
     "requestPlaceholderDiagram": "例: 3層Webアプリのネットワーク構成図（LB→Web→App→DB、DMZあり）",
     "close": "閉じる",
     "stepRequest": "1. 何を作りますか？",
-    "modeSlides": "スライド一式",
+    "modeSlides": "デッキ",
     "modeDiagram": "図",
     "stepConnection": "2. AI の接続",
-    "connectionSettings": "接続設定",
-    "connectionSettingsTitle": "AI の接続設定を開閉（AI ドックの ⚙ と同じ設定）",
+    "connectionSettingsTitle": "AI 接続設定を開閉（AI ドックの ⚙ と同じ設定）",
     "generate": "生成",
     "cancel": "中止",
     "generating": "生成中…",
@@ -636,8 +638,7 @@
     "buttonTitle": "設定（言語・配色・ヘルプ・AI の接続）",
     "language": "言語",
     "theme": "配色",
-    "help": "ヘルプ（ドキュメント）",
-    "aiSettings": "AI の接続設定…"
+    "help": "ヘルプ（ドキュメント）"
   },
   "toolbar": {
     "undo": "元に戻す (⌘/Ctrl+Z)",

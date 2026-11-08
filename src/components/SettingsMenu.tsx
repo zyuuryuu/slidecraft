@@ -11,7 +11,7 @@ import LanguageToggle from "./LanguageToggle";
 import ThemeToggle from "./ThemeToggle";
 
 interface SettingsPanelProps {
-  /** Close the menu (called after an entry that navigates away — help / AI settings). */
+  /** Close the menu (called after an entry that navigates away — help / AI connection settings). */
   onClose: () => void;
   /** Help → docs site (issue #114). Omit → no help entry. */
   onHelp?: () => void;
@@ -38,7 +38,7 @@ export function SettingsPanel({ onClose, onHelp, onAiSettings }: SettingsPanelPr
       {(onHelp || onAiSettings) && <div className="my-1 border-t border-edge" />}
       {onAiSettings && (
         <button type="button" onClick={run(onAiSettings)} className={item}>
-          ✨ {t("settings.aiSettings")}
+          ✨ {t("aiSettings.title")}
         </button>
       )}
       {onHelp && (
