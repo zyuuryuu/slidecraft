@@ -42,8 +42,8 @@ const GOLDEN: Record<string, Record<string, string>> = {
     "layout:kpi-4": "b25918054a58c8103b055d5b8906bd6322321785461adc142decac4c5127121d",
     "deck:ppt/slides/slide2.xml": "3b65229456d2597312cda798449ed884d3e8152b3e4729521da05e7b387bf2a9",
     "deck:ppt/slides/slide3.xml": "6934f904713969860a2856306289a7da5df9080add4f5ce876e8cc20166175a9",
-    "deck:ppt/slides/slide4.xml": "ba664dbfc00b73785d46915b55edab7a23047605af7e913f73118ac1b783da24",
-    "deck:ppt/slides/slide5.xml": "dea6649ce0ad0bcb1069f5fd5b31cdec565a0f7b91aa7fa8f3ddc5bda9cbcea9",
+    "deck:ppt/slides/slide4.xml": "3a06204175daf851435444f17a3494c7c865587fc0a34c5481182df9e828da1b",
+    "deck:ppt/slides/slide5.xml": "6fc4532984d1562e841d16fe8e3fc48d0a4ddfbe9fec2099b37ff987107ec0ab",
   },
   "Dirty_Legacy43_TemplateOnly.pptx": {
     "layout:kpi-4": "2ea4bafab9e0320693d398d3e3289b0026701ed716ea1bf2d4193c6af24ea49a",
