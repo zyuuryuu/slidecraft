@@ -38,7 +38,8 @@ export type ReviewRuleId =
   | "overflow-scale-hint"
   | "field-row-rescued"
   | "marker-layout-missing"
-  | "density-target";
+  | "density-target"
+  | "kpi-value-overflow";
 
 export interface ReviewRule {
   id: ReviewRuleId;
@@ -73,6 +74,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "field-row-rescued", level: "info" },
   { id: "marker-layout-missing", level: "info" },
   { id: "density-target", level: "info" }, // #596: テンプレの密度目標（StylePreset.density）超え。get_deck_issues が density-hint.ts で足す
+  { id: "kpi-value-overflow", level: "warn" }, // #643: KPI の値が値の枠に 1 行で収まらない（kpi-overflow.ts）
 ];
 
 export const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
