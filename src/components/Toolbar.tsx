@@ -96,55 +96,60 @@ export default function Toolbar({
           <>
             <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
             <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
-              {onOpenProject && (
-                <button
-                  onClick={() => { setExportOpen(false); onOpenProject(); }}
-                  className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
-                >
-                  <span>📂 {t("toolbar.openProject")}</span>
-                  <span className="text-faint text-xs">.scft</span>
-                </button>
-              )}
-              {onSaveProject && (
-                <button
-                  onClick={() => { setExportOpen(false); onSaveProject(); }}
-                  disabled={!hasSpec}
-                  className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
-                >
-                  <span>💾 {t("toolbar.saveProject")}</span>
-                  <span className="text-faint text-xs">.scft</span>
-                </button>
-              )}
-              <div className="my-1 border-t border-edge" />
-              <div className="px-3 pb-0.5 text-[10px] text-faint">{t("toolbar.exportSection")}</div>
-              <button
-                onClick={() => { setExportOpen(false); onGenerate(); }}
-                disabled={!hasSpec || generating}
-                className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
-              >
-                <span>📊 PPTX</span>
-                <span className="text-faint text-xs">.pptx</span>
-              </button>
-              {onExportHtml && (
-                <>
-                  {/* #650: the transition is picked in the row below (no flyout → nesting stays ≤ 2); click exports with it. */}
+              {/* #674: each section is a role="group" (as in the master menu) so the UX budget counts it (≤ 7 items). */}
+              <div role="group" aria-label={t("toolbar.projectSection")}>
+                {onOpenProject && (
                   <button
-                    onClick={() => { setExportOpen(false); onExportHtml(htmlTransition); }}
+                    onClick={() => { setExportOpen(false); onOpenProject(); }}
+                    className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
+                  >
+                    <span>📂 {t("toolbar.openProject")}</span>
+                    <span className="text-faint text-xs">.scft</span>
+                  </button>
+                )}
+                {onSaveProject && (
+                  <button
+                    onClick={() => { setExportOpen(false); onSaveProject(); }}
                     disabled={!hasSpec}
                     className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                   >
-                    <span>🌐 HTML</span>
+                    <span>💾 {t("toolbar.saveProject")}</span>
+                    <span className="text-faint text-xs">.scft</span>
                   </button>
-                  <HtmlTransitionPicker value={htmlTransition} onChange={setHtmlTransition} disabled={!hasSpec} />
-                </>
-              )}
-              <button
-                onClick={() => { setExportOpen(false); onSave(); }}
-                className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
-              >
-                <span>📄 Markdown</span>
-                <span className="text-faint text-xs">.md</span>
-              </button>
+                )}
+              </div>
+              <div role="group" aria-label={t("toolbar.exportSection")}>
+                <div className="my-1 border-t border-edge" />
+                <div className="px-3 pb-0.5 text-[10px] text-faint">{t("toolbar.exportSection")}</div>
+                <button
+                  onClick={() => { setExportOpen(false); onGenerate(); }}
+                  disabled={!hasSpec || generating}
+                  className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
+                >
+                  <span>📊 PPTX</span>
+                  <span className="text-faint text-xs">.pptx</span>
+                </button>
+                {onExportHtml && (
+                  <>
+                    {/* #650: the transition is picked in the row below (no flyout → nesting stays ≤ 2); click exports with it. */}
+                    <button
+                      onClick={() => { setExportOpen(false); onExportHtml(htmlTransition); }}
+                      disabled={!hasSpec}
+                      className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
+                    >
+                      <span>🌐 HTML</span>
+                    </button>
+                    <HtmlTransitionPicker value={htmlTransition} onChange={setHtmlTransition} disabled={!hasSpec} />
+                  </>
+                )}
+                <button
+                  onClick={() => { setExportOpen(false); onSave(); }}
+                  className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
+                >
+                  <span>📄 Markdown</span>
+                  <span className="text-faint text-xs">.md</span>
+                </button>
+              </div>
             </div>
           </>
         )}

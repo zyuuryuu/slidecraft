@@ -649,6 +649,8 @@
     "buttonTitle": "Settings (language, theme, help, AI connection)",
     "language": "Language",
     "theme": "Theme",
+    "displaySection": "Display",
+    "aiHelpSection": "AI & help",
     "help": "Help (documentation)"
   },
   "toolbar": {
@@ -664,6 +666,7 @@
     "draft": "📝 Draft",
     "openProject": "Open Project",
     "saveProject": "Save Project",
+    "projectSection": "Project",
     "exportSection": "Export",
     "transition": "Transition",
     "transitionGroup": "HTML transition",

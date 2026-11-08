@@ -4,6 +4,7 @@
  *
  *  - i18nLeaks(file): TSX の画面に直書きされた文言（i18n の辞書を通らない文言）を列挙する。
  *  - menuDepth(html): 描画した HTML で、メニュー項目に届くまでの段数を数える。
+ *  - groupItems(html) / isSegmentRow: メニューの区画ごとの項目数（セグメント行＝1 項目）。
  */
 import ts from "typescript";
 
@@ -103,12 +104,28 @@ export function menuDepth(html: string): { depth: number; deepest: string[] } {
   return { depth, deepest };
 }
 
+/** セグメント行（同じ軸の選択肢を横に並べた 1 行・ThemeToggle／LanguageToggle／HtmlTransitionPicker）か。
+ *  判定はここだけ（R8）: role="group" の直下が、押し状態（aria-pressed）を持つボタンだけで 1 個以上。
+ *  セグメント行は「1 つの値を選ぶ 1 チャンク」なので、メニューの区画ではなく区画の 1 項目と数える
+ *  （docs/design/ux-principles.md §3・#674）。 */
+export function isSegmentRow(children: ReadonlyArray<{ button: boolean; pressed: boolean }>): boolean {
+  return children.length > 0 && children.every((c) => c.button && c.pressed);
+}
+
 /** 描画した HTML の `role="group"`（メニューの区画）ごとに、ボタンを含む直下の要素（＝項目）を数える。
- *  見出し・区切り線はボタンを含まないので数えない。スクロールする一覧（マスターの一覧）は 1 項目。 */
+ *  見出し・区切り線はボタンを含まないので数えない。スクロールする一覧（マスターの一覧）は 1 項目。
+ *  セグメント行（isSegmentRow）は区画として返さず、それを含む区画の 1 項目になる。 */
 export function groupItems(html: string): Array<{ label: string; items: number }> {
-  type Frame = { tag: string; group?: { label: string; items: number }; child?: { hasButton: boolean } };
+  type Group = { label: string; items: number };
+  type Frame = {
+    tag: string;
+    group?: Group;
+    /** group の直下の要素（セグメント行の判定に使う）。 */
+    kids?: Array<{ button: boolean; pressed: boolean }>;
+    child?: { hasButton: boolean };
+  };
   const stack: Frame[] = [];
-  const out: Array<{ label: string; items: number }> = [];
+  const out: Group[] = [];
   const tagRe = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g;
   for (let m = tagRe.exec(html); m; m = tagRe.exec(html)) {
     const [, close, rawTag, attrs, selfClose] = m;
@@ -120,16 +137,19 @@ export function groupItems(html: string): Array<{ label: string; items: number }
         const f = stack[j];
         const parent = stack[j - 1];
         if (f.child?.hasButton && parent?.group) parent.group.items++;
+        if (f.group && f.kids && isSegmentRow(f.kids)) out.splice(out.indexOf(f.group), 1);
       }
       stack.length = i;
       continue;
     }
     if (tag === "button") for (const f of stack) if (f.child) f.child.hasButton = true;
-    if (VOID.has(tag) || selfClose) continue;
     const parent = stack[stack.length - 1];
+    parent?.kids?.push({ button: tag === "button", pressed: /\saria-pressed="/.test(attrs) });
+    if (VOID.has(tag) || selfClose) continue;
     const frame: Frame = { tag };
     if (/\srole="group"/.test(attrs)) {
       frame.group = { label: attrs.match(/\saria-label="([^"]*)"/)?.[1] ?? "", items: 0 };
+      frame.kids = [];
       out.push(frame.group);
     }
     if (parent?.group) frame.child = { hasButton: tag === "button" };
