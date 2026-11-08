@@ -76,3 +76,26 @@ describe("#662 不変条件: section 役レイアウトを持つテンプレで�
     }
   }
 });
+
+/**
+ * 統括レビュー（PR #678）: section 役レイアウトを持つテンプレでも、章扉の解決先が section 役以外になる経路がある
+ * （section 役は slideRoleRegions で hasTitle && !hasBody のときだけ・最終スライドの閉じ挨拶は closing 役）。
+ * これは正しい解決であり「テンプレに無い」は偽なので告げない。告知はテンプレに section 役が無い場合に限る。
+ */
+describe("#662 不変条件: section 役を持つテンプレでは、本文つき章扉・閉じ挨拶の章扉でも 0 件（raw／materialized 一致）", () => {
+  const cases: Array<[string, string]> = [
+    ["<!-- section --> ＋ 本文 1 行", "# 表紙\n\n---\n\n<!-- section -->\n# 第1章\n\n本章の概要を述べる。\n\n---\n\n# 本文\n\n- a"],
+    ["最終スライドが「ご清聴ありがとうございました」の章扉", "# 表紙\n\n---\n\n# 本文\n\n- a\n\n---\n\n<!-- section -->\n# ご清聴ありがとうございました"],
+  ];
+  for (const file of ["技術報告_スタンダード水色_TemplateOnly.pptx", "エグゼクティブ_Executive_TemplateOnly.pptx"]) {
+    for (const [label, md] of cases) {
+      it(`${file}: ${label}`, async () => {
+        const raw = await hits(resolve(SHIPPED_DIR, file), md, false);
+        const materialized = await hits(resolve(SHIPPED_DIR, file), md, true);
+        expect(raw).toEqual([]);
+        expect(materialized).toEqual([]);
+        expect(raw.length).toBe(materialized.length);
+      });
+    }
+  }
+});
