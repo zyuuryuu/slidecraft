@@ -7,6 +7,7 @@
  *     `planAugmentation` の `reason` を添えて無効にする。
  *  3. 取り込み結果の帯からは強化のボタンを外し、メニューへの案内だけにする。案内とメニューは同じ計画
  *     （planTemplateAugmentation）から作る — 一致テスト（R8）。
+ * 区画の数・1 区画の項目数の上限は tests/ux-budget.test.tsx に集約（#648）。ここは区画の中身と順を見る。
  * DOM 環境は無いので、状態を持たない MasterMenu を react-dom/server で描画して確かめる。
  */
 import { describe, it, expect, beforeAll } from "vitest";
