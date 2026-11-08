@@ -160,7 +160,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             </button>
             {showSettings && (
               <div className="rounded border border-edge bg-panel">
-                <AiSettingsPopover ai={ai} />
+                <AiSettingsPopover ai={ai} surface="dialog" />
               </div>
             )}
           </div>

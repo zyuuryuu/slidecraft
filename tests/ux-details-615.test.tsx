@@ -103,7 +103,7 @@ describe("#615-1 AI の接続設定は 1 か所（AiSettingsPopover）", () => {
     const btn = html.match(/<button[^>]*data-testid="llm-ai-settings-toggle"[^>]*>([\s\S]*?)<\/button>/);
     expect(btn?.[0]).toContain('aria-expanded="false"');
     expect(btn?.[1].replace(/<[^>]+>/g, "")).toContain("接続設定");
-    expect(src("components/LlmAssist.tsx")).toMatch(/<AiSettingsPopover ai=\{ai\} \/>/);
+    expect(src("components/LlmAssist.tsx")).toMatch(/<AiSettingsPopover ai=\{ai\} surface="dialog" \/>/); // #653: ダイアログ向けの表示（候補数なし）
   });
 
   it("ダイアログにしか無かった機能を AiSettingsPopover に移す（キーの表示切替・モデル一覧の案内）", () => {

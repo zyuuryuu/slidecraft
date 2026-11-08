@@ -15,19 +15,25 @@ const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
  * logic (useAiGeneration) is unchanged: this is a pure re-home of the same controls.
  * #615: this is the ONLY place that edits the connection — the 「AIで生成」 dialog (LlmAssist) renders
  * this same component instead of its own copy (tests/ux-details-615.test.tsx).
+ * #653: `surface="dialog"` is that inline use — the dialog's toggle already shows the title and the
+ * connection status, and the candidate count (Best-of-N) only affects single-slide edits in the AI
+ * dock, never whole-deck generation, so those are left out there (one settings source, fewer rows).
  */
-export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
+export default function AiSettingsPopover({ ai, surface = "dock" }: { ai: AiGeneration; surface?: "dock" | "dialog" }) {
   const { t } = useTranslation();
   const [showKey, setShowKey] = useState(false);
+  const inDock = surface === "dock";
   return (
     <div className="flex flex-col gap-2.5 p-3">
-      <div className="text-[11px] font-medium text-fg2">{t("aiSettings.title")}</div>
+      {inDock && <div className="text-[11px] font-medium text-fg2">{t("aiSettings.title")}</div>}
 
-      <div className="flex items-center gap-2 text-[11px] flex-wrap">
-        <span className={toneClass(ai.connection.tone)}>●</span>
-        <span className="text-fg2">{ai.connection.label}</span>
-        {ai.connection.hint && <span className="text-faint">— {ai.connection.hint}</span>}
-      </div>
+      {inDock && (
+        <div className="flex items-center gap-2 text-[11px] flex-wrap">
+          <span className={toneClass(ai.connection.tone)}>●</span>
+          <span className="text-fg2">{ai.connection.label}</span>
+          {ai.connection.hint && <span className="text-faint">— {ai.connection.hint}</span>}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 text-[11px] flex-wrap">
         <span className="shrink-0 text-muted">{t("aiSettings.provider")}</span>
@@ -85,7 +91,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
 
       {/* Best-of-N: generate N candidates for a single-slide edit and let the adoption gate pick the
           best. Capped at MAX_BEST_OF_N so a mistaken huge value can't spawn a runaway fan-out. */}
-      <label className="flex items-center gap-2 text-xs text-muted" title={t("aiSettings.bestOfNTitle")}>
+      {inDock && <label className="flex items-center gap-2 text-xs text-muted" title={t("aiSettings.bestOfNTitle")}>
         <span className="text-fg2">{t("aiSettings.bestOfNLabel")}</span>
         <input
           type="number"
@@ -96,7 +102,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           className={`${field} w-14`}
         />
         <span className="text-faint">{t("aiSettings.bestOfNRange", { max: MAX_BEST_OF_N })}</span>
-      </label>
+      </label>}
 
       <div className="flex flex-wrap items-center gap-2">
         {!ai.preset.native && ai.provider !== "builtin" && (
