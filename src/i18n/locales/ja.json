@@ -649,6 +649,8 @@
     "buttonTitle": "設定（言語・配色・ヘルプ・AI の接続）",
     "language": "言語",
     "theme": "配色",
+    "displaySection": "表示",
+    "aiHelpSection": "AI とヘルプ",
     "help": "ヘルプ（ドキュメント）"
   },
   "menu": {
@@ -667,6 +669,7 @@
     "draft": "📝 原稿",
     "openProject": "プロジェクトを開く",
     "saveProject": "プロジェクトを保存",
+    "projectSection": "プロジェクト",
     "exportSection": "書き出す",
     "transition": "遷移",
     "transitionGroup": "HTML の遷移",

@@ -27,24 +27,32 @@ export function SettingsPanel({ onClose, onHelp, onAiSettings }: SettingsPanelPr
   const run = (fn: () => void) => () => { onClose(); fn(); };
   return (
     <div>
-      <div className={row}>
-        <span className="text-xs text-muted">{t("settings.language")}</span>
-        <LanguageToggle />
+      {/* #674: each section is a role="group" (as in the master menu) so the UX budget counts it (≤ 7 items).
+          A toggle is a segment row (one choice = one item), not a section of its own. */}
+      <div role="group" aria-label={t("settings.displaySection")}>
+        <div className={row}>
+          <span className="text-xs text-muted">{t("settings.language")}</span>
+          <LanguageToggle />
+        </div>
+        <div className={row}>
+          <span className="text-xs text-muted">{t("settings.theme")}</span>
+          <ThemeToggle />
+        </div>
       </div>
-      <div className={row}>
-        <span className="text-xs text-muted">{t("settings.theme")}</span>
-        <ThemeToggle />
-      </div>
-      {(onHelp || onAiSettings) && <div className="my-1 border-t border-edge" />}
-      {onAiSettings && (
-        <button type="button" onClick={run(onAiSettings)} className={item}>
-          ✨ {t("menu.opensDialog", { title: t("aiSettings.title") })}
-        </button>
-      )}
-      {onHelp && (
-        <button type="button" onClick={run(onHelp)} title={t("toolbar.help")} className={item}>
-          ? {t("settings.help")}
-        </button>
+      {(onHelp || onAiSettings) && (
+        <div role="group" aria-label={t("settings.aiHelpSection")}>
+          <div className="my-1 border-t border-edge" />
+          {onAiSettings && (
+            <button type="button" onClick={run(onAiSettings)} className={item}>
+              ✨ {t("menu.opensDialog", { title: t("aiSettings.title") })}
+            </button>
+          )}
+          {onHelp && (
+            <button type="button" onClick={run(onHelp)} title={t("toolbar.help")} className={item}>
+              ? {t("settings.help")}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
