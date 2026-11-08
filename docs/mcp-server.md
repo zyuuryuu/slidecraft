@@ -149,7 +149,7 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 編集(内容) | `set_deck_markdown(markdown)` | ⚠ deck 全体を置換（図は保持されない・1枚だけなら set_slide_markdown / insert_slide） |
 | 編集(内容) | `split_overflowing_slides()` | 決定論レバー：溢れた本文をフォント縮小なしで分割。`changedSlides`（新 index）を返す |
 | 編集(内容) | `convert_bullets_to_table(index)` | 決定論レバー：key-value 箇条書き → GFM 表。対象なしは `{ok:true, changed:false, status:"not-applicable"}` |
-| 編集(内容) | `set_slide_diagram(index, source, format, placeholderIdx?)` | `source` は DiagramSpec(yaml/json)/Mermaid の **JSON/YAML/Mermaid 文字列**（オブジェクト不可・例 `source: '{"type":"flowchart","nodes":[...],"edges":[...]}'`）。図ありは置換、**text スライドは body 領域へ追加**（`created` で判別）。Mermaid はブラケット `A[label]` が必要 |
+| 編集(内容) | `set_slide_diagram(index, source, format, placeholderIdx?, figure?)` | `source` は DiagramSpec(yaml/json)/Mermaid の **JSON/YAML/Mermaid 文字列**（オブジェクト不可・例 `source: '{"type":"flowchart","nodes":[...],"edges":[...]}'`）。図ありは置換、**text スライドは body 領域へ追加**（`created` で判別）。図が 2 つ以上のスライドは `figure`（図・Mermaid を出現順に 1 始まり・既定は先頭）で何番目を置換するか指定（範囲外は拒否・追加は `set_slide_markdown`）。Mermaid はブラケット `A[label]` が必要 |
 | 編集(内容) | `apply_design_intent(index, intent)` | `intent` は ops 配列の **JSON 文字列**（オブジェクト不可・例 `intent: '[{"op":"relayout","direction":"LR"}]'`）で**空間意図**：`regionSplit`(text-left/right/diagram-only)/`emphasize`(nodeId)/`relayout`(TB/LR/RL/BT)。図を持つスライドのみ・`changed`/`skipped` で結果が分かる |
 | 構造 | `insert_slide(index, markdown, position?)` | index の前/後に1枚挿入（他スライドの図は保持＝set_deck_markdown と違い surgical） |
 | 構造 | `delete_slide(index)` | 削除（最後の1枚は never-silent 拒否・`deletedMd` を返す） |

@@ -563,7 +563,18 @@
     "resetToDefault": "⟲ 既定に戻す",
     "resetToFrame": "⟲ 枠にリセット",
     "layout": "レイアウト",
-    "resetToAuto": "⟳ 自動"
+    "resetToAuto": "⟳ 自動",
+    "figureList": "ビジュアル（出現順）",
+    "figureUp": "前へ",
+    "figureDown": "後ろへ",
+    "figureDelete": "このビジュアルを削除",
+    "figureKind": {
+      "diagram": "図",
+      "mermaid": "Mermaid 図",
+      "table": "表",
+      "code": "コード",
+      "image": "画像"
+    }
   },
   "slideList": {
     "dragToReorder": "ドラッグで並べ替え",

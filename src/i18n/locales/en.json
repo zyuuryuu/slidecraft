@@ -563,7 +563,18 @@
     "resetToDefault": "⟲ Reset to default",
     "resetToFrame": "⟲ Reset to frame",
     "layout": "Layout",
-    "resetToAuto": "⟳ Auto"
+    "resetToAuto": "⟳ Auto",
+    "figureList": "Visuals (in order)",
+    "figureUp": "Move earlier",
+    "figureDown": "Move later",
+    "figureDelete": "Delete this visual",
+    "figureKind": {
+      "diagram": "Diagram",
+      "mermaid": "Mermaid",
+      "table": "Table",
+      "code": "Code",
+      "image": "Image"
+    }
   },
   "slideList": {
     "dragToReorder": "Drag to reorder",

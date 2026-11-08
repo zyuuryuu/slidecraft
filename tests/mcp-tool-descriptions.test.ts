@@ -52,7 +52,10 @@ const HOT_TOOLS = [
  *  o200k ではホット 3,660 → 2,314 tok。Issue の目標 2,000 tok は未達 — 残りの最大項は SDK 生成の整数境界
  *  （"minimum":-9007199254740991 等・ホットだけで 456 tok）で、これは inputSchema の形の変更になるため
  *  本 Issue の不変条件の外（Issue #513 を閉じる PR の統括相談を参照）。上限は実測値に僅かな余裕だけ乗せた ratchet。 */
-const HOT_CHAR_LIMIT = 7950;
+// #392 段 3（set_slide_diagram の引数 `figure` 追加・意図した inputSchema の拡張。型は number＝SDK の整数境界
+// 約 50 字を避け、意味の説明は bootstrap.toolNotes.diagram へ置いて describe は 1 句）でホット 7,924 → 7,980 字。
+// 宣言して上限を実測値に更新（全体は 19,050 以内に収まったので据え置き）。
+const HOT_CHAR_LIMIT = 7980;
 // #554（export_pptx の引数 `charts` 追加・意図した inputSchema の拡張）で全体 17,577 → 17,752 字。宣言して上限を更新。
 // #247（set_review_rules 追加・意図したツール面の拡張。id の enum は schema に載せずサーバ側検証＝+450 字に抑えた）で
 // 全体 17,752 → 18,202 字。宣言して上限を更新。

@@ -128,8 +128,26 @@ export function imageEditGeometry(
   image: ImageBlock,
   layoutPlaceholders: readonly PlaceholderInfo[],
 ): { box: ImageRect | undefined; aspect: number } {
-  const box = imageRect(image, imagePlaceholder(layoutPlaceholders, image.placeholderIdx));
+  return editGeometry(image, imagePlaceholder(layoutPlaceholders, image.placeholderIdx));
+}
+function editGeometry(image: ImageBlock, ph: PlaceholderInfo | undefined): { box: ImageRect | undefined; aspect: number } {
+  const box = imageRect(image, ph);
   return { box, aspect: imageAspectRatio(image, box) };
+}
+
+/** #392 段 3: the placeholder the slide's (first) image is DRAWN in — a body image by the placement
+ *  (figureRegions; beside a table both stored at "1", the image moves to the 2nd region), a behind image
+ *  by its stored box. What the preview drag and the form's X/Y/W/H edit (= what export draws, R8). */
+export function slideImagePlaceholder(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): PlaceholderInfo | undefined {
+  const img = slide.image;
+  if (!img) return undefined;
+  if (img.behind) return imagePlaceholder(layoutPlaceholders, img.placeholderIdx);
+  return figureRegions(slide, layoutPlaceholders).find((r) => r.primary && r.figure.kind === "image")?.ph;
+}
+
+/** imageEditGeometry on the box the slide's (first) image is drawn in (slideImagePlaceholder). */
+export function slideImageEditGeometry(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): { box: ImageRect | undefined; aspect: number } | undefined {
+  return slide.image ? editGeometry(slide.image, slideImagePlaceholder(slide, layoutPlaceholders)) : undefined;
 }
 
 /** The PPTX picture geometry for an image dropped in `box` (inches): the actual <p:pic> rect plus an
