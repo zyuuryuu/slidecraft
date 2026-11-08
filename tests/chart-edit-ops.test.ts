@@ -298,3 +298,44 @@ describe("applyDataEditOps — setTask", () => {
     expect(d).toContain('- "設計": start 0, end 10, status "done", section "計画"');
   });
 });
+
+// ── KPI (setCard: the schema's card fields value / label / delta / trend) ──
+
+const KPI = ["type: kpi", "nodes: []", "kpi:", "  cards:", "    - value: 120%", "      label: 前年比", "      delta: +5pt", "      trend: up", "    - value: 35社", "      label: 新規顧客"].join("\n");
+
+describe("applyDataEditOps — setCard", () => {
+  it("parses: index required; fields are the schema's card fields", () => {
+    expect(parseDataEditOps('[{"op":"setCard","index":1,"value":"40社"}]')).toEqual([{ op: "setCard", index: 1, value: "40社" }]);
+    expect(parseDataEditOps('[{"op":"setCard","value":"40社"}]')).toBeNull();
+  });
+
+  const cases: Array<[string, Record<string, unknown>, Array<[string, string]>]> = [
+    ["change the big number", { index: 1, value: "40社" }, [["    - value: 35社", "    - value: 40社"]]],
+    ["relabel + delta + trend", { index: 0, label: "前年同期比", delta: "-2pt", trend: "down" }, [["      label: 前年比", "      label: 前年同期比"], ["      delta: +5pt", "      delta: '-2pt'"], ["      trend: up", "      trend: down"]]],
+  ];
+  for (const [name, op, edits] of cases) {
+    it(`(b) R8: setCard ≡ editing the kpi YAML in the slide Markdown — ${name}`, () => {
+      const slide = md1(figMd(KPI));
+      let body = KPI;
+      for (const [from, to] of edits) body = body.replace(from, to);
+      const viaOps = applyDataEditOps(slide, [{ op: "setCard", ...op } as never]);
+      expect(viaOps.skipped).toEqual([]);
+      expect(specOf(viaOps.slide)).toEqual(specOf(md1(figMd(body))));
+      expect(viaOps.slide.placeholders).toBe(slide.placeholders);
+    });
+  }
+  it("(c) out-of-range card / non-kpi figure are skipped and announced", () => {
+    const slide = md1(figMd(KPI));
+    const r = applyDataEditOps(slide, [{ op: "setCard", index: 2, value: "x" }]);
+    expect(r.slide).toBe(slide);
+    expect(r.skipped[0].reason).toBe("out-of-range");
+    expect(r.skipped[0].message).toMatch(/2 枚/);
+    expect(applyDataEditOps(md1(figMd(XY)), [{ op: "setCard", index: 0, value: "x" }]).skipped[0].reason).toBe("no-chart");
+  });
+  it("describeEditableData lists each card with its index", () => {
+    const d = describeEditableData(md1(figMd(KPI)));
+    expect(d).toMatch(/setCard/);
+    expect(d).toContain('- card 0: value "120%", label "前年比", delta "+5pt", trend "up"');
+    expect(d).toContain('- card 1: value "35社", label "新規顧客", delta "", trend ""');
+  });
+});

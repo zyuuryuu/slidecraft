@@ -29,13 +29,18 @@ const SetTaskOp = z.object({
   op: z.literal("setTask"), name: z.string().min(1), newName: z.string().min(1).optional(),
   start: z.number().optional(), end: z.number().optional(), status: z.string().optional(), section: z.string().optional(),
 });
+// KPI card by 0-based position; the fields are the schema's card fields (schema-charts.ts KpiSchema).
+const SetCardOp = z.object({
+  op: z.literal("setCard"), index: Index,
+  value: z.string().optional(), label: z.string().optional(), delta: z.string().optional(), trend: z.string().optional(),
+});
 
-export const DataEditOpsSchema = z.array(z.discriminatedUnion("op", [SetCellOp, SetSeriesValueOp, SetTaskOp])).min(1);
+export const DataEditOpsSchema = z.array(z.discriminatedUnion("op", [SetCellOp, SetSeriesValueOp, SetTaskOp, SetCardOp])).min(1);
 export type DataEditOps = z.infer<typeof DataEditOpsSchema>;
 export type DataEditOp = DataEditOps[number];
 type CellOp = z.infer<typeof SetCellOp>;
 type FigureOp = Exclude<DataEditOp, CellOp>;
-const DATA_OPS = new Set(["setCell", "setSeriesValue", "setTask"]);
+const DATA_OPS = new Set(["setCell", "setSeriesValue", "setTask", "setCard"]);
 
 /** A DATA op that didn't take effect — surfaced never-silently (mirrors SkippedFieldOp). */
 export interface SkippedDataOp {
@@ -105,7 +110,11 @@ function seriesChart(raw: RawDiagram): { series: Series[]; slots: string } | nul
 const NO_CHART: Record<FigureOp["op"], string> = {
   setSeriesValue: "setSeriesValue: このスライドの図は折れ線・棒（xychart）／レーダー（radar）ではないため適用しませんでした。",
   setTask: "setTask: このスライドの図はガントチャート（gantt）ではないため適用しませんでした。",
+  setCard: "setCard: このスライドの図は KPI カード（kpi）ではないため適用しませんでした。",
 };
+
+const kpiCards = (raw: RawDiagram): Array<Record<string, unknown>> | null =>
+  raw.type === "kpi" && raw.kpi ? listOf<Record<string, unknown>>((raw.kpi as { cards?: unknown }).cards) : null;
 
 type Task = { name?: unknown; start?: unknown; end?: unknown; [k: string]: unknown };
 const ganttTasks = (raw: RawDiagram): Task[] | null =>
@@ -149,6 +158,13 @@ function applyFigureOp(raw: RawDiagram, o: FigureOp, skip: (reason: SkippedDataO
       const end = o.end ?? Number(t.end);
       if (end < start) { skip("invalid-range", `setTask: タスク「${o.name}」の終了（${end}）が開始（${start}）より前になるため適用しませんでした。`); return false; }
       return assign(t, { name: o.newName, start: o.start, end: o.end, status: o.status, section: o.section });
+    }
+    case "setCard": {
+      const cards = kpiCards(raw);
+      if (!cards) { skip("no-chart", NO_CHART[o.op]); return false; }
+      const card = cards[o.index];
+      if (!card) { skip("out-of-range", `setCard: index ${o.index} のカードは無いため適用しませんでした（カードは ${cards.length} 枚・0 始まり）`); return false; }
+      return assign(card, { value: o.value, label: o.label, delta: o.delta, trend: o.trend });
     }
   }
 }
@@ -201,6 +217,7 @@ export function routeDataEdit(slide: SlideIR, raw: string): DataEditRoute | null
  * real row / series / task / card. Empty when the slide carries none (the request is then unchanged).
  */
 export function describeEditableData(slide: SlideIR): string {
+  const str = (v: unknown): string => JSON.stringify(String(v ?? ""));
   const out: string[] = [];
   const t = slide.table;
   if (t && t.rows.length > 0) {
@@ -208,20 +225,23 @@ export function describeEditableData(slide: SlideIR): string {
     t.rows.forEach((r, i) => out.push(`- row ${i}: ${JSON.stringify(r)}`));
   }
   const raw = slide.diagram || slide.mermaidBlock ? readFigureRaw(slide) : null;
-  const chart = raw ? seriesChart(raw) : null;
-  if (raw && chart) {
+  if (!raw) return out.join("\n");
+  const chart = seriesChart(raw);
+  if (chart) {
     const c = (raw.type === "xychart" ? raw.xychart : raw.radar) as { categories?: unknown; axes?: unknown };
-    out.push(`Chart series (setSeriesValue series/index, 0-based):`);
+    out.push("Chart series (setSeriesValue series/index, 0-based):");
     out.push(raw.type === "xychart" ? `- categories: ${JSON.stringify(listOf(c.categories))}` : `- axes: ${JSON.stringify(listOf(c.axes))}`);
-    chart.series.forEach((x, i) => out.push(`- series ${i} ${JSON.stringify(String(x.name ?? ""))}: ${JSON.stringify(listOf(x.values))}`));
+    chart.series.forEach((x, i) => out.push(`- series ${i} ${str(x.name)}: ${JSON.stringify(listOf(x.values))}`));
   }
-  const tasks = raw ? ganttTasks(raw) : null;
-  if (raw && tasks) {
-    out.push(`Gantt tasks (setTask by name; start/end = day offsets from ${JSON.stringify(String((raw.gantt as { startDate?: unknown }).startDate ?? ""))}):`);
-    for (const t of tasks) {
-      const str = (v: unknown) => JSON.stringify(String(v ?? ""));
-      out.push(`- ${str(t.name)}: start ${String(t.start)}, end ${String(t.end)}, status ${str(t.status)}, section ${str(t.section)}`);
-    }
+  const tasks = ganttTasks(raw);
+  if (tasks) {
+    out.push(`Gantt tasks (setTask by name; start/end = day offsets from ${str((raw.gantt as { startDate?: unknown }).startDate)}):`);
+    for (const k of tasks) out.push(`- ${str(k.name)}: start ${String(k.start)}, end ${String(k.end)}, status ${str(k.status)}, section ${str(k.section)}`);
+  }
+  const cards = kpiCards(raw);
+  if (cards) {
+    out.push("KPI cards (setCard index, 0-based):");
+    cards.forEach((c, i) => out.push(`- card ${i}: value ${str(c.value)}, label ${str(c.label)}, delta ${str(c.delta)}, trend ${str(c.trend)}`));
   }
   return out.join("\n");
 }
