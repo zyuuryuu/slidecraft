@@ -1,0 +1,806 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > [#392 で変わる予定] set_slide_diagram with placeholderIdx '2' on a table-solo slide 1`] = `
+{
+  "result": {
+    "error": "このスライドのレイアウト（Content.1Body.Single）に図の配置先（body 領域）がありません、または placeholderIdx が範囲外です（1..1）。",
+    "ok": false,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": undefined,
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "1",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > [#392 で変わる予定] table + diagram (no col) 1`] = `
+{
+  "preview": {
+    "afterMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`",
+    "beforeMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`",
+  },
+  "result": {
+    "afterMd": "<!-- slide: Content.1Body.Single -->
+# 表と図
+
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 表と図
+
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": false,
+    "created": false,
+    "diagnostics": [
+      {
+        "id": "visual-collision",
+        "level": "warn",
+        "levers": [
+          "split",
+        ],
+        "message": "図と表が同じ枠（Body.Center）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Content.1Body.Single）",
+        "slideIndex": 1,
+        "title": "表と図",
+      },
+    ],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "1",
+      "yaml": "type: flowchart
+nodes:
+  - id: n
+    label: 新しい図",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "1",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > col text | diagram 1`] = `
+{
+  "preview": {
+    "afterMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`",
+    "beforeMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`",
+  },
+  "result": {
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
+# col
+
+<!-- col -->
+- 左
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Column.2Body.Equal -->
+# col
+
+<!-- col -->
+- 左
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "created": false,
+    "diagnostics": [],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+      "1",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "2",
+      "yaml": "type: flowchart
+nodes:
+  - id: n
+    label: 新しい図",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": undefined,
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > diagram solo 1`] = `
+{
+  "preview": {
+    "afterMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`",
+    "beforeMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`",
+  },
+  "result": {
+    "afterMd": "<!-- slide: Content.1Body.Single -->
+# 図
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 図
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "created": false,
+    "diagnostics": [],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "1",
+      "yaml": "type: flowchart
+nodes:
+  - id: n
+    label: 新しい図",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": undefined,
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > table solo 1`] = `
+{
+  "preview": {
+    "afterMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`",
+    "beforeMd": "",
+  },
+  "result": {
+    "afterMd": "<!-- slide: Content.1Body.Single -->
+# 表
+
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 表
+
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": false,
+    "created": true,
+    "diagnostics": [
+      {
+        "id": "visual-collision",
+        "level": "warn",
+        "levers": [
+          "split",
+        ],
+        "message": "図と表が同じ枠（Body.Center）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Content.1Body.Single）",
+        "slideIndex": 1,
+        "title": "表",
+      },
+    ],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "1",
+      "yaml": "type: flowchart
+nodes:
+  - id: n
+    label: 新しい図",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "1",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > text + table 1`] = `
+{
+  "preview": {
+    "afterMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`",
+    "beforeMd": "",
+  },
+  "result": {
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
+# 本文と表
+
+<!-- col -->
+- 説明
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Column.2Body.Equal -->
+# 本文と表
+
+<!-- col -->
+- 説明
+
+<!-- col -->
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "created": true,
+    "diagnostics": [
+      {
+        "id": "visual-collision",
+        "level": "warn",
+        "levers": [
+          "split",
+        ],
+        "message": "図と表が同じ枠（Body2.Right）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Column.2Body.Equal）",
+        "slideIndex": 1,
+        "title": "本文と表",
+      },
+    ],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+      "1",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "2",
+      "yaml": "type: flowchart
+nodes:
+  - id: n
+    label: 新しい図",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "2",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_diagram (MCP) ≡ applyFigureYaml (GUI), and previewFigureEdit — current results > text 1`] = `
+{
+  "preview": {
+    "afterMd": "\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`",
+    "beforeMd": "",
+  },
+  "result": {
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
+# 中身
+
+<!-- col -->
+- 一
+- 二
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+- 一
+- 二
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "created": true,
+    "diagnostics": [],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+      "1",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "2",
+      "yaml": "type: flowchart
+nodes:
+  - id: n
+    label: 新しい図",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": undefined,
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > [#392 で変わる予定] text → col table | diagram 1`] = `
+{
+  "result": {
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
+# 中身
+
+<!-- col -->
+| k | v |
+| --- | --- |
+| a | 1 |
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+- 一
+- 二
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "diagnostics": [],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "2",
+      "yaml": "type: flowchart
+nodes:
+  - id: a
+    label: A",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "1",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > [#392 で変わる予定] text → table + diagram (no col) 1`] = `
+{
+  "result": {
+    "afterMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+- 一
+- 二
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "diagnostics": [
+      {
+        "id": "visual-collision",
+        "level": "warn",
+        "levers": [
+          "split",
+        ],
+        "message": "図と表が同じ枠（Body.Center）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Content.1Body.Single）",
+        "slideIndex": 1,
+        "title": "中身",
+      },
+    ],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "1",
+      "yaml": "type: flowchart
+nodes:
+  - id: a
+    label: A",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "1",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > [#392 で変わる予定] text → two diagrams (last wins: the earlier one is dropped today) 1`] = `
+{
+  "result": {
+    "afterMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: b
+    label: B
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+- 一
+- 二
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "diagnostics": [
+      {
+        "id": "figure-dropped",
+        "level": "info",
+        "levers": [],
+        "message": "同じスライドの先行する図（\`\`\`diagram / \`\`\`mermaid）が後続の図に上書きされ変換時に失われました（1スライドに保持される図は最後の1つのみ）",
+        "slideIndex": 1,
+        "title": "中身",
+      },
+    ],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "1",
+      "yaml": "type: flowchart
+nodes:
+  - id: b
+    label: B",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": undefined,
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > a text-only edit of a slide with a diagram carries the diagram (B3) — pinned value 1`] = `
+{
+  "body": [
+    "15",
+    "1",
+  ],
+  "code": undefined,
+  "diagram": {
+    "placeholderIdx": "2",
+    "yaml": "type: flowchart
+nodes:
+  - id: a
+    label: A",
+  },
+  "image": undefined,
+  "layout": "auto",
+  "mermaidBlock": undefined,
+  "table": undefined,
+}
+`;
+
+exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > text → table only 1`] = `
+{
+  "result": {
+    "afterMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+| k | v |
+| --- | --- |
+| a | 1 |
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+- 一
+- 二
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "diagnostics": [],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+    ],
+    "code": undefined,
+    "diagram": undefined,
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": {
+      "header": true,
+      "placeholderIdx": "1",
+      "rows": [
+        [
+          "k",
+          "v",
+        ],
+        [
+          "a",
+          "1",
+        ],
+      ],
+    },
+  },
+}
+`;
+
+exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > text → text + diagram 1`] = `
+{
+  "result": {
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
+# 中身
+
+<!-- col -->
+- 一
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`
+",
+    "beforeMd": "<!-- slide: Content.1Body.Single -->
+# 中身
+
+- 一
+- 二
+",
+    "budget": {
+      "charsPerBullet": 59,
+      "maxBullets": 22,
+    },
+    "changed": true,
+    "diagnostics": [],
+    "ok": true,
+  },
+  "slide": {
+    "body": [
+      "15",
+      "1",
+    ],
+    "code": undefined,
+    "diagram": {
+      "placeholderIdx": "2",
+      "yaml": "type: flowchart
+nodes:
+  - id: a
+    label: A",
+    },
+    "image": undefined,
+    "layout": "auto",
+    "mermaidBlock": undefined,
+    "table": undefined,
+  },
+}
+`;

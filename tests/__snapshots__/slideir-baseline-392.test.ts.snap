@@ -1,0 +1,8182 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/deck-01-mixed-layouts.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "Title.1Title.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Mirai Flow",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現場の段取りを、AIが自動で組み立てる",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "PRODUCT PITCH",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-06-24 | 株式会社ミライワークス",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Confidential — 投資家向け資料",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 8,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Section.1Title.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "課題と解決策",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "The Problem & The Solution",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 14,
+        "sourceLineStart": 10,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現場は「段取り」に時間を奪われている",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Why Now",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "製造・物流・建設の現場では、作業計画の組み替えが日々発生し、その調整が属人化しています。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "計画変更のたびに",
+                  },
+                  {
+                    "bold": true,
+                    "text": "平均2.5時間",
+                  },
+                  {
+                    "text": "の手戻りが発生",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "段取り業務の",
+                  },
+                  {
+                    "bold": true,
+                    "text": "68%",
+                  },
+                  {
+                    "text": "がベテラン1名に依存（属人化）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "紙とExcelの併用で、最新情報がリアルタイムに共有されない",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "結果として、設備稼働率は理論値より",
+                  },
+                  {
+                    "bold": true,
+                    "text": "約15ポイント",
+                  },
+                  {
+                    "text": "低下",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 26,
+        "sourceLineStart": 16,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: flowchart
+direction: LR
+title: Mirai Flow 処理フロー
+nodes:
+  - id: input
+    label: 現場データ取込
+    shape: rounded_rect
+    icon: client
+  - id: engine
+    label: 最適化エンジン
+    icon: server
+  - id: db
+    label: 制約・実績DB
+    shape: rounded_rect
+    icon: database
+  - id: plan
+    label: 最適段取り出力
+    shape: rounded_rect
+    icon: cloud
+edges:
+  - from: input
+    to: engine
+    label: "取込"
+  - from: engine
+    to: db
+    label: "参照"
+  - from: engine
+    to: plan
+    label: "生成"",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Mirai Flow — 段取りを自動最適化するSaaS",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "How It Works",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現場データを取り込むと、AIが制約条件を考慮して最適な作業順序を自動生成します。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 65,
+        "sourceLineStart": 28,
+      },
+      {
+        "layout": "Column.2Body.Equal",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "提供価値 — Before / After",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "導入前後の比較",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "導入前（現状）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "段取り作成に毎日2.5時間",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ベテラン依存で属人化",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "紙・Excelで情報が分散",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "設備稼働率は理論値の85%",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "急な変更に弱い",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "導入後（Mirai Flow）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "段取り自動生成で",
+                  },
+                  {
+                    "bold": true,
+                    "text": "5分",
+                  },
+                  {
+                    "text": "に短縮",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "誰でも同じ品質の計画を作成",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "クラウドで全員が同じ最新情報",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "設備稼働率を",
+                  },
+                  {
+                    "bold": true,
+                    "text": "97%",
+                  },
+                  {
+                    "text": "まで改善",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "変更にも即時で再計画",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 89,
+        "sourceLineStart": 67,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: kpi
+title: 市場規模と価格
+kpi:
+  cards:
+    - value: "8,400億"
+      label: 国内TAM
+      delta: "+12%/年"
+      trend: up
+    - value: "1,200億"
+      label: 想定SAM
+      delta: "+18%/年"
+      trend: up
+    - value: "¥1,800"
+      label: 月額/ユーザー
+      delta: ""
+      trend: up
+nodes: []
+edges: []",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "市場機会",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "TAM / SAM / SOM",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "国内の現場系SaaS市場は拡大を続けており、人手不足を背景に需要が加速しています。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 117,
+        "sourceLineStart": 91,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "料金プラン",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Pricing（ネイティブ表）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 128,
+        "sourceLineStart": 119,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "プラン",
+              "月額/ユーザー",
+              "拠点数",
+              "サポート",
+            ],
+            [
+              "Starter",
+              "¥1,800",
+              "1拠点",
+              "メール",
+            ],
+            [
+              "Standard",
+              "¥1,500",
+              "〜5拠点",
+              "優先メール・電話",
+            ],
+            [
+              "Enterprise",
+              "要相談",
+              "無制限",
+              "専任CS・SLA保証",
+            ],
+          ],
+        },
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: radar
+title: 競合比較（5段階評価）
+radar:
+  max: 5
+  axes: ["導入容易性", "最適化精度", "価格", "サポート", "拡張性"]
+  series:
+    - name: Mirai Flow
+      values: [5, 5, 4, 5, 4]
+    - name: 既存大手A
+      values: [2, 4, 2, 3, 5]
+nodes: []
+edges: []",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "競合比較",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "なぜ Mirai Flow が選ばれるのか",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 148,
+        "sourceLineStart": 130,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "トラクションとロードマップ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Traction & Roadmap",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "PoCを経て有償導入が立ち上がり、継続率も高水準を維持しています。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "導入企業 ",
+                  },
+                  {
+                    "bold": true,
+                    "text": "42社",
+                  },
+                  {
+                    "text": " / 解約率 月次 ",
+                  },
+                  {
+                    "bold": true,
+                    "text": "1.2%",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ARR ",
+                  },
+                  {
+                    "bold": true,
+                    "text": "1.8億円",
+                  },
+                  {
+                    "text": "（前年比 +210%）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "2026 Q3: 在庫連携API公開・パートナー開拓",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "2026 Q4: 多言語対応で東南アジア展開",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "2027 Q1: 予知保全モジュールをリリース",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 161,
+        "sourceLineStart": 150,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Closing.1Message.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現場の段取りを、もっとなめらかに。",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Thank You",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "CONTACT",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "代表取締役 佐藤 健一 | k.sato@miraiworks.example",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "株式会社ミライワークス",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 171,
+        "sourceLineStart": 163,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/deck-02-diagrams.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "Title.1Title.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "図解デッキ — ダイアグラム編集テスト",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "flowchart / sequence をネイティブ編集",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "DIAGRAM TEST",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-06-24 | SlideCraft",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "YAML / JSON / Mermaid 切替の動作確認用",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 8,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+title: Web三層構成
+nodes:
+  - id: client
+    label: ブラウザ
+    shape: rounded_rect
+    icon: client
+  - id: lb
+    label: ロードバランサ
+    icon: load_balancer
+  - id: web
+    label: Webサーバ
+    icon: server
+  - id: db
+    label: データベース
+    shape: rounded_rect
+    icon: database
+edges:
+  - from: client
+    to: lb
+    label: "HTTPS"
+  - from: lb
+    to: web
+  - from: web
+    to: db
+    label: "SQL"",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "システム構成（flowchart・アイコン）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ノードにアイコン、TB方向",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 43,
+        "sourceLineStart": 10,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: LR
+title: ETL パイプライン
+nodes:
+  - id: src
+    label: ソース
+    shape: rounded_rect
+  - id: ext
+    label: 抽出
+  - id: tr
+    label: 変換
+  - id: load
+    label: ロード
+  - id: dw
+    label: データ基盤
+    shape: rounded_rect
+    icon: database
+edges:
+  - from: src
+    to: ext
+  - from: ext
+    to: tr
+  - from: tr
+    to: load
+  - from: load
+    to: dw",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "データ処理パイプライン（flowchart・LR）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "左→右の流れ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 77,
+        "sourceLineStart": 45,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+title: 承認フロー
+nodes:
+  - id: start
+    label: 申請
+    shape: rounded_rect
+  - id: check
+    label: 金額判定
+    shape: diamond
+  - id: mgr
+    label: 課長承認
+  - id: dir
+    label: 部長承認
+  - id: done
+    label: 完了
+    shape: rounded_rect
+edges:
+  - from: start
+    to: check
+  - from: check
+    to: mgr
+    label: "10万未満"
+  - from: check
+    to: dir
+    label: "10万以上"
+  - from: mgr
+    to: done
+  - from: dir
+    to: done",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "申請の承認フロー（flowchart・分岐）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "diamond で条件分岐",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 115,
+        "sourceLineStart": 79,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: sequence
+direction: TB
+title: 決済リクエスト
+nodes:
+  - id: user
+    label: ユーザー
+  - id: api
+    label: API
+  - id: pay
+    label: 決済サービス
+  - id: db
+    label: DB
+edges:
+  - from: user
+    to: api
+    label: "注文確定"
+  - from: api
+    to: pay
+    label: "与信照会"
+  - from: pay
+    to: api
+    label: "OK"
+    style:
+      dash: true
+  - from: api
+    to: db
+    label: "保存"
+  - from: api
+    to: user
+    label: "完了通知"
+    style:
+      dash: true",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "API リクエスト（sequence）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "参加者とメッセージの往復",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 155,
+        "sourceLineStart": 117,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+title: サービス境界
+nodes:
+  - id: gw
+    label: API Gateway
+    icon: load_balancer
+  - id: order
+    label: 注文サービス
+    icon: server
+    group: core
+  - id: inv
+    label: 在庫サービス
+    icon: server
+    group: core
+  - id: odb
+    label: 注文DB
+    shape: rounded_rect
+    icon: database
+    group: data
+  - id: idb
+    label: 在庫DB
+    shape: rounded_rect
+    icon: database
+    group: data
+groups:
+  - id: core
+    label: コアサービス
+  - id: data
+    label: データ層
+edges:
+  - from: gw
+    to: order
+  - from: gw
+    to: inv
+  - from: order
+    to: odb
+  - from: inv
+    to: idb
+  - from: order
+    to: inv
+    label: "在庫引当"
+    style:
+      dash: true",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "マイクロサービス構成（flowchart・グループ）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "groups でサブグラフ化",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 207,
+        "sourceLineStart": 157,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Closing.1Message.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "各図で YAML / JSON / Mermaid を切り替えて確認",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Edit モードのフォーム編集も併せてテスト",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 213,
+        "sourceLineStart": 209,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/deck-03-report-charts.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "Title.1Title.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026年度 第2四半期 業績報告",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Q2 FY2026 Business Review",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "QUARTERLY BUSINESS REPORT",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-06-30 | 経営企画本部",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Confidential — Internal Use Only",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 8,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: kpi
+title: 2026年度 Q2 業績
+kpi:
+  cards:
+    - value: "14.8億"
+      label: 四半期売上
+      delta: "+18%"
+      trend: up
+    - value: "3.6億"
+      label: 営業利益
+      delta: "+22%"
+      trend: up
+    - value: "31.5%"
+      label: 粗利率
+      delta: "+1.8pt"
+      trend: up
+    - value: "5.2%"
+      label: 解約率
+      delta: "-0.6pt"
+      trend: down
+nodes: []
+edges: []",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "業績ハイライト",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "主要KPI サマリ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 38,
+        "sourceLineStart": 10,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: xychart
+direction: TB
+title: 四半期売上の推移（百万円）
+
+nodes: []
+
+edges: []
+
+xychart:
+  xlabel: ""
+  ylabel: "売上"
+  ymin: 0
+  ymax: 1800
+  categories: ["Q1","Q2","Q3見込","Q4見込"]
+  series:
+    - kind: bar
+      name: ""
+      values: [1250,1480,1620,1750]
+    - kind: line
+      name: ""
+      values: [1200,1400,1550,1700]
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "四半期売上の推移",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "棒グラフ＋折れ線（実績 vs 計画）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 52,
+        "sourceLineStart": 40,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: radar
+title: 事業領域の競争力評価
+radar:
+  max: 5
+  axes: ["価格競争力", "製品品質", "サポート", "ブランド", "技術革新", "市場浸透"]
+  series:
+    - name: 自社
+      values: [3, 5, 4, 4, 5, 3]
+    - name: 競合A
+      values: [5, 3, 3, 4, 2, 4]
+nodes: []
+edges: []",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "事業領域の競争力評価",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "レーダーチャート（自社 vs 競合）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 72,
+        "sourceLineStart": 54,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "セグメント別 業績",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "事業セグメント実績（前年同期比）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 84,
+        "sourceLineStart": 74,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "セグメント",
+              "売上（億円）",
+              "前年比",
+              "営業利益率",
+            ],
+            [
+              "SaaS",
+              "8.4",
+              "+24%",
+              "38%",
+            ],
+            [
+              "プロフェッショナルサービス",
+              "3.9",
+              "+11%",
+              "21%",
+            ],
+            [
+              "ライセンス",
+              "1.7",
+              "-4%",
+              "45%",
+            ],
+            [
+              "その他",
+              "0.8",
+              "+6%",
+              "12%",
+            ],
+          ],
+        },
+      },
+      {
+        "layout": "Column.2Body.Equal",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "成果と課題",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Achievements / Challenges",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "今四半期の成果",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "新規ARR 過去最高の3.2億円を達成",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "エンタープライズ契約 12社を新規獲得",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "NPS が +8pt 改善（38 → 46）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "AI機能の利用率が全顧客の61%に到達",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "次四半期の課題",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "中堅企業向けの解約抑制施策",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "サポート応答時間の短縮（目標 4時間以内）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "北米リージョンの黒字化",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "採用計画の前倒し（エンジニア 8名）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 106,
+        "sourceLineStart": 86,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Closing.1Message.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "通期計画の達成に向けて、引き続き全力で取り組みます",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Thank You",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "THANK YOU",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "経営企画本部 | ir@example.com",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 115,
+        "sourceLineStart": 108,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/deck-04-stress-edgecases.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "Title.1Title.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "地域物流DXプロジェクト 中間報告",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "配送網の自動最適化に向けた第2四半期レビュー",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "社内事業レビュー",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-06-24",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ロジスティクス改革推進室",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 9,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Content.1Body.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "プロジェクトの背景と現状認識",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "当社の配送リードタイムは過去3年間にわたって慢性的に悪化しており、特に都市部での再配達率の上昇が顧客満足度を押し下げている深刻な課題となっている",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "既存の配車計画は熟練オペレーターの経験と勘に依存しているため、担当者が不在の日には計画品質が大きくばらつき、繁忙期には現場が混乱する状況が続いている",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "競合他社が相次いで配送AIを導入し当日配送の標準化を進めるなかで、当社が現行の手動運用を続ければ向こう2年で主要顧客の流出が避けられないと営業部門は警鐘を鳴らしている",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 18,
+        "sourceLineStart": 11,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Content.1Body.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "第2四半期の主要KPI実績",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "平均配送リードタイム: 26時間",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "再配達率: 11%",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "積載効率: 78%",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "計画作成所要時間: 45分",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "顧客満足度スコア: 82点",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 29,
+        "sourceLineStart": 20,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Content.1Body.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "配車計画の自動生成エンジンを3つの主要拠点に試験導入した",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "試験導入した拠点では計画作成時間が平均で6割短縮された",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ドライバーからは走行ルートが分かりやすくなったと好評を得た",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "一方で例外的な大口注文への対応ロジックには改善余地が残った",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "既存の基幹システムとのデータ連携で想定外の遅延が発生した",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "次の四半期に向けて連携基盤の刷新を優先課題として位置づける",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 40,
+        "sourceLineStart": 31,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Content.1Body.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "検討中の課題と論点を一覧で棚卸し",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "配送拠点を現行の5箇所から8箇所へ拡張する案の費用対効果を精査する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "配車AIの学習データに過去3年分の実績を投入するか直近1年に絞るか",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ドライバー向けモバイルアプリのUIを内製するか外部ベンダーに委託するか",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "繁忙期のスポット車両を確保する協力会社との契約条件を再交渉する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "再配達削減のための置き配と宅配ボックス連携をどの地域から始めるか",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "配送実績データを需要予測チームへ日次で連携する仕組みを構築する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "燃料費高騰を踏まえた配送料金の改定タイミングを営業部門と調整する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "個人情報を含む配送先データの暗号化と保持期間の方針を法務と確認する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "AIの判断根拠を現場が理解できるよう可視化ダッシュボードを整備する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "試験導入拠点で得た知見を全国展開する際の教育プログラムを設計する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "障害発生時に手動運用へ切り替えるフォールバック手順を明文化する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "経営会議へ報告する投資回収シナリオを楽観・標準・悲観の3案で用意する",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 58,
+        "sourceLineStart": 42,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: flowchart
+direction: LR
+title: 展開3ステップ
+nodes:
+  - id: a
+    label: 基盤刷新
+    shape: rounded_rect
+  - id: b
+    label: 横展開
+    shape: rounded_rect
+  - id: c
+    label: 全国運用
+    shape: rounded_rect
+edges:
+  - from: a
+    to: b
+    label: "Q3"
+  - from: b
+    to: c
+    label: "Q4"",
+        },
+        "layout": "Process.3Step.Horizontal",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "全国展開までのロードマップ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 86,
+        "sourceLineStart": 60,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Closing.1Message.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "次の四半期で連携基盤を刷新し全国展開へ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 91,
+        "sourceLineStart": 88,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-01-business-proposal.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "社内ナレッジ検索ツール「Hubble」導入提案",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "背景",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "近年、当社の事業拡大にともない、各部門が蓄積するドキュメントやノウハウの総量は急速に増加しています。営業資料、技術仕様書、過去の提案書、議事録といった情報資産は、いまや会社全体の競争力を支える基盤となっていますが、その保管場所は共有ストレージ、チャットツール、各種SaaS、そして個人のローカル環境へと際限なく分散しているのが実情です。結果として、必要な情報がどこにあるのかを把握している人が限られ、組織としての知識の再利用が十分に進んでいません。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "特に入社から日の浅いメンバーにとっては、誰に何を聞けばよいのかという初歩的なハードルが高く、本来であれば数分で解決するはずの疑問に半日を費やしてしまう場面も少なくありません。こうした状況は、個人の生産性を下げるだけでなく、ベテラン社員への問い合わせを集中させ、組織全体の時間を静かに浪費しています。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 課題",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "現状の最大の課題は、情報が「探せない」ことにあります。各ツールに個別の検索機能は備わっているものの、横断的に一度で探せる仕組みが存在しないため、利用者は複数のツールを行き来しながら手作業で情報を突き合わせる必要があります。さらに、検索がファイル名やタイトルの完全一致に依存しているため、表現の揺れや言い回しの違いによって、実際には存在する情報にたどり着けないケースが頻発しています。問い合わせ対応に追われる担当者の負担も看過できず、属人化したナレッジが退職とともに失われるリスクも年々高まっています。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 提案",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "そこで、社内に散在する情報資産を横断的に検索できるナレッジ検索ツール「Hubble」の導入を提案します。Hubbleは主要な社内ツールと連携し、自然言語による問いかけに対して関連性の高い情報を要約とともに提示します。キーワードの完全一致に頼らず文意を理解した検索を行うため、表現の揺れに強く、目的の情報へ短時間で到達できます。アクセス権限は既存の認証基盤と統合され、各メンバーが本来閲覧できる範囲のみを対象とするため、情報セキュリティを損なうことなく運用できます。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 期待効果",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "検索時間削減: 1件あたり平均15分から2分へ",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "問い合わせ件数: 月間でおよそ40パーセント減",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "新人立ち上がり期間: 3週間から2週間へ短縮",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "対象ドキュメント数: 初期連携で約12万件",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "想定ROI: 導入12カ月で投資回収",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 導入スケジュール",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "導入は段階的に進める計画です。まず最初の1カ月で対象データソースの棚卸しと権限設計を行い、続く2カ月でパイロット部門を選定して試験運用を実施します。そこで得られたフィードバックをもとに検索精度と運用ルールを調整したうえで、4カ月目以降に全社展開へと移行します。展開後も利用状況を継続的にモニタリングし、四半期ごとに改善サイクルを回していく方針です。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 28,
+        "sourceLineStart": 1,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-02-tech-report.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "決済API 負荷試験レポート — 2026年Q2",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "試験条件と環境",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本レポートは、決済処理APIに対して実施した負荷試験の結果と、その分析、ならびにキャッシュ層およびコネクションプール設定の見直しによる改善効果をまとめたものである。試験は本番同等のステージング環境で行い、ピーク商戦期を想定したトラフィックを再現した。対象期間中、約3週間にわたって計測と段階的なチューニングを繰り返している。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "試験対象はNode.js製の決済オーケストレーションサービスであり、背後にPostgreSQL 16とRedis 7を配置している。負荷生成にはk6を用い、仮想ユーザを段階的に増加させながら、5分間のランプアップと20分間の定常負荷を組み合わせたシナリオを実行した。各リクエストは認証、在庫引当、与信照会、確定の4ステップを含む現実的なフローを模している。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "想定ピーク: 8,000 RPS",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "仮想ユーザ数: 12,000",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "試験時間: 25分（ランプ5分＋定常20分）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 改善前の計測結果",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "初回計測では、定常負荷の後半で明確な性能劣化が観測された。とくにp99レイテンシが急峻に悪化し、データベースのコネクション枯渇に起因すると見られるエラーが断続的に発生した。長時間にわたるトレースを確認したところ、与信照会ステップで外部APIへの同期待機が積み上がり、プール内の接続が解放されないまま保持され続けるパターンが支配的であった。これがスループットの頭打ちと末尾レイテンシ膨張の主因と判断している。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "p50レイテンシ: 142ms",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "p99レイテンシ: 1,820ms",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "スループット: 4,300 RPS",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "エラー率: 3.7%",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "推定インフラコスト: 月額 ¥1,480,000",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 改善施策",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "主な変更は三点である。第一に、与信照会を非同期化し、外部API呼び出しにタイムアウトとサーキットブレーカーを導入した。第二に、Redisを用いた在庫引当結果の短期キャッシュを追加し、重複照会を削減した。第三に、PostgreSQLのコネクションプール上限とアイドル回収間隔を再設定し、PgBouncerをトランザクションプーリングモードで前段に配置した。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 改善後の計測結果",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "同一シナリオで再計測したところ、末尾レイテンシとエラー率が大幅に改善した。とくにp99の改善幅が大きく、定常負荷の後半でも安定して目標スループットを維持できるようになった。コスト面でもインスタンス台数を削減できたため、月額負担が軽くなっている。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "p50レイテンシ: 88ms",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "p99レイテンシ: 410ms",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "スループット: 7,650 RPS",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "エラー率: 0.4%",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "推定インフラコスト: 月額 ¥1,060,000",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 結論と今後",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "今回のチューニングにより、スループットは約1.8倍、p99レイテンシは約4.4分の1に短縮され、想定ピークに対する余裕度が確保できた。残課題として、与信照会の外部依存が依然としてボトルネックの起点になりうる点が挙げられる。次フェーズでは照会結果の予測キャッシュとリージョン分散を検討し、さらなる末尾レイテンシの安定化を目指す。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 40,
+        "sourceLineStart": 1,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-03-howto-guide.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "新メンバーの開発環境セットアップガイド",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "はじめに",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "このドキュメントは、新しくチームに参加したエンジニアが、最初の一日でローカル開発環境を立ち上げ、最初のプルリクエストを出せるようになるまでの道のりをまとめたものです。手順そのものよりも「なぜそうするのか」を理解してもらうことを大切にしているので、つまずいたときは遠慮なくチームの誰かに声をかけてください。私たちは質問を歓迎する文化を持っています。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "私たちのプロダクトはデスクトップアプリケーションであり、ビルドにはいくつかの外部ツールチェーンが必要です。最初は依存関係が多く感じるかもしれませんが、一度そろえてしまえば日々の開発は驚くほど快適になります。焦らず、一歩ずつ進めていきましょう。所要時間はおよそ半日を見込んでおくと安心です。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 環境を整える",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "まずは土台となるツール群をインストールします。順番が前後すると後の手順でエラーが出ることがあるため、次の流れに沿って進めてください。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "ordered": true,
+                "segments": [
+                  {
+                    "text": "まず社内アカウントを発行してもらい、GitHub Organization への招待を受け取ります。招待メールが届いていない場合はオンボーディング担当に連絡してください。",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "ordered": true,
+                "segments": [
+                  {
+                    "text": "次に Node.js と Rust のツールチェーンをインストールします。バージョンはリポジトリ直下の設定ファイルに固定されているので、それに合わせてください。",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "ordered": true,
+                "segments": [
+                  {
+                    "text": "続いてリポジトリをクローンし、依存パッケージをインストールします。ここで時間がかかるのは正常です。",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "ordered": true,
+                "segments": [
+                  {
+                    "text": "最後に環境変数のテンプレートをコピーし、必要な値を自分用に書き換えます。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "ここまで終えると、ローカルでアプリを起動する準備が整います。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 動作を確認する",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "セットアップが正しく完了したかは、実際に動かして確かめるのが一番確実です。開発サーバーを起動し、ブラウザでプレビュー画面が表示されることを確認してください。あわせてテストスイートを一度走らせ、すべて緑になることを見届けます。もしテストが落ちる場合、それは多くの場合あなたのミスではなく、環境のどこかが噛み合っていないサインです。エラーメッセージをそのままチームに共有してくれれば、原因をすぐに切り分けられます。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 最初の一歩",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "環境が動いたら、ウォームアップとして小さな修正に挑戦してみましょう。タイポの修正やコメントの追記など、ごく軽いもので構いません。ブランチを切り、変更をコミットし、プルリクエストを作成する。この一連の流れを体験することが、チームの開発リズムをつかむ何よりの近道です。最初のレビューを楽しみにしています。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 27,
+        "sourceLineStart": 1,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-04-meeting-notes.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "プロジェクトキックオフ 議事録",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "議題",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-06-23（火）14:00-15:10　会議室B＋オンライン併用",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "出席：田中（PM）、佐藤、鈴木、山本、外部ベンダーの伊藤さん（一部のみ）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "新CRM移行プロジェクトの全体スケジュール確認",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "役割分担",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "リスクの洗い出し",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "今回はとりあえずキックオフということで、まず全体像を共有してから細かいタスクに落としていく流れで進めたいという田中さんの提案があり、特に反対もなかったのでその方針で進めることになった。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 決定事項",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "本番リリースは10月末を目標とするが、データ移行の検証に想定以上に時間がかかる可能性があるため、9月中旬にいったん中間レビューを設けて、そこで間に合わなさそうなら段階リリースに切り替えるかどうかを改めて判断するという形で全員合意した。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "週次定例は毎週水曜10時で固定",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ドキュメントはすべて共有ドライブのprojectフォルダに集約",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ツールはSlackとNotionを併用",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 課題",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "旧システムの仕様書が一部見当たらない",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "移行対象データの件数がまだ未確定（情シスに要確認）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "伊藤さん「ベンダー側の検証環境は7月後半にならないと用意できない」とのこと、ここがスケジュールのボトルネックになりそう",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "予算",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## ToDo",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "田中：スケジュール案をたたき台として今週金曜までに展開",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "佐藤：旧システムのデータ項目一覧を棚卸し",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "鈴木：情シスへ件数とアカウント権限を確認",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "山本：Notionにプロジェクトページ作成",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "## 次回",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "来週水曜の定例で、各自のToDo進捗とスケジュール案へのフィードバックを持ち寄る。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 39,
+        "sourceLineStart": 1,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/sample-deck.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "Title.1Title.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "NextGen CRM プロジェクト",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "移行計画レビュー",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "DATA ANALYSIS REPORT",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-03-31 | DX推進本部",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Confidential",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 8,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本日のアジェンダ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Today's Agenda",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "プロジェクト概要と目的",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "現状分析データの共有",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "システム比較と推奨案",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "導入ロードマップ",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "Q&A・ネクストステップ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 19,
+        "sourceLineStart": 10,
+      },
+      {
+        "derived": "toc",
+        "layout": "auto",
+        "placeholders": [],
+        "sourceLineEnd": 23,
+        "sourceLineStart": 21,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "第 1 部：現状と課題",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現行 CRM の実態を確認し、論点を整理する",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sectionBreak": true,
+        "sourceLineEnd": 29,
+        "sourceLineStart": 25,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "notes": [
+          {
+            "segments": [
+              {
+                "text": "スピーカーノートのデモ（",
+              },
+              {
+                "code": true,
+                "text": "<!-- note -->",
+              },
+              {
+                "text": " 以降スライド末尾まで）。スライド面には出ず、",
+              },
+            ],
+          },
+          {
+            "segments": [
+              {
+                "text": "PPTX ではノートペイン、HTML では ",
+              },
+              {
+                "code": true,
+                "text": "n",
+              },
+              {
+                "text": " キーのパネルに入ります。",
+              },
+            ],
+          },
+          {
+            "segments": [
+              {
+                "text": "",
+              },
+            ],
+          },
+          {
+            "bullet": true,
+            "segments": [
+              {
+                "text": "アクティブ率 73% は 2026-02 の社内集計。母数は付与ライセンス 1,240",
+              },
+            ],
+          },
+          {
+            "bullet": true,
+            "segments": [
+              {
+                "text": "レスポンス 3.2 秒は営業時間帯の p50。ピーク時は 5 秒超の報告あり",
+              },
+            ],
+          },
+          {
+            "bullet": true,
+            "segments": [
+              {
+                "text": "想定問答: 「モバイル対応の暫定策は？」→ 現行はブラウザのみ、暫定策なし",
+              },
+            ],
+          },
+        ],
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現状分析",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Current State Analysis",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現行CRMの利用状況を分析した結果、以下の課題が明らかになりました。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "月間アクティブユーザー率: 73%（目標 90%）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "平均レスポンス時間: 3.2秒（業界平均の3倍）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "モバイル対応: 非対応",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ユーザー満足度: 5段階中 3.2（前年比 -0.3pt）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 49,
+        "sourceLineStart": 31,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+title: CRM システム構成
+
+nodes:
+  - id: client
+    label: ブラウザ
+    shape: rounded_rect
+    icon: client
+  - id: api
+    label: API Gateway
+    icon: load_balancer
+  - id: crm
+    label: CRM Service
+    icon: server
+  - id: db
+    label: Database
+    shape: rounded_rect
+    icon: database
+  - id: ai
+    label: AI Engine
+    icon: cloud
+
+edges:
+  - from: client
+    to: api
+  - from: api
+    to: crm
+  - from: crm
+    to: db
+  - from: crm
+    to: ai",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "システム構成図",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "System Architecture",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 89,
+        "sourceLineStart": 51,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "第 2 部：提案システム",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "新システムの構成と各種ダイアグラムのサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sectionBreak": true,
+        "sourceLineEnd": 95,
+        "sourceLineStart": 91,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: flowchart
+direction: TB
+title: 提案構成
+nodes:
+  - id: ui
+    label: SPA
+    shape: rounded_rect
+    icon: client
+  - id: api
+    label: API GW
+    icon: load_balancer
+  - id: crm
+    label: CRM Core
+    icon: server
+  - id: ai
+    label: AI Engine
+    icon: cloud
+edges:
+  - from: ui
+    to: api
+  - from: api
+    to: crm
+  - from: crm
+    to: ai",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "提案システムの構成",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "図＋説明（箇条書きの横に図を配置）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "フロントは SPA、API は Gateway 経由で疎結合",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "CRM コアは AI エンジンと連携",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "データは専用 DB に集約",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 131,
+        "sourceLineStart": 97,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+title: 社内ネットワーク構成
+nodes:
+  - id: net
+    label: インターネット
+    shape: rounded_rect
+    icon: internet
+  - id: fw
+    label: ファイアウォール
+    icon: firewall
+  - id: rt
+    label: ルーター
+    icon: router
+  - id: sw
+    label: スイッチ
+    icon: switch
+  - id: web
+    label: Webサーバ
+    icon: server
+  - id: db
+    label: DBサーバ
+    icon: database
+  - id: pc
+    label: クライアント
+    shape: rounded_rect
+    icon: client
+edges:
+  - from: net
+    to: fw
+  - from: fw
+    to: rt
+  - from: rt
+    to: sw
+  - from: sw
+    to: web
+  - from: sw
+    to: db
+  - from: sw
+    to: pc",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "社内ネットワーク構成",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ネットワークトポロジー（アイコン）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 179,
+        "sourceLineStart": 133,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: LR
+title: クラウドインフラ構成
+nodes:
+  - id: user
+    label: ユーザー
+    shape: rounded_rect
+    icon: client
+  - id: cloud
+    label: CDN / Cloud
+    shape: rounded_rect
+    icon: cloud
+  - id: lb
+    label: ロードバランサ
+    icon: load_balancer
+  - id: app1
+    label: Appサーバ1
+    icon: server
+  - id: app2
+    label: Appサーバ2
+    icon: server
+  - id: db
+    label: データベース
+    icon: database
+  - id: store
+    label: ストレージ
+    icon: storage
+edges:
+  - from: user
+    to: cloud
+  - from: cloud
+    to: lb
+  - from: lb
+    to: app1
+  - from: lb
+    to: app2
+  - from: app1
+    to: db
+  - from: app2
+    to: db
+  - from: app1
+    to: store",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "クラウドインフラ構成",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "多層アーキテクチャ（アイコン）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 229,
+        "sourceLineStart": 181,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+title: オフィスLAN
+nodes:
+  - id: net
+    label: インターネット
+    shape: rounded_rect
+    icon: internet
+  - id: fw
+    label: UTM / FW
+    icon: firewall
+  - id: ap
+    label: 無線AP
+    icon: wireless_ap
+  - id: pc
+    label: PC
+    shape: rounded_rect
+    icon: monitor
+  - id: phone
+    label: IP電話
+    shape: rounded_rect
+    icon: phone
+  - id: print
+    label: プリンタ
+    shape: rounded_rect
+    icon: printer
+edges:
+  - from: net
+    to: fw
+  - from: fw
+    to: ap
+  - from: ap
+    to: pc
+  - from: ap
+    to: phone
+  - from: fw
+    to: print",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "オフィスLAN",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "拠点ネットワーク（アイコン）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 274,
+        "sourceLineStart": 231,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: LR
+
+nodes:
+  - id: A
+    label: "ユーザー入力"
+  - id: B
+    label: "バリデーション"
+    shape: diamond
+  - id: C
+    label: "データ処理"
+  - id: D
+    label: "エラー表示"
+  - id: E
+    label: "データベース"
+    shape: cylinder
+  - id: F
+    label: "レスポンス返却"
+
+edges:
+  - from: A
+    to: B
+  - from: B
+    to: C
+    label: "OK"
+  - from: B
+    to: D
+    label: "NG"
+  - from: C
+    to: E
+  - from: C
+    to: F
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "データフロー",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Mermaid 記法サンプル",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 288,
+        "sourceLineStart": 276,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: sequence
+direction: TB
+
+nodes:
+  - id: U
+    label: "ユーザー"
+  - id: A
+    label: "API"
+  - id: D
+    label: "DB"
+
+edges:
+  - from: U
+    to: A
+    label: "ログイン要求"
+  - from: A
+    to: D
+    label: "認証情報を照会"
+  - from: D
+    to: A
+    label: "ユーザー情報"
+    style:
+      dash: true
+  - from: A
+    to: U
+    label: "トークン発行"
+    style:
+      dash: true
+  - from: A
+    to: U
+    label: "エラー応答"
+    style:
+      dash: true
+
+fragments:
+  - kind: alt
+    label: "認証成功"
+    from: 3
+    to: 4
+    dividers:
+      - at: 4
+        label: "認証失敗"
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "シーケンス図サンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ログインフロー（alt フラグメント付き）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 308,
+        "sourceLineStart": 290,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+
+nodes:
+  - id: Received
+    label: "受付"
+    shape: rounded_rect
+  - id: Processing
+    label: "処理中"
+    shape: rounded_rect
+  - id: Shipped
+    label: "出荷済"
+    shape: rounded_rect
+  - id: Cancelled
+    label: "取消"
+    shape: rounded_rect
+  - id: __start
+    label: ""
+    shape: start
+  - id: __end
+    label: ""
+    shape: end
+
+edges:
+  - from: __start
+    to: Received
+  - from: Received
+    to: Processing
+    label: "確定"
+  - from: Processing
+    to: Shipped
+    label: "出荷"
+  - from: Processing
+    to: Cancelled
+    label: "キャンセル"
+  - from: Shipped
+    to: __end
+  - from: Cancelled
+    to: __end
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "状態遷移サンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "注文ステートマシン（● = 開始 / ◉ = 終了）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 327,
+        "sourceLineStart": 310,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: TB
+
+nodes:
+  - id: CUSTOMER
+    label: "CUSTOMER"
+    shape: entity
+    attributes:
+      - "string name"
+      - "string email"
+  - id: ORDER
+    label: "ORDER"
+    shape: entity
+    attributes:
+      - "int order_no"
+      - "date ordered_at"
+  - id: LINE_ITEM
+    label: "LINE_ITEM"
+    shape: entity
+  - id: PRODUCT
+    label: "PRODUCT"
+    shape: entity
+
+edges:
+  - from: CUSTOMER
+    to: ORDER
+    label: "発注"
+    srcCard: one
+    tgtCard: zero_many
+  - from: ORDER
+    to: LINE_ITEM
+    label: "含む"
+    srcCard: one
+    tgtCard: one_many
+  - from: PRODUCT
+    to: LINE_ITEM
+    label: "対象"
+    srcCard: one
+    tgtCard: zero_many
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ER図サンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "受注ドメイン（crow's-foot 記法）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 347,
+        "sourceLineStart": 329,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: timeline
+direction: LR
+title: プロダクト沿革
+
+nodes:
+  - id: t0
+    label: "2020"
+    group: "創業期"
+    attributes:
+      - "創業"
+      - "最初のPoC"
+  - id: t1
+    label: "2021"
+    group: "創業期"
+    attributes:
+      - "シード調達"
+  - id: t2
+    label: "2022"
+    group: "成長期"
+    attributes:
+      - "シリーズA"
+      - "国内ローンチ"
+  - id: t3
+    label: "2023"
+    group: "成長期"
+    attributes:
+      - "海外展開"
+      - "黒字化"
+
+groups:
+  - id: "創業期"
+    label: "創業期"
+  - id: "成長期"
+    label: "成長期"
+
+edges: []
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "タイムラインサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "プロダクト沿革（section でグルーピング）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 363,
+        "sourceLineStart": 349,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: quadrant
+direction: TB
+title: 施策ポートフォリオ
+
+nodes: []
+
+edges: []
+
+quadrant:
+  xLow: "低い実現性"
+  xHigh: "高い実現性"
+  yLow: "小さい影響"
+  yHigh: "大きい影響"
+  q1: "最優先"
+  q2: "投資領域"
+  q3: "見送り"
+  q4: "クイックウィン"
+  points:
+    - label: "新機能A"
+      x: 0.78
+      y: 0.82
+    - label: "基盤刷新"
+      x: 0.32
+      y: 0.7
+    - label: "UI改善"
+      x: 0.82
+      y: 0.34
+    - label: "レポート"
+      x: 0.58
+      y: 0.55
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2x2マトリクスサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "施策の優先度（実現性 × 影響）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 383,
+        "sourceLineStart": 365,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: pie
+direction: TB
+title: 売上構成比
+
+nodes:
+  - id: s0
+    label: "国内"
+    value: 52
+  - id: s1
+    label: "北米"
+    value: 28
+  - id: s2
+    label: "欧州"
+    value: 14
+  - id: s3
+    label: "その他"
+    value: 6
+
+edges: []
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "円グラフサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "売上構成比（ネイティブ扇形）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 396,
+        "sourceLineStart": 385,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: gantt
+direction: TB
+title: 開発計画
+
+nodes: []
+
+edges: []
+
+gantt:
+  startDate: "2024-01-01"
+  tasks:
+    - name: "要件定義"
+      section: "設計"
+      start: 0
+      end: 10
+      status: ""
+    - name: "基本設計"
+      section: "設計"
+      start: 10
+      end: 24
+      status: ""
+    - name: "実装"
+      section: "開発"
+      start: 24
+      end: 49
+      status: "crit active"
+    - name: "リリース"
+      section: "開発"
+      start: 55
+      end: 55
+      status: "milestone"
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ガントチャートサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "開発ロードマップ（依存・ステータス・マイルストーン）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 413,
+        "sourceLineStart": 398,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: journey
+direction: LR
+title: カスタマージャーニー
+
+nodes:
+  - id: j0
+    label: "広告を見る"
+    group: "認知"
+    value: 3
+    attributes:
+      - "顧客"
+  - id: j1
+    label: "サイト訪問"
+    group: "認知"
+    value: 4
+    attributes:
+      - "顧客"
+  - id: j2
+    label: "比較する"
+    group: "検討"
+    value: 2
+    attributes:
+      - "顧客"
+  - id: j3
+    label: "問い合わせ"
+    group: "検討"
+    value: 3
+    attributes:
+      - "顧客"
+      - "営業"
+  - id: j4
+    label: "申し込み"
+    group: "購入"
+    value: 5
+    attributes:
+      - "顧客"
+
+groups:
+  - id: "認知"
+    label: "認知"
+  - id: "検討"
+    label: "検討"
+  - id: "購入"
+    label: "購入"
+
+edges: []
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ユーザージャーニーサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "カスタマージャーニー（満足度の推移）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 431,
+        "sourceLineStart": 415,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: LR
+
+nodes:
+  - id: m0
+    label: "新製品"
+    shape: circle
+  - id: m1
+    label: "機能"
+    shape: rounded_rect
+  - id: m2
+    label: "AI分析"
+    shape: rounded_rect
+  - id: m3
+    label: "自動化"
+    shape: rounded_rect
+  - id: m4
+    label: "市場"
+    shape: rounded_rect
+  - id: m5
+    label: "国内"
+    shape: rounded_rect
+  - id: m6
+    label: "海外"
+    shape: rounded_rect
+  - id: m7
+    label: "課題"
+    shape: rounded_rect
+  - id: m8
+    label: "コスト"
+    shape: rounded_rect
+
+edges:
+  - from: m0
+    to: m1
+  - from: m1
+    to: m2
+  - from: m1
+    to: m3
+  - from: m0
+    to: m4
+  - from: m4
+    to: m5
+  - from: m4
+    to: m6
+  - from: m0
+    to: m7
+  - from: m7
+    to: m8
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "マインドマップサンプル",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "アイデア整理（階層ツリー）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 449,
+        "sourceLineStart": 433,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: xychart
+direction: TB
+title: 四半期売上（百万円）
+
+nodes: []
+
+edges: []
+
+xychart:
+  xlabel: ""
+  ylabel: "売上"
+  ymin: 0
+  ymax: 1000
+  categories: ["Q1","Q2","Q3","Q4"]
+  series:
+    - kind: bar
+      name: ""
+      values: [450,620,710,880]
+    - kind: line
+      name: ""
+      values: [400,580,690,850]
+",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "四半期売上",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "棒グラフ＋折れ線（xychart）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 463,
+        "sourceLineStart": 451,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: radar
+title: 製品スキル評価
+radar:
+  max: 5
+  axes: ["技術力", "コスト", "品質", "スピード", "保守性", "拡張性"]
+  series:
+    - name: 自社製品
+      values: [5, 3, 4, 4, 5, 3]
+    - name: 競合A
+      values: [4, 5, 3, 3, 2, 4]
+nodes: []
+edges: []",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "製品スキル評価",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "レーダーチャート（多軸比較）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 483,
+        "sourceLineStart": 465,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: kpi
+title: 2026年度 業績
+kpi:
+  cards:
+    - value: "12.4億"
+      label: 年間売上
+      delta: "+15%"
+      trend: up
+    - value: "98%"
+      label: 目標達成率
+      delta: "+3pt"
+      trend: up
+    - value: "2.1日"
+      label: 平均リードタイム
+      delta: "-0.4日"
+      trend: down
+    - value: "4.6"
+      label: 顧客満足度
+      delta: "+0.2"
+      trend: up
+nodes: []
+edges: []",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "業績サマリ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "KPIカード（大きな数字タイル）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 513,
+        "sourceLineStart": 485,
+      },
+      {
+        "layout": "Column.2Body.Equal",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "スコープ定義",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "In Scope / Out of Scope",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "対象範囲（In Scope）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "顧客データ統合基盤",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "AI分析エンジン",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "営業支援モジュール",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "モバイルアプリ",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "管理者ダッシュボード",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "対象外（Out of Scope）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "基幹系システム（ERP）刷新",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "コールセンターシステム",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "海外拠点対応",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "5年以前のデータ移行",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 536,
+        "sourceLineStart": 515,
+      },
+      {
+        "groupKind": "card",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "主要施策",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "カード3列（グループ構文 <!-- card --> ＋ ### 見出し）",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "データ統合",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "顧客データを単一基盤へ集約",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "AI分析",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "予測・レコメンドを自動化",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "モバイル",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "現場での即時入力に対応",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 553,
+        "sourceLineStart": 538,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "リスク分析",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Risk Assessment",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "プロジェクト遂行にあたり、以下のリスクを識別しています。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "データ移行の品質リスク",
+                  },
+                  {
+                    "text": ": 既存データの整合性チェックに想定以上の工数",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "ユーザー定着リスク",
+                  },
+                  {
+                    "text": ": 新UIへの習熟に時間がかかり一時的な生産性低下",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "ベンダーロックイン",
+                  },
+                  {
+                    "text": ": クラウドサービスへの依存度増大",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "スケジュール遅延",
+                  },
+                  {
+                    "text": ": 要件変更による開発期間の延長",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 565,
+        "sourceLineStart": 555,
+      },
+      {
+        "layout": "Column.2Body.Equal",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "システム比較",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "System Comparison",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "現行CRM",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "レスポンス: 3.2秒",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "モバイル: 非対応",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "AI機能: なし",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "月額コスト: ¥850/user",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "カスタマイズ: 低",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "新CRM（提案）",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "レスポンス: 0.8秒",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "モバイル: 完全対応",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "AI機能: 予測分析搭載",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "月額コスト: ¥1,200/user",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "カスタマイズ: 高",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 589,
+        "sourceLineStart": 567,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "料金プラン比較",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Pricing Plans（ネイティブ表）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 601,
+        "sourceLineStart": 591,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "プラン",
+              "月額/ユーザー",
+              "ユーザー数",
+              "サポート",
+            ],
+            [
+              "Free",
+              "¥0",
+              "1",
+              "コミュニティ",
+            ],
+            [
+              "Pro",
+              "¥1,200",
+              "〜10",
+              "メール",
+            ],
+            [
+              "Business",
+              "¥2,400",
+              "〜50",
+              "優先メール",
+            ],
+            [
+              "Enterprise",
+              "要相談",
+              "無制限",
+              "専任担当",
+            ],
+          ],
+        },
+      },
+      {
+        "code": {
+          "content": "title: 不審なプロセス生成
+detection:
+  selection:
+    EventID: 4688
+    NewProcessName|endswith: '\\\\powershell.exe'
+  condition: selection
+level: high",
+          "lang": "yaml",
+          "placeholderIdx": "1",
+        },
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "検知ルールの実装例",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "コード / ログ（等幅ブロック）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 616,
+        "sourceLineStart": 603,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "導入ロードマップ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Implementation Roadmap",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "段階的な移行により、リスクを最小化しながら全社展開を目指します。",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "Phase 1（2026 Q2）",
+                  },
+                  {
+                    "text": ": 要件定義・ベンダー選定",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "Phase 2（2026 Q3-Q4）",
+                  },
+                  {
+                    "text": ": 開発・テスト・データ移行準備",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "Phase 3（2027 Q1）",
+                  },
+                  {
+                    "text": ": パイロット運用（営業部門先行）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "Phase 4（2027 Q2）",
+                  },
+                  {
+                    "text": ": 全社展開・旧システム廃止",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 628,
+        "sourceLineStart": 618,
+      },
+      {
+        "diagram": undefined,
+        "layout": "Closing.1Message.Single",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ご質問・ご意見をお待ちしています",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Thank You",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "THANK YOU",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "プロジェクトマネージャー: 山田 太郎 | taro.yamada@example.com",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 637,
+        "sourceLineStart": 630,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > tests/fixtures/slideir-baseline/visuals.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "ビジュアル基準デッキ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "16",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "#392 段 0 の固定用",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 4,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+direction: LR
+nodes:
+  - id: a
+    label: 受付
+  - id: b
+    label: 審査
+edges:
+  - from: a
+    to: b",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "図だけ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 21,
+        "sourceLineStart": 6,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "表だけ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 30,
+        "sourceLineStart": 23,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "項目",
+              "値",
+            ],
+            [
+              "売上",
+              "100",
+            ],
+            [
+              "利益",
+              "20",
+            ],
+          ],
+        },
+      },
+      {
+        "code": {
+          "content": "const answer = 42;
+console.info(answer);",
+          "lang": "ts",
+          "placeholderIdx": "1",
+        },
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "コードだけ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 39,
+        "sourceLineStart": 32,
+      },
+      {
+        "diagram": undefined,
+        "image": {
+          "alt": "ロゴ",
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "画像だけ",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 45,
+        "sourceLineStart": 41,
+      },
+      {
+        "diagram": undefined,
+        "image": {
+          "alt": "配置画像",
+          "aspect": 1.333,
+          "fit": "cover",
+          "placeholderIdx": "1",
+          "rect": {
+            "h": 3,
+            "w": 4,
+            "x": 1.5,
+            "y": 2,
+          },
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "画像の属性つき",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "本文の箇条",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 53,
+        "sourceLineStart": 47,
+      },
+      {
+        "diagram": undefined,
+        "image": {
+          "alt": "背景",
+          "behind": true,
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "背面画像",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "前面の本文",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 61,
+        "sourceLineStart": 55,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: flowchart
+nodes:
+  - id: x
+    label: X
+  - id: y
+    label: Y
+edges:
+  - from: x
+    to: y",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本文と図",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "左の説明",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "もう一行",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 80,
+        "sourceLineStart": 63,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本文と表",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "表の説明",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 90,
+        "sourceLineStart": 82,
+        "table": {
+          "header": true,
+          "placeholderIdx": "2",
+          "rows": [
+            [
+              "列A",
+              "列B",
+            ],
+            [
+              "1",
+              "2",
+            ],
+          ],
+        },
+      },
+      {
+        "code": {
+          "content": "print("hi")",
+          "lang": "py",
+          "placeholderIdx": "2",
+        },
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本文とコード",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "コードの説明",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 100,
+        "sourceLineStart": 92,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+nodes:
+  - id: p
+    label: P
+  - id: q
+    label: Q
+edges:
+  - from: p
+    to: q",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "表と図（現状は重なる）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 120,
+        "sourceLineStart": 102,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "指標",
+              "値",
+            ],
+            [
+              "A",
+              "1",
+            ],
+          ],
+        },
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: flowchart
+nodes:
+  - id: m
+    label: M
+  - id: n
+    label: N
+edges:
+  - from: m
+    to: n",
+        },
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "col 本文｜図",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "左カラムの本文",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "二行目",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 141,
+        "sourceLineStart": 122,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "2",
+          "yaml": "type: flowchart
+nodes:
+  - id: s
+    label: S",
+        },
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "col 表｜図",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 158,
+        "sourceLineStart": 143,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "k",
+              "v",
+            ],
+            [
+              "a",
+              "1",
+            ],
+          ],
+        },
+      },
+      {
+        "image": {
+          "alt": "右の画像",
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        },
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "col 本文｜画像",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "画像の説明",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 168,
+        "sourceLineStart": 160,
+      },
+      {
+        "diagram": {
+          "placeholderIdx": "1",
+          "yaml": "type: flowchart
+nodes:
+  - id: two
+    label: 二つ目",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "図が 2 つ（現状は先の図が落ちる）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 186,
+        "sourceLineStart": 170,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": {
+          "mermaid": "stateDiagram-v2
+  [*] --> 待機
+  待機 --> 実行",
+          "placeholderIdx": "1",
+        },
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Mermaid",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 196,
+        "sourceLineStart": 188,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [
+    {
+      "kind": "figure-dropped",
+      "slideIndex": 14,
+    },
+  ],
+}
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/deck-01-mixed-layouts.md 1`] = `
+"<!-- slide: Title.1Title.Single -->
+# Mirai Flow
+## 現場の段取りを、AIが自動で組み立てる
+
+Category: PRODUCT PITCH
+Date: 2026-06-24 | 株式会社ミライワークス
+Footer: Confidential — 投資家向け資料
+
+---
+
+<!-- slide: Section.1Title.Single -->
+# 課題と解決策
+> The Problem & The Solution
+
+
+---
+
+# 現場は「段取り」に時間を奪われている
+> Why Now
+
+製造・物流・建設の現場では、作業計画の組み替えが日々発生し、その調整が属人化しています。
+
+- 計画変更のたびに**平均2.5時間**の手戻りが発生
+- 段取り業務の**68%**がベテラン1名に依存（属人化）
+- 紙とExcelの併用で、最新情報がリアルタイムに共有されない
+- 結果として、設備稼働率は理論値より**約15ポイント**低下
+
+---
+
+# Mirai Flow — 段取りを自動最適化するSaaS
+> How It Works
+
+<!-- col -->
+現場データを取り込むと、AIが制約条件を考慮して最適な作業順序を自動生成します。
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+direction: LR
+title: Mirai Flow 処理フロー
+nodes:
+  - id: input
+    label: 現場データ取込
+    shape: rounded_rect
+    icon: client
+  - id: engine
+    label: 最適化エンジン
+    icon: server
+  - id: db
+    label: 制約・実績DB
+    shape: rounded_rect
+    icon: database
+  - id: plan
+    label: 最適段取り出力
+    shape: rounded_rect
+    icon: cloud
+edges:
+  - from: input
+    to: engine
+    label: "取込"
+  - from: engine
+    to: db
+    label: "参照"
+  - from: engine
+    to: plan
+    label: "生成"
+\`\`\`
+
+
+---
+
+<!-- slide: Column.2Body.Equal -->
+# 提供価値 — Before / After
+> 導入前後の比較
+
+<!-- col -->
+**導入前（現状）**
+
+- 段取り作成に毎日2.5時間
+- ベテラン依存で属人化
+- 紙・Excelで情報が分散
+- 設備稼働率は理論値の85%
+- 急な変更に弱い
+
+<!-- col -->
+**導入後（Mirai Flow）**
+
+- 段取り自動生成で**5分**に短縮
+- 誰でも同じ品質の計画を作成
+- クラウドで全員が同じ最新情報
+- 設備稼働率を**97%**まで改善
+- 変更にも即時で再計画
+
+
+---
+
+# 市場機会
+> TAM / SAM / SOM
+
+<!-- col -->
+国内の現場系SaaS市場は拡大を続けており、人手不足を背景に需要が加速しています。
+
+<!-- col -->
+\`\`\`diagram
+type: kpi
+title: 市場規模と価格
+kpi:
+  cards:
+    - value: "8,400億"
+      label: 国内TAM
+      delta: "+12%/年"
+      trend: up
+    - value: "1,200億"
+      label: 想定SAM
+      delta: "+18%/年"
+      trend: up
+    - value: "¥1,800"
+      label: 月額/ユーザー
+      delta: ""
+      trend: up
+nodes: []
+edges: []
+\`\`\`
+
+
+---
+
+# 料金プラン
+> Pricing（ネイティブ表）
+
+| プラン | 月額/ユーザー | 拠点数 | サポート |
+| --- | --- | --- | --- |
+| Starter | ¥1,800 | 1拠点 | メール |
+| Standard | ¥1,500 | 〜5拠点 | 優先メール・電話 |
+| Enterprise | 要相談 | 無制限 | 専任CS・SLA保証 |
+
+---
+
+# 競合比較
+> なぜ Mirai Flow が選ばれるのか
+
+\`\`\`diagram
+type: radar
+title: 競合比較（5段階評価）
+radar:
+  max: 5
+  axes: ["導入容易性", "最適化精度", "価格", "サポート", "拡張性"]
+  series:
+    - name: Mirai Flow
+      values: [5, 5, 4, 5, 4]
+    - name: 既存大手A
+      values: [2, 4, 2, 3, 5]
+nodes: []
+edges: []
+\`\`\`
+
+---
+
+# トラクションとロードマップ
+> Traction & Roadmap
+
+PoCを経て有償導入が立ち上がり、継続率も高水準を維持しています。
+
+- 導入企業 **42社** / 解約率 月次 **1.2%**
+- ARR **1.8億円**（前年比 +210%）
+- 2026 Q3: 在庫連携API公開・パートナー開拓
+- 2026 Q4: 多言語対応で東南アジア展開
+- 2027 Q1: 予知保全モジュールをリリース
+
+---
+
+<!-- slide: Closing.1Message.Single -->
+# 現場の段取りを、もっとなめらかに。
+## Thank You
+
+Category: CONTACT
+Date: 代表取締役 佐藤 健一 | k.sato@miraiworks.example
+Footer: 株式会社ミライワークス
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/deck-02-diagrams.md 1`] = `
+"<!-- slide: Title.1Title.Single -->
+# 図解デッキ — ダイアグラム編集テスト
+## flowchart / sequence をネイティブ編集
+
+Category: DIAGRAM TEST
+Date: 2026-06-24 | SlideCraft
+Footer: YAML / JSON / Mermaid 切替の動作確認用
+
+---
+
+# システム構成（flowchart・アイコン）
+> ノードにアイコン、TB方向
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: Web三層構成
+nodes:
+  - id: client
+    label: ブラウザ
+    shape: rounded_rect
+    icon: client
+  - id: lb
+    label: ロードバランサ
+    icon: load_balancer
+  - id: web
+    label: Webサーバ
+    icon: server
+  - id: db
+    label: データベース
+    shape: rounded_rect
+    icon: database
+edges:
+  - from: client
+    to: lb
+    label: "HTTPS"
+  - from: lb
+    to: web
+  - from: web
+    to: db
+    label: "SQL"
+\`\`\`
+
+---
+
+# データ処理パイプライン（flowchart・LR）
+> 左→右の流れ
+
+\`\`\`diagram
+type: flowchart
+direction: LR
+title: ETL パイプライン
+nodes:
+  - id: src
+    label: ソース
+    shape: rounded_rect
+  - id: ext
+    label: 抽出
+  - id: tr
+    label: 変換
+  - id: load
+    label: ロード
+  - id: dw
+    label: データ基盤
+    shape: rounded_rect
+    icon: database
+edges:
+  - from: src
+    to: ext
+  - from: ext
+    to: tr
+  - from: tr
+    to: load
+  - from: load
+    to: dw
+\`\`\`
+
+---
+
+# 申請の承認フロー（flowchart・分岐）
+> diamond で条件分岐
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: 承認フロー
+nodes:
+  - id: start
+    label: 申請
+    shape: rounded_rect
+  - id: check
+    label: 金額判定
+    shape: diamond
+  - id: mgr
+    label: 課長承認
+  - id: dir
+    label: 部長承認
+  - id: done
+    label: 完了
+    shape: rounded_rect
+edges:
+  - from: start
+    to: check
+  - from: check
+    to: mgr
+    label: "10万未満"
+  - from: check
+    to: dir
+    label: "10万以上"
+  - from: mgr
+    to: done
+  - from: dir
+    to: done
+\`\`\`
+
+---
+
+# API リクエスト（sequence）
+> 参加者とメッセージの往復
+
+\`\`\`diagram
+type: sequence
+direction: TB
+title: 決済リクエスト
+nodes:
+  - id: user
+    label: ユーザー
+  - id: api
+    label: API
+  - id: pay
+    label: 決済サービス
+  - id: db
+    label: DB
+edges:
+  - from: user
+    to: api
+    label: "注文確定"
+  - from: api
+    to: pay
+    label: "与信照会"
+  - from: pay
+    to: api
+    label: "OK"
+    style:
+      dash: true
+  - from: api
+    to: db
+    label: "保存"
+  - from: api
+    to: user
+    label: "完了通知"
+    style:
+      dash: true
+\`\`\`
+
+---
+
+# マイクロサービス構成（flowchart・グループ）
+> groups でサブグラフ化
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: サービス境界
+nodes:
+  - id: gw
+    label: API Gateway
+    icon: load_balancer
+  - id: order
+    label: 注文サービス
+    icon: server
+    group: core
+  - id: inv
+    label: 在庫サービス
+    icon: server
+    group: core
+  - id: odb
+    label: 注文DB
+    shape: rounded_rect
+    icon: database
+    group: data
+  - id: idb
+    label: 在庫DB
+    shape: rounded_rect
+    icon: database
+    group: data
+groups:
+  - id: core
+    label: コアサービス
+  - id: data
+    label: データ層
+edges:
+  - from: gw
+    to: order
+  - from: gw
+    to: inv
+  - from: order
+    to: odb
+  - from: inv
+    to: idb
+  - from: order
+    to: inv
+    label: "在庫引当"
+    style:
+      dash: true
+\`\`\`
+
+---
+
+<!-- slide: Closing.1Message.Single -->
+# 各図で YAML / JSON / Mermaid を切り替えて確認
+## Edit モードのフォーム編集も併せてテスト
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/deck-03-report-charts.md 1`] = `
+"<!-- slide: Title.1Title.Single -->
+# 2026年度 第2四半期 業績報告
+## Q2 FY2026 Business Review
+
+Category: QUARTERLY BUSINESS REPORT
+Date: 2026-06-30 | 経営企画本部
+Footer: Confidential — Internal Use Only
+
+---
+
+# 業績ハイライト
+> 主要KPI サマリ
+
+\`\`\`diagram
+type: kpi
+title: 2026年度 Q2 業績
+kpi:
+  cards:
+    - value: "14.8億"
+      label: 四半期売上
+      delta: "+18%"
+      trend: up
+    - value: "3.6億"
+      label: 営業利益
+      delta: "+22%"
+      trend: up
+    - value: "31.5%"
+      label: 粗利率
+      delta: "+1.8pt"
+      trend: up
+    - value: "5.2%"
+      label: 解約率
+      delta: "-0.6pt"
+      trend: down
+nodes: []
+edges: []
+\`\`\`
+
+---
+
+# 四半期売上の推移
+> 棒グラフ＋折れ線（実績 vs 計画）
+
+\`\`\`diagram
+type: xychart
+direction: TB
+title: 四半期売上の推移（百万円）
+
+nodes: []
+
+edges: []
+
+xychart:
+  xlabel: ""
+  ylabel: "売上"
+  ymin: 0
+  ymax: 1800
+  categories: ["Q1","Q2","Q3見込","Q4見込"]
+  series:
+    - kind: bar
+      name: ""
+      values: [1250,1480,1620,1750]
+    - kind: line
+      name: ""
+      values: [1200,1400,1550,1700]
+
+\`\`\`
+
+---
+
+# 事業領域の競争力評価
+> レーダーチャート（自社 vs 競合）
+
+\`\`\`diagram
+type: radar
+title: 事業領域の競争力評価
+radar:
+  max: 5
+  axes: ["価格競争力", "製品品質", "サポート", "ブランド", "技術革新", "市場浸透"]
+  series:
+    - name: 自社
+      values: [3, 5, 4, 4, 5, 3]
+    - name: 競合A
+      values: [5, 3, 3, 4, 2, 4]
+nodes: []
+edges: []
+\`\`\`
+
+---
+
+# セグメント別 業績
+> 事業セグメント実績（前年同期比）
+
+| セグメント | 売上（億円） | 前年比 | 営業利益率 |
+| --- | --- | --- | --- |
+| SaaS | 8.4 | +24% | 38% |
+| プロフェッショナルサービス | 3.9 | +11% | 21% |
+| ライセンス | 1.7 | -4% | 45% |
+| その他 | 0.8 | +6% | 12% |
+
+---
+
+<!-- slide: Column.2Body.Equal -->
+# 成果と課題
+> Achievements / Challenges
+
+<!-- col -->
+**今四半期の成果**
+
+- 新規ARR 過去最高の3.2億円を達成
+- エンタープライズ契約 12社を新規獲得
+- NPS が +8pt 改善（38 → 46）
+- AI機能の利用率が全顧客の61%に到達
+
+<!-- col -->
+**次四半期の課題**
+
+- 中堅企業向けの解約抑制施策
+- サポート応答時間の短縮（目標 4時間以内）
+- 北米リージョンの黒字化
+- 採用計画の前倒し（エンジニア 8名）
+
+
+---
+
+<!-- slide: Closing.1Message.Single -->
+# 通期計画の達成に向けて、引き続き全力で取り組みます
+## Thank You
+
+Category: THANK YOU
+Date: 経営企画本部 | ir@example.com
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/deck-04-stress-edgecases.md 1`] = `
+"<!-- slide: Title.1Title.Single -->
+# 地域物流DXプロジェクト 中間報告
+## 配送網の自動最適化に向けた第2四半期レビュー
+
+Category: 社内事業レビュー
+Date: 2026-06-24
+Footer: ロジスティクス改革推進室
+
+---
+
+<!-- slide: Content.1Body.Single -->
+
+プロジェクトの背景と現状認識
+
+- 当社の配送リードタイムは過去3年間にわたって慢性的に悪化しており、特に都市部での再配達率の上昇が顧客満足度を押し下げている深刻な課題となっている
+- 既存の配車計画は熟練オペレーターの経験と勘に依存しているため、担当者が不在の日には計画品質が大きくばらつき、繁忙期には現場が混乱する状況が続いている
+- 競合他社が相次いで配送AIを導入し当日配送の標準化を進めるなかで、当社が現行の手動運用を続ければ向こう2年で主要顧客の流出が避けられないと営業部門は警鐘を鳴らしている
+
+---
+
+<!-- slide: Content.1Body.Single -->
+
+第2四半期の主要KPI実績
+
+- 平均配送リードタイム: 26時間
+- 再配達率: 11%
+- 積載効率: 78%
+- 計画作成所要時間: 45分
+- 顧客満足度スコア: 82点
+
+---
+
+<!-- slide: Content.1Body.Single -->
+
+- 配車計画の自動生成エンジンを3つの主要拠点に試験導入した
+- 試験導入した拠点では計画作成時間が平均で6割短縮された
+- ドライバーからは走行ルートが分かりやすくなったと好評を得た
+- 一方で例外的な大口注文への対応ロジックには改善余地が残った
+- 既存の基幹システムとのデータ連携で想定外の遅延が発生した
+- 次の四半期に向けて連携基盤の刷新を優先課題として位置づける
+
+---
+
+<!-- slide: Content.1Body.Single -->
+
+検討中の課題と論点を一覧で棚卸し
+
+- 配送拠点を現行の5箇所から8箇所へ拡張する案の費用対効果を精査する
+- 配車AIの学習データに過去3年分の実績を投入するか直近1年に絞るか
+- ドライバー向けモバイルアプリのUIを内製するか外部ベンダーに委託するか
+- 繁忙期のスポット車両を確保する協力会社との契約条件を再交渉する
+- 再配達削減のための置き配と宅配ボックス連携をどの地域から始めるか
+- 配送実績データを需要予測チームへ日次で連携する仕組みを構築する
+- 燃料費高騰を踏まえた配送料金の改定タイミングを営業部門と調整する
+- 個人情報を含む配送先データの暗号化と保持期間の方針を法務と確認する
+- AIの判断根拠を現場が理解できるよう可視化ダッシュボードを整備する
+- 試験導入拠点で得た知見を全国展開する際の教育プログラムを設計する
+- 障害発生時に手動運用へ切り替えるフォールバック手順を明文化する
+- 経営会議へ報告する投資回収シナリオを楽観・標準・悲観の3案で用意する
+
+---
+
+<!-- slide: Process.3Step.Horizontal -->
+
+<!-- step -->
+全国展開までのロードマップ
+
+<!-- step -->
+\`\`\`diagram
+type: flowchart
+direction: LR
+title: 展開3ステップ
+nodes:
+  - id: a
+    label: 基盤刷新
+    shape: rounded_rect
+  - id: b
+    label: 横展開
+    shape: rounded_rect
+  - id: c
+    label: 全国運用
+    shape: rounded_rect
+edges:
+  - from: a
+    to: b
+    label: "Q3"
+  - from: b
+    to: c
+    label: "Q4"
+\`\`\`
+
+
+---
+
+<!-- slide: Closing.1Message.Single -->
+# 次の四半期で連携基盤を刷新し全国展開へ
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/manuscript-01-business-proposal.md 1`] = `
+"# 社内ナレッジ検索ツール「Hubble」導入提案
+> 背景
+
+近年、当社の事業拡大にともない、各部門が蓄積するドキュメントやノウハウの総量は急速に増加しています。営業資料、技術仕様書、過去の提案書、議事録といった情報資産は、いまや会社全体の競争力を支える基盤となっていますが、その保管場所は共有ストレージ、チャットツール、各種SaaS、そして個人のローカル環境へと際限なく分散しているのが実情です。結果として、必要な情報がどこにあるのかを把握している人が限られ、組織としての知識の再利用が十分に進んでいません。
+
+特に入社から日の浅いメンバーにとっては、誰に何を聞けばよいのかという初歩的なハードルが高く、本来であれば数分で解決するはずの疑問に半日を費やしてしまう場面も少なくありません。こうした状況は、個人の生産性を下げるだけでなく、ベテラン社員への問い合わせを集中させ、組織全体の時間を静かに浪費しています。
+
+## 課題
+
+現状の最大の課題は、情報が「探せない」ことにあります。各ツールに個別の検索機能は備わっているものの、横断的に一度で探せる仕組みが存在しないため、利用者は複数のツールを行き来しながら手作業で情報を突き合わせる必要があります。さらに、検索がファイル名やタイトルの完全一致に依存しているため、表現の揺れや言い回しの違いによって、実際には存在する情報にたどり着けないケースが頻発しています。問い合わせ対応に追われる担当者の負担も看過できず、属人化したナレッジが退職とともに失われるリスクも年々高まっています。
+
+## 提案
+
+そこで、社内に散在する情報資産を横断的に検索できるナレッジ検索ツール「Hubble」の導入を提案します。Hubbleは主要な社内ツールと連携し、自然言語による問いかけに対して関連性の高い情報を要約とともに提示します。キーワードの完全一致に頼らず文意を理解した検索を行うため、表現の揺れに強く、目的の情報へ短時間で到達できます。アクセス権限は既存の認証基盤と統合され、各メンバーが本来閲覧できる範囲のみを対象とするため、情報セキュリティを損なうことなく運用できます。
+
+## 期待効果
+
+検索時間削減: 1件あたり平均15分から2分へ
+問い合わせ件数: 月間でおよそ40パーセント減
+新人立ち上がり期間: 3週間から2週間へ短縮
+対象ドキュメント数: 初期連携で約12万件
+想定ROI: 導入12カ月で投資回収
+
+## 導入スケジュール
+
+導入は段階的に進める計画です。まず最初の1カ月で対象データソースの棚卸しと権限設計を行い、続く2カ月でパイロット部門を選定して試験運用を実施します。そこで得られたフィードバックをもとに検索精度と運用ルールを調整したうえで、4カ月目以降に全社展開へと移行します。展開後も利用状況を継続的にモニタリングし、四半期ごとに改善サイクルを回していく方針です。
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/manuscript-02-tech-report.md 1`] = `
+"# 決済API 負荷試験レポート — 2026年Q2
+> 試験条件と環境
+
+本レポートは、決済処理APIに対して実施した負荷試験の結果と、その分析、ならびにキャッシュ層およびコネクションプール設定の見直しによる改善効果をまとめたものである。試験は本番同等のステージング環境で行い、ピーク商戦期を想定したトラフィックを再現した。対象期間中、約3週間にわたって計測と段階的なチューニングを繰り返している。
+
+
+試験対象はNode.js製の決済オーケストレーションサービスであり、背後にPostgreSQL 16とRedis 7を配置している。負荷生成にはk6を用い、仮想ユーザを段階的に増加させながら、5分間のランプアップと20分間の定常負荷を組み合わせたシナリオを実行した。各リクエストは認証、在庫引当、与信照会、確定の4ステップを含む現実的なフローを模している。
+
+想定ピーク: 8,000 RPS
+仮想ユーザ数: 12,000
+試験時間: 25分（ランプ5分＋定常20分）
+
+## 改善前の計測結果
+
+初回計測では、定常負荷の後半で明確な性能劣化が観測された。とくにp99レイテンシが急峻に悪化し、データベースのコネクション枯渇に起因すると見られるエラーが断続的に発生した。長時間にわたるトレースを確認したところ、与信照会ステップで外部APIへの同期待機が積み上がり、プール内の接続が解放されないまま保持され続けるパターンが支配的であった。これがスループットの頭打ちと末尾レイテンシ膨張の主因と判断している。
+
+p50レイテンシ: 142ms
+p99レイテンシ: 1,820ms
+スループット: 4,300 RPS
+エラー率: 3.7%
+推定インフラコスト: 月額 ¥1,480,000
+
+## 改善施策
+
+主な変更は三点である。第一に、与信照会を非同期化し、外部API呼び出しにタイムアウトとサーキットブレーカーを導入した。第二に、Redisを用いた在庫引当結果の短期キャッシュを追加し、重複照会を削減した。第三に、PostgreSQLのコネクションプール上限とアイドル回収間隔を再設定し、PgBouncerをトランザクションプーリングモードで前段に配置した。
+
+## 改善後の計測結果
+
+同一シナリオで再計測したところ、末尾レイテンシとエラー率が大幅に改善した。とくにp99の改善幅が大きく、定常負荷の後半でも安定して目標スループットを維持できるようになった。コスト面でもインスタンス台数を削減できたため、月額負担が軽くなっている。
+
+p50レイテンシ: 88ms
+p99レイテンシ: 410ms
+スループット: 7,650 RPS
+エラー率: 0.4%
+推定インフラコスト: 月額 ¥1,060,000
+
+## 結論と今後
+
+今回のチューニングにより、スループットは約1.8倍、p99レイテンシは約4.4分の1に短縮され、想定ピークに対する余裕度が確保できた。残課題として、与信照会の外部依存が依然としてボトルネックの起点になりうる点が挙げられる。次フェーズでは照会結果の予測キャッシュとリージョン分散を検討し、さらなる末尾レイテンシの安定化を目指す。
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/manuscript-03-howto-guide.md 1`] = `
+"# 新メンバーの開発環境セットアップガイド
+> はじめに
+
+このドキュメントは、新しくチームに参加したエンジニアが、最初の一日でローカル開発環境を立ち上げ、最初のプルリクエストを出せるようになるまでの道のりをまとめたものです。手順そのものよりも「なぜそうするのか」を理解してもらうことを大切にしているので、つまずいたときは遠慮なくチームの誰かに声をかけてください。私たちは質問を歓迎する文化を持っています。
+
+
+私たちのプロダクトはデスクトップアプリケーションであり、ビルドにはいくつかの外部ツールチェーンが必要です。最初は依存関係が多く感じるかもしれませんが、一度そろえてしまえば日々の開発は驚くほど快適になります。焦らず、一歩ずつ進めていきましょう。所要時間はおよそ半日を見込んでおくと安心です。
+
+## 環境を整える
+
+まずは土台となるツール群をインストールします。順番が前後すると後の手順でエラーが出ることがあるため、次の流れに沿って進めてください。
+
+1. まず社内アカウントを発行してもらい、GitHub Organization への招待を受け取ります。招待メールが届いていない場合はオンボーディング担当に連絡してください。
+2. 次に Node.js と Rust のツールチェーンをインストールします。バージョンはリポジトリ直下の設定ファイルに固定されているので、それに合わせてください。
+3. 続いてリポジトリをクローンし、依存パッケージをインストールします。ここで時間がかかるのは正常です。
+4. 最後に環境変数のテンプレートをコピーし、必要な値を自分用に書き換えます。
+
+ここまで終えると、ローカルでアプリを起動する準備が整います。
+
+## 動作を確認する
+
+セットアップが正しく完了したかは、実際に動かして確かめるのが一番確実です。開発サーバーを起動し、ブラウザでプレビュー画面が表示されることを確認してください。あわせてテストスイートを一度走らせ、すべて緑になることを見届けます。もしテストが落ちる場合、それは多くの場合あなたのミスではなく、環境のどこかが噛み合っていないサインです。エラーメッセージをそのままチームに共有してくれれば、原因をすぐに切り分けられます。
+
+## 最初の一歩
+
+環境が動いたら、ウォームアップとして小さな修正に挑戦してみましょう。タイポの修正やコメントの追記など、ごく軽いもので構いません。ブランチを切り、変更をコミットし、プルリクエストを作成する。この一連の流れを体験することが、チームの開発リズムをつかむ何よりの近道です。最初のレビューを楽しみにしています。
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/manuscript-04-meeting-notes.md 1`] = `
+"# プロジェクトキックオフ 議事録
+> 議題
+
+2026-06-23（火）14:00-15:10　会議室B＋オンライン併用
+出席：田中（PM）、佐藤、鈴木、山本、外部ベンダーの伊藤さん（一部のみ）
+
+
+- 新CRM移行プロジェクトの全体スケジュール確認
+- 役割分担
+- リスクの洗い出し
+
+今回はとりあえずキックオフということで、まず全体像を共有してから細かいタスクに落としていく流れで進めたいという田中さんの提案があり、特に反対もなかったのでその方針で進めることになった。
+
+## 決定事項
+
+本番リリースは10月末を目標とするが、データ移行の検証に想定以上に時間がかかる可能性があるため、9月中旬にいったん中間レビューを設けて、そこで間に合わなさそうなら段階リリースに切り替えるかどうかを改めて判断するという形で全員合意した。
+
+- 週次定例は毎週水曜10時で固定
+- ドキュメントはすべて共有ドライブのprojectフォルダに集約
+- ツールはSlackとNotionを併用
+
+## 課題
+
+- 旧システムの仕様書が一部見当たらない
+- 移行対象データの件数がまだ未確定（情シスに要確認）
+- 伊藤さん「ベンダー側の検証環境は7月後半にならないと用意できない」とのこと、ここがスケジュールのボトルネックになりそう
+- 予算
+
+## ToDo
+
+- 田中：スケジュール案をたたき台として今週金曜までに展開
+- 佐藤：旧システムのデータ項目一覧を棚卸し
+- 鈴木：情シスへ件数とアカウント権限を確認
+- 山本：Notionにプロジェクトページ作成
+
+## 次回
+
+来週水曜の定例で、各自のToDo進捗とスケジュール案へのフィードバックを持ち寄る。
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/sample-deck.md 1`] = `
+"<!-- slide: Title.1Title.Single -->
+# NextGen CRM プロジェクト
+## 移行計画レビュー
+
+Category: DATA ANALYSIS REPORT
+Date: 2026-03-31 | DX推進本部
+Footer: Confidential
+
+---
+
+# 本日のアジェンダ
+> Today's Agenda
+
+- プロジェクト概要と目的
+- 現状分析データの共有
+- システム比較と推奨案
+- 導入ロードマップ
+- Q&A・ネクストステップ
+
+---
+
+<!-- toc -->
+
+---
+
+<!-- section -->
+# 第 1 部：現状と課題
+> 現行 CRM の実態を確認し、論点を整理する
+
+
+---
+
+# 現状分析
+> Current State Analysis
+
+現行CRMの利用状況を分析した結果、以下の課題が明らかになりました。
+
+- 月間アクティブユーザー率: 73%（目標 90%）
+- 平均レスポンス時間: 3.2秒（業界平均の3倍）
+- モバイル対応: 非対応
+- ユーザー満足度: 5段階中 3.2（前年比 -0.3pt）
+
+<!-- note -->
+スピーカーノートのデモ（\`<!-- note -->\` 以降スライド末尾まで）。スライド面には出ず、
+PPTX ではノートペイン、HTML では \`n\` キーのパネルに入ります。
+
+- アクティブ率 73% は 2026-02 の社内集計。母数は付与ライセンス 1,240
+- レスポンス 3.2 秒は営業時間帯の p50。ピーク時は 5 秒超の報告あり
+- 想定問答: 「モバイル対応の暫定策は？」→ 現行はブラウザのみ、暫定策なし
+
+---
+
+# システム構成図
+> System Architecture
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: CRM システム構成
+
+nodes:
+  - id: client
+    label: ブラウザ
+    shape: rounded_rect
+    icon: client
+  - id: api
+    label: API Gateway
+    icon: load_balancer
+  - id: crm
+    label: CRM Service
+    icon: server
+  - id: db
+    label: Database
+    shape: rounded_rect
+    icon: database
+  - id: ai
+    label: AI Engine
+    icon: cloud
+
+edges:
+  - from: client
+    to: api
+  - from: api
+    to: crm
+  - from: crm
+    to: db
+  - from: crm
+    to: ai
+\`\`\`
+
+---
+
+<!-- section -->
+# 第 2 部：提案システム
+> 新システムの構成と各種ダイアグラムのサンプル
+
+
+---
+
+# 提案システムの構成
+> 図＋説明（箇条書きの横に図を配置）
+
+<!-- col -->
+- フロントは SPA、API は Gateway 経由で疎結合
+- CRM コアは AI エンジンと連携
+- データは専用 DB に集約
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: 提案構成
+nodes:
+  - id: ui
+    label: SPA
+    shape: rounded_rect
+    icon: client
+  - id: api
+    label: API GW
+    icon: load_balancer
+  - id: crm
+    label: CRM Core
+    icon: server
+  - id: ai
+    label: AI Engine
+    icon: cloud
+edges:
+  - from: ui
+    to: api
+  - from: api
+    to: crm
+  - from: crm
+    to: ai
+\`\`\`
+
+
+---
+
+# 社内ネットワーク構成
+> ネットワークトポロジー（アイコン）
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: 社内ネットワーク構成
+nodes:
+  - id: net
+    label: インターネット
+    shape: rounded_rect
+    icon: internet
+  - id: fw
+    label: ファイアウォール
+    icon: firewall
+  - id: rt
+    label: ルーター
+    icon: router
+  - id: sw
+    label: スイッチ
+    icon: switch
+  - id: web
+    label: Webサーバ
+    icon: server
+  - id: db
+    label: DBサーバ
+    icon: database
+  - id: pc
+    label: クライアント
+    shape: rounded_rect
+    icon: client
+edges:
+  - from: net
+    to: fw
+  - from: fw
+    to: rt
+  - from: rt
+    to: sw
+  - from: sw
+    to: web
+  - from: sw
+    to: db
+  - from: sw
+    to: pc
+\`\`\`
+
+---
+
+# クラウドインフラ構成
+> 多層アーキテクチャ（アイコン）
+
+\`\`\`diagram
+type: flowchart
+direction: LR
+title: クラウドインフラ構成
+nodes:
+  - id: user
+    label: ユーザー
+    shape: rounded_rect
+    icon: client
+  - id: cloud
+    label: CDN / Cloud
+    shape: rounded_rect
+    icon: cloud
+  - id: lb
+    label: ロードバランサ
+    icon: load_balancer
+  - id: app1
+    label: Appサーバ1
+    icon: server
+  - id: app2
+    label: Appサーバ2
+    icon: server
+  - id: db
+    label: データベース
+    icon: database
+  - id: store
+    label: ストレージ
+    icon: storage
+edges:
+  - from: user
+    to: cloud
+  - from: cloud
+    to: lb
+  - from: lb
+    to: app1
+  - from: lb
+    to: app2
+  - from: app1
+    to: db
+  - from: app2
+    to: db
+  - from: app1
+    to: store
+\`\`\`
+
+---
+
+# オフィスLAN
+> 拠点ネットワーク（アイコン）
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+title: オフィスLAN
+nodes:
+  - id: net
+    label: インターネット
+    shape: rounded_rect
+    icon: internet
+  - id: fw
+    label: UTM / FW
+    icon: firewall
+  - id: ap
+    label: 無線AP
+    icon: wireless_ap
+  - id: pc
+    label: PC
+    shape: rounded_rect
+    icon: monitor
+  - id: phone
+    label: IP電話
+    shape: rounded_rect
+    icon: phone
+  - id: print
+    label: プリンタ
+    shape: rounded_rect
+    icon: printer
+edges:
+  - from: net
+    to: fw
+  - from: fw
+    to: ap
+  - from: ap
+    to: pc
+  - from: ap
+    to: phone
+  - from: fw
+    to: print
+\`\`\`
+
+---
+
+# データフロー
+> Mermaid 記法サンプル
+
+\`\`\`diagram
+type: flowchart
+direction: LR
+
+nodes:
+  - id: A
+    label: "ユーザー入力"
+  - id: B
+    label: "バリデーション"
+    shape: diamond
+  - id: C
+    label: "データ処理"
+  - id: D
+    label: "エラー表示"
+  - id: E
+    label: "データベース"
+    shape: cylinder
+  - id: F
+    label: "レスポンス返却"
+
+edges:
+  - from: A
+    to: B
+  - from: B
+    to: C
+    label: "OK"
+  - from: B
+    to: D
+    label: "NG"
+  - from: C
+    to: E
+  - from: C
+    to: F
+
+\`\`\`
+
+---
+
+# シーケンス図サンプル
+> ログインフロー（alt フラグメント付き）
+
+\`\`\`diagram
+type: sequence
+direction: TB
+
+nodes:
+  - id: U
+    label: "ユーザー"
+  - id: A
+    label: "API"
+  - id: D
+    label: "DB"
+
+edges:
+  - from: U
+    to: A
+    label: "ログイン要求"
+  - from: A
+    to: D
+    label: "認証情報を照会"
+  - from: D
+    to: A
+    label: "ユーザー情報"
+    style:
+      dash: true
+  - from: A
+    to: U
+    label: "トークン発行"
+    style:
+      dash: true
+  - from: A
+    to: U
+    label: "エラー応答"
+    style:
+      dash: true
+
+fragments:
+  - kind: alt
+    label: "認証成功"
+    from: 3
+    to: 4
+    dividers:
+      - at: 4
+        label: "認証失敗"
+
+\`\`\`
+
+---
+
+# 状態遷移サンプル
+> 注文ステートマシン（● = 開始 / ◉ = 終了）
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+
+nodes:
+  - id: Received
+    label: "受付"
+    shape: rounded_rect
+  - id: Processing
+    label: "処理中"
+    shape: rounded_rect
+  - id: Shipped
+    label: "出荷済"
+    shape: rounded_rect
+  - id: Cancelled
+    label: "取消"
+    shape: rounded_rect
+  - id: __start
+    label: ""
+    shape: start
+  - id: __end
+    label: ""
+    shape: end
+
+edges:
+  - from: __start
+    to: Received
+  - from: Received
+    to: Processing
+    label: "確定"
+  - from: Processing
+    to: Shipped
+    label: "出荷"
+  - from: Processing
+    to: Cancelled
+    label: "キャンセル"
+  - from: Shipped
+    to: __end
+  - from: Cancelled
+    to: __end
+
+\`\`\`
+
+---
+
+# ER図サンプル
+> 受注ドメイン（crow's-foot 記法）
+
+\`\`\`diagram
+type: flowchart
+direction: TB
+
+nodes:
+  - id: CUSTOMER
+    label: "CUSTOMER"
+    shape: entity
+    attributes:
+      - "string name"
+      - "string email"
+  - id: ORDER
+    label: "ORDER"
+    shape: entity
+    attributes:
+      - "int order_no"
+      - "date ordered_at"
+  - id: LINE_ITEM
+    label: "LINE_ITEM"
+    shape: entity
+  - id: PRODUCT
+    label: "PRODUCT"
+    shape: entity
+
+edges:
+  - from: CUSTOMER
+    to: ORDER
+    label: "発注"
+    srcCard: one
+    tgtCard: zero_many
+  - from: ORDER
+    to: LINE_ITEM
+    label: "含む"
+    srcCard: one
+    tgtCard: one_many
+  - from: PRODUCT
+    to: LINE_ITEM
+    label: "対象"
+    srcCard: one
+    tgtCard: zero_many
+
+\`\`\`
+
+---
+
+# タイムラインサンプル
+> プロダクト沿革（section でグルーピング）
+
+\`\`\`diagram
+type: timeline
+direction: LR
+title: プロダクト沿革
+
+nodes:
+  - id: t0
+    label: "2020"
+    group: "創業期"
+    attributes:
+      - "創業"
+      - "最初のPoC"
+  - id: t1
+    label: "2021"
+    group: "創業期"
+    attributes:
+      - "シード調達"
+  - id: t2
+    label: "2022"
+    group: "成長期"
+    attributes:
+      - "シリーズA"
+      - "国内ローンチ"
+  - id: t3
+    label: "2023"
+    group: "成長期"
+    attributes:
+      - "海外展開"
+      - "黒字化"
+
+groups:
+  - id: "創業期"
+    label: "創業期"
+  - id: "成長期"
+    label: "成長期"
+
+edges: []
+
+\`\`\`
+
+---
+
+# 2x2マトリクスサンプル
+> 施策の優先度（実現性 × 影響）
+
+\`\`\`diagram
+type: quadrant
+direction: TB
+title: 施策ポートフォリオ
+
+nodes: []
+
+edges: []
+
+quadrant:
+  xLow: "低い実現性"
+  xHigh: "高い実現性"
+  yLow: "小さい影響"
+  yHigh: "大きい影響"
+  q1: "最優先"
+  q2: "投資領域"
+  q3: "見送り"
+  q4: "クイックウィン"
+  points:
+    - label: "新機能A"
+      x: 0.78
+      y: 0.82
+    - label: "基盤刷新"
+      x: 0.32
+      y: 0.7
+    - label: "UI改善"
+      x: 0.82
+      y: 0.34
+    - label: "レポート"
+      x: 0.58
+      y: 0.55
+
+\`\`\`
+
+---
+
+# 円グラフサンプル
+> 売上構成比（ネイティブ扇形）
+
+\`\`\`diagram
+type: pie
+direction: TB
+title: 売上構成比
+
+nodes:
+  - id: s0
+    label: "国内"
+    value: 52
+  - id: s1
+    label: "北米"
+    value: 28
+  - id: s2
+    label: "欧州"
+    value: 14
+  - id: s3
+    label: "その他"
+    value: 6
+
+edges: []
+
+\`\`\`
+
+---
+
+# ガントチャートサンプル
+> 開発ロードマップ（依存・ステータス・マイルストーン）
+
+\`\`\`diagram
+type: gantt
+direction: TB
+title: 開発計画
+
+nodes: []
+
+edges: []
+
+gantt:
+  startDate: "2024-01-01"
+  tasks:
+    - name: "要件定義"
+      section: "設計"
+      start: 0
+      end: 10
+      status: ""
+    - name: "基本設計"
+      section: "設計"
+      start: 10
+      end: 24
+      status: ""
+    - name: "実装"
+      section: "開発"
+      start: 24
+      end: 49
+      status: "crit active"
+    - name: "リリース"
+      section: "開発"
+      start: 55
+      end: 55
+      status: "milestone"
+
+\`\`\`
+
+---
+
+# ユーザージャーニーサンプル
+> カスタマージャーニー（満足度の推移）
+
+\`\`\`diagram
+type: journey
+direction: LR
+title: カスタマージャーニー
+
+nodes:
+  - id: j0
+    label: "広告を見る"
+    group: "認知"
+    value: 3
+    attributes:
+      - "顧客"
+  - id: j1
+    label: "サイト訪問"
+    group: "認知"
+    value: 4
+    attributes:
+      - "顧客"
+  - id: j2
+    label: "比較する"
+    group: "検討"
+    value: 2
+    attributes:
+      - "顧客"
+  - id: j3
+    label: "問い合わせ"
+    group: "検討"
+    value: 3
+    attributes:
+      - "顧客"
+      - "営業"
+  - id: j4
+    label: "申し込み"
+    group: "購入"
+    value: 5
+    attributes:
+      - "顧客"
+
+groups:
+  - id: "認知"
+    label: "認知"
+  - id: "検討"
+    label: "検討"
+  - id: "購入"
+    label: "購入"
+
+edges: []
+
+\`\`\`
+
+---
+
+# マインドマップサンプル
+> アイデア整理（階層ツリー）
+
+\`\`\`diagram
+type: flowchart
+direction: LR
+
+nodes:
+  - id: m0
+    label: "新製品"
+    shape: circle
+  - id: m1
+    label: "機能"
+    shape: rounded_rect
+  - id: m2
+    label: "AI分析"
+    shape: rounded_rect
+  - id: m3
+    label: "自動化"
+    shape: rounded_rect
+  - id: m4
+    label: "市場"
+    shape: rounded_rect
+  - id: m5
+    label: "国内"
+    shape: rounded_rect
+  - id: m6
+    label: "海外"
+    shape: rounded_rect
+  - id: m7
+    label: "課題"
+    shape: rounded_rect
+  - id: m8
+    label: "コスト"
+    shape: rounded_rect
+
+edges:
+  - from: m0
+    to: m1
+  - from: m1
+    to: m2
+  - from: m1
+    to: m3
+  - from: m0
+    to: m4
+  - from: m4
+    to: m5
+  - from: m4
+    to: m6
+  - from: m0
+    to: m7
+  - from: m7
+    to: m8
+
+\`\`\`
+
+---
+
+# 四半期売上
+> 棒グラフ＋折れ線（xychart）
+
+\`\`\`diagram
+type: xychart
+direction: TB
+title: 四半期売上（百万円）
+
+nodes: []
+
+edges: []
+
+xychart:
+  xlabel: ""
+  ylabel: "売上"
+  ymin: 0
+  ymax: 1000
+  categories: ["Q1","Q2","Q3","Q4"]
+  series:
+    - kind: bar
+      name: ""
+      values: [450,620,710,880]
+    - kind: line
+      name: ""
+      values: [400,580,690,850]
+
+\`\`\`
+
+---
+
+# 製品スキル評価
+> レーダーチャート（多軸比較）
+
+\`\`\`diagram
+type: radar
+title: 製品スキル評価
+radar:
+  max: 5
+  axes: ["技術力", "コスト", "品質", "スピード", "保守性", "拡張性"]
+  series:
+    - name: 自社製品
+      values: [5, 3, 4, 4, 5, 3]
+    - name: 競合A
+      values: [4, 5, 3, 3, 2, 4]
+nodes: []
+edges: []
+\`\`\`
+
+---
+
+# 業績サマリ
+> KPIカード（大きな数字タイル）
+
+\`\`\`diagram
+type: kpi
+title: 2026年度 業績
+kpi:
+  cards:
+    - value: "12.4億"
+      label: 年間売上
+      delta: "+15%"
+      trend: up
+    - value: "98%"
+      label: 目標達成率
+      delta: "+3pt"
+      trend: up
+    - value: "2.1日"
+      label: 平均リードタイム
+      delta: "-0.4日"
+      trend: down
+    - value: "4.6"
+      label: 顧客満足度
+      delta: "+0.2"
+      trend: up
+nodes: []
+edges: []
+\`\`\`
+
+---
+
+<!-- slide: Column.2Body.Equal -->
+# スコープ定義
+> In Scope / Out of Scope
+
+<!-- col -->
+**対象範囲（In Scope）**
+
+- 顧客データ統合基盤
+- AI分析エンジン
+- 営業支援モジュール
+- モバイルアプリ
+- 管理者ダッシュボード
+
+<!-- col -->
+**対象外（Out of Scope）**
+
+- 基幹系システム（ERP）刷新
+- コールセンターシステム
+- 海外拠点対応
+- 5年以前のデータ移行
+
+
+---
+
+# 主要施策
+> カード3列（グループ構文 <!-- card --> ＋ ### 見出し）
+
+<!-- card -->
+### データ統合
+顧客データを単一基盤へ集約
+
+<!-- card -->
+### AI分析
+予測・レコメンドを自動化
+
+<!-- card -->
+### モバイル
+現場での即時入力に対応
+
+
+---
+
+# リスク分析
+> Risk Assessment
+
+プロジェクト遂行にあたり、以下のリスクを識別しています。
+
+- **データ移行の品質リスク**: 既存データの整合性チェックに想定以上の工数
+- **ユーザー定着リスク**: 新UIへの習熟に時間がかかり一時的な生産性低下
+- **ベンダーロックイン**: クラウドサービスへの依存度増大
+- **スケジュール遅延**: 要件変更による開発期間の延長
+
+---
+
+<!-- slide: Column.2Body.Equal -->
+# システム比較
+> System Comparison
+
+<!-- col -->
+**現行CRM**
+
+- レスポンス: 3.2秒
+- モバイル: 非対応
+- AI機能: なし
+- 月額コスト: ¥850/user
+- カスタマイズ: 低
+
+<!-- col -->
+**新CRM（提案）**
+
+- レスポンス: 0.8秒
+- モバイル: 完全対応
+- AI機能: 予測分析搭載
+- 月額コスト: ¥1,200/user
+- カスタマイズ: 高
+
+
+---
+
+# 料金プラン比較
+> Pricing Plans（ネイティブ表）
+
+| プラン | 月額/ユーザー | ユーザー数 | サポート |
+| --- | --- | --- | --- |
+| Free | ¥0 | 1 | コミュニティ |
+| Pro | ¥1,200 | 〜10 | メール |
+| Business | ¥2,400 | 〜50 | 優先メール |
+| Enterprise | 要相談 | 無制限 | 専任担当 |
+
+---
+
+# 検知ルールの実装例
+> コード / ログ（等幅ブロック）
+
+\`\`\`yaml
+title: 不審なプロセス生成
+detection:
+  selection:
+    EventID: 4688
+    NewProcessName|endswith: '\\\\powershell.exe'
+  condition: selection
+level: high
+\`\`\`
+
+---
+
+# 導入ロードマップ
+> Implementation Roadmap
+
+段階的な移行により、リスクを最小化しながら全社展開を目指します。
+
+- **Phase 1（2026 Q2）**: 要件定義・ベンダー選定
+- **Phase 2（2026 Q3-Q4）**: 開発・テスト・データ移行準備
+- **Phase 3（2027 Q1）**: パイロット運用（営業部門先行）
+- **Phase 4（2027 Q2）**: 全社展開・旧システム廃止
+
+---
+
+<!-- slide: Closing.1Message.Single -->
+# ご質問・ご意見をお待ちしています
+## Thank You
+
+Category: THANK YOU
+Date: プロジェクトマネージャー: 山田 太郎 | taro.yamada@example.com
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > tests/fixtures/slideir-baseline/visuals.md 1`] = `
+"# ビジュアル基準デッキ
+> #392 段 0 の固定用
+
+
+---
+
+# 図だけ
+
+\`\`\`diagram
+type: flowchart
+direction: LR
+nodes:
+  - id: a
+    label: 受付
+  - id: b
+    label: 審査
+edges:
+  - from: a
+    to: b
+\`\`\`
+
+---
+
+# 表だけ
+
+| 項目 | 値 |
+| --- | --- |
+| 売上 | 100 |
+| 利益 | 20 |
+
+---
+
+# コードだけ
+
+\`\`\`ts
+const answer = 42;
+console.info(answer);
+\`\`\`
+
+---
+
+# 画像だけ
+
+![ロゴ](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)
+
+---
+
+# 画像の属性つき
+
+- 本文の箇条
+
+![配置画像](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==){x=1.5,y=2,w=4,h=3,fit=cover,ar=1.333}
+
+---
+
+# 背面画像
+
+- 前面の本文
+
+![背景](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==){behind=1}
+
+---
+
+# 本文と図
+
+<!-- col -->
+- 左の説明
+- もう一行
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: x
+    label: X
+  - id: y
+    label: Y
+edges:
+  - from: x
+    to: y
+\`\`\`
+
+
+---
+
+# 本文と表
+
+<!-- col -->
+- 表の説明
+
+<!-- col -->
+| 列A | 列B |
+| --- | --- |
+| 1 | 2 |
+
+
+---
+
+# 本文とコード
+
+- コードの説明
+
+\`\`\`py
+print("hi")
+\`\`\`
+
+---
+
+# 表と図（現状は重なる）
+
+| 指標 | 値 |
+| --- | --- |
+| A | 1 |
+
+---
+
+# col 本文｜図
+
+<!-- col -->
+- 左カラムの本文
+- 二行目
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: m
+    label: M
+  - id: n
+    label: N
+edges:
+  - from: m
+    to: n
+\`\`\`
+
+
+---
+
+# col 表｜図
+
+<!-- col -->
+| k | v |
+| --- | --- |
+| a | 1 |
+
+<!-- col -->
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: s
+    label: S
+\`\`\`
+
+
+---
+
+# col 本文｜画像
+
+- 画像の説明
+
+![右の画像](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)
+
+---
+
+# 図が 2 つ（現状は先の図が落ちる）
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: two
+    label: 二つ目
+\`\`\`
+
+---
+
+# Mermaid
+
+\`\`\`mermaid
+stateDiagram-v2
+  [*] --> 待機
+  待機 --> 実行
+\`\`\`
+"
+`;
