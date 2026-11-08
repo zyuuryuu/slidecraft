@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } fro
 import { useTranslation } from "react-i18next";
 import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration } from "./useAiGeneration";
+import { toneClass } from "./ai-generation-types";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
 import { slideEditUserPrompt } from "../engine/deck-plan-prompts";
@@ -261,11 +262,6 @@ export default function AiPanel({
     }
   };
 
-  const toneColor =
-    ai.connection.tone === "ok" ? "text-green-400"
-    : ai.connection.tone === "err" ? "text-red-400"
-    : ai.connection.tone === "checking" ? "text-muted"
-    : "text-amber-400";
 
   return (
     <div className="relative border-t border-accent/40 bg-void flex flex-col shrink-0" style={{ height: panelH }}>
@@ -304,7 +300,7 @@ export default function AiPanel({
             })}
             className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
           >
-            <span className={`${toneColor} leading-none`}>●</span>
+            <span className={`${toneClass(ai.connection.tone)} leading-none`}>●</span>
             <span className="truncate">{ai.connection.label}</span>
             <span className="text-muted leading-none">⚙</span>
           </button>

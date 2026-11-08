@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { PROVIDERS } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
 import type { AiGeneration } from "./useAiGeneration";
-import { MAX_BEST_OF_N } from "./ai-generation-types";
+import { MAX_BEST_OF_N, toneClass } from "./ai-generation-types";
 import LocalOnlyToggle from "./LocalOnlyToggle";
 
 const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
@@ -19,17 +19,12 @@ const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
 export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
   const { t } = useTranslation();
   const [showKey, setShowKey] = useState(false);
-  const toneColor =
-    ai.connection.tone === "ok" ? "text-green-400"
-    : ai.connection.tone === "err" ? "text-red-400"
-    : ai.connection.tone === "checking" ? "text-muted"
-    : "text-amber-400";
   return (
     <div className="flex flex-col gap-2.5 p-3">
       <div className="text-[11px] font-medium text-fg2">{t("aiSettings.title")}</div>
 
       <div className="flex items-center gap-2 text-[11px] flex-wrap">
-        <span className={toneColor}>●</span>
+        <span className={toneClass(ai.connection.tone)}>●</span>
         <span className="text-fg2">{ai.connection.label}</span>
         {ai.connection.hint && <span className="text-faint">— {ai.connection.hint}</span>}
       </div>

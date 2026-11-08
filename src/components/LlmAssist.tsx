@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { generateCombinedPrompt, DIAGRAM_TYPES } from "../engine/llm-prompts";
 import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration, DiagramTypeChoice } from "./useAiGeneration";
+import { toneClass } from "./ai-generation-types";
 import type { LayoutCatalog } from "../engine/template-catalog";
 
 interface LlmAssistProps {
@@ -78,11 +79,6 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
 
   const fieldClass =
     "w-full px-3 py-2 bg-field border border-edge rounded text-sm text-fg";
-  const toneColor =
-    ai.connection.tone === "ok" ? "text-green-400"
-    : ai.connection.tone === "err" ? "text-red-400"
-    : ai.connection.tone === "checking" ? "text-muted"
-    : "text-amber-400";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/60">
@@ -157,7 +153,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               title={t("llmAssist.connectionSettingsTitle")}
               className="flex items-center gap-2 text-[11px] px-2 py-1.5 rounded border border-edge bg-field hover:bg-edge text-left"
             >
-              <span className={toneColor}>●</span>
+              <span className={toneClass(ai.connection.tone)}>●</span>
               <span className="text-fg2">{ai.connection.label}</span>
               {ai.connection.hint && <span className="text-faint truncate">— {ai.connection.hint}</span>}
               <span className="ml-auto shrink-0 text-muted">⚙ {t("llmAssist.connectionSettings")} {showSettings ? "▾" : "▸"}</span>
