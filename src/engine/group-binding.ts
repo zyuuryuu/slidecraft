@@ -133,12 +133,16 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
       if (colorPh) overlay.frames.push(frameAround(unions, i, colorPh.style.fontColor));
     }
 
+    // #645: a KPI tile's description lines (ValueDesc / KPI補足 / 補足 — the kpi group's body slots) are a
+    // caption, not a list — unbulleted like the value (#638) so they don't inherit the master's lvl1 glyph.
+    // Judged only by the group's kind + slot role (group-layout, R8); card / step / compare keep their bullets.
+    const slotParas = shape.kind === "kpi" ? bodyParas.map(unbullet) : bodyParas;
     if (bodySlots.length === 1) {
-      if (bodyParas.length) out.set(bodySlots[0].phIdx, { idx: bodySlots[0].phIdx, paragraphs: bodyParas });
+      if (slotParas.length) out.set(bodySlots[0].phIdx, { idx: bodySlots[0].phIdx, paragraphs: slotParas });
     } else if (bodySlots.length >= 2) {
       // KPI: para0 → 数値枠, para1.. → 補足枠 (fill each slot, spilling extras into the last).
       const buckets: Paragraph[][] = bodySlots.map(() => []);
-      bodyParas.forEach((p, j) => buckets[Math.min(j, buckets.length - 1)].push(p));
+      slotParas.forEach((p, j) => buckets[Math.min(j, buckets.length - 1)].push(p));
       bodySlots.forEach((s, j) => { if (buckets[j].length) out.set(s.phIdx, { idx: s.phIdx, paragraphs: buckets[j] }); });
     }
     // #638: the KPI value box shows a number, not a list item — its `- **4.2 億円**` line arrives as a bullet,
