@@ -1,18 +1,18 @@
 /**
  * toolbar-settings-614.test.tsx — #614: 上部バーを文書の操作だけにする＋アイコンの役割を決める。
  *
- *  1. 上部バーに常に見えるボタンは 7 個以下（↶ ↷ ｜ ファイル 📝原稿 🎨マスター ｜ ✨AI ⚙）。
+ *  1. 上部バーのボタンは ↶ ↷ ｜ ファイル 📝原稿 🎨マスター ｜ ✨AI ⚙ の順。
  *     言語（JA/EN）・テーマ（🌙☀◐）・ヘルプ（?）はバーに直接並べず、⚙ のメニューに入れる。
  *  2. ⚙ のメニューから、言語・テーマ・ヘルプ・AI の接続設定に届く。
- *  3. ✨ は AI の機能だけに使う（目次の生成・更新通知には使わない）。使用箇所は許可リストで固定し、
- *     AI でない機能に ✨ が戻ってきたら落ちる。
+ *  3. ✨ は AI の機能だけに使う（目次の生成・更新通知には使わない）。
  *  4. ＋ は「追加」だけ：マスターの取り込みは 📥、Re-make は 🔁（取り込み結果の帯と同じアイコン）。
  *     📝 は原稿だけ：ファイル → Markdown の書き出しは 📄。
+ * 数の上限（ボタン ≤ 7）と記号の許可リスト（✨・＋）は tests/ux-budget.test.tsx に集約（#648・R8）。
  * DOM 環境は無いので、react-dom/server で描画して確かめる（先例 tests/master-menu.test.tsx）。
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { readFileSync, readdirSync, statSync } from "fs";
-import { join, resolve, relative } from "path";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { renderToStaticMarkup } from "react-dom/server";
 import i18n from "../src/i18n"; // init side-effect → useTranslation interpolates (ja default)
 import Toolbar from "../src/components/Toolbar";
@@ -60,9 +60,8 @@ const topBar = () =>
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
 
 describe("#614 上部バー: 文書の操作だけ", () => {
-  it("常に見えるボタンは 7 個以下（↶ ↷ ファイル 📝原稿 🎨マスター ✨AI ⚙）", () => {
+  it("ボタンは ↶ ↷ ファイル 📝原稿 🎨マスター ✨AI ⚙ の順（数の上限は ux-budget）", () => {
     const b = buttons(topBar());
-    expect(b.length).toBeLessThanOrEqual(7);
     expect(b).toEqual(["↶", "↷", "ファイル▾", "📝 原稿", "🎨技術報告 スタンダード水色▾", "✨ AI", "⚙"]);
   });
 
@@ -126,54 +125,6 @@ describe("#614 ✨ は AI の機能だけ", () => {
     expect(html).not.toContain("✨");
     expect(html).toContain("🔔");
   });
-
-  // 使用箇所の許可リスト。AI の機能（AI ドック・✨直す・AI で生成・テンプレ作成の AI 欄）だけ。
-  // ここに足す変更は「その機能は AI か」をレビューで問う（AI でない機能に ✨ を戻さない）。
-  const SRC = resolve(__dirname, "../src");
-  const ALLOWED_SRC = new Set(["components/AiPanel.tsx", "components/SettingsMenu.tsx"]);
-  const ALLOWED_KEYS = new Set([
-    "initModal.generateAi",
-    "llmAssist.title",
-    "reviewBar.aiFix",
-    "templateCreator.aiIntro",
-    "templateCreator.aiProposeTitleNotReady",
-    "toolbar.aiCollabLabel",
-    "toolbar.aiLabel",
-  ]);
-  const walk = (dir: string, out: string[] = []): string[] => {
-    for (const n of readdirSync(dir)) {
-      const p = join(dir, n);
-      if (statSync(p).isDirectory()) walk(p, out);
-      else if (/\.(ts|tsx)$/.test(n)) out.push(p);
-    }
-    return out;
-  };
-  // A comment line (// …, * …, /* …, {/* …) documents ✨, it does not render it.
-  const isComment = (line: string) => /^\s*(\/\/|\*|\/\*|\{\/\*)/.test(line) || /^\s*[^"'`]*\/\/.*✨/.test(line);
-
-  it("src の画面コードで ✨ を描くのは許可リストのファイルだけ", () => {
-    const hits: string[] = [];
-    for (const f of walk(SRC)) {
-      const rel = relative(SRC, f).replace(/\\/g, "/");
-      readFileSync(f, "utf8").split("\n").forEach((line, i) => {
-        if (line.includes("✨") && !isComment(line) && !ALLOWED_SRC.has(rel)) hits.push(`${rel}:${i + 1}`);
-      });
-    }
-    expect(hits).toEqual([]);
-  });
-
-  it("辞書（ja / en）で ✨ を含むのは AI の機能のキーだけ", () => {
-    for (const lang of ["ja", "en"]) {
-      const dict = JSON.parse(readFileSync(join(SRC, `i18n/locales/${lang}.json`), "utf8"));
-      const found: string[] = [];
-      const visit = (o: unknown, path: string[]) => {
-        if (typeof o === "string") { if (o.includes("✨")) found.push(path.join(".")); return; }
-        if (o && typeof o === "object") for (const [k, v] of Object.entries(o)) visit(v, [...path, k]);
-      };
-      visit(dict, []);
-      expect(found.filter((k) => !ALLOWED_KEYS.has(k))).toEqual([]);
-    }
-  });
 });
 
 describe("#614 ＋ は追加だけ・📝 は原稿だけ", () => {
@@ -182,10 +133,9 @@ describe("#614 ＋ は追加だけ・📝 は原稿だけ", () => {
   );
   const b = buttons(html);
 
-  it("マスターの取り込みは 📥・Re-make は 🔁（＋ は新規作成だけ）", () => {
+  it("マスターの取り込みは 📥・Re-make は 🔁（＋ が新規作成だけなのは ux-budget）", () => {
     expect(b.find((x) => x.includes("マスターを取り込む"))?.startsWith("📥")).toBe(true);
     expect(b.find((x) => x.includes("Re-make"))?.startsWith("🔁")).toBe(true);
-    expect(b.filter((x) => x.startsWith("＋")).map((x) => x.includes("テンプレを作成"))).toEqual([true]);
   });
 
   it("ファイル → Markdown の書き出しは 📄（📝 は原稿ボタンだけ）", () => {
