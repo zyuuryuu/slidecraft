@@ -5,12 +5,12 @@
  *      密度（本文 18pt・左右 0.8in）・レイアウトの部分集合。生成テンプレは health ok・picture 枠あり・
  *      編集フィールドの写像は全レイアウトで全単射。
  *  (b) 出荷物とプリセット表の一致（R8）: public/templates/slide の TemplateOnly は writePresetTemplate(PITCH_PRESET)
- *      と part 単位で byte-identical。BUILTIN_MASTERS の末尾に登録され、既定（先頭）は技術報告のまま。
+ *      と part 単位で byte-identical。BUILTIN_MASTERS に登録され、既定（先頭）は技術報告のまま。
  *  (c) 受け入れ: samples/manuscript-05-sales-pitch.md（#580 目標デッキ A・14 枚）を Pitch で取り込むと
  *      14 枚のまま（自動分割 0）・get_deck_issues の消失系 0・ステートメント／引用／KPI.1／CTA が意図の
  *      レイアウトに入る。
  *  (d) golden: 全レイアウト見本 fixture は生成スクリプトの出力と part 単位で byte-identical。
- *  (e) 既存の不変: スタイル専用 LayoutDef（Media.1Body+1Image・Summary.3Block.Equal）は BUILTIN_LAYOUTS に入らない
+ *  (e) 既存の不変: スタイル専用 LayoutDef（Media.1Body+1Image・Summary.3Block.Equal・Closing.1Ask+1Decision）は BUILTIN_LAYOUTS に入らない
  *      （既存 TemplateSpec の出力＝template-presets.test.ts の LEGACY_DIGEST が変わらない）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -140,9 +140,9 @@ describe("(b) 出荷物とプリセット表の一致（R8）", () => {
     expect(Buffer.from(await buildTemplateOnly(a)).equals(Buffer.from(once))).toBe(true);
   });
 
-  it("BUILTIN_MASTERS の末尾に登録・既定（先頭）は技術報告のまま・CREDITS に記載", () => {
-    const last = BUILTIN_MASTERS[BUILTIN_MASTERS.length - 1];
-    expect(last).toEqual({ id: "builtin-pitch", name: "セールスピッチ Pitch", url: "/templates/slide/セールスピッチ_Pitch_TemplateOnly.pptx" });
+  it("BUILTIN_MASTERS に登録・既定（先頭）は技術報告のまま・CREDITS に記載", () => {
+    expect(BUILTIN_MASTERS[0].id).toBe("builtin-gijutsu");
+    expect(BUILTIN_MASTERS).toContainEqual({ id: "builtin-pitch", name: "セールスピッチ Pitch", url: "/templates/slide/セールスピッチ_Pitch_TemplateOnly.pptx" });
     expect(BUILTIN_MASTER.id).toBe("builtin-gijutsu");
     expect(readFileSync(resolve(ROOT, "public/templates/slide/CREDITS.md"), "utf8")).toContain("セールスピッチ_Pitch_TemplateOnly.pptx");
   });
@@ -246,7 +246,7 @@ describe("(d) golden: 全レイアウト見本 fixture", () => {
 describe("(e) 既存出力の不変", () => {
   it("スタイル専用 LayoutDef は BUILTIN_LAYOUTS に入らない（既存 TemplateSpec の出力は変わらない）", () => {
     const builtin = new Set(BUILTIN_LAYOUTS.map((d) => d.name));
-    expect(PRESET_LAYOUTS.map((d) => d.name)).toEqual(["Media.1Body+1Image", "Summary.3Block.Equal"]);
+    expect(PRESET_LAYOUTS.map((d) => d.name)).toEqual(["Media.1Body+1Image", "Summary.3Block.Equal", "Closing.1Ask+1Decision"]);
     for (const d of PRESET_LAYOUTS) expect(builtin.has(d.name)).toBe(false);
   });
 });

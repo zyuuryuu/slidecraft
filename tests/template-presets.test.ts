@@ -201,12 +201,13 @@ describe("(d) #570 adjustTemplate とプリセットの一致", () => {
     expect(master).toMatch(/<p:bodyStyle><a:lvl1pPr[^>]*>(?:(?!<\/a:lvl1pPr>).)*<a:defRPr sz="1550"/); // 14pt × 1.1 = 15.4 → 15.5
   });
 
-  it("density.bodyPt は adjustTemplate の本文倍率（bodyPt ÷ 14）と同じ経路・同じ結果", async () => {
+  // PR #635 裁定 B: 倍率の対象は本文の大きさの帯（基準 14pt の 1.5 倍＝21pt 以下）の枠に限る（bodyMaxPt）。
+  it("density.bodyPt は adjustTemplate の本文倍率（bodyPt ÷ 14・上限 21pt の枠まで）と同じ経路・同じ結果", async () => {
     expect(presetRecipe(REPORT_PRESET)).toEqual({});
     const pitchLike: StylePreset = { ...REPORT_PRESET, name: "Big Body", density: { ...BASE_DENSITY, bodyPt: 18 } };
-    expect(presetRecipe(pitchLike)).toEqual({ scale: { body: 18 / BASE_DENSITY.bodyPt } });
+    expect(presetRecipe(pitchLike)).toEqual({ scale: { body: 18 / BASE_DENSITY.bodyPt, bodyMaxPt: 21 } });
     const viaPreset = await writePresetTemplate(pitchLike);
-    const viaAdjust = await adjustTemplate(await writeTemplate(presetToSpec(pitchLike)), { scale: { body: 18 / 14 } });
+    const viaAdjust = await adjustTemplate(await writeTemplate(presetToSpec(pitchLike)), { scale: { body: 18 / 14, bodyMaxPt: 21 } });
     expect(await contentDigest(viaPreset)).toBe(await contentDigest(viaAdjust));
     const tpl = await loadTemplate(viaPreset);
     expect(tpl.masterBodyStyle.fontSize).toBe(18);
