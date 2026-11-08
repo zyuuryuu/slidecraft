@@ -1,7 +1,8 @@
 /**
- * template-augment.spec.ts — #568 段 2「テンプレを強化」の GUI 経路。
- * マスターを取り込む → 取り込み結果バーに「テンプレを強化（3 列を追加）」→ 確認 → 強化済みテンプレが
- * 適用され、結果バーが「強化」・レイアウト数 +1・追加レイアウト名を示す。3 列を持つテンプレでは出ない。
+ * template-augment.spec.ts — #568 段 2/3「テンプレを強化」の GUI 経路。
+ * マスターを取り込む → 取り込み結果バーに「テンプレを強化（3 列・KPI 4 個を追加）」→ 確認 → 強化済みテンプレが
+ * 適用され、結果バーが「強化」・レイアウト数 +2・追加レイアウト名を示す。段 3 からは無い構造（N 列・比較・
+ * カード 3・KPI 3/4）を全部足すので、2/3 列・比較・KPI を持つ Midnight にはカード 3 枚だけが提案される。
  */
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "fs";
@@ -27,24 +28,26 @@ test.describe("テンプレを強化 (#568)", () => {
     await seedDeck(page);
   });
 
-  test("技術報告: the button adds a 3-column layout after confirmation", async ({ page }) => {
+  test("技術報告: the button adds the missing 3-column and 4-KPI layouts after confirmation", async ({ page }) => {
     await importMaster(page, "技術報告_スタンダード水色_全レイアウト見本.pptx", "tech-report.pptx");
     await expect(page.getByText("13 レイアウト")).toBeVisible();
     const btn = page.getByTestId("intake-augment");
-    await expect(btn).toHaveText("テンプレを強化（3 列を追加）");
+    await expect(btn).toHaveText("テンプレを強化（3 列・KPI 4 個を追加）");
 
     let confirmText = "";
     page.once("dialog", (d) => { confirmText = d.message(); void d.accept(); });
     await btn.click();
 
     await expect(page.getByText("強化（レイアウト追加）")).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText("14 レイアウト")).toBeVisible();
+    await expect(page.getByText("15 レイアウト")).toBeVisible();
     expect(confirmText).toContain("02_本文（1カラム）");
-    expect(confirmText).toContain("16→12pt");
+    expect(confirmText).toContain("3 列 16→12pt");
+    expect(confirmText).toContain("KPI 4 個 本文 16→12pt");
+    expect(confirmText).toContain("既にあるため追加しないもの: 2 列・比較（左右 2 案）・カード 3 枚・KPI 3 個");
     // nothing left to add → the button is gone; the detail lists the added layout
     await expect(page.getByTestId("intake-augment")).toHaveCount(0);
     await page.getByRole("button", { name: "詳細 ▾" }).click();
-    await expect(page.getByText(/追加したレイアウト: 02_本文（1カラム） \+3Body/)).toBeVisible();
+    await expect(page.getByText(/追加したレイアウト: 02_本文（1カラム） \+3Body \/ 02_本文（1カラム） \+4KPI/)).toBeVisible();
   });
 
   test("cancelling the confirmation changes nothing", async ({ page }) => {
@@ -55,8 +58,8 @@ test.describe("テンプレを強化 (#568)", () => {
     await expect(page.getByTestId("intake-augment")).toBeVisible();
   });
 
-  test("Midnight (already has 2/3 columns): no button", async ({ page }) => {
+  test("Midnight (already has 2/3 columns, compare, KPI 3/4): only the 3-card layout is offered", async ({ page }) => {
     await importMaster(page, "Midnight_Executive_30_TemplateOnly.pptx", "midnight.pptx");
-    await expect(page.getByTestId("intake-augment")).toHaveCount(0);
+    await expect(page.getByTestId("intake-augment")).toHaveText("テンプレを強化（カード 3 枚を追加）");
   });
 });

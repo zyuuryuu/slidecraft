@@ -69,11 +69,19 @@ function tagGroupSlots(cells: PlaceholderInfo[], nameChrome = true): { slots: Gr
 // master is named like this (see group-detect.test.ts's untouched corpus), so this never fires outside
 // SlideCraft's own generated templates. Overrides the geometric kind/grouping entirely when it matches
 // (rather than patching individual mis-detections) so our own canonical set stays self-consistent.
+/** #568 段 3: the name suffix layout augmentation gives a synthesized group layout — `<base> +3Card`. */
+export const AUGMENT_GROUP_SUFFIX: Readonly<Record<"card" | "kpi" | "compare", string>> = { card: "Card", kpi: "KPI", compare: "Compare" };
+
 const CANONICAL_NAME_HINTS: Array<{ re: RegExp; kind: GroupLayoutShape["kind"] }> = [
   { re: /^Process\.(\d+)Step\./, kind: "step" },
   { re: /^KPI\.(\d+)Value\./, kind: "kpi" },
   { re: /^Summary\.(\d+)Block\./, kind: "card" },
   { re: /^Compare\.(\d+)Option\./, kind: "compare" },
+  // #568 段 3: layout augmentation names a synthesized group layout `<base> +3Card` / `+3KPI` / `+2Compare`
+  // (AUGMENT_GROUP_SUFFIX below — ONE table for the name it writes and the hint read here, R8). Without it
+  // a 3-column heading+body card row reads geometrically as kpi (no chrome/picture), so `<!-- card -->`
+  // could never reach it. No third-party master ends a layout name in ` +<N>Card` (group-detect corpus).
+  ...(Object.entries(AUGMENT_GROUP_SUFFIX) as Array<[GroupLayoutShape["kind"], string]>).map(([kind, word]) => ({ re: new RegExp(` \\+(\\d+)${word}$`), kind })),
 ];
 
 /** SlideCraft's own layout names. For these the NAME decides group-ness: a non-group family (Section /

@@ -56,7 +56,10 @@ const HOT_CHAR_LIMIT = 7950;
 // #554（export_pptx の引数 `charts` 追加・意図した inputSchema の拡張）で全体 17,577 → 17,752 字。宣言して上限を更新。
 // #247（set_review_rules 追加・意図したツール面の拡張。id の enum は schema に載せずサーバ側検証＝+450 字に抑えた）で
 // 全体 17,752 → 18,202 字。宣言して上限を更新。
-const ALL_CHAR_LIMIT = 18250;
+// #568 段 3 / #570 段 3（augment_template / adjust_template 追加・意図したツール面の拡張。レシピの書式は
+// bootstrap.toolNotes.templateDerive へ置き説明文は 1 行に抑えた — 2 本で +794 字、うち約 200 字/本は SDK の固定部分）で
+// 全体 18,199 → 18,993 字。宣言して上限を更新。
+const ALL_CHAR_LIMIT = 19050;
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> };
 type CallRes = { content: Array<{ text?: string }>; isError?: boolean };
@@ -93,12 +96,16 @@ function allDescriptions(t: Tool): string {
   return [t.description ?? "", ...Object.values(props).map((p) => p.description ?? "")].join("\n");
 }
 
-let tools: Tool[] = []; // collab-gui ＝ 全ツールの上位集合（solo/collab-ai はその部分集合 — mcp-tool-profiles.test.ts）
+// 全ツール＝collab-gui ∪ solo（PR #606 D3 で solo 専用ツールができ、collab-gui は上位集合でなくなった —
+// mcp-tool-profiles.test.ts）。collab-ai はどちらかの部分集合。
+let tools: Tool[] = [];
 let bootstrapText = "";
 let flowchartGuide = "";
 
 beforeAll(async () => {
-  tools = (await (await connect(collabGuiHost())).listTools()).tools as Tool[];
+  const gui = (await (await connect(collabGuiHost())).listTools()).tools as Tool[];
+  const solo = (await (await connect()).listTools()).tools as Tool[];
+  tools = [...gui, ...solo.filter((t) => !gui.some((g) => g.name === t.name))];
   const tBytes = readFileSync(resolve(__dirname, "fixtures/templates/Midnight_Executive_30_TemplateOnly.pptx"));
   const template = await loadTemplate(tBytes);
   const bytes = await bundleProject(parseMd("# 表紙\n\n---\n\n# 中身\n\n- 速度: 0.8秒"), template, { templateName: "T", savedAt: "2026-06-28T00:00:00Z" });
@@ -125,7 +132,7 @@ describe("固定費 ratchet（#513: ホット説明文の圧縮）", () => {
   it(`ホット 16 本の tools/list は ${HOT_CHAR_LIMIT} 字以下`, () => {
     expect(jsonChars(hot())).toBeLessThanOrEqual(HOT_CHAR_LIMIT);
   });
-  it(`全ツール（collab-gui）の tools/list は ${ALL_CHAR_LIMIT} 字以下`, () => {
+  it(`全ツール（collab-gui ∪ solo）の tools/list は ${ALL_CHAR_LIMIT} 字以下`, () => {
     expect(jsonChars(tools)).toBeLessThanOrEqual(ALL_CHAR_LIMIT);
   });
 });
