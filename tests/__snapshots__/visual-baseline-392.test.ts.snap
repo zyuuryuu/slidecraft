@@ -14,7 +14,7 @@ exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templat
   "slide13.xml.rels col 表｜図": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
   "slide14.xml col 本文｜画像": "9578c055195de6d9d57f5669ca82dc06609e92cddf1bc818a84f885c3f522cdd",
   "slide14.xml.rels col 本文｜画像": "d347b968a8a2ed3926cdfcb666164d4e490578b054f2ea02129b2e9d44dd3af4",
-  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "e84c8d793b5582e341e292ab38a67911e68c4db24cbfd75267fca26a6848d3c2",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "b1cd09fd570cee52bb5dbe8f25c4274f618c33a0e4745dfa570968dd7dcade06",
   "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
   "slide16.xml Mermaid": "3029fb511424d5e16b9d8dd30bcac0ee009c43c675e837200725335c11c6e7bb",
   "slide16.xml.rels Mermaid": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
