@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { SlideIR } from "./slide-schema";
 import { bareArray } from "./field-edit-ops";
 import { applyToFigure, readFigureRaw, type RawDiagram } from "./design-intent";
+import { isSeparatorCells } from "./md-table";
 
 const Index = z.number().int().nonnegative();
 
@@ -45,7 +46,9 @@ const DATA_OPS = new Set(["setCell", "setSeriesValue", "setTask", "setCard"]);
 /** A DATA op that didn't take effect — surfaced never-silently (mirrors SkippedFieldOp). */
 export interface SkippedDataOp {
   op: DataEditOp["op"];
-  reason: "no-table" | "out-of-range" | "multiline-cell" | "no-chart" | "unparseable-figure" | "unknown-series" | "unknown-task" | "ambiguous-task" | "invalid-range";
+  reason:
+    | "no-table" | "out-of-range" | "multiline-cell" | "unrepresentable-cell" | "no-chart" | "unparseable-figure"
+    | "unknown-series" | "ambiguous-series" | "unknown-task" | "ambiguous-task" | "duplicate-task-name" | "invalid-range";
   message: string; // human, Japanese — ready to show as a notice
 }
 
@@ -86,9 +89,15 @@ function applyCells(slide: SlideIR, ops: CellOp[], skipped: SkippedDataOp[]): Sl
       skipped.push({ op: o.op, reason: "multiline-cell", message: `setCell: (row ${o.row}, col ${o.col}) の文面に改行があり、表のセルに入れられないため適用しませんでした。` });
       continue;
     }
-    if (rows[o.row][o.col] === o.text) continue;
-    rows[o.row] = rows[o.row].slice();
-    rows[o.row][o.col] = o.text;
+    const text = o.text.trim(); // a GFM cell is trimmed on parse (md-table splitRow) — keep ops ≡ Markdown
+    if (rows[o.row][o.col] === text) continue;
+    const row = rows[o.row].slice();
+    row[o.col] = text;
+    if (isSeparatorCells(row)) {
+      skipped.push({ op: o.op, reason: "unrepresentable-cell", message: `setCell: (row ${o.row}, col ${o.col}) を書き込むと行の全セルが「-」だけになり、Markdown の表では区切り行と区別できないため適用しませんでした。` });
+      continue;
+    }
+    rows[o.row] = row;
     dirty = true;
   }
   return dirty ? { ...slide, table: { ...t, rows } } : slide;
@@ -100,6 +109,8 @@ function applyCells(slide: SlideIR, ops: CellOp[], skipped: SkippedDataOp[]): Sl
 type Series = { name?: unknown; values?: unknown[] };
 const listOf = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const quoted = (names: string[]): string => names.map((n) => `「${n}」`).join("・") || "なし";
+/** Items whose `name` (stringified, missing → "") equals `name` — one shared rule for series and tasks. */
+const byName = <T extends { name?: unknown }>(items: T[], name: string): T[] => items.filter((x) => String(x.name ?? "") === name);
 
 /** The chart object a setSeriesValue edits: xychart or radar (by the figure's type). */
 function seriesChart(raw: RawDiagram): { series: Series[]; slots: string } | null {
@@ -138,7 +149,9 @@ function applyFigureOp(raw: RawDiagram, o: FigureOp, skip: (reason: SkippedDataO
       const chart = seriesChart(raw);
       if (!chart) { skip("no-chart", NO_CHART[o.op]); return false; }
       const names = chart.series.map((x, i) => (x.name ? String(x.name) : `#${i}`));
-      const ser = typeof o.series === "number" ? chart.series[o.series] : chart.series.find((x) => String(x.name ?? "") === o.series);
+      const hits = typeof o.series === "number" ? [chart.series[o.series]].filter(Boolean) : byName(chart.series, o.series);
+      if (hits.length > 1) { skip("ambiguous-series", `setSeriesValue: 系列名「${String(o.series)}」が ${hits.length} 件あり特定できないため適用しませんでした（系列は番号でも指定できます）。`); return false; }
+      const ser = hits[0];
       if (!ser) { skip("unknown-series", `setSeriesValue: 系列 ${JSON.stringify(o.series)} が見つからず適用しませんでした（系列: ${quoted(names)}）`); return false; }
       const values = listOf<unknown>(ser.values);
       if (o.index >= values.length) { skip("out-of-range", `setSeriesValue: index ${o.index} は範囲外のため適用しませんでした（値は ${values.length} 個・0 始まり）`); return false; }
@@ -150,10 +163,14 @@ function applyFigureOp(raw: RawDiagram, o: FigureOp, skip: (reason: SkippedDataO
     case "setTask": {
       const tasks = ganttTasks(raw);
       if (!tasks) { skip("no-chart", NO_CHART[o.op]); return false; }
-      const hits = tasks.filter((t) => String(t.name ?? "") === o.name);
+      const hits = byName(tasks, o.name);
       if (hits.length === 0) { skip("unknown-task", `setTask: タスク「${o.name}」が見つからず適用しませんでした（タスク: ${quoted(tasks.map((t) => String(t.name ?? "")))}）`); return false; }
       if (hits.length > 1) { skip("ambiguous-task", `setTask: タスク名「${o.name}」が ${hits.length} 件あり特定できないため適用しませんでした。`); return false; }
       const t = hits[0];
+      if (o.newName !== undefined && o.newName !== o.name && byName(tasks, o.newName).length > 0) {
+        skip("duplicate-task-name", `setTask: 新しい名前「${o.newName}」は既存のタスク名と重なり、以後タスクを特定できなくなるため適用しませんでした。`);
+        return false;
+      }
       const start = o.start ?? Number(t.start);
       const end = o.end ?? Number(t.end);
       if (end < start) { skip("invalid-range", `setTask: タスク「${o.name}」の終了（${end}）が開始（${start}）より前になるため適用しませんでした。`); return false; }
@@ -174,7 +191,7 @@ function applyFigureOps(slide: SlideIR, ops: FigureOp[], skipped: SkippedDataOp[
     for (const o of ops) skipped.push({ op: o.op, reason, message: message(o) });
     return slide;
   };
-  if (!slide.diagram && !slide.mermaidBlock) return all("no-chart", (o) => NO_CHART[o.op]);
+  if (!slide.diagram && !slide.mermaidBlock) return all("no-chart", (o) => `${o.op}: このスライドには図がないため適用しませんでした。`);
   if (readFigureRaw(slide) === null) return all("unparseable-figure", (o) => `${o.op}: 図の定義を解析できないため適用しませんでした（図の記述に不正がある可能性）。`);
   let dirty = false;
   const out = applyToFigure(slide, (_spec, raw) => {

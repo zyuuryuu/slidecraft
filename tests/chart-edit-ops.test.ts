@@ -85,6 +85,7 @@ describe("applyDataEditOps — setCell", () => {
     ["a body value", { row: 1, col: 2, text: "130" }, "| 売上 | 100 | 130 |"],
     ["the header cell", { row: 0, col: 1, text: "前年" }, "| 項目 | 前年 | 2026 |"],
     ["a cell containing a pipe", { row: 2, col: 0, text: "利益|率" }, "| 利益\\|率 | 10 | 15 |"],
+    ["surrounding whitespace (trimmed, as splitRow trims)", { row: 1, col: 2, text: " 130 " }, "| 売上 | 100 |  130  |"],
   ];
   for (const [name, op, editedLine] of cases) {
     it(`(b) R8: setCell ≡ editing the GFM table in the slide Markdown — ${name}`, () => {
@@ -120,6 +121,23 @@ describe("applyDataEditOps — setCell", () => {
     const out = applyDataEditOps(slide, [{ op: "setCell", row: 1, col: 0, text: "売\n上" }]);
     expect(out.slide).toBe(slide);
     expect(out.skipped[0].reason).toBe("multiline-cell");
+  });
+  it("(b)(c) R8: a row made entirely of `-` cells re-parses as a separator in Markdown → skipped as unrepresentable", () => {
+    // The Markdown path: the edited row is read as a separator, so the table ends at the header.
+    const lines = TABLE_MD.split("\n");
+    lines[4] = "| - | - | - |";
+    expect(md1(lines.join("\n")).table?.rows ?? []).not.toEqual([["項目", "2025", "2026"], ["-", "-", "-"], ["利益", "10", "15"]]);
+    // The ops path refuses the write that would turn the row into a separator (never silently).
+    const { slide: out, skipped } = applyDataEditOps(slide, [
+      { op: "setCell", row: 1, col: 0, text: "-" },
+      { op: "setCell", row: 1, col: 1, text: ":---:" },
+      { op: "setCell", row: 1, col: 2, text: " -- " },
+    ]);
+    expect(skipped.map((s) => s.reason)).toEqual(["unrepresentable-cell"]);
+    expect(skipped[0].message).toMatch(/row 1, col 2/);
+    expect(out.table!.rows[1]).toEqual(["-", ":---:", "120"]);
+    const head = applyDataEditOps(md1("# t\n\n| a |\n| --- |\n| b |"), [{ op: "setCell", row: 0, col: 0, text: "---" }]);
+    expect(head.skipped.map((s) => s.reason)).toEqual(["unrepresentable-cell"]);
   });
   it("a setCell that writes the same text is not a change (original slide returned)", () => {
     expect(applyDataEditOps(slide, [{ op: "setCell", row: 1, col: 1, text: "100" }]).slide).toBe(slide);
@@ -216,6 +234,19 @@ describe("applyDataEditOps — setSeriesValue", () => {
     expect(skipped[0].message).toContain("利益");
     expect(skipped[2].message).toMatch(/3 個/);
   });
+  it("(c) a series name shared by several series (incl. two unnamed xychart series) is ambiguous → skipped", () => {
+    const dup = md1(figMd(XY.replace("name: 利益", "name: 売上")));
+    const r = applyDataEditOps(dup, [{ op: "setSeriesValue", series: "売上", index: 0, value: 9 }]);
+    expect(r.slide).toBe(dup);
+    expect(r.skipped.map((s) => s.reason)).toEqual(["ambiguous-series"]);
+    expect(r.skipped[0].message).toMatch(/2 件/);
+    const unnamed = md1(figMd(XY.replace("      name: 売上\n", "").replace("      name: 利益\n", "")));
+    const u = applyDataEditOps(unnamed, [{ op: "setSeriesValue", series: "", index: 0, value: 9 }]);
+    expect(u.slide).toBe(unnamed);
+    expect(u.skipped.map((s) => s.reason)).toEqual(["ambiguous-series"]);
+    // addressing by index still works for unnamed series
+    expect(specOf(applyDataEditOps(unnamed, [{ op: "setSeriesValue", series: 1, index: 0, value: 9 }]).slide).xychart!.series[1].values).toEqual([9, 2, 3]);
+  });
   it("(c) a slide whose figure is not an xychart/radar (or has no figure) skips and announces", () => {
     const flow = md1(figMd("type: flowchart\nnodes:\n  - id: a\n    label: A"));
     expect(applyDataEditOps(flow, [{ op: "setSeriesValue", series: 0, index: 0, value: 1 }]).skipped[0].reason).toBe("no-chart");
@@ -223,6 +254,9 @@ describe("applyDataEditOps — setSeriesValue", () => {
     const r = applyDataEditOps(plain, [{ op: "setSeriesValue", series: 0, index: 0, value: 1 }]);
     expect(r.slide).toBe(plain);
     expect(r.skipped[0].reason).toBe("no-chart");
+    // the notice tells "no figure at all" apart from "a figure of another type"
+    expect(r.skipped[0].message).toMatch(/図がない/);
+    expect(applyDataEditOps(flow, [{ op: "setSeriesValue", series: 0, index: 0, value: 1 }]).skipped[0].message).toMatch(/xychart/);
   });
   it("(c) a figure that fails the schema is skipped as unparseable (never silently dropped)", () => {
     const bad = md1(figMd(XY.replace("nodes: []\n", "")));
@@ -290,6 +324,15 @@ describe("applyDataEditOps — setTask", () => {
     expect(skipped.map((s) => s.reason)).toEqual(["unknown-task", "invalid-range"]);
     expect(skipped[0].message).toContain("「設計」・「実装」");
     expect(applyDataEditOps(md1(figMd(XY)), [{ op: "setTask", name: "設計", end: 1 }]).skipped[0].reason).toBe("no-chart");
+  });
+  it("(c) newName colliding with another task's name is skipped and announced (would make the name ambiguous)", () => {
+    const slide = md1(figMd(GANTT));
+    const r = applyDataEditOps(slide, [{ op: "setTask", name: "実装", newName: "設計", end: 35 }]);
+    expect(r.slide).toBe(slide);
+    expect(r.skipped.map((s) => s.reason)).toEqual(["duplicate-task-name"]);
+    expect(r.skipped[0].message).toContain("設計");
+    // renaming a task to its own name is not a collision
+    expect(applyDataEditOps(slide, [{ op: "setTask", name: "実装", newName: "実装", end: 35 }]).skipped).toEqual([]);
   });
   it("describeEditableData lists each task with its schedule (day offsets from startDate)", () => {
     const d = describeEditableData(md1(figMd(GANTT)));
