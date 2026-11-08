@@ -252,7 +252,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     (a, extra) =>
       run(async () => {
         const s = sessionOf(extra, a.docId);
-        return persistScopedOrBase64(s, await S.saveProjectBytes(s), "scft", a.filename);
+        return persistScopedOrBase64(s, await S.saveProjectBytes(s, !host.guiClient), "scft", a.filename) // #633: GUI = read;
       }),
   );
   tool(
