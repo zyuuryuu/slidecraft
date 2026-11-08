@@ -9,6 +9,7 @@
  * they render still falls back to the font-stack.ts (#192) chain when it isn't in a subset.
  */
 import type { DeckIR, Paragraph } from "./slide-schema";
+import { slideFigures } from "./slide-figures";
 
 function paragraphText(p: Paragraph): string {
   return p.segments.map((s) => s.text).join("");
@@ -22,11 +23,13 @@ export function collectDeckText(deck: DeckIR): string {
     for (const ph of slide.placeholders) {
       for (const p of ph.paragraphs) parts.push(paragraphText(p));
     }
-    if (slide.table) {
-      for (const row of slide.table.rows) parts.push(row.join(""));
+    // Every drawn table / code / image (#392 段 2: a 2nd+ one too — slideFigures, R8), then a behind image.
+    for (const f of slideFigures(slide)) {
+      if (f.kind === "table") for (const row of f.rows) parts.push(row.join(""));
+      else if (f.kind === "code") parts.push(f.content);
+      else if (f.kind === "image" && f.alt) parts.push(f.alt);
     }
-    if (slide.code) parts.push(slide.code.content);
-    if (slide.image?.alt) parts.push(slide.image.alt);
+    if (slide.image?.behind && slide.image.alt) parts.push(slide.image.alt);
     if (slide.notes) {
       for (const p of slide.notes) parts.push(paragraphText(p));
     }
@@ -43,7 +46,7 @@ export function deckUsesBold(deck: DeckIR): boolean {
   const paragraphsBold = (paragraphs: Paragraph[]) =>
     paragraphs.some((p) => p.heading || p.segments.some((s) => s.bold));
   for (const slide of deck.slides) {
-    if (slide.table?.header) return true;
+    if (slideFigures(slide).some((f) => f.kind === "table" && f.header)) return true;
     for (const ph of slide.placeholders) if (paragraphsBold(ph.paragraphs)) return true;
     if (slide.notes && paragraphsBold(slide.notes)) return true;
   }

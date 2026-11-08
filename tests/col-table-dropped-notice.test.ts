@@ -2,8 +2,9 @@
  * col-table-dropped-notice.test.ts — #412 → #392 段 1: a `<!-- col -->` slide whose columns EACH hold a GFM
  * table used to keep only the LAST column's table (SlideIR carried one `table`) with a `table-dropped`
  * ParseNotice. #392 段 1 extends the IR (`figures`): every column's table is KEPT at its column idx (the
- * singular `table` = the FIRST), so nothing is dropped at parse time. Never-silent stays: until #392 段 2
- * places a 2nd table, no renderer draws it — get_deck_issues reports that as `figure-dropped`.
+ * singular `table` = the FIRST), so nothing is dropped at parse time. Since #392 段 2 the 2nd table is drawn
+ * in its own column region, so get_deck_issues reports nothing; never-silent stays for a layout without a
+ * region for it (`figure-dropped`, figure-dropped-notice.test.ts).
  */
 import { describe, it, expect } from "vitest";
 import { parseMd, parseMdReport } from "../src/engine/md-parser";
@@ -11,6 +12,9 @@ import { diagnoseDeck } from "../src/engine/deck-diagnostics";
 import { parseTemplateSpecResponse } from "../src/engine/template-spec-prompts";
 import { writeTemplate } from "../src/engine/template-writer";
 import * as S from "../src/mcp/session";
+import JSZip from "jszip";
+import { loadTemplate } from "../src/engine/template-loader";
+import { generatePptx } from "../src/engine/placeholder-filler";
 
 // The issue's repro, verbatim.
 const REPRO = "# T\n\n<!-- col -->\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<!-- col -->\n| c | d |\n|---|---|\n| 3 | 4 |";
@@ -53,19 +57,20 @@ describe("parseMdReport — every column's table is kept on the <!-- col --> pat
   });
 });
 
-describe("the not-yet-drawn 2nd table → DeckIssue (#392 段 1)", () => {
-  it("diagnoseDeck reports it as figure-dropped on that slide (and no table-dropped)", () => {
-    const issues = diagnoseDeck(parseMd(`# 一\n\n- a\n\n---\n\n${REPRO}`));
-    expect(issues.filter((x) => x.id === "figure-dropped").map((x) => x.slideIndex)).toEqual([1]);
-    expect(issues.filter((x) => x.id === "table-dropped")).toEqual([]);
+describe("the 2nd table is drawn (#392 段 2) → no DeckIssue", () => {
+  it("diagnoseDeck (with the template) reports neither figure-dropped nor table-dropped", async () => {
+    const s = S.createSession(null);
+    const r = await S.newProject(s, await defaultTemplateBytes(), `# 一\n\n- a\n\n---\n\n${REPRO}`);
+    expect(r.diagnostics.filter((x) => x.id === "figure-dropped" || x.id === "table-dropped")).toEqual([]);
+    expect(S.getDiagnostics(s).issues.filter((x) => x.id === "figure-dropped")).toEqual([]);
+    expect(diagnoseDeck(parseMd(`# 一\n\n- a\n\n---\n\n${REPRO}`)).filter((x) => x.id === "table-dropped")).toEqual([]);
   });
 
-  it("new_project → get_deck_issues surfaces it (and persists across reads)", async () => {
-    const s = S.createSession(null);
-    const r = await S.newProject(s, await defaultTemplateBytes(), REPRO);
-    expect(r.diagnostics.filter((x) => x.id === "figure-dropped")).toHaveLength(1);
-    const issues = S.getDiagnostics(s).issues.filter((x) => x.id === "figure-dropped");
-    expect(issues).toHaveLength(1);
-    expect(issues[0].slideIndex).toBe(0);
+  it("the exported PPTX carries both tables", async () => {
+    const tpl = await loadTemplate(await defaultTemplateBytes());
+    const zip = await JSZip.loadAsync(await generatePptx(parseMd(REPRO), tpl));
+    const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+    expect(xml.match(/<a:tbl>/g)).toHaveLength(2);
+    expect(xml).toContain(">c<");
   });
 });
