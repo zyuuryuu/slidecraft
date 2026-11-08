@@ -204,19 +204,44 @@ pub async fn register_claude_code(app: tauri::AppHandle) -> Result<RegisterOutco
 
 fn run(exe: &Path, program: String, args: Vec<String>, path: Option<OsString>) -> RegisterOutcome {
     let mut cmd = Command::new(exe);
-    cmd.args(&args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(&args);
     if let Some(p) = path {
         cmd.env("PATH", p);
     }
+    match run_captured(cmd, RUN_TIMEOUT) {
+        Ok(c) => RegisterOutcome::Ran {
+            program,
+            args,
+            exit_code: c.exit_code,
+            stdout: c.stdout,
+            stderr: c.stderr,
+            timed_out: c.timed_out,
+        },
+        Err(error) => RegisterOutcome::SpawnFailed { program, args, error },
+    }
+}
+
+/// A finished (or timed-out) child: exit code + both streams, each capped by `cap_output`.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Captured {
+    /// `None` = killed by a signal or by the timeout.
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub timed_out: bool,
+}
+
+/// Run `cmd` with no stdin and both streams captured, killing it after `timeout`. No console window on
+/// Windows. `Err` = it could not be spawned or waited on (the OS error text). Shared by the one-click register
+/// and the 接続テスト (mcp_doctor.rs, #517) so both report a child the same way.
+pub(crate) fn run_captured(mut cmd: Command, timeout: Duration) -> Result<Captured, String> {
+    cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => return RegisterOutcome::SpawnFailed { program, args, error: e.to_string() },
-    };
+    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
     let out = child.stdout.take().map(drain);
     let err = child.stderr.take().map(drain);
-    let deadline = Instant::now() + RUN_TIMEOUT;
+    let deadline = Instant::now() + timeout;
     let (status, timed_out) = loop {
         match child.try_wait() {
             Ok(Some(s)) => break (Some(s), false),
@@ -228,19 +253,17 @@ fn run(exe: &Path, program: String, args: Vec<String>, path: Option<OsString>) -
             Err(e) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return RegisterOutcome::SpawnFailed { program, args, error: e.to_string() };
+                return Err(e.to_string());
             }
         }
     };
     let collect = |h: Option<std::thread::JoinHandle<String>>| h.and_then(|h| h.join().ok()).unwrap_or_default();
-    RegisterOutcome::Ran {
-        program,
-        args,
+    Ok(Captured {
         exit_code: if timed_out { None } else { status.and_then(|s| s.code()) },
         stdout: collect(out),
         stderr: collect(err),
         timed_out,
-    }
+    })
 }
 
 /// Read a child pipe to the end on its own thread (a full pipe must never block the child).

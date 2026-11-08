@@ -31,7 +31,10 @@
     },
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://zyuuryuu.github.io/**" }]
+      "allow": [
+        { "url": "https://zyuuryuu.github.io/**" },
+        { "url": "https://github.com/zyuuryuu/slidecraft/releases/download/**" }
+      ]
     }
   ]
 }
