@@ -78,6 +78,7 @@ export function slideMarkdownEditPrompt(): string {
 
 Choose the format:
 - Only rewording text that is ALREADY in a field (title / subtitle / bullets / meta — the ones listed under "Fields")? → (B) TEXT ops (setField), one op per changed field. If the request has no "Fields" list, never use setField — use (A).
+- Only changing a table cell, a chart value, a gantt task or a KPI card listed under "Data"? → (B) DATA ops, one op per changed cell/value (charts, gantts and KPI cards have no nodes — use DATA ops for them, not CONTENT ops). If the request has no "Data" list, never use DATA ops — use (A).
 - Any other change to WHAT the slide says — filling a field that isn't listed, restructuring the slide — or ADD / REMOVE a whole figure (none↔one)? → (A) Markdown.
 - Change to an EXISTING figure — its CONTENT (rename/relabel a node, change a value, ADD or REMOVE a node/edge, change its direction) OR its ARRANGEMENT (move/place it, emphasize a node)? → (B) a JSON array of ops.
 - Adding or removing a NODE or EDGE inside an existing figure is (B), NOT (A). Prefer (B) for any change to an existing figure's nodes/edges/labels/direction; use (A) only when the slide's structure changes beyond rewording listed fields, or a figure is added/removed as a whole.
@@ -90,12 +91,20 @@ Choose the format:
 - Bullets are SHORT key phrases (≤ ~20 full-width chars), no trailing "。"/".".
 
 (B) OPS — return ONLY a JSON array of ops. Use ids EXACTLY as in the \`\`\`diagram block (idx EXACTLY as
-under "Fields"), and emit ONLY the ops the change needs (unchanged fields/nodes/labels/values stay — the
-engine keeps them, so never re-list them). Emit ONE kind per reply (TEXT, CONTENT or ARRANGEMENT ops), never mixed.
+under "Fields"; rows/series/tasks/cards EXACTLY as under "Data"), and emit ONLY the ops the change needs
+(unchanged fields/nodes/labels/values stay — the engine keeps them, so never re-list them). Emit ONE kind per
+reply (TEXT, DATA, CONTENT or ARRANGEMENT ops), never mixed.
 
 TEXT ops (reword an existing field's text):
 [ {"op":"setField","idx":"<idx>","text":"<the field's WHOLE new text>"} ]
 - "text" uses the field's line syntax as shown under "Fields": "- " bullet, "  - " nested bullet, "### " heading line, "\\n" between lines. "" clears the field.
+
+DATA ops (change a table cell / chart value / gantt task / KPI card — numbered as under "Data", 0-based; table row 0 = header):
+[ {"op":"setCell","row":<n>,"col":<n>,"text":"<the cell's new text, one line>"},
+  {"op":"setSeriesValue","series":<n>|"<series name>","index":<n>,"value":<number>},
+  {"op":"setTask","name":"<task name>","newName"?:"…","start"?:<day>,"end"?:<day>,"status"?:"done"|"active"|"crit"|"milestone","section"?:"…"},
+  {"op":"setCard","index":<n>,"value"?:"…","label"?:"…","delta"?:"…","trend"?:"up"|"down"} ]
+- setTask start/end are day offsets from the gantt's start date, as listed under "Data".
 
 CONTENT ops (change the figure's data — this is how you rename/relabel/add/remove/redirect):
 [ {"op":"nodeUpdate","id":"<id>","label"?:"…","sublabel"?:"…","value"?:<number>,"icon"?:"…","shape"?:"…"},
@@ -117,6 +126,8 @@ ARRANGEMENT ops (change only WHERE it sits / what's focal):
 
 Example (B) — instruction "タイトルに年度を入れて"（wording only → setField）:
 [{"op":"setField","idx":"15","text":"売上の推移（2026年度）"}]
+Example (B) — instruction "Q2 の売上を 25 に"（a chart value listed under "Data" → DATA ops）:
+[{"op":"setSeriesValue","series":"売上","index":1,"value":25}]
 Example (B) — instruction "DBノードを PostgreSQL にして、後ろにキャッシュを追加":
 [{"op":"nodeUpdate","id":"db","label":"PostgreSQL"},{"op":"addNode","id":"cache","label":"Redis"},{"op":"addEdge","from":"db","to":"cache"}]
 Example (B) — instruction "存在しない Cache ノードを削除"（emit the named id even if absent — the engine skips + reports it; do NOT delete a different node）:
@@ -144,12 +155,14 @@ Rules:
 
 /**
  * The per-slide edit request (AiPanel generate + ops auto-retry). `fields` is describeEditableFields(slide)
- * — the idx list a setField op names (#106 P2); omitted when empty so a field-less slide's request is
- * unchanged. Pure string (R2).
+ * — the idx list a setField op names (#106 P2); `data` is describeEditableData(slide) — the table rows /
+ * chart series / gantt tasks / KPI cards a DATA op names (#106 P3). Each is omitted when empty so a slide
+ * without them gets the same request as before. Pure string (R2).
  */
-export function slideEditUserPrompt(slideMd: string, fields: string, instruction: string): string {
+export function slideEditUserPrompt(slideMd: string, fields: string, instruction: string, data = ""): string {
   const f = fields ? `\n\nFields (setField idx: current text):\n${fields}` : "";
-  return `Current slide:\n${slideMd}${f}\n\nInstruction: ${instruction}`;
+  const d = data ? `\n\nData:\n${data}` : "";
+  return `Current slide:\n${slideMd}${f}${d}\n\nInstruction: ${instruction}`;
 }
 
 /**
