@@ -18,6 +18,7 @@ import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 import { slideIdxRole, placeholderRole, type PlaceholderRole } from "./template-catalog";
 import { fieldSlotOf, isFieldIdx } from "./field-rows";
+import type { FieldRescue } from "./field-rescue";
 
 /** Stable placeholder order: shorter idx first, then lexicographic (so 1 < 2 < 10 < 15). */
 export function sortByIdx<T extends { idx: string }>(a: T, b: T): number {
@@ -217,6 +218,9 @@ export interface BindingPlan {
   assignments: Array<{ content: ContentRef; placeholder: PlaceholderRef }>;
   unbound: ContentRef[];
   unfilled: PlaceholderRef[];
+  /** #597: unbound Category/Source/Takeaway rows drawn at their fixed fallback instead (field-rescue.ts).
+   *  Present only when non-empty (render-only — they stay in `unbound`, which says "no slot"). */
+  rescued?: FieldRescue[];
 }
 
 /**
