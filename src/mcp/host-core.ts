@@ -47,6 +47,9 @@ export interface HostContext {
   setActive(extra: unknown, docId: string): void;
   /** AI clients see only shared docs (private-by-default); the GUI sees all. */
   sharedOnly: boolean;
+  /** #633: this connection is the collab GUI (x-slidecraft-role: gui). Its save_project is a READ (template
+   *  pull / opening an AI doc as a tab — the human saves locally), so it never marks the host doc saved. */
+  guiClient?: boolean;
   /** Solo (stdio) adapter marker (ADR-0033 D1): exactly ONE doc is ever open. open/new_project
    *  mint a fresh doc as usual, then the caller (server.ts's openInHost) sweeps any OTHER doc out of
    *  the registry so `soleDocId()` keeps resolving and resources/undo stay pinned to one doc. Absent

@@ -81,6 +81,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
     active: (extra) => { const s = sidOf(extra); return s ? activeByConn.get(s) : undefined; },
     setActive: (extra, docId) => { const s = sidOf(extra); if (s) activeByConn.set(s, docId); },
     sharedOnly: aiClient,
+    guiClient: !aiClient,
     templates,
     onMutated: (entry, _tool, opId, changedIndices) => broadcast("deckChanged", deckChangedPayload(entry, opId, aiClient ? "ai" : "gui", changedIndices)),
     // #616: deck unchanged, template replaced → the SAME deckChanged with templateChanged:true (案 A: no new notification).
