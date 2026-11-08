@@ -25,13 +25,13 @@ serde_json = "1"
 dunce = "1"
 # Streaming model-weights download (rustls = pure-Rust TLS, no system OpenSSL) + SHA256 verify.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
-sha2 = "0.10"
+sha2 = "0.11"
 # OS keychain for the BYOK API key (ADR-0016 F3): Windows Credential Manager / macOS Keychain /
 # Linux Secret Service. Pure-Rust features (crypto-rust + zbus) so it builds without system dev libs;
 # when no backend is present the commands error and the webview falls back to localStorage.
 keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 # Host capability probe (total RAM) to pick the default model tier by environment (ADR: 環境適応既定モデル).
-sysinfo = { version = "0.39", default-features = false, features = ["system"] }
+sysinfo = { version = "0.40", default-features = false, features = ["system"] }
 
 # Desktop-only: route a warm double-click of a `.scft` into the running instance instead of
 # spawning a duplicate app (ADR-0024). init-only (no webview command → no capability entry).
