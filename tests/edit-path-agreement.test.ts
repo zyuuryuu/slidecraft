@@ -275,7 +275,7 @@ describe("#220 B3 through the MCP envelope (set_slide_markdown)", () => {
 // ── #106 P2: placeholder TEXT edits — the AI setField ops door ≡ the GUI field-editor door ──
 // Both write one placeholder's text through applyFieldEdit(textToParagraphs(text)): the field editor
 // (SlideEditor.updatePlaceholder) by hand, the AI panel (useDeckController handleApplySlide /
-// previewSlideEdit → routeFieldEdit) from a setField ops array. No MCP door here (統括裁定 2026-11-07:
+// previewSlideEdit → routeSlideEdit → routeFieldEdit, #629) from a setField ops array. No MCP door here (統括裁定 2026-11-07:
 // no placeholder-level MCP tool — set_slide_markdown covers it).
 describe("#106 P2 delegation: the setField door goes through the field editor's primitive", () => {
   const src = (p: string) => readFileSync(resolve(__dirname, "../src", p), "utf8");
@@ -285,9 +285,9 @@ describe("#106 P2 delegation: the setField door goes through the field editor's 
     expect(src("components/SlideEditor.tsx")).toMatch(/applyFieldEdit\(slide\.placeholders, idx, textToParagraphs\(text\)\)/);
   });
   it("the GUI controller routes AI output through routeFieldEdit in BOTH apply and preview", () => {
-    const ctl = src("components/useDeckController.ts");
-    expect(ctl).toMatch(/import \{[^}]*\brouteFieldEdit\b[^}]*\} from "\.\.\/engine\/field-edit-ops"/);
-    expect(ctl.match(/\brouteFieldEdit\(/g)?.length).toBe(2);
+    // #629: the branch moved to slide-edit-route.ts; the GUI reaches it via routeSlideEdit in both doors.
+    expect(src("engine/slide-edit-route.ts")).toMatch(/import \{[^}]*\brouteFieldEdit\b[^}]*\} from "\.\/field-edit-ops"/);
+    expect(src("components/useDeckController.ts").match(/\brouteSlideEdit\(/g)?.length).toBe(2);
   });
 });
 
@@ -315,13 +315,14 @@ describe("#106 P2 agreement: setField ops (AI door) ≡ field editor (GUI door) 
 });
 
 // ── #106 P3: DATA edits (table cell / chart value / gantt task / KPI card) — the AI DATA-ops door ≡ the
-// Markdown editor door (handleSlideMdChange → parseMd of the edited slide Markdown). The GUI routes
-// DATA ops right beside setField (routeFieldEdit ?? routeDataEdit). No MCP door (統括裁定: no new tools).
+// Markdown editor door (handleSlideMdChange → parseMd of the edited slide Markdown). DATA ops are routed
+// right beside setField, only when routeFieldEdit had no result — since #629 inside slide-edit-route.ts,
+// which the GUI calls in BOTH apply and preview (see #106 P2). No MCP door (統括裁定: no new tools).
 describe("#106 P3 delegation: the GUI controller routes AI output through routeDataEdit in BOTH apply and preview", () => {
   it("routeDataEdit sits beside routeFieldEdit (same result shape, same branch)", () => {
-    const ctl = readFileSync(resolve(__dirname, "../src/components/useDeckController.ts"), "utf8");
-    expect(ctl).toMatch(/import \{[^}]*\brouteDataEdit\b[^}]*\} from "\.\.\/engine\/chart-edit-ops"/);
-    expect(ctl.match(/routeFieldEdit\([^)]*\) \?\? routeDataEdit\(/g)?.length).toBe(2);
+    const route = readFileSync(resolve(__dirname, "../src/engine/slide-edit-route.ts"), "utf8");
+    expect(route).toMatch(/import \{[^}]*\brouteDataEdit\b[^}]*\} from "\.\/chart-edit-ops"/);
+    expect(route.match(/const (\w+) = routeFieldEdit\([^)]*\);\s*const \w+ = \1 \? null : routeDataEdit\(/g)?.length).toBe(1);
   });
 });
 
