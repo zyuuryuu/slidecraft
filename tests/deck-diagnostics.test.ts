@@ -79,7 +79,9 @@ describe("diagnoseDeck", () => {
   describe("parser-fallback surfacing (#148)", () => {
     const DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 
-    it("flags a 2nd image line that leaked into body text as literal Markdown", () => {
+    // #392 段 1: a 2nd body image is no longer body text — it is kept in SlideIR `figures`; the flag is now
+    // the not-yet-drawn figure (figure-dropped, info), still naming 画像.
+    it("flags a 2nd image (kept in figures, not yet drawn)", () => {
       const md = `# 画像\n\n![一枚目](${DATA_URI})\n\n![二枚目](${DATA_URI})`;
       const issues = diagnoseDeck(parseMd(md));
       const img = issues.find((x) => x.slideIndex === 0 && x.message.includes("画像"));

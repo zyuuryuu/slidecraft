@@ -114,13 +114,15 @@ describe("#392 段 0: visuals.md — the per-slide visual fields, pinned explici
   it("[#392 で変わる予定] col table | diagram → table 1, diagram 2", () => {
     expect(at("col 表｜図")).toEqual({ ...none, body: ["15"], table: "1", diagram: "2" });
   });
-  it("[#392 で変わる予定] two diagrams → last wins: only the LATER one survives, with a figure-dropped notice (#391)", () => {
-    const r = at("図が 2 つ（現状は先の図が落ちる）");
-    expect(r).toEqual({ ...none, body: ["15"], diagram: "1" });
+  // #392 段 1 で変わった（旧: last wins で後の図だけが残り figure-dropped notice）: 両方が figures に出現順で残り、
+  // 単数 diagram は 1 つ目。parse 時のドロップは無くなった（描画されないことの告知は deck-diagnostics 側）。
+  it("[#392 段 1 で変更] two diagrams → both kept in figures (source order), the singular diagram is the FIRST, no notice", () => {
     const idx = deck.deck.slides.findIndex((sl) => sl.placeholders.some((p) => p.paragraphs[0]?.segments[0]?.text?.startsWith("図が 2 つ")));
-    expect(deck.deck.slides[idx].diagram!.yaml).toContain("id: two");
-    expect(deck.deck.slides[idx].diagram!.yaml).not.toContain("id: one");
-    expect(deck.notices).toEqual([{ kind: "figure-dropped", slideIndex: idx }]);
+    const s = deck.deck.slides[idx];
+    expect(at("図が 2 つ（現状は先の図が落ちる）")).toEqual({ ...none, body: ["15"], diagram: "1" });
+    expect(s.diagram!.yaml).toContain("id: one");
+    expect(s.figures!.map((f) => (f.kind === "diagram" ? /id: (\w+)/.exec(f.yaml)![1] : f.kind))).toEqual(["one", "two"]);
+    expect(deck.notices).toEqual([]);
   });
 });
 
@@ -150,12 +152,14 @@ describe("#392 段 0: what the serializer writes back for visuals.md (pinned exp
     expect(slideMd("col 表｜図")).toContain("<!-- col -->");
     expect(backOf("col 表｜図")).toMatchObject({ table: { placeholderIdx: "1" }, diagram: { placeholderIdx: "2" } });
   });
-  // DATA LOSS today: table + diagram at the same ordinal serializes the table only, so the diagram is gone after
-  // one md round-trip (the fixed point above holds only because md1 is already lossy). #392 段 1 must keep both.
-  it("[#392 で変わる予定] table + diagram (no col): the diagram is NOT written back — lost after one round-trip", () => {
-    expect(slideMd("表と図（現状は重なる）")).not.toContain("```diagram");
+  // #392 段 1 で変更（旧: 表＋図が同じ ordinal で表だけが書き戻され、1 回の round-trip で図が消えていた）:
+  // figures の出現順（表→図）で両方を書き戻す。
+  it("[#392 段 1 で変更] table + diagram (no col): both are written back in source order and survive the round-trip", () => {
+    const md = slideMd("表と図（現状は重なる）");
+    expect(md).toContain("```diagram");
+    expect(md.indexOf("| 指標 |")).toBeLessThan(md.indexOf("```diagram"));
     expect(backOf("表と図（現状は重なる）").table).toBeDefined();
-    expect(backOf("表と図（現状は重なる）").diagram).toBeUndefined();
+    expect(backOf("表と図（現状は重なる）").diagram).toBeDefined();
   });
 });
 

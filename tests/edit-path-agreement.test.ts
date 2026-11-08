@@ -24,6 +24,7 @@ import type { SlideIR } from "../src/engine/slide-schema";
 import { applyFieldEdit } from "../src/engine/placeholder-binding";
 import { textToParagraphs } from "../src/engine/field-text";
 import { routeFieldEdit } from "../src/engine/field-edit-ops";
+import { slideFigures } from "../src/engine/slide-figures";
 import { routeDataEdit } from "../src/engine/chart-edit-ops";
 import { DiagramSpecSchema } from "../src/engine/schema";
 import { loadYaml } from "../src/engine/yaml-io";
@@ -186,6 +187,33 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
     expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
     expect(s.deck!.slides[1].table).not.toEqual(old.table);
     expect(s.deck!.slides[1]).toEqual(gui.slide);
+  });
+  // #392 D1: a text-only edit of a 2-figure slide used to drop the 2nd figure silently (figures 2→1, no notice).
+  const TWO_DIAGS = "# 表紙\n\n---\n\n# 中身\n\n```diagram\ntype: flowchart\nnodes:\n  - id: one\n    label: ONE\n```\n\n```diagram\ntype: flowchart\nnodes:\n  - id: two\n    label: TWO\n```";
+  it("#392 D1: a text-only edit of a slide with 2 figures keeps both on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TWO_DIAGS);
+    const old = s.deck!.slides[1];
+    expect(slideFigures(old)).toHaveLength(2);
+    const edit = "# 中身\n\n- 本文だけ直した";
+    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
+    expect(slideFigures(s.deck!.slides[1])).toEqual(slideFigures(old));
+    expect(s.deck!.slides[1].figures).toEqual(old.figures);
+    expect(s.deck!.slides[1]).toEqual(gui.slide);
+  });
+  it("#392 D1: an edit that carries a visual is respected as before (the old figures list is not carried)", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TWO_DIAGS);
+    const old = s.deck!.slides[1];
+    const edit = "# 中身\n\n- 本文\n\n```diagram\ntype: flowchart\nnodes:\n  - id: solo\n    label: SOLO\n```";
+    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
+    const after = s.deck!.slides[1];
+    expect(after.figures).toBeUndefined();
+    expect(slideFigures(after).map((f) => f.kind)).toEqual(["diagram"]);
+    expect(after.diagram?.yaml).toContain("id: solo");
+    expect(after).toEqual(gui.slide);
   });
   // Was a KNOWN DIVERGENCE (MCP stored the broken YAML). 裁定 B3: neither door stores it — the GUI keeps the
   // old valid figure + an advisory (its adoption gate), MCP rejects the whole edit (never-silent, nothing saved).

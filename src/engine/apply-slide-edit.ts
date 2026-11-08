@@ -17,6 +17,7 @@ import { diagramSpecToYaml } from "./diagram-serialize";
 import { DiagramSpecSchema } from "./schema";
 import { applyRegionSplit } from "./design-intent";
 import { hasText } from "./slide-roles";
+import { slideFigures } from "./slide-figures";
 import { autoSelectLayout } from "./template-loader";
 import type { LayoutCatalog } from "./template-catalog";
 
@@ -48,14 +49,19 @@ export function resolvedBodyCount(slide: SlideIR, i: number, total: number, cata
 }
 
 /** Carry the blocks an edit OMITTED (diagram / Mermaid / table / code) from the old slide — a text edit
- *  that leaves a block out keeps it (no silent drop); a block the edit carries is respected (#220 B3). */
+ *  that leaves a block out keeps it (no silent drop); a block the edit carries is respected (#220 B3).
+ *  #392 D1: the 2nd+ visuals (`figures`) ride along only when the edit carries NO body visual at all — a
+ *  text-only edit of a multi-figure slide keeps every figure; an edit with its own visuals is taken as-is
+ *  (per-figure carry is #392 段 3). */
 export function carryOmittedBlocks(old: SlideIR, edited: SlideIR): SlideIR {
+  const textOnly = slideFigures(edited).length === 0;
   return {
     ...edited,
     diagram: edited.diagram ?? old.diagram,
     mermaidBlock: edited.mermaidBlock ?? old.mermaidBlock,
     table: edited.table ?? old.table,
     code: edited.code ?? old.code,
+    ...(textOnly && old.figures ? { figures: old.figures } : {}),
   };
 }
 

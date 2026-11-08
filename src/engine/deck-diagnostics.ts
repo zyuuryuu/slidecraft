@@ -27,6 +27,7 @@ import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramI
 import { fitTitle, slideRoleContent } from "./title-fit";
 import { columnAugmentHint } from "./layout-augment-plan";
 import { rescueMessage } from "./field-rescue";
+import { undrawnFigures, FIGURE_KIND_LABEL } from "./slide-figures";
 import { markerLayoutMissingHint } from "./slide-marker-hint";
 import { RULE_LEVEL, type ReviewRuleId } from "./review-rules";
 
@@ -90,6 +91,8 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
     const body = rolePlaceholder(slide, "body");
 
     if (!title.trim() && (body || isVisual)) add("missing-title", "タイトルが無い", ["title"]);
+    const undrawn = undrawnFigures(slide); // #392 段 1: kept in SlideIR, but no renderer places a 2nd+ figure of one kind yet (段 2)
+    if (undrawn.length > 0) add("figure-dropped", `${[...new Set(undrawn.map((f) => FIGURE_KIND_LABEL[f.kind]))].join("・")}の2つ目以降（${undrawn.length}個）は出力（PPTX/プレビュー）にまだ描画されません（Markdown には保持されます）。別スライドに分けるか、異なる種類のビジュアルにしてください`, ["split"]);
 
     // #435 never-silent: a `<!-- slide: X -->` pin THIS template lacks. Read off the SAME resolution
     // export/preview draw with (autoSelectLayout honors a pin the catalog has, degrades one it lacks —
@@ -294,8 +297,6 @@ export function parseNoticesToIssues(deck: DeckIR, notices: readonly SlideParseN
         return { ...base, id: "image-dropped" as const, level: RULE_LEVEL["image-dropped"], message: "画像記法（![alt](src)）を含む内容が2つ目以降の表と衝突し変換時に失われました" };
       case "meta-key-dropped":
         return { ...base, id: "meta-key-dropped" as const, level: RULE_LEVEL["meta-key-dropped"], message: `「${n.detail ?? "?"}:」等の認識されないメタキーを含む内容が2つ目以降の表と衝突し変換時に失われました（Category/Date/Footer のみ対応）` };
-      case "figure-dropped":
-        return { ...base, id: "figure-dropped" as const, level: RULE_LEVEL["figure-dropped"], message: "同じスライドの先行する図（```diagram / ```mermaid）が後続の図に上書きされ変換時に失われました（1スライドに保持される図は最後の1つのみ）" };
       case "pre-separator-dropped": {
         // detail is the parser's SeparatorType — the before/after family's first marker is `<!-- before -->`.
         const marker = `<!-- ${n.detail === "beforeAfter" ? "before" : n.detail ?? "col"} -->`;

@@ -35,10 +35,13 @@ describe("parseMdReport — table-dropped ParseNotice", () => {
   const TABLE_A = "| a | b |\n| --- | --- |\n| 1 | 2 |";
   const TABLE_B = "| c | d |\n| --- | --- |\n| 3 | 4 |";
 
-  it("fires when a 2nd table follows the first (both dropped but the 1st)", () => {
+  // #392 段 1: was "fires when a 2nd table follows the first (both dropped but the 1st)" — the IR now keeps
+  // every table (`figures`), so nothing is dropped and no notice fires.
+  it("does NOT fire for a 2nd table — both are kept (#392 段 1), the 1st in `table`", () => {
     const { deck, notices } = parseMdReport(`# T\n\n${TABLE_A}\n\n${TABLE_B}`);
-    expect(deck.slides[0].table?.rows).toEqual([["a", "b"], ["1", "2"]]); // only the FIRST table survives
-    expect(notices).toEqual([{ slideIndex: 0, kind: "table-dropped" }]);
+    expect(deck.slides[0].table?.rows).toEqual([["a", "b"], ["1", "2"]]);
+    expect(deck.slides[0].figures?.map((f) => (f.kind === "table" ? f.rows[0] : null))).toEqual([["a", "b"], ["c", "d"]]);
+    expect(notices).toEqual([]);
   });
 
   // #101: was "fires when prose surrounds a single table (the prose is dropped too)" — the root
@@ -63,9 +66,9 @@ describe("parseMdReport — table-dropped ParseNotice", () => {
     expect(notices).toEqual([]);
   });
 
-  it("tags the correct slideIndex across multiple slides", () => {
+  it("multi-slide decks with a 2-table slide carry no notice either (#392 段 1)", () => {
     const { notices } = parseMdReport(`# 一\n\n- a\n\n---\n\n# 二\n\n${TABLE_A}\n\n${TABLE_B}`);
-    expect(notices).toEqual([{ slideIndex: 1, kind: "table-dropped" }]);
+    expect(notices).toEqual([]);
   });
 
   it("parseMd (the thin wrapper) returns the identical deck parseMdReport does", () => {

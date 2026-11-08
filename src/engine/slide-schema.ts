@@ -165,6 +165,20 @@ export const ImageBlockSchema = z.object({
 
 export type ImageBlock = z.infer<typeof ImageBlockSchema>;
 
+// ── Figure list (#392: more than one visual per slide) ──
+
+// One body visual, tagged by kind — the existing block's own fields (incl. placeholderIdx) + `kind`.
+export const FigureBlockSchema = z.discriminatedUnion("kind", [
+  DiagramBlockSchema.extend({ kind: z.literal("diagram") }),
+  MermaidBlockSchema.extend({ kind: z.literal("mermaid") }),
+  TableBlockSchema.extend({ kind: z.literal("table") }),
+  CodeBlockSchema.extend({ kind: z.literal("code") }),
+  ImageBlockSchema.extend({ kind: z.literal("image") }),
+]);
+
+export type FigureBlock = z.infer<typeof FigureBlockSchema>;
+export type FigureKind = FigureBlock["kind"];
+
 // ── Single slide IR ──
 
 export const SlideIRSchema = z.object({
@@ -175,6 +189,10 @@ export const SlideIRSchema = z.object({
   table: TableBlockSchema.optional(), // embedded table (GFM Markdown → native OOXML table)
   code: CodeBlockSchema.optional(), // embedded code/log (```lang fence → monospace body)
   image: ImageBlockSchema.optional(), // embedded image (![alt](data URI) → <img> / PPTX pic)
+  // #392: ALL body visuals in source order — present only when there are ≥2 (absent = the singular
+  // fields above say everything, so single-visual decks stay byte-identical). The singular fields keep
+  // the FIRST visual of each kind (read compat). Read the list via slide-figures.slideFigures (R8).
+  figures: z.array(FigureBlockSchema).optional(),
   // `<!-- card/step/kpi/compare -->` groups → layout hint。compare（#396）・beforeAfter（#402: `<!-- before -->`/`<!-- after -->`）は optional の enum 追加。
   // statement / quote（#593・R4 統括承認）は名前に反してグループではない: 区切り記号でなくスライド属性マーカー
   // （`<!-- statement -->`/`<!-- quote -->`）で、選択のヒントとしてここに相乗りする。グループかどうかは

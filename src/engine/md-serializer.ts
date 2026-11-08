@@ -18,8 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, imageLine, notesLines, fieldRowLines, getSeparatorType, isColumnScopedTable, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
-import { tableToMarkdown } from "./md-table";
+import { serializeParagraphs, getPlaceholderText, figureBlock, figureMd, imageLine, notesLines, fieldRowLines, getSeparatorType, columnFigures, singleBodyFigure, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { slideMarker, markerLine, isGroupedSlide } from "./slide-markers";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
@@ -184,43 +183,30 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
     // Column/KPI/Process layout must serialize as single-body (else the parser re-absorbs the
     // trailing figure into the last column). A table is the SAME — UNLESS it's genuinely
     // column-scoped (#100: bound to its own region beside other real column content), which
-    // isColumnScopedTable (shared with md-serializer-plan, R8) distinguishes from that mis-pin.
+    // columnFigures / singleBodyFigure (shared with md-serializer-plan, R8) distinguish from that mis-pin.
     // A statement/quote marker slide (#593) is single-body on any layout — same rule as serializeByPlan.
     const sepType = slideMarker(slide) ? null : (slide.groupKind ?? getSeparatorType(layout));
-    const tableColumnScoped = isColumnScopedTable(slide);
-    const singleBodyFigure = !!(slide.code || (slide.image && !slide.image.behind) || (slide.table && !tableColumnScoped));
 
-    if (sepType && !singleBodyFigure) {
+    if (sepType && !singleBodyFigure(slide)) {
       // Multi-section: each numbered region (column) becomes a section. A region may
       // hold TEXT or a FIGURE (diagram/mermaid/table) — emit the figure's fenced block in
       // its own column so text+figure COEXISTENCE round-trips (the figure sits beside
       // the bullets instead of replacing them). Iterate 1..max so column positions
       // (hence the figure's placeholderIdx) survive even with gaps/empties.
-      const diagIdx = slide.diagram ? parseInt(slide.diagram.placeholderIdx) : NaN;
-      const mermIdx = slide.mermaidBlock ? parseInt(slide.mermaidBlock.placeholderIdx) : NaN;
-      const tableIdx = tableColumnScoped ? parseInt(slide.table!.placeholderIdx) : NaN;
+      const colFigs = columnFigures(slide); // at most one per column (else singleBodyFigure)
       let maxCol = 0;
       for (const p of slide.placeholders) {
         const n = parseInt(p.idx);
         if (/^\d+$/.test(p.idx) && n >= 1 && n <= 10) maxCol = Math.max(maxCol, n);
       }
-      if (!Number.isNaN(diagIdx)) maxCol = Math.max(maxCol, diagIdx);
-      if (!Number.isNaN(mermIdx)) maxCol = Math.max(maxCol, mermIdx);
-      if (!Number.isNaN(tableIdx)) maxCol = Math.max(maxCol, tableIdx);
+      for (const f of colFigs) maxCol = Math.max(maxCol, parseInt(f.placeholderIdx));
       maxCol = Math.max(maxCol, maxCurrentStepCol(sepType, slide));
 
       for (let col = 1; col <= maxCol; col++) {
         lines.push(separatorLine(sepType, slide, col));
-        if (col === diagIdx) {
-          lines.push("```diagram");
-          lines.push(slide.diagram!.yaml);
-          lines.push("```");
-        } else if (col === mermIdx) {
-          lines.push("```mermaid");
-          lines.push(slide.mermaidBlock!.mermaid);
-          lines.push("```");
-        } else if (col === tableIdx) {
-          lines.push(tableToMarkdown(slide.table!.rows));
+        const fig = colFigs.find((f) => parseInt(f.placeholderIdx) === col);
+        if (fig) {
+          lines.push(figureMd(fig));
         } else {
           const ph = slide.placeholders.find((p) => p.idx === String(col));
           if (ph) lines.push(serializeParagraphs(ph.paragraphs));

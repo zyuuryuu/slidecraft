@@ -11,6 +11,12 @@
  *
  * #392 段 1 以降で変わってよい点: なし。複数ビジュアルのスライド（表＋図・col 表｜図）も、保存済みファイル
  * としては今の単数フィールドのまま開けること（移行するなら migrate の段で、この期待値を満たしたうえで）。
+
+ *
+ * #392 段 1 の注記: .scft 側は何も変わらない（開いた DeckIR は保存時と一致）。変わったのは**同じ md の parse**で、
+ * 「図が 2 つ」は旧 parser が後勝ち（2 つ目の図だけ）で保存していたのに対し、段 1 の parser は単数 diagram に
+ * 1 つ目の図を入れ（裁定どおり）、2 つ目は figures に残す。よって「旧 .scft の書き出し == 今の md の書き出し」は
+ * そのスライドだけ成り立たない（旧ファイルは旧挙動のまま描かれる＝後方互換は保たれている）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -70,6 +76,10 @@ describe("#392 段 0: a v1 .scft saved today opens to the same DeckIR", () => {
     const { deck, template } = await openProject(bytes);
     const fromProject = await slideHashes(deck, await template.zip.generateAsync({ type: "uint8array" }));
     const fromMd = await slideHashes(parseMd(readFileSync(resolve(ROOT, "tests/fixtures/slideir-baseline/visuals.md"), "utf8")), readFileSync(TEMPLATE));
-    expect(fromProject).toEqual(fromMd);
+    // #392 段 1: 同種 2 つの「図が 2 つ」だけは md の意味が変わった（上記注記）。その 1 枚を除き一致すること。
+    const sameKindPair = rawDeck.slides.findIndex((sl) => sl.placeholders.some((p) => p.paragraphs[0]?.segments[0]?.text?.startsWith("図が 2 つ")));
+    expect(rawDeck.slides[sameKindPair].diagram!.yaml).toContain("id: two"); // saved by the last-wins parser
+    expect(fromProject.filter((_, i) => i !== sameKindPair)).toEqual(fromMd.filter((_, i) => i !== sameKindPair));
+    expect(fromProject[sameKindPair]).not.toBe(fromMd[sameKindPair]);
   });
 });

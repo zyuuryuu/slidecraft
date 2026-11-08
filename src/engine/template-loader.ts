@@ -17,6 +17,7 @@ import { nestedLevelFontSize } from "./nested-level-font";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { readStyleDensity, type StyleDensity } from "./style-meta";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
+import { slideFigures } from "./slide-figures";
 
 // ── Types ──
 
@@ -858,9 +859,9 @@ export function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides
   const hasCtrTitle = idxs.has("0");
   // A diagram/mermaid/table/code/image occupies a body placeholder even though it isn't in `placeholders`.
   // EVERY visual's ordinal counts (#390) — a slide can carry more than one (e.g. col 1 table + col 2
-  // diagram), and reading only the first would miss the region the others need.
-  const visualIdxs = [slide.diagram, slide.mermaidBlock, slide.table, slide.code, slide.image]
-    .flatMap((v) => (v ? [v.placeholderIdx] : []));
+  // diagram), and reading only the first would miss the region the others need. #392: the list is
+  // slideFigures (R8 — incl. a 2nd figure of one kind) + a behind image, which has always counted here.
+  const visualIdxs = [...slideFigures(slide), ...(slide.image?.behind ? [slide.image] : [])].map((v) => v.placeholderIdx);
   const hasVisual = visualIdxs.length > 0;
   const hasBody = idxs.has("1") || visualIdxs.includes("1");
   const hasIdx2 = idxs.has("2") || visualIdxs.includes("2");
