@@ -666,7 +666,7 @@
     "saveProject": "Save Project",
     "exportSection": "Export",
     "transition": "Transition",
-    "transitionDefault": "Default",
+    "transitionGroup": "HTML transition",
     "transitionSlide": "Slide",
     "transitionFade": "Fade",
     "transitionZoom": "Zoom",
