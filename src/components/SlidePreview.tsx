@@ -18,7 +18,7 @@ import { bindContentByRole } from "../engine/placeholder-binding";
 import { planFieldRescue, applyFieldRescue } from "../engine/field-rescue";
 import { FieldNoteLayer } from "./FieldNoteLayer";
 import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL, TABLE_CELL_IN } from "../engine/table-layout";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect } from "../engine/visual-placement";
+import { imagePlaceholder, imageRect, figureAt, figureRegions } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
 import { isGroupedSlide } from "../engine/slide-markers";
 import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
@@ -272,19 +272,18 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   const contentFor = applyFieldRescue(bound, rescue);
   // Group-cell decorations (#400 icons / #401 current-step frame) — the export's same overlay + painter.
   const overlay = isGroupedSlide(slide) && layout && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
-  const bodyPhs = bodyPlaceholders(layoutPhs);
-  const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
-  const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
-  const tableBodyIdx = slide.table ? nthBody(bodyPhs, slide.table.placeholderIdx)?.idx : undefined;
-  const codeBodyIdx = slide.code ? nthBody(bodyPhs, slide.code.placeholderIdx)?.idx : undefined;
-  // An image prefers a PICTURE frame (else the Nth body). A BEHIND image binds to NO placeholder
-  // (it's a backmost layer) → undefined, so it doesn't suppress any placeholder's content.
-  const imageBodyIdx = slide.image && !slide.image.behind ? imagePlaceholder(layoutPhs, slide.image.placeholderIdx)?.idx : undefined;
+  // #392 段 2: the visual drawn at each placeholder — EVERY body visual (not just the first of each kind),
+  // placed by the SAME resolution the export uses (figureAt / figureRegions, R8). An image prefers a
+  // PICTURE frame (else the Nth body); a BEHIND image binds to NO placeholder (it's a backmost layer), so
+  // it doesn't suppress any placeholder's content. Editing (diagram drag, image drag) stays on the
+  // PRIMARY visual of its kind = the singular field the editors write (2nd+ = 段 3).
+  const figAt = figureAt(slide, layoutPhs);
+  const soloDiagram = figureRegions(slide, layoutPhs).find((r) => r.figure.kind === "diagram" && r.solo && !r.ph);
   const pxW = SLIDE_W * scale;
   const pxH = SLIDE_H * scale;
 
   // Image box + drag/resize editing (案B) — one gesture path for a body figure AND a behind layer (#122).
-  const { renderImageBox, renderImageChrome, renderImageCaption } = useSlideImageLayer({
+  const { renderImageBox, renderImageChrome, renderImageCaption, renderStaticImage } = useSlideImageLayer({
     slide, layoutPhs, scale, isActive, onImageRectChange, slideW: SLIDE_W, slideH: SLIDE_H,
   });
   const behindRect = slide.image?.behind ? imageRect(slide.image, imagePlaceholder(layoutPhs, slide.image.placeholderIdx)) : undefined;
@@ -387,10 +386,10 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           placeholder, but the loop below can only draw a diagram anchored on one — so without this it
           would vanish from the preview while the export still paints it (buildSlideXml), breaking
           WYSIWYG. Reachable once the chrome gate (#124) empties a layout's body ordinals. */}
-      {slide.diagram && !diagBodyIdx && slide.diagram.placeholderIdx === "1" && (
+      {soloDiagram?.figure.kind === "diagram" && (
         <DiagramSvgOverlay
           key="diagram-solo"
-          diagramYaml={slide.diagram.yaml}
+          diagramYaml={soloDiagram.figure.yaml}
           editable={!!onDiagramChange}
           onChange={onDiagramChange}
         />
@@ -400,24 +399,23 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
       {layout?.placeholders.map((ph) => {
         const s = ph.style;
 
-        // If this placeholder is replaced by a diagram or mermaid, render it (role-resolved body idx)
-        const isDiagramPh = slide.diagram && ph.idx === diagBodyIdx;
-        const isMermaidPh = slide.mermaidBlock && ph.idx === mermBodyIdx;
+        // If this placeholder is replaced by a visual, render it (role-resolved body idx)
+        const at = figAt.get(ph.idx);
+        const fig = at?.figure;
 
         // Diagram: full-slide transparent SVG overlay (matches how the export
         // embeds diagram shapes at absolute slide coordinates).
-        if (isDiagramPh) {
-          // Solo diagram (idx 1) = full-slide; beside-text diagram (idx 2) is
-          // confined to its placeholder box. Both are drag-editable (the overlay
-          // inverse-maps the region transform for hit-testing).
-          const isSolo = slide.diagram!.placeholderIdx === "1";
+        if (fig?.kind === "diagram") {
+          // Solo diagram (a lone one at ordinal 1) = full-slide; any other is confined to its
+          // placeholder box. The primary one is drag-editable (the overlay inverse-maps the region
+          // transform for hit-testing).
           return (
             <DiagramSvgOverlay
               key={`diagram-${ph.idx}`}
-              diagramYaml={slide.diagram!.yaml}
-              region={isSolo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
-              editable={!!onDiagramChange}
-              onChange={onDiagramChange}
+              diagramYaml={fig.yaml}
+              region={at!.solo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
+              editable={at!.primary && !!onDiagramChange}
+              onChange={at!.primary ? onDiagramChange : undefined}
             />
           );
         }
@@ -425,15 +423,14 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         // Mermaid (```mermaid): if it's a NATIVE diagram type, render it natively
         // (same engine as .diagram / the export) — never a blank mermaid.js image.
         // Only genuinely non-native Mermaid (pie/gantt/…) falls back to an image.
-        if (isMermaidPh) {
-          const nativeSpec = mermaidToDiagramSpec(slide.mermaidBlock!.mermaid);
+        if (fig?.kind === "mermaid") {
+          const nativeSpec = mermaidToDiagramSpec(fig.mermaid);
           if (nativeSpec) {
-            const isSolo = slide.mermaidBlock!.placeholderIdx === "1";
             return (
               <DiagramSvgOverlay
                 key={`mmd-native-${ph.idx}`}
                 diagramYaml={diagramSpecToYaml(nativeSpec)}
-                region={isSolo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
+                region={at!.solo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
                 editable={false}
               />
             );
@@ -451,11 +448,11 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
               }}
             >
               <MermaidDirect
-                mermaidSyntax={slide.mermaidBlock!.mermaid}
+                mermaidSyntax={fig.mermaid}
                 width="100%"
                 height="100%"
-                instanceId={`mmd-${slideIndex}-${scale}`}
-                svgCache={slide.mermaidBlock!.svgCache}
+                instanceId={at!.primary ? `mmd-${slideIndex}-${scale}` : `mmd-${slideIndex}-${scale}-${at!.ordinal}`}
+                svgCache={fig.svgCache}
               />
             </div>
           );
@@ -464,8 +461,8 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         // Native table → an HTML <table> at the placeholder box (matches the export).
         // Column widths + numeric alignment come from table-layout's shared computation
         // (R8) so the preview never drifts from what table-ooxml actually exports (#138).
-        if (slide.table && ph.idx === tableBodyIdx) {
-          const t = slide.table;
+        if (fig?.kind === "table") {
+          const t = fig;
           const colWidthsEmu = computeColumnWidthsEmu(t.rows, s.w);
           const totalEmu = colWidthsEmu.reduce((a, b) => a + b, 0);
           const numericCols = computeNumericColumns(t.rows, t.header);
@@ -530,7 +527,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
         }
 
         // Code/log → monospace text at the code body box (matches the export's code-body fill).
-        if (slide.code && ph.idx === codeBodyIdx) {
+        if (fig?.kind === "code") {
           return (
             <div
               key={`code-${ph.idx}`}
@@ -548,17 +545,19 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
                 lineHeight: 1.35,
               }}
             >
-              {slide.code.content}
+              {fig.content}
             </div>
           );
         }
 
         // Image (![alt](data URI)) as a BODY figure → rendered in its (dragged/manual/placeholder) box.
-        // A BEHIND image is NOT rendered here (imageBodyIdx is undefined for it) — it's drawn as a
-        // backmost layer BEFORE this map so existing content stays on top.
-        if (slide.image && ph.idx === imageBodyIdx) {
-          const resolved = imageRect(slide.image, ph) ?? s;
-          return [renderImageBox(resolved), renderImageCaption(resolved, s.fontColor)];
+        // A BEHIND image is NOT rendered here (it is in no placeholder) — it's drawn as a backmost layer
+        // BEFORE this map so existing content stays on top. A 2nd+ image is drawn the same, not draggable.
+        if (fig?.kind === "image") {
+          const resolved = imageRect(fig, ph) ?? s;
+          return at!.primary
+            ? [renderImageBox(resolved), renderImageCaption(resolved, s.fontColor)]
+            : renderStaticImage(fig, resolved, s.fontColor, `image-${ph.idx}`);
         }
 
         let content = contentFor.get(ph.idx);
@@ -678,8 +677,8 @@ export default function SlidePreview({
   // 章名変更は次のレンダーで自動反映される（deck 状態には導出内容を持たない）。呼び出し側が既に
   // materialize 済みを渡すとき（preMaterialized）は素通しする（#275・二重 materialize の回避）。
   const deck = useMemo(
-    () => (deckProp && !preMaterialized ? materializeDerivedSlides(deckProp) : deckProp),
-    [deckProp, preMaterialized],
+    () => (deckProp && !preMaterialized ? materializeDerivedSlides(deckProp, catalog) : deckProp),
+    [deckProp, preMaterialized, catalog],
   );
 
   // Fit the slide to the available pane by default (the fixed 72-dpi render overflowed

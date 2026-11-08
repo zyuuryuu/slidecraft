@@ -71,7 +71,7 @@ export default function App() {
   // が同じ内容を描くよう、ここで1回だけ materializeDerivedSlides を通して両ペインへ渡す。materialize
   // は 1:1 変換（枚数不変）なので activeSlide/selected の index はそのまま使い回せる。編集エディタ
   // （SlideEditor/SlideMarkdownEditor）は <!-- toc --> マーカーを編集するため生の deck のまま。
-  const displayDeck = useMemo(() => (deck ? materializeDerivedSlides(deck) : deck), [deck]);
+  const displayDeck = useMemo(() => (deck ? materializeDerivedSlides(deck, catalog) : deck), [deck, catalog]);
   const { show: showUpdateBanner, latestVersion, dismiss: dismissUpdateBanner } = useUpdateBanner();
   const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 

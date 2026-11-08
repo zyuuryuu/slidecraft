@@ -50,7 +50,7 @@ nodes:
 \`\`\`",
   },
   "result": {
-    "afterMd": "<!-- slide: Content.1Body.Single -->
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
 # 表と図
 
 | k | v |
@@ -64,7 +64,7 @@ nodes:
     label: 新しい図
 \`\`\`
 ",
-    "beforeMd": "<!-- slide: Content.1Body.Single -->
+    "beforeMd": "<!-- slide: Column.2Body.Equal -->
 # 表と図
 
 | k | v |
@@ -84,18 +84,7 @@ nodes:
     },
     "changed": true,
     "created": false,
-    "diagnostics": [
-      {
-        "id": "visual-collision",
-        "level": "warn",
-        "levers": [
-          "split",
-        ],
-        "message": "図と表が同じ枠（Body.Center）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Content.1Body.Single）",
-        "slideIndex": 1,
-        "title": "表と図",
-      },
-    ],
+    "diagnostics": [],
     "ok": true,
   },
   "slide": {
@@ -284,7 +273,7 @@ nodes:
     "beforeMd": "",
   },
   "result": {
-    "afterMd": "<!-- slide: Content.1Body.Single -->
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
 # 表
 
 | k | v |
@@ -311,18 +300,7 @@ nodes:
     },
     "changed": true,
     "created": true,
-    "diagnostics": [
-      {
-        "id": "visual-collision",
-        "level": "warn",
-        "levers": [
-          "split",
-        ],
-        "message": "図と表が同じ枠（Body.Center）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Content.1Body.Single）",
-        "slideIndex": 1,
-        "title": "表",
-      },
-    ],
+    "diagnostics": [],
     "ok": true,
   },
   "slide": {
@@ -370,7 +348,7 @@ nodes:
     "beforeMd": "",
   },
   "result": {
-    "afterMd": "<!-- slide: Column.2Body.Equal -->
+    "afterMd": "<!-- slide: Column.3Body.Equal -->
 # 本文と表
 
 - 説明
@@ -403,18 +381,7 @@ nodes:
     },
     "changed": true,
     "created": true,
-    "diagnostics": [
-      {
-        "id": "visual-collision",
-        "level": "warn",
-        "levers": [
-          "split",
-        ],
-        "message": "図と表が同じ枠（Body2.Right）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Column.2Body.Equal）",
-        "slideIndex": 1,
-        "title": "本文と表",
-      },
-    ],
+    "diagnostics": [],
     "ok": true,
   },
   "slide": {
@@ -583,7 +550,7 @@ nodes:
 exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > [#392 で変わる予定] text → table + diagram (no col) 1`] = `
 {
   "result": {
-    "afterMd": "<!-- slide: Content.1Body.Single -->
+    "afterMd": "<!-- slide: Column.2Body.Equal -->
 # 中身
 
 | k | v |
@@ -608,18 +575,7 @@ nodes:
       "maxBullets": 22,
     },
     "changed": true,
-    "diagnostics": [
-      {
-        "id": "visual-collision",
-        "level": "warn",
-        "levers": [
-          "split",
-        ],
-        "message": "図と表が同じ枠（Body.Center）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（Content.1Body.Single）",
-        "slideIndex": 1,
-        "title": "中身",
-      },
-    ],
+    "diagnostics": [],
     "ok": true,
   },
   "slide": {
@@ -658,7 +614,7 @@ nodes:
 exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool result > [#392 で変わる予定] text → two diagrams (last wins: the earlier one is dropped today) 1`] = `
 {
   "result": {
-    "afterMd": "<!-- slide: Content.1Body.Single -->
+    "afterMd": "<!-- slide: Chart.2Chart.Equal -->
 # 中身
 
 \`\`\`diagram
@@ -686,18 +642,7 @@ nodes:
       "maxBullets": 22,
     },
     "changed": true,
-    "diagnostics": [
-      {
-        "id": "figure-dropped",
-        "level": "info",
-        "levers": [
-          "split",
-        ],
-        "message": "図の2つ目以降（1個）は出力（PPTX/プレビュー）にまだ描画されません（Markdown には保持されます）。別スライドに分けるか、異なる種類のビジュアルにしてください",
-        "slideIndex": 1,
-        "title": "中身",
-      },
-    ],
+    "diagnostics": [],
     "ok": true,
   },
   "slide": {

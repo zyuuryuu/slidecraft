@@ -1,7 +1,9 @@
 /**
  * parse-fallback-diagnostics.test.ts — #148 acceptance: previously-silent parse-time fallbacks
  * (2nd+ table, 2nd+ image, unrecognized `Key:` line, distill auto-split) now show up in
- * get_deck_issues. Synthetic template fixture (ADR-0030's stated policy for this "層2"
+ * get_deck_issues. Since #392 a 2nd table / image is kept (段 1) and drawn in its own region (段 2); what
+ * is still reported is a visual the layout has no region for (here the 4th visual — the 2nd table — on a
+ * 3-column layout: `figure-dropped`). Synthetic template fixture (ADR-0030's stated policy for this "層2"
  * plumbing/observation class of bug — see binding-diagnostics.test.ts).
  */
 import { describe, it, expect } from "vitest";
@@ -41,7 +43,8 @@ describe("#148 — new_project → get_deck_issues surfaces all 3 parse-time fal
     await S.newProject(s, await defaultTemplateBytes(), FALLBACK_MD);
     const { issues } = S.getDiagnostics(s);
     expect(issues.some((x) => x.message.includes("表"))).toBe(true);
-    expect(issues.some((x) => x.message.includes("画像"))).toBe(true);
+    // #392 段 2: the 2nd image is DRAWN now (its own region) — nothing to report for it any more.
+    expect(issues.some((x) => x.id === "figure-dropped" && x.message.includes("画像"))).toBe(false);
     expect(issues.some((x) => x.message.includes("Meta"))).toBe(true);
   });
 
@@ -49,7 +52,7 @@ describe("#148 — new_project → get_deck_issues surfaces all 3 parse-time fal
     const s = S.createSession(null);
     const r = await S.newProject(s, await defaultTemplateBytes(), FALLBACK_MD);
     expect(r.diagnostics.some((x) => x.message.includes("表"))).toBe(true);
-    expect(r.diagnostics.some((x) => x.message.includes("画像"))).toBe(true);
+    expect(r.diagnostics.some((x) => x.id === "figure-dropped" && x.message.includes("画像"))).toBe(false); // drawn since #392 段 2
     expect(r.diagnostics.some((x) => x.message.includes("Meta"))).toBe(true);
   });
 
