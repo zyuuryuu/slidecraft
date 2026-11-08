@@ -25,6 +25,7 @@ import { isBlankParagraphs, contentHead } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
+import { kpiValueOverflows } from "./kpi-overflow";
 import { columnAugmentHint } from "./layout-augment-plan";
 import { rescueMessage } from "./field-rescue";
 import { undrawnFigures, FIGURE_KIND_LABEL } from "./slide-figures";
@@ -274,6 +275,11 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
           message: `タイトルがこのレイアウト（${layout.name}）のタイトル枠に収まりません（${fit.basePt}pt→下限 ${fit.fontPt}pt まで縮小しても推定 ${fit.lines}行 > 枠 ${fit.maxLines}行）。はみ出して表示されます。タイトルを短くしてください`,
           levers: ["condense"],
         });
+      }
+
+      // #643 never-silent: a KPI value that wraps in its value box (same box / plan / width estimate, R8).
+      for (const o of kpiValueOverflows(slide, layout, plan)) {
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "kpi-value-overflow", level: RULE_LEVEL["kpi-value-overflow"], message: `KPI の値「${o.text}」がこのレイアウト（${layout.name}）の値の枠（${o.placeholder.name}）に 1 行で収まりません（${o.fontPt}pt で推定 ${o.lines} 行）。折り返して表示が崩れ、隣の枠と重なることがあります。値を短くしてください（単位や補足は次の行へ）`, levers: ["condense"] });
       }
     });
   }
