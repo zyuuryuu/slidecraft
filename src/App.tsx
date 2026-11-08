@@ -604,7 +604,7 @@ export default function App() {
         )}
       </div>
 
-      <StatusBar spec={null} error={parseError} filePath={filePath} />
+      <StatusBar filePath={filePath} />
 
       {/* Initialize phase (modal): Markdown lives only here → 確定 commits the deck */}
       <InitializeModal
