@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { slideMarkdownEditPrompt, slideCondensePrompt, slideEditUserPrompt } from "../src/engine/deck-plan-prompts";
 import { parseFieldEditOps } from "../src/engine/field-edit-ops";
+import { parseDataEditOps } from "../src/engine/chart-edit-ops";
 import { parseDiagramEditOps } from "../src/engine/diagram-edit-ops";
 import { parseDesignIntent } from "../src/engine/design-intent";
 
@@ -79,6 +80,21 @@ describe("slideMarkdownEditPrompt — structure preservation + dual-mode decisio
     expect(p).toMatch(/no "Fields" list.*\(A\)/);
   });
 
+  it("offers DATA ops (#106 P3: table cell / chart value / gantt task / KPI card) with an example the engine parses", () => {
+    for (const op of ["setCell", "setSeriesValue", "setTask", "setCard"]) expect(p).toContain(op);
+    const example = '[{"op":"setSeriesValue","series":"売上","index":1,"value":25}]';
+    expect(p).toContain(example);
+    expect(parseDataEditOps(example)).not.toBeNull();
+    expect(parseFieldEditOps(example)).toBeNull(); // disjoint from TEXT ops
+    expect(parseDiagramEditOps(example)).toBeNull(); // from figure CONTENT ops
+    expect(parseDesignIntent(example)).toBeNull(); // and from design ops
+    expect(p).toMatch(/row 0 = header/); // the table addressing is stated, as the Data list shows it
+  });
+
+  it("DATA ops are offered ONLY when a Data list is given (batch edit sends none and parses Markdown only)", () => {
+    expect(p).toMatch(/no "Data" list.*\(A\)/);
+  });
+
   it("still offers arrangement (design) ops that route to parseDesignIntent", () => {
     expect(p).toContain("regionSplit");
     expect(parseDesignIntent('[{"op":"relayout","direction":"LR"}]')).not.toBeNull();
@@ -95,6 +111,18 @@ describe("slideEditUserPrompt — the per-slide request carries the setField idx
   });
   it("without fields it is exactly the previous request shape", () => {
     expect(slideEditUserPrompt("# 売上", "", "x")).toBe("Current slide:\n# 売上\n\nInstruction: x");
+  });
+});
+
+describe("slideEditUserPrompt — the per-slide request carries the DATA listing (#106 P3)", () => {
+  it("appends the Data listing after the Fields list", () => {
+    const u = slideEditUserPrompt("# 売上", '- idx "15": "売上"', "Q2 を 25 に", '- series 0 "売上": [10,20,30]');
+    expect(u).toContain('Data:\n- series 0 "売上": [10,20,30]');
+    expect(u.indexOf("Fields")).toBeLessThan(u.indexOf("Data:"));
+    expect(u.endsWith("Instruction: Q2 を 25 に")).toBe(true);
+  });
+  it("without data it is exactly the P2 request (slides with no table/chart are unchanged)", () => {
+    expect(slideEditUserPrompt("# 売上", '- idx "15": "売上"', "x", "")).toBe(slideEditUserPrompt("# 売上", '- idx "15": "売上"', "x"));
   });
 });
 
