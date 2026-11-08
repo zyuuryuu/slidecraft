@@ -20,6 +20,7 @@ import { FieldNoteLayer } from "./FieldNoteLayer";
 import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL, TABLE_CELL_IN } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
+import { isGroupedSlide } from "../engine/slide-markers";
 import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
 import { renderPaintToSvg } from "../engine/svg-writer";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
@@ -263,14 +264,14 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
   const layoutPhs = layout?.placeholders ?? [];
   // WYSIWYG: share the SAME contentFor as the export — a grouped slide fills via expandGroups.
-  const bound = slide.groupKind && layout && isGroupedLayout(layout)
+  const bound = isGroupedSlide(slide) && layout && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layoutPhs);
   // #597: the export's same slot-less row fallback (field-rescue) — merged text + the source note.
   const rescue = layout ? planFieldRescue(slide, layout, bound) : { rescues: [] };
   const contentFor = applyFieldRescue(bound, rescue);
   // Group-cell decorations (#400 icons / #401 current-step frame) — the export's same overlay + painter.
-  const overlay = slide.groupKind && layout && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
+  const overlay = isGroupedSlide(slide) && layout && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
   const bodyPhs = bodyPlaceholders(layoutPhs);
   const diagBodyIdx = slide.diagram ? nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx : undefined;
   const mermBodyIdx = slide.mermaidBlock ? nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx : undefined;
