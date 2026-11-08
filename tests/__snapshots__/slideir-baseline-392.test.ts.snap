@@ -6593,6 +6593,36 @@ edges:
   - from: p
     to: q",
         },
+        "figures": [
+          {
+            "header": true,
+            "kind": "table",
+            "placeholderIdx": "1",
+            "rows": [
+              [
+                "指標",
+                "値",
+              ],
+              [
+                "A",
+                "1",
+              ],
+            ],
+          },
+          {
+            "kind": "diagram",
+            "placeholderIdx": "1",
+            "yaml": "type: flowchart
+nodes:
+  - id: p
+    label: P
+  - id: q
+    label: Q
+edges:
+  - from: p
+    to: q",
+          },
+        ],
         "layout": "auto",
         "mermaidBlock": undefined,
         "placeholders": [
@@ -6686,6 +6716,31 @@ nodes:
   - id: s
     label: S",
         },
+        "figures": [
+          {
+            "header": true,
+            "kind": "table",
+            "placeholderIdx": "1",
+            "rows": [
+              [
+                "k",
+                "v",
+              ],
+              [
+                "a",
+                "1",
+              ],
+            ],
+          },
+          {
+            "kind": "diagram",
+            "placeholderIdx": "2",
+            "yaml": "type: flowchart
+nodes:
+  - id: s
+    label: S",
+          },
+        ],
         "layout": "auto",
         "placeholders": [
           {
@@ -6760,9 +6815,27 @@ nodes:
           "placeholderIdx": "1",
           "yaml": "type: flowchart
 nodes:
+  - id: one
+    label: 一つ目",
+        },
+        "figures": [
+          {
+            "kind": "diagram",
+            "placeholderIdx": "1",
+            "yaml": "type: flowchart
+nodes:
+  - id: one
+    label: 一つ目",
+          },
+          {
+            "kind": "diagram",
+            "placeholderIdx": "1",
+            "yaml": "type: flowchart
+nodes:
   - id: two
     label: 二つ目",
-        },
+          },
+        ],
         "layout": "auto",
         "mermaidBlock": undefined,
         "placeholders": [
@@ -6811,12 +6884,7 @@ nodes:
     ],
     "template": undefined,
   },
-  "notices": [
-    {
-      "kind": "figure-dropped",
-      "slideIndex": 14,
-    },
-  ],
+  "notices": [],
 }
 `;
 
@@ -8745,6 +8813,18 @@ print("hi")
 | --- | --- |
 | A | 1 |
 
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: p
+    label: P
+  - id: q
+    label: Q
+edges:
+  - from: p
+    to: q
+\`\`\`
+
 ---
 
 # col 本文｜図
@@ -8796,6 +8876,13 @@ nodes:
 ---
 
 # 図が 2 つ（現状は先の図が落ちる）
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: one
+    label: 一つ目
+\`\`\`
 
 \`\`\`diagram
 type: flowchart

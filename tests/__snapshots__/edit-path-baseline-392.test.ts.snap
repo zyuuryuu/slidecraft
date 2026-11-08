@@ -56,6 +56,13 @@ nodes:
 | k | v |
 | --- | --- |
 | a | 1 |
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`
 ",
     "beforeMd": "<!-- slide: Content.1Body.Single -->
 # 表と図
@@ -63,12 +70,19 @@ nodes:
 | k | v |
 | --- | --- |
 | a | 1 |
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`
 ",
     "budget": {
       "charsPerBullet": 59,
       "maxBullets": 22,
     },
-    "changed": false,
+    "changed": true,
     "created": false,
     "diagnostics": [
       {
@@ -276,6 +290,13 @@ nodes:
 | k | v |
 | --- | --- |
 | a | 1 |
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: n
+    label: 新しい図
+\`\`\`
 ",
     "beforeMd": "<!-- slide: Content.1Body.Single -->
 # 表
@@ -288,7 +309,7 @@ nodes:
       "charsPerBullet": 59,
       "maxBullets": 22,
     },
-    "changed": false,
+    "changed": true,
     "created": true,
     "diagnostics": [
       {
@@ -352,10 +373,12 @@ nodes:
     "afterMd": "<!-- slide: Column.2Body.Equal -->
 # 本文と表
 
-<!-- col -->
 - 説明
 
-<!-- col -->
+| k | v |
+| --- | --- |
+| a | 1 |
+
 \`\`\`diagram
 type: flowchart
 nodes:
@@ -566,6 +589,13 @@ exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool
 | k | v |
 | --- | --- |
 | a | 1 |
+
+\`\`\`diagram
+type: flowchart
+nodes:
+  - id: a
+    label: A
+\`\`\`
 ",
     "beforeMd": "<!-- slide: Content.1Body.Single -->
 # 中身
@@ -634,6 +664,13 @@ exports[`#392 段 0: set_slide_markdown (MCP) — the applied slide and the tool
 \`\`\`diagram
 type: flowchart
 nodes:
+  - id: a
+    label: A
+\`\`\`
+
+\`\`\`diagram
+type: flowchart
+nodes:
   - id: b
     label: B
 \`\`\`
@@ -653,8 +690,10 @@ nodes:
       {
         "id": "figure-dropped",
         "level": "info",
-        "levers": [],
-        "message": "同じスライドの先行する図（\`\`\`diagram / \`\`\`mermaid）が後続の図に上書きされ変換時に失われました（1スライドに保持される図は最後の1つのみ）",
+        "levers": [
+          "split",
+        ],
+        "message": "図の2つ目以降（1個）は出力（PPTX/プレビュー）にまだ描画されません（Markdown には保持されます）。別スライドに分けるか、異なる種類のビジュアルにしてください",
         "slideIndex": 1,
         "title": "中身",
       },
@@ -670,8 +709,8 @@ nodes:
       "placeholderIdx": "1",
       "yaml": "type: flowchart
 nodes:
-  - id: b
-    label: B",
+  - id: a
+    label: A",
     },
     "image": undefined,
     "layout": "auto",
