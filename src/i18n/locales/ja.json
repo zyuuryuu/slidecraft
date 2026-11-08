@@ -641,7 +641,7 @@
   },
   "toolbar": {
     "undo": "元に戻す (⌘/Ctrl+Z)",
-    "redo": "やり直す (⌘/Ctrl+Shift+Z)",
+    "redo": "やり直す (⌘/Ctrl+Shift+Z・Ctrl+Y)",
     "aiCollabTitle": "協働編集中：別の AI とライブ共有中（クリックで AI ドックを開閉）",
     "aiRunningTitle": "AI タスク {{n}} 件 実行中",
     "aiTitle": "AI（アシスト・協働・タスク履歴）",

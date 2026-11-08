@@ -641,7 +641,7 @@
   },
   "toolbar": {
     "undo": "Undo (⌘/Ctrl+Z)",
-    "redo": "Redo (⌘/Ctrl+Shift+Z)",
+    "redo": "Redo (⌘/Ctrl+Shift+Z, Ctrl+Y)",
     "aiCollabTitle": "Co-editing: live-sharing with another AI (click to toggle the AI dock)",
     "aiRunningTitle": "{{n}} AI task(s) running",
     "aiTitle": "AI (assist, collaboration, task history)",
