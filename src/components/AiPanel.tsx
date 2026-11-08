@@ -1,8 +1,8 @@
 /**
  * AiPanel.tsx — In-Edit AI dock.
  *
- * An immersive, always-at-hand AI surface for Edit mode: describe a deck →
- * generate (streamed) → apply, without leaving the editor. Shares all
+ * An always-at-hand AI surface for Edit mode: instruct the selected slide(s) → generate (streamed) →
+ * review → adopt, without leaving the editor. No selection → a hint to 📝 原稿 (#690). Shares all
  * generation logic with the AI dialog via useAiGeneration (no divergence).
  */
 
@@ -13,6 +13,7 @@ import type { AiGeneration } from "./useAiGeneration";
 import { toneClass } from "./ai-generation-types";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
+import AiDeckGuidance from "./AiDeckGuidance";
 import { slideEditUserPrompt } from "../engine/deck-plan-prompts";
 
 const AIPANEL_HEIGHT_KEY = "slidecraft_aipanel_h";
@@ -52,6 +53,8 @@ interface AiPanelProps {
   collabTab?: ReactNode;
   /** Whether a collab session is live (drives the 協働 tab's pulse + the initial tab). */
   collabConnected?: boolean;
+  /** No slide selected → the hint links to 📝 原稿 (#690): the toolbar's handler and its draftGate. */
+  onOpenDraft?: () => void; draftGate?: "locked" | "busy";
 }
 
 export default function AiPanel({
@@ -71,6 +74,7 @@ export default function AiPanel({
   ai,
   collabTab,
   collabConnected,
+  onOpenDraft, draftGate,
 }: AiPanelProps) {
   const { t } = useTranslation();
   const [userRequest, setUserRequest] = useState("");
@@ -262,7 +266,6 @@ export default function AiPanel({
     }
   };
 
-
   return (
     <div className="relative border-t border-accent/40 bg-void flex flex-col shrink-0" style={{ height: panelH }}>
       {/* Drag the top edge to resize the dock (double-click resets) */}
@@ -384,16 +387,13 @@ export default function AiPanel({
           )}
         </div>
         {/* Compact by default (~3 rows); resize-y lets you drag it a little taller, clamped so it can't swallow the panel. */}
-        {!promptCollapsed && (
+        {!promptCollapsed && !batch && !canSlide && <AiDeckGuidance onOpenDraft={onOpenDraft} draftGate={draftGate} />}
+        {!promptCollapsed && (batch || canSlide) && (
         <div className="flex gap-2">
           <textarea
             value={userRequest}
             onChange={(e) => setUserRequest(e.target.value)}
-            placeholder={
-              slideScope
-                ? t("aiPanel.slidePromptPlaceholder")
-                : t("aiPanel.deckPromptPlaceholder")
-            }
+            placeholder={t("aiPanel.slidePromptPlaceholder")}
             className="flex-1 h-[4.5rem] min-h-[2.75rem] max-h-56 px-2 py-1.5 bg-field border border-edge rounded text-sm text-fg resize-y"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) doGenerate();
