@@ -148,9 +148,18 @@
     "repairPlanHeader": "このテンプレートはそのままでは使用できません:\n{{blocks}}\n\n",
     "repairPlanProposal": "自動修復の提案: 計 {{total}} 件（{{parts}}）のプレースホルダに種別を付与します。\n",
     "repairPlanConfirm": "整形して取り込みますか？",
-    "augmentColumns": "{{n}} 列",
-    "augmentSize": "{{n}} 列 {{from}}→{{to}}pt",
-    "augmentPlan": "このテンプレートに無い {{what}} のレイアウトを、レイアウト「{{base}}」を元に追加します。\n体裁（フォント・配色・装飾・フッタ）はこのテンプレートのまま継承し、本文の文字サイズは列数に応じて下げます（{{sizes}}）。\n既存のレイアウトは変更しません。\n\n強化しますか？",
+    "augmentStructure": {
+      "columns-2": "2 列",
+      "columns-3": "3 列",
+      "compare-2": "比較（左右 2 案）",
+      "card-3": "カード 3 枚",
+      "kpi-3": "KPI 3 個",
+      "kpi-4": "KPI 4 個"
+    },
+    "augmentSize": "{{label}} {{from}}→{{to}}pt",
+    "augmentSizeGroup": "{{label}} 本文 {{from}}→{{to}}pt・見出し {{head}}pt",
+    "augmentPlan": "このテンプレートに無い {{what}} のレイアウトを、レイアウト「{{base}}」を元に追加します。\n体裁（フォント・配色・装飾・フッタ）はこのテンプレートのまま継承し、本文の文字サイズは列数・組数に応じて下げます（{{sizes}}）。\n既存のレイアウトは変更しません。{{skipped}}\n\n強化しますか？",
+    "augmentPlanSkipped": "\n既にあるため追加しないもの: {{list}}",
     "augmentFailed": "テンプレートの強化を中止しました（検査に通りませんでした）: {{reason}}"
   },
   "builtinRuntime": {

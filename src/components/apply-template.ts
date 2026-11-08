@@ -17,6 +17,7 @@ import { faithfulRemake } from "../engine/faithful-remake";
 import { writeTemplate } from "../engine/template-writer";
 import { augmentAndVerify } from "../engine/layout-augment";
 import type { AugmentPlan, AugmentOptions } from "../engine/layout-augment-plan";
+import type { AugmentStructure } from "../engine/layout-augment-structures";
 import { adjustTemplate, type TemplateAdjustRecipe } from "../engine/template-adjust";
 
 export interface TemplateSetters {
@@ -342,9 +343,22 @@ export async function applyTemplateBytesAsAugmented(
 export function describeAugmentPlan(plan: AugmentPlan): string {
   const sep = i18n.t("applyTemplate.repairPartSeparator");
   const from = plan.base?.sourceSizes[0];
+  const label = (s: AugmentStructure) => augmentStructureLabel(s);
+  // #568 段 3: never-silent list — what is added (with its sizes) and what is NOT added because it exists.
+  const present = plan.skipped.filter((x) => x.reason !== plan.reason).map((x) => label(x.structure));
   return i18n.t("applyTemplate.augmentPlan", {
-    what: plan.add.map((a) => i18n.t("applyTemplate.augmentColumns", { n: a.columns })).join(sep),
+    what: plan.add.map((a) => label(a.structure)).join(sep),
     base: plan.base?.layoutName ?? "",
-    sizes: plan.add.map((a) => i18n.t("applyTemplate.augmentSize", { n: a.columns, from, to: a.levelSizes[0] })).join(sep),
+    sizes: plan.add
+      .map((a) => a.group
+        ? i18n.t("applyTemplate.augmentSizeGroup", { label: label(a.structure), from, to: a.levelSizes[0], head: a.group.headSize })
+        : i18n.t("applyTemplate.augmentSize", { label: label(a.structure), from, to: a.levelSizes[0] }))
+      .join(sep),
+    skipped: present.length > 0 ? i18n.t("applyTemplate.augmentPlanSkipped", { list: present.join(sep) }) : "",
   });
+}
+
+/** 構造の表示名（i18n）。ボタンと確認文で共用。 */
+export function augmentStructureLabel(s: AugmentStructure): string {
+  return i18n.t(`applyTemplate.augmentStructure.${s}`);
 }
