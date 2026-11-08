@@ -64,15 +64,18 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
   const augmentPlan = useMemo(() => (open && onAugment && template ? planTemplateAugmentation(template) : null), [open, onAugment, template]);
 
   return (
-    <div className="relative inline-flex items-center gap-1" ref={ref}>
+    <div className="relative inline-flex min-w-0 items-center gap-1" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
         title={t("masterPicker.buttonTitle")}
-        className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge inline-flex items-center gap-1.5 max-w-[220px]"
+        className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge inline-flex min-w-0 items-center gap-1.5 max-w-[380px]"
       >
         <span className="shrink-0">🎨</span>
-        <span className="truncate">{active ? active.name : t("masterPicker.selectMaster")}</span>
+        {/* #692: say what the button is before the name. When space is short the NAME truncates first (far larger
+            flex-shrink); the prefix gives way only on a very narrow window, so the AI and ⚙ buttons stay on screen. */}
+        <span className="min-w-0 overflow-hidden whitespace-nowrap">{t("masterPicker.buttonPrefix")}</span>
+        <span className="min-w-0 truncate shrink-[1000]">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
       </button>
       {open && (

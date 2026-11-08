@@ -16,5 +16,5 @@ export function markerLayoutMissingHint(slide: SlideIR, slideIndex: number, tota
   if (!marker || catalog.length === 0) return undefined;
   const resolved = autoSelectLayout(slide, slideIndex, totalSlides, catalog);
   if (resolved === slide.layout || catalog.find((e) => e.name === resolved)?.role === marker) return undefined;
-  return `<!-- ${marker} --> に対応するレイアウト（役割 ${marker}）がこのテンプレにありません。「${resolved}」で代替しました`;
+  return `<!-- ${marker} --> に対応するレイアウト（役割 ${marker}）がこのテンプレートにありません。「${resolved}」で代替しました`;
 }

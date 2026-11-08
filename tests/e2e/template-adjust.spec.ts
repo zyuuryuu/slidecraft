@@ -13,8 +13,8 @@ const titlePx = async (page: Page) =>
 
 async function openAdjust(page: Page) {
   await page.getByRole("button", { name: /🎨/ }).click(); // master picker
-  await page.getByRole("button", { name: /テンプレ調整/ }).click();
-  const panel = page.getByRole("region", { name: "テンプレ調整" });
+  await page.getByRole("button", { name: /テンプレート調整/ }).click();
+  const panel = page.getByRole("region", { name: "テンプレート調整" });
   await expect(panel).toBeVisible();
   return panel;
 }

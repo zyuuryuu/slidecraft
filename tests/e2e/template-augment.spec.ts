@@ -21,7 +21,7 @@ const masterButton = (page: Page) => page.getByRole("button", { name: /🎨/ });
 async function importMaster(page: Page, file: string, asName: string) {
   await masterButton(page).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: /マスターを取り込む/ }).click();
+  await page.getByRole("button", { name: /テンプレートを取り込む/ }).click();
   await (await chooser).setFiles({ name: asName, mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", buffer: readFileSync(resolve(FIX, file)) });
   await expect(page.getByText("取り込み結果")).toBeVisible({ timeout: 15000 });
 }
@@ -43,10 +43,10 @@ test.describe("テンプレを強化 (#568 / #612 menu entry)", () => {
     await expect(page.getByText("13 レイアウト")).toBeVisible();
     // the intake bar only points at the menu (no button there any more)
     await expect(page.getByTestId("intake-augment")).toHaveCount(0);
-    await expect(page.getByTestId("intake-augment-hint")).toHaveText("🎨 メニューの「テンプレを強化」で 3 列・KPI 4 個 を追加できます");
+    await expect(page.getByTestId("intake-augment-hint")).toHaveText("🎨 テンプレートのメニューの「テンプレートを強化」で 3 列・KPI 4 個 を追加できます");
 
     const item = await augmentItem(page);
-    await expect(item).toHaveText("🧩テンプレを強化（3 列・KPI 4 個を追加）…");
+    await expect(item).toHaveText("🧩テンプレートを強化（3 列・KPI 4 個を追加）…");
     await expect(item).toBeEnabled();
 
     let confirmText = "";
@@ -81,14 +81,14 @@ test.describe("テンプレを強化 (#568 / #612 menu entry)", () => {
 
   test("Midnight (already has 2/3 columns, compare, KPI 3/4): only the 3-card layout is offered", async ({ page }) => {
     await importMaster(page, "Midnight_Executive_30_TemplateOnly.pptx", "midnight.pptx");
-    await expect(await augmentItem(page)).toHaveText("🧩テンプレを強化（カード 3 枚を追加）…");
+    await expect(await augmentItem(page)).toHaveText("🧩テンプレートを強化（カード 3 枚を追加）…");
   });
 
   test("#612: the built-in master (no intake yet) can be augmented from the menu", async ({ page }) => {
     await expect(page.getByText("取り込み結果")).toHaveCount(0); // nothing imported
     await expect(masterButton(page)).toContainText("技術報告 スタンダード水色");
     const item = await augmentItem(page);
-    await expect(item).toHaveText("🧩テンプレを強化（3 列・KPI 4 個を追加）…");
+    await expect(item).toHaveText("🧩テンプレートを強化（3 列・KPI 4 個を追加）…");
     page.once("dialog", (d) => void d.accept());
     await item.click();
     await expect(page.getByText("強化（レイアウト追加）")).toBeVisible({ timeout: 15000 });
@@ -104,6 +104,6 @@ test.describe("テンプレを強化 (#568 / #612 menu entry)", () => {
     await expect(page.getByTestId("intake-augment-hint")).toHaveCount(0);
     const item = await augmentItem(page);
     await expect(item).toBeDisabled();
-    await expect(item).toContainText("テンプレの強化はできません: タイトル枠と本文 1 枠を持つレイアウトが無いため、元にするレイアウトを決められません。");
+    await expect(item).toContainText("テンプレートの強化はできません: タイトル枠と本文 1 枠を持つレイアウトが無いため、元にするレイアウトを決められません。");
   });
 });

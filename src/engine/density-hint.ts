@@ -45,7 +45,7 @@ export function densityIssues(deck: DeckIR, density: StyleDensity | undefined): 
       id: "density-target",
       level: RULE_LEVEL["density-target"],
       levers: ["condense", "split"],
-      message: `このテンプレの目標帯を超えています: ${over.join("・")}。1 枚 1 メッセージに絞り、補足はノートか別スライドへ`,
+      message: `このテンプレートの目標帯を超えています: ${over.join("・")}。1 枚 1 メッセージに絞り、補足はノートか別スライドへ`,
     });
   });
   return issues;

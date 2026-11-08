@@ -14,7 +14,7 @@ test.describe("HTML export: transition picked in the File menu (#650)", () => {
     await page.waitForTimeout(1500); // let the template + deck settle before export
 
     const exportHtml = async () => {
-      await page.getByRole("button", { name: /ファイル/ }).click();
+      await page.getByRole("button", { name: /保存・書き出し/ }).click();
       const htmlBtn = page.getByRole("button", { name: /HTML/ });
       await expect(htmlBtn).toBeEnabled({ timeout: 10000 });
       return htmlBtn;

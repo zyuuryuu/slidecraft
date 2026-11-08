@@ -289,7 +289,7 @@ describe("UX 予算（ADR-0039）", () => {
           <MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onClose={noop} onImport={noop} onRemake={noop} onCreate={noop} />,
         ),
       );
-      expect(b.filter((x) => x.startsWith("＋")).map((x) => x.includes("テンプレを作成"))).toEqual([true]);
+      expect(b.filter((x) => x.startsWith("＋")).map((x) => x.includes("テンプレートを作成"))).toEqual([true]);
     });
   });
 

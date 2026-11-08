@@ -62,7 +62,7 @@ const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/b
 describe("#614 上部バー: 文書の操作だけ", () => {
   it("ボタンは ↶ ↷ ファイル 📝原稿 🎨マスター ✨AI ⚙ の順（数の上限は ux-budget）", () => {
     const b = buttons(topBar());
-    expect(b).toEqual(["↶", "↷", "ファイル▾", "📝 原稿", "🎨技術報告 スタンダード水色▾", "✨ AI", "⚙"]);
+    expect(b).toEqual(["↶", "↷", "保存・書き出し▾", "📝 原稿入力", "🎨テンプレート：技術報告 スタンダード水色▾", "✨ AI", "⚙"]);
   });
 
   it("言語・テーマ・ヘルプはバーに直接並べない（⚙ のメニューへ）", () => {
@@ -76,10 +76,10 @@ describe("#614 上部バー: 文書の操作だけ", () => {
     expect(tag).toContain('aria-haspopup="true"');
   });
 
-  it("英語表示では原稿ボタンは「📝 Draft」", async () => {
+  it("英語表示では原稿ボタンは「📝 Write draft」", async () => {
     await i18n.changeLanguage("en");
     try {
-      expect(buttons(topBar())).toContain("📝 Draft");
+      expect(buttons(topBar())).toContain("📝 Write draft");
     } finally {
       await i18n.changeLanguage("ja");
     }
@@ -134,7 +134,7 @@ describe("#614 ＋ は追加だけ・📝 は原稿だけ", () => {
   const b = buttons(html);
 
   it("マスターの取り込みは 📥・Re-make は 🔁（＋ が新規作成だけなのは ux-budget）", () => {
-    expect(b.find((x) => x.includes("マスターを取り込む"))?.startsWith("📥")).toBe(true);
+    expect(b.find((x) => x.includes("テンプレートを取り込む"))?.startsWith("📥")).toBe(true);
     expect(b.find((x) => x.includes("Re-make"))?.startsWith("🔁")).toBe(true);
   });
 

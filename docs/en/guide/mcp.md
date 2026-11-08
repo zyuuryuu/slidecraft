@@ -185,7 +185,7 @@ to receive "how to write for this template," then author accordingly. That is th
 | Tool | Role |
 |---|---|
 | `open_project(dataBase64)` | Loads a base64 `.slidecraft`. Returns `{slideCount, diagnostics, contract}` |
-| `new_project(templateBase64, markdown?)` | Creates a new project from a base64 `.pptx` template (plus optional Markdown). Goes through the same formatting path as the GUI's Draft |
+| `new_project(templateBase64, markdown?)` | Creates a new project from a base64 `.pptx` template (plus optional Markdown). Goes through the same formatting path as the GUI's Write draft |
 | `create_template(spec?)` | When there are no template bytes, **generates a template PPTX** from a name, fonts, and a 9-color palette and returns it. Missing pieces are filled from a preset |
 
 ### Read the contract (learn how to write)

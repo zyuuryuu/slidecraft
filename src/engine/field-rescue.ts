@@ -178,5 +178,5 @@ const WHERE: Record<RescueVia, string> = {
 
 /** The `field-row-rescued` (info) message for one rescue — names the row and where it was drawn. */
 export function rescueMessage(r: FieldRescue, layoutName: string): string {
-  return `${ROW_NAME[r.kind]}: 行の専用枠がこのレイアウト（${layoutName}）に無いため、${WHERE[r.via]}出力します（専用枠のあるテンプレではその枠に入ります）`;
+  return `${ROW_NAME[r.kind]}: 行の専用枠がこのレイアウト（${layoutName}）に無いため、${WHERE[r.via]}出力します（専用枠のあるテンプレートではその枠に入ります）`;
 }

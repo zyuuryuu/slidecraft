@@ -214,5 +214,5 @@ export function columnAugmentHint(
   let plan = planCache.get(catalog);
   if (!plan) planCache.set(catalog, (plan = planAugmentation({ layouts: [...layouts] }, catalog)));
   if (!plan.add.some((a) => a.columns === regions)) return undefined;
-  return `このテンプレには ${regions} 列のレイアウトが無いため「${resolvedName}」に配置しました。「テンプレを強化」で ${regions} 列のレイアウトを追加できます（体裁はこのテンプレのまま）`;
+  return `このテンプレートには ${regions} 列のレイアウトが無いため「${resolvedName}」に配置しました。「テンプレートを強化」で ${regions} 列のレイアウトを追加できます（体裁はこのテンプレートのまま）`;
 }

@@ -97,7 +97,7 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       if (resolved !== slide.layout) {
         const alts = suggestLayouts(slide, i, deck.slides.length, catalog, 4).filter((n) => n !== resolved);
         const others = alts.length > 0 ? `（他の候補: ${alts.join(" / ")}）` : "";
-        add("unknown-layout-pin", `レイアウト「${slide.layout}」はこのテンプレにありません。auto 選択で「${resolved}」に代替しました${others}`, []);
+        add("unknown-layout-pin", `レイアウト「${slide.layout}」はこのテンプレートにありません。auto 選択で「${resolved}」に代替しました${others}`, []);
       }
     }
     const markerHint = catalog && markerLayoutMissingHint(slide, i, deck.slides.length, catalog); // #593 never-silent
@@ -147,7 +147,7 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const chunks = packParagraphs(body.paragraphs, box).length;
       const tallest = body.paragraphs.reduce((m, p) => Math.max(m, paragraphLines(p, box.charsPerLine)), 0);
       if (chunks > 1 || tallest > box.maxLines) {
-        add("body-overflow", `本文がテンプレ容量を超過（最大${box.maxLines}行）`, ["split", "condense", "visualize"]);
+        add("body-overflow", `本文がテンプレート容量を超過（最大${box.maxLines}行）`, ["split", "condense", "visualize"]);
       }
     }
 
@@ -186,7 +186,7 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const others = lost.filter((u) => !isFieldIdx(u.idx));
       // #97: name WHAT vanishes (head of the first unbound item), not just how many.
       if (others.length > 0) add("unbound-content", `内容 ${others.length} 件（先頭「${contentHead(others[0].content)}」）がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`);
-      if (rows.length > 0) add("unbound-content", `${rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ")} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレを使ってください`);
+      if (rows.length > 0) add("unbound-content", `${rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ")} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレートを使ってください`);
       for (const r of plan.rescued ?? []) add("field-row-rescued", rescueMessage(r, layout.name));
 
       // #390 never-silent: body text that DID bind, but to a placeholder a visual replaces (table /
@@ -340,7 +340,7 @@ export function splitInfoIssues(deck: DeckIR, offsets: readonly number[]): DeckI
       slideIndex: start,
       title: slideTitle(deck.slides[start]),
       level: "info",
-      message: `スライドはテンプレ容量に収まらず ${count} 枚に分割されました`,
+      message: `スライドはテンプレート容量に収まらず ${count} 枚に分割されました`,
       levers: [],
     });
   });
