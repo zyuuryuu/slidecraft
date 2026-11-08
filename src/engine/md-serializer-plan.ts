@@ -19,6 +19,7 @@ import { sortByIdx } from "./placeholder-binding";
 import { TITLE_NS, META_FIELDS } from "./slide-roles";
 import { serializeParagraphs, getPlaceholderText, figureBlock, getSeparatorType, isColumnScopedTable, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { tableToMarkdown } from "./md-table";
+import { slideMarker } from "./slide-markers";
 
 /**
  * The template context that lets the serializer read a slide back out through the SAME binding
@@ -75,7 +76,9 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
   // Separator form when the layout name says so (canonical Column./KPI./Process.), or the slide holds a
   // title + ≥2 positional body regions — the legacy Columns fallback classification, so a third-party
   // template's multi-region slide keeps its <!-- col --> markers instead of collapsing into one body.
-  const sepType = getSeparatorType(layout) ?? (title && bodyIsh(1) && bodyIsh(2) ? "col" : null);
+  // A statement/quote marker slide (#593) is never split into columns: the parser reads it single-body
+  // (a quote's 2nd box is its attribution line), so it serializes single-body on ANY resolved layout.
+  const sepType = slideMarker(slide) ? null : getSeparatorType(layout) ?? (title && bodyIsh(1) && bodyIsh(2) ? "col" : null);
 
   if (sepType && !singleBodyFigure) {
     let maxCol = 0;
