@@ -17,7 +17,8 @@ const SLIDE_W = 13.333;
 const TITLE_BAND = 0.9; // y above this = title band (drop page-meta)
 const FOOTER_BAND = 6.4; // y below this = footer strip (drop page-meta)
 
-export type GroupSlotRole = "chrome" | "picture" | "heading" | "body";
+// "value" (#593): a KPI group's big-number box — see markKpiValue. Only kpi groups carry it.
+export type GroupSlotRole = "chrome" | "picture" | "heading" | "value" | "body";
 export interface GroupSlot { phIdx: string; role: GroupSlotRole; y: number; }
 export interface GroupLayoutShape { kind: "card" | "step" | "kpi" | "compare"; groups: GroupSlot[][]; }
 
@@ -130,7 +131,10 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
   // geometry — see nameHintedGroups' docstring for why (2x2 grids / single-slot-per-group layouts the
   // geometric clustering below can't shape correctly). No-op (returns null) for any non-canonical name.
   const hinted = nameHintedGroups(layout.name, cands);
-  if (hinted) return hinted;
+  if (hinted) return markKpiValue(hinted, layout);
+  // #593: a hand-made single hero-number layout (マガジン 05_ビッグナンバー), recognized by NAME.
+  const hero = heroNumberGroup(layout);
+  if (hero) return hero;
   // A canonical name outside the group families → not grouped. (A group-family name whose hint failed —
   // a hand-edited layout — still falls through to geometry, as before.)
   if (CANONICAL_NAMES.has(layout.name) && !CANONICAL_NAME_HINTS.some((h) => h.re.test(layout.name))) return null;
@@ -183,7 +187,63 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
   else if (hasChrome) kind = "card"; // numbered cards
   else if (size === 2 && columns.length === 2) kind = "compare"; // 見出し+本文 ×2, no chrome
   else kind = "kpi"; // no chrome, ≥3 text slots (ラベル+数値+補足)
-  return { kind, groups };
+  return markKpiValue({ kind, groups }, layout);
+}
+
+/** A KPI value box's font must dominate every other text slot of its group by this ratio. Measured:
+ *  canonical KPI.1 72pt vs 18/13, KPI.2 60 vs 14, KPI.3 52 vs 13, report 09_KPI 72 vs 13, マガジン
+ *  05_ビッグナンバー 150 vs 15/14 — all ≥ 3.7×; equal-font groups (KPI.4Value.Grid's 14pt cells) are 1×. */
+const VALUE_FONT_RATIO = 1.5;
+
+/** The group's VALUE box: the text slot whose font dominates every other text slot, else undefined. */
+function dominantValueSlot(group: GroupSlot[], layout: LayoutInfo): GroupSlot | undefined {
+  const text = group.filter((s) => s.role === "heading" || s.role === "body");
+  if (text.length < 2) return undefined;
+  const fontOf = new Map(layout.placeholders.map((p) => [p.idx, p.style.fontSize] as const));
+  const fs = (s: GroupSlot) => fontOf.get(s.phIdx) ?? 0;
+  const value = text.reduce((a, b) => (fs(b) > fs(a) ? b : a));
+  return text.every((s) => s === value || fs(value) >= VALUE_FONT_RATIO * fs(s)) ? value : undefined;
+}
+
+/**
+ * #593 — fix a KPI group whose VALUE box (dominant font) was tagged as the heading. The top→bottom tagging
+ * assumes the label sits on top: true for the report masters' 09_KPIハイライト (label above value), where
+ * binding's "body para0 → first body slot" already lands the number in the value box — those groups are
+ * left exactly as they were. It is inverted on the canonical KPI.*Value layouts (value box ABOVE its
+ * label): Midnight / generated templates put the `###` heading into the 72pt box and the number into the
+ * small label. There the value box is re-tagged "value" (binding gives it body para0) and the next text slot
+ * becomes the heading. Non-kpi shapes and groups without a dominant font are untouched. Pure (R2).
+ */
+function markKpiValue(shape: GroupLayoutShape, layout: LayoutInfo): GroupLayoutShape {
+  if (shape.kind !== "kpi") return shape;
+  const groups = shape.groups.map((group) => {
+    const value = dominantValueSlot(group, layout);
+    if (!value || value.role !== "heading") return group;
+    const label = group.find((s) => s !== value && s.role === "body");
+    return group.map((s): GroupSlot => (s === value ? { ...s, role: "value" } : s === label ? { ...s, role: "heading" } : s));
+  });
+  return { ...shape, groups };
+}
+
+// #593: localized/plain names of a single hero-number layout (one huge KPI + its label/notes).
+const HERO_NUMBER_NAME = /ビッグナンバー|big\s*number|hero\s*(?:number|kpi|stat)/i;
+
+/**
+ * #593 — a hand-made "big number" layout as ONE kpi group, recognized by NAME (マガジン 05_ビッグナンバー:
+ * 注記 15pt / ビッグナンバー 150pt / 補足 14pt). Geometry alone can't see it (one column, and the 注記 name
+ * is filtered as pollution above), so a `<!-- kpi -->` slide never reached it. Only kpi slides route by
+ * groupKind (autoSelectLayout), so a slide without the marker is unaffected. Needs a dominant value box —
+ * otherwise null (the name alone is not trusted).
+ */
+function heroNumberGroup(layout: LayoutInfo): GroupLayoutShape | null {
+  if (!HERO_NUMBER_NAME.test(layout.name)) return null;
+  const cells = layout.placeholders.filter((p) => {
+    const s = p.style;
+    return p.type.toLowerCase() === "body" && s.w > 0 && s.h > 0 && s.y >= TITLE_BAND && s.y <= FOOTER_BAND;
+  });
+  if (cells.length < 2) return null;
+  const group = tagGroupSlots(cells, false).slots;
+  return dominantValueSlot(group, layout) ? markKpiValue({ kind: "kpi", groups: [group] }, layout) : null;
 }
 
 /** True when the layout is a repeated-group layout (has a group fill path). */

@@ -90,7 +90,12 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
       const para = split ? split.paragraph : p;
       return isCurrent ? boldRuns(para) : para;
     });
-    const bodyParas = c.paragraphs.filter((p) => !p.heading);
+    // #593: a KPI value box (group-layout markKpiValue) takes the FIRST body paragraph — the number; the
+    // rest flows through the heading/body slots below exactly as a value-less group's body would.
+    const valueSlot = col.find((s) => s.role === "value");
+    const allBody = c.paragraphs.filter((p) => !p.heading);
+    const bodyParas = valueSlot ? allBody.slice(1) : allBody;
+    if (valueSlot && allBody.length) out.set(valueSlot.phIdx, { idx: valueSlot.phIdx, paragraphs: allBody.slice(0, 1) });
     const headSlot = col.find((s) => s.role === "heading");
     const bodySlots = col.filter((s) => s.role === "body");
     const chromeSlot = col.find((s) => s.role === "chrome");

@@ -9,6 +9,7 @@
  */
 
 import type { PlaceholderRole } from "./template-catalog";
+import { STYLE_LAYOUTS } from "./template-layout-library-style";
 
 /** 生成テンプレの配色スロット（hex・# なし）。canonical の 14 色パレットから実使用分を昇格。 */
 export const PALETTE_KEYS = [
@@ -330,4 +331,6 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
     { name: "Body.Center", type: "body", idx: 1, x: 0.8, y: 1.45, w: 11.7, h: 5.4, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
     { name: "SlideNum.Footer", type: "sldNum", idx: 50, x: 12.0, y: 7.05, w: 1.2, h: 0.3, fontSize: 10, font: "minor", color: "muted", bold: false, align: "r" },
   ]},
+  // 32-34: スタイル別の共通構造（#593）— 定義は template-layout-library-style.ts
+  ...STYLE_LAYOUTS,
 ];

@@ -244,6 +244,8 @@ Usage notes:
 - Content written **before** the first separator comment does not go into any region, apart from the title/subtitle. The title (`#`) and subtitle (`>`) become the heading for the whole slide, and each region's content is written **between** the separators.
 - In each region, `### 小見出し` becomes the region's header, and bullets or paragraphs go beneath it.
 - Aside from `col` (a plain column), `kpi` / `step` / `card` / `compare` / `before`·`after` act as hints to choose the corresponding layout (KPI tiles, process, cards, comparison). `col` is a plain side-by-side layout with no hint.
+- In each `kpi` region the `### heading` is the **label**, the **first line under it is the value** (the big-number box), and the rest is the note. A slide with a single `<!-- kpi -->` picks a one-big-number layout (`KPI.1Value.Single`, or `05_ビッグナンバー` in the Magazine template).
+- When the last slide's title is a closing word (e.g. "Summary", "Next steps", or Japanese 「次のステップ」「お問い合わせ」「ご相談」), a closing layout is picked.
 
 ### Comparing two options `<!-- compare -->`
 

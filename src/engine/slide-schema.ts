@@ -42,6 +42,10 @@ export const LAYOUT_NAMES = [
   "Closing.1Message.Single",
   "Closing.1Steps.Single+1Notes",
   "SectionNav.1TitleList.Single",
+  // #593 (#580 段 2-a): スタイル別の共通構造（template-layout-library-style.ts）
+  "Statement.1Message.Single",
+  "Quote.1Message.Single+1Attribution",
+  "Closing.1CTA+1Contact",
 ] as const;
 
 export type LayoutName = (typeof LAYOUT_NAMES)[number];
