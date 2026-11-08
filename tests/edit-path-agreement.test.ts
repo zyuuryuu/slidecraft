@@ -16,6 +16,7 @@ import { resolve } from "path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import * as S from "../src/mcp/session";
+import * as E from "../src/mcp/slide-edit";
 import { buildServer } from "../src/mcp/server";
 import { applyFigureYaml, reconcileSlideEdit } from "../src/engine/ai-apply";
 import { distillDeck } from "../src/engine/distill";
@@ -614,5 +615,98 @@ describe("#106 P4 agreement: the batch edit asks with the AI panel's request (sl
     const slideMd = serializeMd({ slides: [{ ...s, layout: autoSelectLayout(s, 1, deck.slides.length, catalog) }] });
     expect(describeEditableData(s)).not.toBe(""); // the listing is really exercised
     expect(reqs).toEqual([slideEditUserPrompt(slideMd, describeEditableFields(s), "売上を 120 に", describeEditableData(s))]);
+  });
+});
+
+// ── #631 (#106 P4b): the MCP door. set_slide_markdown hands a bare JSON array to routeOpsReply — the
+// SAME door as refine/batch (R8: no MCP-own branch) — and commits the routed slide; anything else keeps
+// the Markdown path byte-identical. A malformed ops array falls back to that Markdown path WITH the notice.
+describe("#631 delegation: set_slide_markdown routes through routeOpsReply (no own branch)", () => {
+  const src = (p: string) => readFileSync(resolve(__dirname, "../src", p), "utf8");
+  it("server.ts calls applySlideEdit; slide-edit.ts calls routeOpsReply once and branches on nothing else", () => {
+    expect(src("mcp/server.ts")).toMatch(/"set_slide_markdown", \(s\) => E\.applySlideEdit\(s, a\.index, a\.markdown\)/);
+    const e = src("mcp/slide-edit.ts");
+    expect(e).toMatch(/import \{[^}]*\brouteOpsReply\b[^}]*\} from "\.\.\/engine\/slide-edit-route"/);
+    expect(e.match(/\brouteOpsReply\(/g)?.length).toBe(1);
+    expect(e).not.toMatch(/\b(parseDiagramEditOps|routeFieldEdit|routeDataEdit|parseDesignIntent|reconcileSlideEdit|bareArray)\(/);
+  });
+});
+
+describe("#631 agreement: MCP set_slide_markdown(ops) ≡ the GUI's routeSlideEdit on every ops route", () => {
+  const DECK631 = [
+    "# 表紙",
+    "# 中身\n\n- 一\n- 二\n- 三",
+    "# 表\n\n| 項目 | 値 |\n| --- | --- |\n| 売上 | 100 |",
+    "# 図\n\n- 説明\n\n```diagram\ntype: flowchart\nnodes:\n  - id: a\n    label: 受付\n  - id: b\n    label: 処理\nedges:\n  - from: a\n    to: b\n```",
+  ].join("\n\n---\n\n");
+  async function twin() {
+    const mk = async () => { const s = S.createSession(null); await S.newProject(s, templateBytes, DECK631); return s; };
+    return [await mk(), await mk()] as const;
+  }
+  const bodyOf = (sl: SlideIR) => sl.placeholders.find((p) => p.idx !== "0" && p.idx !== "15")!.idx;
+  type Case = { name: string; i: number; ops: (sl: SlideIR) => unknown[]; route: string; changed: boolean; skipped: number };
+  const cases: Case[] = [
+    { name: "setField (clean)", i: 1, ops: (sl) => [{ op: "setField", idx: bodyOf(sl), text: "一だけ" }], route: "field-ops", changed: true, skipped: 0 },
+    { name: "setField (skip: unknown idx → never-silent, nothing changed)", i: 1, ops: () => [{ op: "setField", idx: "99", text: "x" }], route: "field-ops", changed: false, skipped: 1 },
+    { name: "setCell", i: 2, ops: () => [{ op: "setCell", row: 1, col: 1, text: "120" }], route: "data-ops", changed: true, skipped: 0 },
+    { name: "diagram ops", i: 3, ops: () => [{ op: "nodeUpdate", id: "a", label: "窓口" }], route: "diagram-ops", changed: true, skipped: 0 },
+    { name: "diagram ops (skip)", i: 3, ops: () => [{ op: "nodeUpdate", id: "zz", label: "X" }], route: "diagram-ops", changed: false, skipped: 1 },
+    { name: "design intent", i: 3, ops: () => [{ op: "relayout", direction: "LR" }], route: "design", changed: true, skipped: 0 },
+  ];
+  for (const c of cases) {
+    it(c.name, async () => {
+      const [s] = await twin();
+      const old = s.deck!.slides[c.i];
+      const raw = JSON.stringify(c.ops(old));
+      const gui = routeSlideEdit(old, raw);
+      const r = E.applySlideEdit(s, c.i, raw) as Record<string, unknown>;
+      expect(r).toMatchObject({ ok: true, changed: c.changed, route: c.route, skipped: c.skipped, notices: gui.notices });
+      expect(gui.route).toBe(c.route);
+      expect(s.deck!.slides[c.i]).toEqual(gui.slide);
+      if (c.skipped > 0) expect((r.notices as string[]).length).toBeGreaterThan(0); // never-silent skip
+      if (!c.changed) expect(s.deck!.slides[c.i]).toBe(old);
+      expect(s.deck!.slides.filter((_, k) => k !== c.i)).toEqual((await twin())[0].deck!.slides.filter((_, k) => k !== c.i));
+    });
+  }
+  it("a fenced ```json ops array is routed the same way (bareArray accepts the fence)", async () => {
+    const [s] = await twin();
+    const old = s.deck!.slides[1];
+    const raw = "```json\n" + JSON.stringify([{ op: "setField", idx: bodyOf(old), text: "一だけ" }]) + "\n```";
+    expect(E.applySlideEdit(s, 1, raw)).toMatchObject({ ok: true, changed: true, route: "field-ops" });
+    expect(s.deck!.slides[1]).toEqual(routeSlideEdit(old, raw).slide);
+  });
+  it("malformed ops array → full-text fallback through the MCP Markdown path, with the notice (never silent)", async () => {
+    const [s, md] = await twin();
+    const raw = JSON.stringify([{ op: "setField", idx: bodyOf(s.deck!.slides[1]) }]);
+    const gui = routeSlideEdit(s.deck!.slides[1], raw);
+    expect(gui.route).toBe("fallback");
+    const r = E.applySlideEdit(s, 1, raw);
+    expect(r).toEqual({ ...S.applySlideMarkdown(md, 1, raw), route: "fallback", notices: gui.notices });
+    expect(gui.notices.length).toBe(1);
+    expect(s.deck).toEqual(md.deck);
+  });
+  it("Markdown (and a bare array no ops route claims) keeps the pre-#631 path byte-identical (result + deck)", async () => {
+    for (const raw of ["# 中身\n\n- 一\n- 二", "[1, 2]"]) {
+      const [s, md] = await twin();
+      expect(E.applySlideEdit(s, 1, raw)).toEqual(S.applySlideMarkdown(md, 1, raw));
+      expect(s.deck).toEqual(md.deck);
+      expect(s.parseNotices).toEqual(md.parseNotices);
+    }
+  });
+  it("through the MCP envelope: ok:true + rev + route, afterMd carries the edit; guards still reject", async () => {
+    const server = buildServer(S.createSession(null));
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await server.connect(st);
+    const c = new Client({ name: "test", version: "1.0.0" });
+    await c.connect(ct);
+    const call = async (name: string, args: Record<string, unknown>) =>
+      JSON.parse(((await c.callTool({ name, arguments: args })) as unknown as { content: Array<{ text: string }> }).content[0].text) as Record<string, unknown>;
+    await call("new_project", { templateBase64: templateBytes.toString("base64"), markdown: DECK631 });
+    const [s] = await twin();
+    const raw = JSON.stringify([{ op: "setField", idx: bodyOf(s.deck!.slides[1]), text: "一だけ" }]);
+    const r = await call("set_slide_markdown", { index: 1, markdown: raw });
+    expect(r).toMatchObject({ ok: true, changed: true, route: "field-ops", skipped: 0, notices: [], rev: 1 });
+    expect(String(r.afterMd)).toContain("一だけ");
+    expect(await call("set_slide_markdown", { index: 99, markdown: raw })).toMatchObject({ ok: false, code: "index-out-of-range" });
   });
 });
