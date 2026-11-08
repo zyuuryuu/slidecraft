@@ -162,10 +162,10 @@ export default function DiagramEditor({
           title={mermaidIncompatible ? t("diagramEditor.mermaidIncompatibleHint") : t("diagramEditor.selectEditFormat")}
           className="px-2 py-0.5 bg-field border border-edge rounded text-[11px] text-fg hover:border-accent/60"
         >
-          <option value="yaml">YAML</option>
-          <option value="json">JSON</option>
+          <option value="yaml">{t("diagramEditor.formatYaml")}</option>
+          <option value="json">{t("diagramEditor.formatJson")}</option>
           <option value="mermaid" disabled={mermaidIncompatible && mode !== "mermaid"}>
-            {mermaidIncompatible && mode !== "mermaid" ? t("diagramEditor.mermaidNotConvertible") : "MERMAID"}
+            {mermaidIncompatible && mode !== "mermaid" ? t("diagramEditor.mermaidNotConvertible") : t("diagramEditor.formatMermaid")}
           </option>
         </select>
       </div>
@@ -183,7 +183,7 @@ export default function DiagramEditor({
           {validationError}
         </div>
       ) : textValue.trim() && mode !== "mermaid" ? (
-        <div className="mt-1 text-[10px] text-cyan">✓ valid</div>
+        <div className="mt-1 text-[10px] text-cyan">{t("diagramEditor.valid")}</div>
       ) : null}
       {mode !== "mermaid" && !validationError && slide.diagram?.yaml ? (
         <EdgeStyleControls diagramYaml={slide.diagram.yaml} onChange={onUpdateDiagramYaml} />
