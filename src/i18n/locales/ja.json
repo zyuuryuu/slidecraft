@@ -302,6 +302,15 @@
     "cancel": "キャンセル",
     "commit": "✓ スライドにする"
   },
+  "noticeSlot": {
+    "hiddenTitle": "ほかに {{count}} 件の通知があります（{{names}}）。いま出ている帯が終わると表示されます。",
+    "separator": "・",
+    "kind": {
+      "adjust": "テンプレ調整",
+      "intake": "取り込み",
+      "update": "更新のお知らせ"
+    }
+  },
   "updateBanner": {
     "message": "新しいバージョン（v{{version}}）が利用可能です。GitHub Releases から更新してください。",
     "dismiss": "閉じる"

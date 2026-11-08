@@ -98,10 +98,20 @@ fn resolve_weights(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 /// SHA256 of a file, streamed (never buffers the whole ~2.4 GB).
 fn sha256_file(path: &Path) -> Result<String, String> {
     use sha2::{Digest, Sha256};
+    use std::io::Read;
     let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
-    Ok(format!("{:x}", hasher.finalize()))
+    // sha2 ≥0.11: the digest no longer implements io::Write and finalize() has no LowerHex — stream
+    // 1 MiB chunks through update() and hex-format the bytes ourselves.
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = file.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect())
 }
 
 /// True if the model is available (the file exists, or the SLIDECRAFT_GGUF dev override is set).
@@ -258,9 +268,14 @@ fn choose_parallel(gguf: &Path) -> (u32, u32) {
     const MARGIN_MB: u64 = 1536; // OS + runtime headroom
     const MAX_SLOTS: u32 = 3; // cap (the observed acceptable parallelism)
 
-    let mut sys = sysinfo::System::new();
-    sys.refresh_memory();
-    let avail_mb = sys.available_memory() / 1024 / 1024;
+    // sysinfo ≥0.40: System::new() is fallible. On failure assume no headroom (→ 1 slot).
+    let avail_mb = sysinfo::System::new()
+        .ok()
+        .map(|mut sys| {
+            sys.refresh_memory();
+            sys.available_memory() / 1024 / 1024
+        })
+        .unwrap_or(0);
     let weights_mb = std::fs::metadata(gguf).map(|m| m.len() / 1024 / 1024).unwrap_or(6144);
 
     let mut slots = 1u32;
