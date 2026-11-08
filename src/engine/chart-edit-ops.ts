@@ -16,20 +16,25 @@
 import { z } from "zod";
 import type { SlideIR } from "./slide-schema";
 import { bareArray } from "./field-edit-ops";
+import { applyToFigure, readFigureRaw, type RawDiagram } from "./design-intent";
 
 const Index = z.number().int().nonnegative();
 
 const SetCellOp = z.object({ op: z.literal("setCell"), row: Index, col: Index, text: z.string() });
+// series: 0-based position in the chart's series list, or its exact name.
+const SetSeriesValueOp = z.object({ op: z.literal("setSeriesValue"), series: z.union([Index, z.string()]), index: Index, value: z.number() });
 
-export const DataEditOpsSchema = z.array(z.discriminatedUnion("op", [SetCellOp])).min(1);
+export const DataEditOpsSchema = z.array(z.discriminatedUnion("op", [SetCellOp, SetSeriesValueOp])).min(1);
 export type DataEditOps = z.infer<typeof DataEditOpsSchema>;
 export type DataEditOp = DataEditOps[number];
-const DATA_OPS = new Set(["setCell"]);
+type CellOp = z.infer<typeof SetCellOp>;
+type FigureOp = Exclude<DataEditOp, CellOp>;
+const DATA_OPS = new Set(["setCell", "setSeriesValue"]);
 
 /** A DATA op that didn't take effect — surfaced never-silently (mirrors SkippedFieldOp). */
 export interface SkippedDataOp {
   op: DataEditOp["op"];
-  reason: "no-table" | "out-of-range" | "multiline-cell";
+  reason: "no-table" | "out-of-range" | "multiline-cell" | "no-chart" | "unparseable-figure" | "unknown-series";
   message: string; // human, Japanese — ready to show as a notice
 }
 
@@ -52,7 +57,7 @@ export function malformedDataOpsNotice(raw: string): string | null {
 
 // ── Table: setCell writes slide.table.rows[row][col] (row 0 = the header row when table.header) ──
 
-function applyCells(slide: SlideIR, ops: Array<z.infer<typeof SetCellOp>>, skipped: SkippedDataOp[]): SlideIR {
+function applyCells(slide: SlideIR, ops: CellOp[], skipped: SkippedDataOp[]): SlideIR {
   const t = slide.table;
   if (!t) {
     for (const o of ops) skipped.push({ op: o.op, reason: "no-table", message: "setCell: このスライドには表がないため適用しませんでした。" });
@@ -78,6 +83,56 @@ function applyCells(slide: SlideIR, ops: Array<z.infer<typeof SetCellOp>>, skipp
   return dirty ? { ...slide, table: { ...t, rows } } : slide;
 }
 
+// ── Figure data: written into the figure's raw YAML via applyToFigure (P1's re-dump; a Mermaid figure
+// graduates to the canonical diagram, exactly as a figure op does) ──
+
+type Series = { name?: unknown; values?: unknown[] };
+const listOf = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const quoted = (names: string[]): string => names.map((n) => `「${n}」`).join("・") || "なし";
+
+/** The chart object a setSeriesValue edits: xychart or radar (by the figure's type). */
+function seriesChart(raw: RawDiagram): { series: Series[]; slots: string } | null {
+  const c = (raw.type === "xychart" ? raw.xychart : raw.type === "radar" ? raw.radar : null) as { series?: unknown } | null | undefined;
+  return c ? { series: listOf<Series>(c.series), slots: raw.type === "xychart" ? "カテゴリ" : "軸" } : null;
+}
+
+const NO_CHART: Record<FigureOp["op"], string> = {
+  setSeriesValue: "setSeriesValue: このスライドの図は折れ線・棒（xychart）／レーダー（radar）ではないため適用しませんでした。",
+};
+
+/** Apply one figure op to the raw YAML object. Returns true when it changed a value. */
+function applyFigureOp(raw: RawDiagram, o: FigureOp, skip: (reason: SkippedDataOp["reason"], message: string) => void): boolean {
+  switch (o.op) {
+    case "setSeriesValue": {
+      const chart = seriesChart(raw);
+      if (!chart) { skip("no-chart", NO_CHART[o.op]); return false; }
+      const names = chart.series.map((x, i) => (x.name ? String(x.name) : `#${i}`));
+      const ser = typeof o.series === "number" ? chart.series[o.series] : chart.series.find((x) => String(x.name ?? "") === o.series);
+      if (!ser) { skip("unknown-series", `setSeriesValue: 系列 ${JSON.stringify(o.series)} が見つからず適用しませんでした（系列: ${quoted(names)}）`); return false; }
+      const values = listOf<unknown>(ser.values);
+      if (o.index >= values.length) { skip("out-of-range", `setSeriesValue: index ${o.index} は範囲外のため適用しませんでした（値は ${values.length} 個・0 始まり）`); return false; }
+      if (values[o.index] === o.value) return false;
+      values[o.index] = o.value;
+      ser.values = values;
+      return true;
+    }
+  }
+}
+
+function applyFigureOps(slide: SlideIR, ops: FigureOp[], skipped: SkippedDataOp[]): SlideIR {
+  const all = (reason: SkippedDataOp["reason"], message: (o: FigureOp) => string): SlideIR => {
+    for (const o of ops) skipped.push({ op: o.op, reason, message: message(o) });
+    return slide;
+  };
+  if (!slide.diagram && !slide.mermaidBlock) return all("no-chart", (o) => NO_CHART[o.op]);
+  if (readFigureRaw(slide) === null) return all("unparseable-figure", (o) => `${o.op}: 図の定義を解析できないため適用しませんでした（図の記述に不正がある可能性）。`);
+  let dirty = false;
+  const out = applyToFigure(slide, (_spec, raw) => {
+    for (const o of ops) if (applyFigureOp(raw, o, (reason, message) => skipped.push({ op: o.op, reason, message }))) dirty = true;
+  });
+  return dirty ? out : slide;
+}
+
 /**
  * Merge DATA ops in order. Each target kind is applied once, in the order the ops name them; within a
  * kind the ops apply in sequence (a later op sees an earlier one's write). Untouched content stays the
@@ -85,9 +140,11 @@ function applyCells(slide: SlideIR, ops: Array<z.infer<typeof SetCellOp>>, skipp
  */
 export function applyDataEditOps(slide: SlideIR, ops: DataEditOps): { slide: SlideIR; skipped: SkippedDataOp[] } {
   const skipped: SkippedDataOp[] = [];
-  const cells = ops.filter((o): o is z.infer<typeof SetCellOp> => o.op === "setCell");
+  const cells = ops.filter((o): o is CellOp => o.op === "setCell");
+  const figure = ops.filter((o): o is FigureOp => o.op !== "setCell");
   let out = slide;
   if (cells.length > 0) out = applyCells(out, cells, skipped);
+  if (figure.length > 0) out = applyFigureOps(out, figure, skipped);
   return { slide: out, skipped };
 }
 
@@ -115,6 +172,14 @@ export function describeEditableData(slide: SlideIR): string {
   if (t && t.rows.length > 0) {
     out.push(`Table (setCell row/col, 0-based${t.header ? "; row 0 = header" : ""}):`);
     t.rows.forEach((r, i) => out.push(`- row ${i}: ${JSON.stringify(r)}`));
+  }
+  const raw = slide.diagram || slide.mermaidBlock ? readFigureRaw(slide) : null;
+  const chart = raw ? seriesChart(raw) : null;
+  if (raw && chart) {
+    const c = (raw.type === "xychart" ? raw.xychart : raw.radar) as { categories?: unknown; axes?: unknown };
+    out.push(`Chart series (setSeriesValue series/index, 0-based):`);
+    out.push(raw.type === "xychart" ? `- categories: ${JSON.stringify(listOf(c.categories))}` : `- axes: ${JSON.stringify(listOf(c.axes))}`);
+    chart.series.forEach((x, i) => out.push(`- series ${i} ${JSON.stringify(String(x.name ?? ""))}: ${JSON.stringify(listOf(x.values))}`));
   }
   return out.join("\n");
 }

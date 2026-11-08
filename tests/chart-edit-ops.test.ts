@@ -21,9 +21,17 @@ import {
 import { parseFieldEditOps } from "../src/engine/field-edit-ops";
 import { parseDiagramEditOps } from "../src/engine/diagram-edit-ops";
 import { parseDesignIntent } from "../src/engine/design-intent";
+import { DiagramSpecSchema, type DiagramSpec } from "../src/engine/schema";
+import { loadYaml } from "../src/engine/yaml-io";
+import * as yaml from "js-yaml";
 
 /** Parse a one-slide Markdown deck (the GUI Markdown editor's write: handleSlideMdChange → parseMd). */
 const md1 = (md: string): SlideIR => parseMd(md).slides[0];
+
+/** The figure as the renderer sees it (schema-parsed DiagramSpec). */
+const specOf = (s: SlideIR): DiagramSpec => DiagramSpecSchema.parse(loadYaml(s.diagram!.yaml));
+/** A one-figure slide; `body` is the figure YAML. */
+const figMd = (body: string): string => `# グラフ\n\n\`\`\`diagram\n${body}\n\`\`\``;
 
 // ── Table (setCell) ──
 
@@ -152,5 +160,93 @@ describe("describeEditableData — the table listing handed to the model", () =>
   });
   it("is empty for a slide without a table or chart", () => {
     expect(describeEditableData(md1("# 見出し\n\n- a"))).toBe("");
+  });
+});
+
+// ── Chart series (setSeriesValue: xychart / radar) ──
+
+const XY = ["type: xychart", "nodes: []", "xychart:", "  categories: [Q1, Q2, Q3]", "  series:", "    - kind: bar", "      name: 売上", "      values: [10, 20, 30]", "    - kind: line", "      name: 利益", "      values: [1, 2, 3]"].join("\n");
+const RADAR = ["type: radar", "nodes: []", "radar:", "  axes: [速度, 品質, 価格]", "  max: 5", "  series:", "    - name: 自社", "      values: [4, 5, 3]", "    - name: 競合", "      values: [3, 3, 5]"].join("\n");
+
+describe("applyDataEditOps — setSeriesValue", () => {
+  it("parses with the series named by 0-based index or by name", () => {
+    expect(parseDataEditOps('[{"op":"setSeriesValue","series":0,"index":1,"value":25}]')).toEqual([{ op: "setSeriesValue", series: 0, index: 1, value: 25 }]);
+    expect(parseDataEditOps('[{"op":"setSeriesValue","series":"利益","index":2,"value":3.5}]')).toEqual([{ op: "setSeriesValue", series: "利益", index: 2, value: 3.5 }]);
+    expect(parseDataEditOps('[{"op":"setSeriesValue","series":0,"index":1,"value":"25"}]')).toBeNull(); // value must be a number
+  });
+
+  const cases: Array<[string, string, Record<string, unknown>, [string, string]]> = [
+    ["xychart by index", XY, { series: 0, index: 1, value: 25 }, ["values: [10, 20, 30]", "values: [10, 25, 30]"]],
+    ["xychart by name", XY, { series: "利益", index: 2, value: 3.5 }, ["values: [1, 2, 3]", "values: [1, 2, 3.5]"]],
+    ["radar by name", RADAR, { series: "競合", index: 0, value: 4 }, ["values: [3, 3, 5]", "values: [4, 3, 5]"]],
+  ];
+  for (const [name, body, op, [from, to]] of cases) {
+    it(`(b) R8: setSeriesValue ≡ editing the figure YAML in the slide Markdown — ${name}`, () => {
+      const slide = md1(figMd(body));
+      const direct = md1(figMd(body.replace(from, to)));
+      const viaOps = applyDataEditOps(slide, [{ op: "setSeriesValue", ...op } as never]);
+      expect(viaOps.skipped).toEqual([]);
+      expect(specOf(viaOps.slide)).toEqual(specOf(direct));
+      expect(viaOps.slide.placeholders).toBe(slide.placeholders);
+      expect(viaOps.slide.diagram!.placeholderIdx).toBe(slide.diagram!.placeholderIdx);
+    });
+  }
+
+  it("(a) on a canonically dumped figure only the edited value's line changes (rest byte-identical)", () => {
+    const canon = yaml.dump(loadYaml(XY), { lineWidth: 1000 });
+    const slide: SlideIR = { layout: "auto", placeholders: [], diagram: { yaml: canon, placeholderIdx: "1" } };
+    const out = applyDataEditOps(slide, [{ op: "setSeriesValue", series: 1, index: 0, value: 7 }]).slide.diagram!.yaml;
+    const a = canon.split("\n");
+    const b = out.split("\n");
+    expect(b.length).toBe(a.length);
+    expect(a.filter((l, i) => l !== b[i])).toEqual(["        - 1"]);
+    expect(b.filter((l, i) => l !== a[i])).toEqual(["        - 7"]);
+  });
+
+  it("(c) unknown series / out-of-range index are skipped and announced with the candidates", () => {
+    const slide = md1(figMd(XY));
+    const { slide: out, skipped } = applyDataEditOps(slide, [
+      { op: "setSeriesValue", series: "費用", index: 0, value: 1 },
+      { op: "setSeriesValue", series: 2, index: 0, value: 1 },
+      { op: "setSeriesValue", series: 0, index: 3, value: 1 },
+    ]);
+    expect(out).toBe(slide); // nothing applied → original slide (no spurious re-dump)
+    expect(skipped.map((s) => s.reason)).toEqual(["unknown-series", "unknown-series", "out-of-range"]);
+    expect(skipped[0].message).toContain("売上");
+    expect(skipped[0].message).toContain("利益");
+    expect(skipped[2].message).toMatch(/3 個/);
+  });
+  it("(c) a slide whose figure is not an xychart/radar (or has no figure) skips and announces", () => {
+    const flow = md1(figMd("type: flowchart\nnodes:\n  - id: a\n    label: A"));
+    expect(applyDataEditOps(flow, [{ op: "setSeriesValue", series: 0, index: 0, value: 1 }]).skipped[0].reason).toBe("no-chart");
+    const plain = md1("# 見出し");
+    const r = applyDataEditOps(plain, [{ op: "setSeriesValue", series: 0, index: 0, value: 1 }]);
+    expect(r.slide).toBe(plain);
+    expect(r.skipped[0].reason).toBe("no-chart");
+  });
+  it("(c) a figure that fails the schema is skipped as unparseable (never silently dropped)", () => {
+    const bad = md1(figMd(XY.replace("nodes: []\n", "")));
+    const r = applyDataEditOps(bad, [{ op: "setSeriesValue", series: 0, index: 0, value: 1 }]);
+    expect(r.slide).toBe(bad);
+    expect(r.skipped[0].reason).toBe("unparseable-figure");
+  });
+  it("a table op and a series op in one reply both apply (one DATA kind per reply)", () => {
+    const md = `${TABLE_MD}\n\n\`\`\`diagram\n${XY}\n\`\`\``;
+    const slide = md1(md);
+    const { slide: out, skipped } = applyDataEditOps(slide, [
+      { op: "setCell", row: 1, col: 1, text: "101" },
+      { op: "setSeriesValue", series: 0, index: 0, value: 11 },
+    ]);
+    expect(skipped).toEqual([]);
+    expect(out.table!.rows[1][1]).toBe("101");
+    expect(specOf(out).xychart!.series[0].values).toEqual([11, 20, 30]);
+  });
+  it("describeEditableData lists categories/axes and each series with its index", () => {
+    const d = describeEditableData(md1(figMd(XY)));
+    expect(d).toMatch(/setSeriesValue/);
+    expect(d).toContain('categories: ["Q1","Q2","Q3"]');
+    expect(d).toContain('- series 0 "売上": [10,20,30]');
+    expect(d).toContain('- series 1 "利益": [1,2,3]');
+    expect(describeEditableData(md1(figMd(RADAR)))).toContain('axes: ["速度","品質","価格"]');
   });
 });
