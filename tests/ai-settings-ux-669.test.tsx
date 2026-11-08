@@ -215,6 +215,8 @@ describe("#669-2 ⚙ の「AI 接続設定」項目に「…」を戻す（呼�
   });
 
   it("⚙ メニューの項目は「AI 接続設定…」（ja）／「AI connection settings…」（en）", async () => {
+    // useTheme（ThemeToggle）は <html data-theme> を読む — node 環境にその 1 属性だけ渡す（先例 toolbar-settings-614）。
+    vi.stubGlobal("document", { documentElement: { getAttribute: () => "dark", setAttribute: noop } });
     const panel = () => renderToStaticMarkup(<SettingsPanel onClose={noop} onAiSettings={noop} />);
     expect(panel()).toContain("✨ AI 接続設定…");
     await i18n.changeLanguage("en");
