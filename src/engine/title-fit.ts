@@ -56,7 +56,9 @@ export function slideRoleContent(slide: SlideIR, role: "title" | "body"): Placeh
 
 const textOf = (p: Paragraph) => p.segments.map((s) => s.text).join("");
 
-function measure(paragraphs: readonly Paragraph[], style: { w: number; h: number }, pt: number): { lines: number; maxLines: number } {
+/** Estimated wrapped lines of `paragraphs` at `pt` in a box, and the lines the box holds. Also read by
+ *  kpi-overflow (#643: a KPI value must stay on one line) so there is ONE width estimate (R8). */
+export function measureLines(paragraphs: readonly Paragraph[], style: { w: number; h: number }, pt: number): { lines: number; maxLines: number } {
   const maxW = (style.w - 2 * INSET_IN) * 72; // pt, same unit as estTextWidth(…, pt)
   const lines = paragraphs.reduce((n, p) => n + (textOf(p) ? wrapToWidth(textOf(p), maxW, pt).length : 1), 0);
   // A title box shorter than one line still shows one line (title bands are often < 1.2em tall).
@@ -72,9 +74,9 @@ export function fitTitle(paragraphs: readonly Paragraph[], style: { w: number; h
   // Nothing to measure (no text, no size, no usable width) → leave the title alone.
   if (basePt <= 0 || style.w <= 2 * INSET_IN + basePt / 72 || !paragraphs.some((p) => textOf(p).trim())) return unchanged;
 
-  let last = { pt: basePt, ...measure(paragraphs, style, basePt) };
+  let last = { pt: basePt, ...measureLines(paragraphs, style, basePt) };
   for (let pt = basePt; pt >= minPt; pt -= STEP_PT) {
-    last = { pt, ...measure(paragraphs, style, pt) };
+    last = { pt, ...measureLines(paragraphs, style, pt) };
     if (last.lines <= last.maxLines) return { basePt, fontPt: pt, minPt, fits: true, lines: last.lines, maxLines: last.maxLines };
   }
   return { basePt, fontPt: last.pt, minPt, fits: false, lines: last.lines, maxLines: last.maxLines };
