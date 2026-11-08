@@ -35,6 +35,7 @@ export type ReviewRuleId =
   | "pre-separator-dropped"
   | "section-footer-injected"
   | "missing-column-layout"
+  | "overflow-scale-hint"
   | "field-row-rescued"
   | "marker-layout-missing";
 
@@ -67,6 +68,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "pre-separator-dropped", level: "warn" },
   { id: "section-footer-injected", level: "info" },
   { id: "missing-column-layout", level: "info" },
+  { id: "overflow-scale-hint", level: "info" }, // #570 段 3: 本文倍率の提案（MCP get_deck_issues が overflow-scale-hint.ts で足す）
   { id: "field-row-rescued", level: "info" },
   { id: "marker-layout-missing", level: "info" },
 ];

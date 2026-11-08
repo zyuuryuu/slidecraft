@@ -27,7 +27,7 @@ export type PaletteKey = (typeof PALETTE_KEYS)[number];
 
 export interface LayoutPhDef {
   name: string;
-  type: string; // "body" | "ctrTitle" | "subTitle" | "sldNum"
+  type: string; // "body" | "ctrTitle" | "subTitle" | "sldNum" | "pic"（画像枠＝picture 役・#594）
   idx: number;
   x: number; y: number; w: number; h: number; // inches
   fontSize: number; // pt
@@ -55,6 +55,7 @@ export interface LayoutDecoDef {
 export interface LayoutDef {
   name: string;
   family: "dark" | "light"; // dark=background 塗り / light=canvas 塗り＋ヘッダーバー
+  bg?: PaletteKey; // 背景色の上書き（色面の章扉・ダーク表紙。#594）。省略時は family 由来
   decos?: LayoutDecoDef[]; // family 由来の自動装飾に追加する固有装飾
   placeholders: LayoutPhDef[];
 }
