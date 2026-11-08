@@ -51,7 +51,7 @@
     "@tauri-apps/plugin-fs": "^2.7.1",
     "@tauri-apps/plugin-http": "^2.8.3",
     "@tauri-apps/plugin-opener": "^2.7.2",
-    "harfbuzzjs": "^0.10.3",
+    "harfbuzzjs": "^1.6.4",
     "i18next": "^26.7.1",
     "js-yaml": "^5.5.0",
     "jszip": "^3.10.2",
