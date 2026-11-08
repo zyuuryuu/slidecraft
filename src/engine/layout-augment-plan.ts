@@ -207,8 +207,10 @@ export function columnAugmentHint(
   resolvedName: string,
 ): string | undefined {
   if (slide.layout !== "auto" || slide.groupKind) return undefined;
-  const { role, regions } = slideRoleRegions(slide, slideIndex, totalSlides);
+  const { role, regions, visual } = slideRoleRegions(slide, slideIndex, totalSlides);
   if (role !== "columns" || !AUGMENT_COLUMNS.includes(regions as ColumnCount)) return undefined;
+  // #598: images alone placed in an image-structure layout (Gallery.*) — not a missing column layout.
+  if (visual && catalog.find((e) => e.name === resolvedName)?.role === visual.role) return undefined;
   let plan = planCache.get(catalog);
   if (!plan) planCache.set(catalog, (plan = planAugmentation({ layouts: [...layouts] }, catalog)));
   if (!plan.add.some((a) => a.columns === regions)) return undefined;

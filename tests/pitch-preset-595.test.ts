@@ -246,7 +246,11 @@ describe("(d) golden: 全レイアウト見本 fixture", () => {
 describe("(e) 既存出力の不変", () => {
   it("スタイル専用 LayoutDef は BUILTIN_LAYOUTS に入らない（既存 TemplateSpec の出力は変わらない）", () => {
     const builtin = new Set(BUILTIN_LAYOUTS.map((d) => d.name));
-    expect(PRESET_LAYOUTS.map((d) => d.name)).toEqual(["Media.1Body+1Image", "Summary.3Block.Equal", "Closing.1Ask+1Decision"]);
+    expect(PRESET_LAYOUTS.map((d) => d.name)).toEqual([
+      "Media.1Body+1Image", "Summary.3Block.Equal", "Closing.1Ask+1Decision",
+      // #598 Campaign
+      "Image.FullBleed+1Caption", "Media.1Caption+1Image", "Gallery.2Image.Equal", "Gallery.4Image.Grid", "Section.1Title.ColorField", "Closing.1Notes.Bottom",
+    ]);
     for (const d of PRESET_LAYOUTS) expect(builtin.has(d.name)).toBe(false);
   });
 });

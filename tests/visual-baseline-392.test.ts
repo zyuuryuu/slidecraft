@@ -43,12 +43,13 @@ beforeAll(async () => {
   for (const f of TEMPLATES) loaded[f] = await loadTemplate(readFileSync(resolve(TPL_DIR, f)));
 });
 
-// #595 Pitch・#596 エグゼクティブ（writer プリセット）を出荷に追加 → 入力は 5 本（既存 3 本の snapshot は不変）。
+// #595 Pitch・#596 エグゼクティブ・#598 マーケ（writer プリセット）を出荷に追加 → 入力は 6 本（既存の snapshot は不変）。
 it("#392 段 0: the shipped templates are the input (committed under public/)", () => {
   expect(TEMPLATES).toEqual([
     "エグゼクティブ_Executive_TemplateOnly.pptx", // #596 で追加（5 本目）
     "セールスピッチ_Pitch_TemplateOnly.pptx", // #595 で追加（4 本目）。既存 3 本の golden は不変
     "ビジュアルデッキ_マガジン_TemplateOnly.pptx",
+    "マーケ_Campaign_TemplateOnly.pptx", // #598 で追加（6 本目）。既存 5 本の golden は不変
     "技術報告_スタンダード水色_TemplateOnly.pptx",
     "配布資料_公文書高密度_TemplateOnly.pptx",
   ]);
