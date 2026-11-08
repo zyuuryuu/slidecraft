@@ -16,7 +16,7 @@
  */
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { phaseFraction, type IntakeSummary, type IntakeProgress } from "./apply-template";
+import { phaseFraction, augmentStructureLabel, type IntakeSummary, type IntakeProgress } from "./apply-template";
 import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
 import { findLayout, type TemplateData } from "../engine/template-loader";
 import { parseMd } from "../engine/md-parser";
@@ -24,6 +24,7 @@ import type { DeckIR } from "../engine/slide-schema";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { buildCatalog } from "../engine/template-catalog";
 import { planAugmentation, type AugmentPlan } from "../engine/layout-augment-plan";
+import { ALL_AUGMENT_STRUCTURES } from "../engine/layout-augment-structures";
 
 // A mini WYSIWYG preview of a re-made layout: the SAME SlideCard the editor uses, rendered tiny with a
 // dummy-filled sample slide — so the user SEES what each mapped layout looks like, not just its name.
@@ -193,7 +194,8 @@ export default function IntakeSummaryBar({
     [t],
   );
   // #568: what 「テンプレを強化」 would add to the ACTIVE template (pure plan; nothing is written here).
-  const augment = useMemo(() => (onAugment && template ? planAugmentation(template, buildCatalog(template)) : null), [onAugment, template]);
+  // #568 段 3: 「無い構造を全部足す」— N 列・比較・カード 3・KPI 3/4 のうちテンプレに無いもの。
+  const augment = useMemo(() => (onAugment && template ? planAugmentation(template, buildCatalog(template), { structures: ALL_AUGMENT_STRUCTURES }) : null), [onAugment, template]);
   if (!busy && !result) return null;
 
   // Only offer 「詳細」 when there's something to expand — a clean faithful Import has no theme,
@@ -242,7 +244,7 @@ export default function IntakeSummaryBar({
                   onClick={() => onAugment?.(augment)}
                   className="text-accent-soft hover:text-fg border border-accent/40 rounded px-1.5"
                 >
-                  {t("intake.augmentButton", { what: augment.add.map((a) => t("applyTemplate.augmentColumns", { n: a.columns })).join(t("applyTemplate.repairPartSeparator")) })}
+                  {t("intake.augmentButton", { what: augment.add.map((a) => augmentStructureLabel(a.structure)).join(t("applyTemplate.repairPartSeparator")) })}
                 </button>
               )}
               {augment && augment.add.length === 0 && augment.reason && augment.skipped.some((x) => x.reason === augment.reason) && (

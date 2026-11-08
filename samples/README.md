@@ -44,6 +44,7 @@ SlideCraft をさまざまな入力で触って検証するためのサンプル
 | `deck-02-diagrams.md` | 図解（7枚） | **flowchart×4＋sequence をネイティブ編集**（YAML/JSON/Mermaid 切替の動作確認） |
 | `deck-03-report-charts.md` | 四半期レポート | KPIカード/radar/xychart/表 の報告グラフ |
 | `deck-04-stress-edgecases.md` | 診断発火用 | **整形レビューを全レバー発火**（⚠5/💡4：溢れ/長文/key-value/タイトル無し） |
+| `deck-05-report-form.md` | 報告書（7枚） | `manuscript-01` の**報告書版**。スタイル比較の基準デッキ（#597）。番号付き見出し・注記（※）・`Takeaway:`/`Source:`。`npx tsx scripts/style-metrics.ts samples/deck-05-report-form.md` で文字量・画像面積比・余白率・消失件数・自動分割を JSON 出力 |
 
 ## 注意（ネイティブ図の型）
 

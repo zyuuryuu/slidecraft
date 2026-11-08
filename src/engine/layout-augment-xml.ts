@@ -48,6 +48,45 @@ export function setLevelSizes(sp: string, sizes: ReadonlyMap<number, number>): s
   return /<p:extLst\b/.test(sp) ? sp.replace(/<p:extLst\b/, `${tx}<p:extLst`) : sp.replace(/<\/p:sp>$/, `${tx}</p:sp>`);
 }
 
+export interface LevelProps {
+  bold?: boolean; // defRPr@b="1"
+  algn?: "ctr"; // lvlNpPr@algn
+  noBullet?: boolean; // <a:buNone/> と marL/indent 0（見出し・KPI の数値/ラベル）
+}
+
+/** pPr の子のうち箇条記号の要素（スキーマ順: … buFont, [buNone|buAutoNum|buChar|buBlip], tabLst, defRPr, extLst）。 */
+const BULLET_RE = /<a:bu(?:None|AutoNum|Char|Blip)\b(?:[^>]*\/>|[^>]*>[\s\S]*?<\/a:bu(?:AutoNum|Char|Blip)>)/;
+
+/** lstStyle の lvl k に太字・揃え・箇条なしを書く。lvl k が無ければ作る（setLevelSizes の後に呼ぶ想定）。 */
+export function setLevelProps(sp: string, k: number, props: LevelProps): string {
+  const withLvl = lvlRe(k).test(sp.match(/<a:lstStyle>([\s\S]*?)<\/a:lstStyle>/)?.[1] ?? "") ? sp : setLevelSizes(sp, new Map());
+  return withLvl.replace(/<a:lstStyle>([\s\S]*?)<\/a:lstStyle>/, (_all, inner: string) => {
+    let s = inner;
+    if (!lvlRe(k).test(s)) s = s + `<a:lvl${k}pPr></a:lvl${k}pPr>`; // keep schema order: callers write lvl1 only
+    const m = s.match(lvlRe(k))!;
+    let attrs = m[1];
+    let body = m[2] ?? "";
+    const setAttr = (a: string, name: string, v: string) => (new RegExp(`\\s${name}="`).test(a) ? a.replace(new RegExp(`(\\s${name}=")[^"]*"`), `$1${v}"`) : `${a} ${name}="${v}"`);
+    if (props.noBullet) {
+      attrs = setAttr(setAttr(attrs, "marL", "0"), "indent", "0");
+      if (BULLET_RE.test(body)) body = body.replace(BULLET_RE, "<a:buNone/>");
+      else {
+        const at = body.search(/<a:tabLst\b|<a:defRPr\b|<a:extLst\b/);
+        body = at === -1 ? body + "<a:buNone/>" : body.slice(0, at) + "<a:buNone/>" + body.slice(at);
+      }
+    }
+    if (props.algn) attrs = setAttr(attrs, "algn", props.algn);
+    if (props.bold) {
+      if (/<a:defRPr\b/.test(body)) body = body.replace(/<a:defRPr\b([^>]*?)(\/?)>/, (_d, a: string, c: string) => `<a:defRPr${setAttr(a, "b", "1")}${c}>`);
+      else {
+        const at = body.search(/<a:extLst\b/);
+        body = at === -1 ? body + '<a:defRPr b="1"/>' : body.slice(0, at) + '<a:defRPr b="1"/>' + body.slice(at);
+      }
+    }
+    return `<a:lstStyle>${s.slice(0, m.index!)}<a:lvl${k}pPr${attrs}>${body}</a:lvl${k}pPr>${s.slice(m.index! + m[0].length)}</a:lstStyle>`;
+  });
+}
+
 /** 見本テキスト（`<a:p>` 内の rPr / endParaRPr）の sz を外す — lstStyle の値が効くように。 */
 export function stripRunSizes(sp: string): string {
   return sp.replace(/<a:p>[\s\S]*?<\/a:p>|<a:p\b[^>]*>[\s\S]*?<\/a:p>/g, (p) =>
