@@ -246,7 +246,7 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
   });
 
   // #392 段 3: set_slide_diagram `figure` (MCP) ≡ applyFigureYaml's target (GUI) — the n-th figure
-  // (diagram / Mermaid, source order). Omitted = the first figure, as before.
+  // (diagram / Mermaid, source order). Omitted = the first diagram, else the first Mermaid (as before).
   it("#392 段 3: figure 2 replaces only the 2nd diagram, the same on both doors", async () => {
     const s = S.createSession(null);
     await S.newProject(s, templateBytes, TABLE_TWO_DIAGS);
@@ -283,6 +283,39 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
     expect(!r.ok && r.error).toContain("1..2");
     expect(s.deck).toBe(deckBefore);
     expect(applyFigureYaml(deckBefore!.slides[1], NEW_YAML, undefined, 3)).toBeNull();
+  });
+  // #392 段 3 review: on a [Mermaid, diagram] slide the numbering puts Mermaid at 1, but an OMITTED figure
+  // targets the first DIAGRAM (diagram before Mermaid, as before 段 3) — not "figure 1". Pins the wording
+  // in server.ts / guides.ts / docs to the implementation, on both doors.
+  const MERMAID_THEN_DIAG = "# 表紙\n\n---\n\n# 中身\n\n```mermaid\ngantt\n  title x\n```\n\n```diagram\ntype: flowchart\nnodes:\n  - id: one\n    label: ONE\n```";
+  it("#392 段 3: [Mermaid, diagram] with figure omitted replaces the diagram (= figure 2), Mermaid untouched, on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, MERMAID_THEN_DIAG);
+    const old = s.deck!.slides[1];
+    expect(slideFigures(old).map((f) => f.kind)).toEqual(["mermaid", "diagram"]);
+    const gui = applyFigureYaml(old, NEW_YAML);
+    expect(gui).toEqual(applyFigureYaml(old, NEW_YAML, undefined, 2));
+    const r = S.setDiagram(s, 1, NEW_YAML, "yaml");
+    expect(r.ok && r.created).toBe(false);
+    const after = s.deck!.slides[1];
+    expect(after).toEqual(gui);
+    expect(slideFigures(after).map((f) => f.kind)).toEqual(["mermaid", "diagram"]);
+    expect(slideFigures(after)[0]).toEqual(slideFigures(old)[0]);
+    expect(after.diagram?.yaml).toBe(NEW_YAML);
+  });
+  it("#392 段 3: [Mermaid, diagram] with figure 1 replaces the Mermaid, the diagram untouched, on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, MERMAID_THEN_DIAG);
+    const old = s.deck!.slides[1];
+    const gui = applyFigureYaml(old, NEW_YAML, undefined, 1);
+    const r = S.setDiagram(s, 1, NEW_YAML, "yaml", undefined, 1);
+    expect(r.ok && r.created).toBe(false);
+    const after = s.deck!.slides[1];
+    expect(after).toEqual(gui);
+    const figs = slideFigures(after);
+    expect(figs.map((f) => f.kind)).toEqual(["diagram", "diagram"]);
+    expect(figs[0].kind === "diagram" && figs[0].yaml).toBe(NEW_YAML);
+    expect(figs[1]).toEqual(slideFigures(old)[1]);
   });
   // Was a KNOWN DIVERGENCE (MCP stored the broken YAML). 裁定 B3: neither door stores it — the GUI keeps the
   // old valid figure + an advisory (its adoption gate), MCP rejects the whole edit (never-silent, nothing saved).
