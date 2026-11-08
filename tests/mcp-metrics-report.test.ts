@@ -87,6 +87,26 @@ describe("集計（doc ハンドル × 時間窓）", () => {
   });
 });
 
+describe("#631: 編集経路（ops 率）", () => {
+  const tools = Object.keys(TOOL_PROFILES);
+  const rec = (k: number, extra: Partial<MetricsRecord>): MetricsRecord =>
+    ({ v: 1, ts: new Date(Date.parse("2026-11-08T00:00:00.000Z") + k * 1000).toISOString(), tool: "set_slide_markdown", profile: "solo", doc: "d", ms: 1, outcome: "ok", inChars: 1, outChars: 1, ...extra });
+  it("経路を記録した呼出のうち ops 経路（OPS_ROUTES）の比率と skip 合計。経路の無い旧行は分母に入れない", () => {
+    const rs = [
+      rec(0, {}), // 旧行（route 無し）
+      rec(1, { route: "markdown", skipped: 0 }),
+      rec(2, { route: "field-ops", skipped: 1 }),
+      rec(3, { route: "diagram-ops", skipped: 0 }),
+      rec(4, { route: "fallback", skipped: 0 }),
+    ];
+    const rep = aggregateMetrics(rs, { tools });
+    expect(rep.routes).toEqual({ recorded: 4, ops: 2, opsShare: 2 / 4, skipped: 1 });
+    expect(renderMetricsReport(rep)).toMatch(/\| 編集経路: ops \/ 経路を記録した呼出（#106） \| 50\.0%（2\/4・skip 1） \|/);
+    expect(aggregateMetrics([rec(0, {})], { tools }).routes).toEqual({ recorded: 0, ops: 0, opsShare: null, skipped: 0 });
+    expect(renderMetricsReport(aggregateMetrics([], { tools }))).toMatch(/\| 編集経路: ops \/ 経路を記録した呼出（#106） \| —（0\/0・skip 0） \|/);
+  });
+});
+
 describe("集計スクリプト scripts/mcp-metrics-report.ts", () => {
   const fixture = resolve(__dirname, "fixtures/mcp-metrics/sample.jsonl");
   const read = (p: string) => readFileSync(p, "utf8");
