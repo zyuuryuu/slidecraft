@@ -9,8 +9,10 @@
  *  - canonical の KPI.*Value（値枠がラベルの上）: markKpiValue が role "value" を付けた枠。
  *  - 報告書・マガジンの 09_KPIハイライト / 05_ビッグナンバー（ラベルが値の上）: role は body のまま
  *    （tests/group-detect.test.ts が固定）だが、同じ dominantValueSlot が値枠と判定する枠。
- *  - ラベル（見出し）・説明行（補足）は従来どおり（説明行は箇条のまま＝マスターの書式に従う）。
- *  - KPI 以外のグループ（card / step / compare）の段落は変えない。
+ *  - ラベル（見出し）は従来どおり。
+ *  - #645: 説明行（値以外の body 枠＝ValueDesc／KPI補足／補足、説明枠の無いレイアウトではラベル枠へ流れる行）も
+ *    箇条を外す（buNone）。KPI タイルの説明はキャプションであって箇条ではない。判定は group-layout の kind のみ（R8）。
+ *  - KPI 以外のグループ（card / step / compare）の段落は変えない（slide XML は byte-identical）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -60,12 +62,12 @@ beforeAll(async () => {
 
 describe("#638 KPI の値枠の段落に buNone が付く", () => {
   for (const key of ["writerDefault", "reportPreset"] as const) {
-    it(`KPI.1Value.Single（${key}）: 値は buNone・ラベル／説明は従来どおり`, async () => {
+    it(`KPI.1Value.Single（${key}）: 値・説明は buNone・ラベルは従来どおり`, async () => {
       const at = await lastSlideParas(KPI1, tpls[key]);
       expect(at.get("Value.Center")).toEqual([`<a:p>${BU_NONE}<a:r><a:rPr b="1"/><a:t>4.2 億円</a:t></a:r></a:p>`]);
       expect(at.get("ValueLabel.Center")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>年間コスト削減</a:t></a:r></a:p>`]);
-      // 説明行は箇条のまま（マスターの本文スタイルに従う＝従来の出力）。
-      expect(at.get("ValueDesc.Center")).toEqual(["<a:p><a:r><a:t>平年度ベース</a:t></a:r></a:p>"]);
+      // #645: 説明行も箇条を外す（マスター lvl1 の「•」を継がない）。
+      expect(at.get("ValueDesc.Center")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>平年度ベース</a:t></a:r></a:p>`]);
     });
   }
 
@@ -74,29 +76,33 @@ describe("#638 KPI の値枠の段落に buNone が付く", () => {
     expect(at.get("Value1")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>−18%</a:t></a:r></a:p>`]);
     expect(at.get("Value2")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>40% 減</a:t></a:r></a:p>`]);
     expect(at.get("Value3")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>2 週</a:t></a:r></a:p>`]);
-    // KPI.3 には説明枠が無いので、値より後の行はラベル枠へ（#593 の束縛・従来どおり）。箇条のまま。
+    // KPI.3 には説明枠が無いので、値より後の行はラベル枠へ（#593 の束縛・従来どおり）。
+    // #645 裁定 A（PR #656）: ラベル枠へ流れる説明行も箇条を外す（buNone）。
     expect(at.get("Label1")).toEqual([
       `<a:p>${BU_NONE}<a:r><a:t>コスト</a:t></a:r></a:p>`,
-      "<a:p><a:r><a:t>前年比</a:t></a:r></a:p>",
+      `<a:p>${BU_NONE}<a:r><a:t>前年比</a:t></a:r></a:p>`,
     ]);
   });
 
   for (const key of ["report", "magazine"] as const) {
-    it(`09_KPIハイライト（${key}・ラベルが値の上）: 数値枠は buNone・ラベル／補足は従来どおり`, async () => {
+    it(`09_KPIハイライト（${key}・ラベルが値の上）: 数値枠・補足は buNone・ラベルは従来どおり`, async () => {
       const at = await lastSlideParas(KPI3, tpls[key]);
       expect(at.get("KPI数値1")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>−18%</a:t></a:r></a:p>`]);
       expect(at.get("KPI数値2")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>40% 減</a:t></a:r></a:p>`]);
       expect(at.get("KPI数値3")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>2 週</a:t></a:r></a:p>`]);
       expect(at.get("KPIラベル1")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>コスト</a:t></a:r></a:p>`]);
-      expect(at.get("KPI補足1")).toEqual(["<a:p><a:r><a:t>前年比</a:t></a:r></a:p>"]);
-      expect(at.get("KPI補足2")).toEqual(["<a:p><a:r><a:t>補足 1</a:t></a:r></a:p>", "<a:p><a:r><a:t>補足 2</a:t></a:r></a:p>"]);
+      expect(at.get("KPI補足1")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>前年比</a:t></a:r></a:p>`]);
+      expect(at.get("KPI補足2")).toEqual([
+        `<a:p>${BU_NONE}<a:r><a:t>補足 1</a:t></a:r></a:p>`,
+        `<a:p>${BU_NONE}<a:r><a:t>補足 2</a:t></a:r></a:p>`,
+      ]);
     });
   }
 
-  it("05_ビッグナンバー（magazine・名前で認識する kpi 1 枠）: 大数字は buNone・補足は従来どおり", async () => {
+  it("05_ビッグナンバー（magazine・名前で認識する kpi 1 枠）: 大数字・補足は buNone", async () => {
     const at = await lastSlideParas(KPI1, tpls.magazine);
     expect(at.get("ビッグナンバー")).toEqual([`<a:p>${BU_NONE}<a:r><a:rPr b="1"/><a:t>4.2 億円</a:t></a:r></a:p>`]);
-    expect(at.get("補足")).toEqual(["<a:p><a:r><a:t>平年度ベース</a:t></a:r></a:p>"]);
+    expect(at.get("補足")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>平年度ベース</a:t></a:r></a:p>`]);
   });
 });
 
