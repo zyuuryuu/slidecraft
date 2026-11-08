@@ -230,19 +230,19 @@ describe("get_deck_issues — overflow-scale-hint (#570 段 3)", () => {
   });
 });
 
-describe("PR #606 D3: the template-derive tools are solo-only (collab GUI does not pull the template from the host)", () => {
+describe("#616: the template-derive tools are back on every profile (collab syncs the template to the GUI — PR #606 D3 lifted)", () => {
   for (const sharedOnly of [false, true]) {
-    it(`collab ${sharedOnly ? "AI" : "GUI"}: augment_template / adjust_template are not registered, and get_deck_issues never hints adjust_template`, async () => {
+    it(`collab ${sharedOnly ? "AI" : "GUI"}: augment_template / adjust_template are registered, and get_deck_issues hints adjust_template`, async () => {
       const { client } = await connectCollab(sharedOnly);
       const names = (await client.listTools()).tools.map((t) => t.name);
-      expect(names).not.toContain("augment_template");
-      expect(names).not.toContain("adjust_template");
+      expect(names).toContain("augment_template");
+      expect(names).toContain("adjust_template");
       await call(client, "new_project", { templateBase64: TECH.toString("base64") });
       await call(client, "set_slide_markdown", { index: 0, markdown: `# 本文\n\n${bullets(overN)}` });
       const r = await call(client, "get_deck_issues");
-      expect(countOverflows(r.issues as never)).toBeGreaterThan(0); // the overflow is there …
-      expect((r.issues as Array<{ id?: string }>).some((i) => i.id === "overflow-scale-hint")).toBe(false); // … but no hint to a tool it can't call
-      expect((r.hints as Array<{ tool: string }>).some((h) => h.tool === "adjust_template")).toBe(false);
+      expect(countOverflows(r.issues as never)).toBeGreaterThan(0);
+      expect((r.issues as Array<{ id?: string }>).some((i) => i.id === "overflow-scale-hint")).toBe(true);
+      expect((r.hints as Array<{ tool: string }>).some((h) => h.tool === "adjust_template")).toBe(true);
     });
   }
 });

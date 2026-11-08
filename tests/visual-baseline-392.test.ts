@@ -45,6 +45,7 @@ beforeAll(async () => {
 
 it("#392 段 0: the three shipped templates are the input (committed under public/)", () => {
   expect(TEMPLATES).toEqual([
+    "セールスピッチ_Pitch_TemplateOnly.pptx", // #595 で追加（4 本目）。既存 3 本の golden は不変
     "ビジュアルデッキ_マガジン_TemplateOnly.pptx",
     "技術報告_スタンダード水色_TemplateOnly.pptx",
     "配布資料_公文書高密度_TemplateOnly.pptx",
@@ -124,7 +125,7 @@ describe("#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templa
   // placeholder を占有するので、本文テキストは PPTX に描かれない（deck-diagnostics の visual-shadowed-content が報告）。
   // 表／図／コードは本文の隣で ordinal 2 に移る（#390）ので本文は残る。この差も固定しておく。
   it("body text beside an image is NOT drawn; beside a table/diagram/code it is (current behavior)", async () => {
-    const zip = await JSZip.loadAsync(await generatePptx(deck, loaded[TEMPLATES[1]]));
+    const zip = await JSZip.loadAsync(await generatePptx(deck, loaded["技術報告_スタンダード水色_TemplateOnly.pptx"])); // 名前で指す（#595 で並びが変わった）
     const xmlOf = async (title: string) =>
       zip.file(`ppt/slides/slide${deck.slides.findIndex((s) => titleOf(s) === title) + 1}.xml`)!.async("string");
     expect(await xmlOf("画像の属性つき")).not.toContain("本文の箇条");

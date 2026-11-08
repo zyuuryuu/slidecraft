@@ -30,14 +30,13 @@ import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { openDocs } from "./ipc/docs";
 import { describeRepairPlan, describeAugmentPlan } from "./components/apply-template";
 import type { AugmentPlan } from "./engine/layout-augment-plan";
-import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
-import UpdateBanner from "./components/UpdateBanner";
+import type { IntakeResult, IntakeBusy } from "./components/IntakeSummaryBar";
+import NoticeSlot from "./components/NoticeSlot";
 import { useUpdateBanner } from "./components/useUpdateBanner";
 import Onboarding from "./components/Onboarding";
 import { useOnboarding } from "./components/useOnboarding";
 import { ONBOARDING_SAMPLE_MD } from "./components/onboarding-sample";
 import TemplateCreator from "./components/TemplateCreator";
-import TemplateAdjustPanel from "./components/TemplateAdjustPanel";
 import { useTemplateAdjust } from "./components/useTemplateAdjust";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
@@ -67,7 +66,7 @@ export default function App() {
     handleGenerateToc, handleRegenerateStaticToc,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields, currentSlideData,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
-    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
+    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, setHostDocTemplate, editLockedRef, collabRef,
   } = useDeckController();
   const { t } = useTranslation();
   // 表示用の materialize 済み deck（#275）: 左サムネイル一覧（SlideList）と右プレビュー（SlidePreview）
@@ -245,6 +244,7 @@ export default function App() {
     getMasterBytes,
     // Link the tab that was active on 開始 to the seed's host doc (so switching back re-targets here).
     onSeedDoc: (docId) => linkHostDoc(activeId, docId),
+    applyHostTemplate: setHostDocTemplate, // #616: an AI template swap reaches the tab mirroring that host doc
     // Mode (b): an AI-created deck opens as a BACKGROUND tab (no view switch). Unbundle the full
     // .scft (deck + template) so the new tab renders with its OWN master, not the current one.
     onNewHostDoc: async (docId, title, dataBase64) => {
@@ -435,9 +435,9 @@ export default function App() {
         />
         <div className="flex items-center gap-2 px-3 py-2">
           {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
-              second tab. The master picker (select + import) lives here on the top bar now — the same
-              MasterPicker is also in Draft (select-only). It supersedes the old one-shot "Load Template"
-              (this registers the imported master + applies). Both are gated while collab-locked. */}
+              second tab. #612: every template operation (select / import / adjust · augment · ⓘ / create)
+              lives in this master menu; Draft shows the same MasterPicker with select + import only.
+              Both are gated while collab-locked or while a template adjust is open. */}
           <button
             onClick={handleEnterImport}
             disabled={editLocked || !!adjust.session}
@@ -452,9 +452,9 @@ export default function App() {
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
             onRemake={handleRemakeMaster}
-            onAdjust={() => void adjust.start()}
+            onAdjust={() => void adjust.start()} onAugment={editLocked || adjust.session ? undefined : handleAugmentMaster} template={templateData}
             onCreate={() => setShowTemplateCreator(true)}
-            onShowInfo={intakeResult ? () => setIntakeDismissed((d) => !d) : undefined}
+            onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
             onRemove={handleRemoveMaster}
             disabled={editLocked || !!adjust.session}
           />
@@ -463,24 +463,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* "New version available" notice (notify-only — ADR-0021). Above IntakeSummaryBar so a fresh
-          intake result doesn't bury a pending update notice. */}
-      {showUpdateBanner && latestVersion && <UpdateBanner latestVersion={latestVersion} onDismiss={dismissUpdateBanner} />}
-
-      {/* Intake transparency (progress + result) as a flow banner under the toolbar — never overlaps
-          the panes, the master dropdown, or the bottom Assist dock. */}
-      <IntakeSummaryBar
-        busy={intakeBusy}
-        result={intakeDismissed ? null : intakeResult}
-        onDismiss={() => setIntakeDismissed(true)}
-        template={templateData}
-        unbound={diagnostics.filter((d) => d.id === "unbound-content")}
-        onAugment={editLocked || !!adjust.session ? undefined : handleAugmentMaster}
+      {/* #613: ONE notice strip under the toolbar (flow, not overlay) — template adjust > intake
+          (progress/result) > update notice (ADR-0021); the others wait behind a "+N" badge. */}
+      <NoticeSlot
+        update={showUpdateBanner && latestVersion ? { latestVersion, onDismiss: dismissUpdateBanner } : null}
+        intake={{ busy: intakeBusy, result: intakeDismissed ? null : intakeResult, onDismiss: () => setIntakeDismissed(true),
+          template: templateData, unbound: diagnostics.filter((d) => d.id === "unbound-content"), augmentHint: !editLocked && !adjust.session }}
+        adjust={adjust.session ? { session: adjust.session, busy: adjust.busy, onPreview: adjust.preview,
+          onApply: (r) => void adjust.apply(r), onCancel: () => void adjust.cancel() } : null}
       />
-      {adjust.session && (
-        <TemplateAdjustPanel session={adjust.session} busy={adjust.busy} onPreview={adjust.preview}
-          onApply={(r) => void adjust.apply(r)} onCancel={() => void adjust.cancel()} />
-      )}
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>

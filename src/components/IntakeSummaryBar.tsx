@@ -11,20 +11,20 @@
  *    placeholder of the applied template can hold (it would vanish on export), a STRONG warning chip in
  *    the summary row + the per-slide list in 「詳細」. The data is the deck diagnostics' own
  *    `unbound-content` issues, passed in as-is — no second detection path (R8).
+ *  - #612: 「テンプレを強化」 lives in the master menu (usable for any master, not only after an intake);
+ *    this bar only HINTS at it, from the same plan the menu uses (augment-offer — R8).
  *
  * Pure presentation — all data comes from apply-template's IntakeSummary + the AI result fields.
  */
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { phaseFraction, augmentStructureLabel, type IntakeSummary, type IntakeProgress } from "./apply-template";
+import { phaseFraction, type IntakeSummary, type IntakeProgress } from "./apply-template";
 import { SlideCard, SLIDE_W, SLIDE_H } from "./SlidePreview";
 import { findLayout, type TemplateData } from "../engine/template-loader";
 import { parseMd } from "../engine/md-parser";
 import type { DeckIR } from "../engine/slide-schema";
 import type { DeckIssue } from "../engine/deck-diagnostics";
-import { buildCatalog } from "../engine/template-catalog";
-import { planAugmentation, type AugmentPlan } from "../engine/layout-augment-plan";
-import { ALL_AUGMENT_STRUCTURES } from "../engine/layout-augment-structures";
+import { planTemplateAugmentation, augmentWhat } from "./augment-offer";
 
 // A mini WYSIWYG preview of a re-made layout: the SAME SlideCard the editor uses, rendered tiny with a
 // dummy-filled sample slide — so the user SEES what each mapped layout looks like, not just its name.
@@ -173,7 +173,7 @@ export function Detail({ result, template, sample, unbound = [] }: { result: Int
 }
 
 export default function IntakeSummaryBar({
-  busy, result, onDismiss, template, unbound = [], onAugment,
+  busy, result, onDismiss, template, unbound = [], augmentHint = false,
 }: {
   busy: IntakeBusy | null;
   result: IntakeResult | null;
@@ -182,8 +182,9 @@ export default function IntakeSummaryBar({
   template?: TemplateData | null;
   /** #97: the deck's `unbound-content` diagnostics under this template (content that would vanish). */
   unbound?: readonly DeckIssue[];
-  /** #568: 「テンプレを強化」— offered when the active template lacks an N-column layout it can synthesize. */
-  onAugment?: (plan: AugmentPlan) => void;
+  /** #612: hint at the menu's 「テンプレを強化」 when the active template lacks layouts it can add
+   *  (false while the menu's augment is unavailable — collab-locked / adjusting). */
+  augmentHint?: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -193,9 +194,8 @@ export default function IntakeSummaryBar({
     () => parseMd(`# ${t("intake.sampleTitle")}\n\n- ${t("intake.sampleBody")}\n- ${t("intake.sampleBody")}\n- ${t("intake.sampleBody")}`),
     [t],
   );
-  // #568: what 「テンプレを強化」 would add to the ACTIVE template (pure plan; nothing is written here).
-  // #568 段 3: 「無い構造を全部足す」— N 列・比較・カード 3・KPI 3/4 のうちテンプレに無いもの。
-  const augment = useMemo(() => (onAugment && template ? planAugmentation(template, buildCatalog(template), { structures: ALL_AUGMENT_STRUCTURES }) : null), [onAugment, template]);
+  // #612: what the menu's 「テンプレを強化」 would add to the ACTIVE template (pure plan; nothing written).
+  const augment = useMemo(() => (augmentHint && template && result ? planTemplateAugmentation(template) : null), [augmentHint, template, result]);
   if (!busy && !result) return null;
 
   // Only offer 「詳細」 when there's something to expand — a clean faithful Import has no theme,
@@ -239,17 +239,8 @@ export default function IntakeSummaryBar({
                 </span>
               )}
               {augment && augment.add.length > 0 && (
-                <button
-                  data-testid="intake-augment"
-                  onClick={() => onAugment?.(augment)}
-                  className="text-accent-soft hover:text-fg border border-accent/40 rounded px-1.5"
-                >
-                  {t("intake.augmentButton", { what: augment.add.map((a) => augmentStructureLabel(a.structure)).join(t("applyTemplate.repairPartSeparator")) })}
-                </button>
-              )}
-              {augment && augment.add.length === 0 && augment.reason && augment.skipped.some((x) => x.reason === augment.reason) && (
-                <span data-testid="intake-augment-unavailable" className="text-muted truncate" title={augment.reason}>
-                  {t("intake.augmentUnavailable", { reason: augment.reason })}
+                <span data-testid="intake-augment-hint" className="text-accent-soft truncate">
+                  {t("intake.augmentHint", { what: augmentWhat(augment) })}
                 </span>
               )}
               <div className="flex-1" />

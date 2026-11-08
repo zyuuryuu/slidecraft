@@ -302,6 +302,15 @@
     "cancel": "Cancel",
     "commit": "✓ Make slides"
   },
+  "noticeSlot": {
+    "hiddenTitle": "Notices waiting ({{count}}): {{names}}. They appear once the one shown ends.",
+    "separator": ", ",
+    "kind": {
+      "adjust": "template adjust",
+      "intake": "master intake",
+      "update": "update notice"
+    }
+  },
   "updateBanner": {
     "message": "A new version (v{{version}}) is available. See GitHub Releases to update.",
     "dismiss": "Dismiss"
@@ -352,9 +361,9 @@
     "unboundChip": "{{count}} slide(s) with unbound content (dropped on export)",
     "unboundTitle": "Content no placeholder can hold (dropped on export with this template)",
     "unboundItem": "Slide {{slide}}: {{message}}",
-    "augmentButton": "Augment template (add {{what}})",
     "augmentUnavailable": "This template can't be augmented: {{reason}}",
-    "augmented": "Added layouts"
+    "augmented": "Added layouts",
+    "augmentHint": "🎨 Use \"Augment template\" in the master menu to add {{what}}"
   },
   "lang": {
     "name": "English",
@@ -421,7 +430,18 @@
     "showInfoTitle": "Show the latest intake result",
     "removeTitle": "Delete this template",
     "adjustTitle": "Make a derived template with the current master's fonts and text sizes adjusted in one go (the original is not changed)",
-    "adjustLabel": "Adjust template (fonts / sizes)…"
+    "adjustLabel": "Adjust template (fonts / sizes)…",
+    "section": {
+      "select": "Select",
+      "intake": "Import",
+      "modify": "Modify",
+      "create": "New"
+    },
+    "augmentLabel": "Augment template (add {{what}})…",
+    "augmentLabelPlain": "Augment template",
+    "augmentTitle": "Make a derived template that adds the layouts the current master lacks (N columns, compare, cards, KPI); the original is not changed",
+    "augmentNothing": "No missing layouts (N columns, compare, cards and KPI are all present)",
+    "showInfoLabel": "Show the latest intake result"
   },
   "masterReg": {
     "defaultName": "Template",
