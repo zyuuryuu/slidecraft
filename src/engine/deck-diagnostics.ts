@@ -27,79 +27,12 @@ import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramI
 import { fitTitle, slideRoleContent } from "./title-fit";
 import { columnAugmentHint } from "./layout-augment-plan";
 import { rescueMessage } from "./field-rescue";
+import { markerLayoutMissingHint } from "./slide-marker-hint";
+import { RULE_LEVEL, type ReviewRuleId } from "./review-rules";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
-/**
- * REVIEW_RULES — the ONE registry of review-rule id → level (#244). Every DeckIssue this module
- * produces sets `id` from here (via RULE_LEVEL, so the level literal itself is written ONCE), and
- * `get_authoring_guide`'s `activeReviewRules` (src/mcp/guides.ts) is a literal projection of this
- * same array — so the rules an agent is told about up front can never drift from what
- * `get_deck_issues` actually flags later (R8; locked by tests/review-rules-agreement.test.ts).
- */
-export type ReviewRuleId =
-  | "missing-title"
-  | "unknown-layout-pin"
-  | "touten-used"
-  | "kuten-used"
-  | "image-markdown-leftover"
-  | "unrecognized-meta-key"
-  | "body-overflow"
-  | "title-overflow"
-  | "long-bullet"
-  | "key-value-table"
-  | "unbound-content"
-  | "visual-shadowed-content"
-  | "visual-collision"
-  | "table-overflow"
-  | "diagram-node-shrink"
-  | "diagram-invalid"
-  | "table-dropped"
-  | "image-dropped"
-  | "meta-key-dropped"
-  | "figure-dropped"
-  | "pre-separator-dropped"
-  | "section-footer-injected"
-  | "missing-column-layout"
-  | "overflow-scale-hint"
-  | "field-row-rescued";
-
-export interface ReviewRule {
-  id: ReviewRuleId;
-  level: "warn" | "info";
-}
-
-export const REVIEW_RULES: readonly ReviewRule[] = [
-  { id: "missing-title", level: "warn" },
-  { id: "unknown-layout-pin", level: "warn" },
-  { id: "touten-used", level: "warn" },
-  { id: "kuten-used", level: "info" },
-  { id: "image-markdown-leftover", level: "info" },
-  { id: "unrecognized-meta-key", level: "warn" },
-  { id: "body-overflow", level: "warn" },
-  { id: "title-overflow", level: "warn" },
-  { id: "long-bullet", level: "info" },
-  { id: "key-value-table", level: "info" },
-  { id: "unbound-content", level: "warn" },
-  { id: "visual-shadowed-content", level: "warn" },
-  { id: "visual-collision", level: "warn" },
-  { id: "table-overflow", level: "warn" },
-  { id: "diagram-node-shrink", level: "warn" },
-  { id: "diagram-invalid", level: "warn" },
-  { id: "table-dropped", level: "info" },
-  { id: "image-dropped", level: "info" },
-  { id: "meta-key-dropped", level: "warn" },
-  { id: "figure-dropped", level: "info" },
-  { id: "pre-separator-dropped", level: "warn" },
-  { id: "section-footer-injected", level: "info" },
-  { id: "missing-column-layout", level: "info" },
-  { id: "overflow-scale-hint", level: "info" }, // #570 段 3: 本文倍率の提案（MCP get_deck_issues が overflow-scale-hint.ts で足す）
-  { id: "field-row-rescued", level: "info" },
-];
-
-const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
-  REVIEW_RULES.map((r) => [r.id, r.level]),
-) as Record<ReviewRuleId, "warn" | "info">;
+export { REVIEW_RULES, type ReviewRuleId, type ReviewRule } from "./review-rules"; // registry split out for R1 (#593)
 
 export interface DeckIssue {
   slideIndex: number;
@@ -170,6 +103,8 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
         add("unknown-layout-pin", `レイアウト「${slide.layout}」はこのテンプレにありません。auto 選択で「${resolved}」に代替しました${others}`, []);
       }
     }
+    const markerHint = catalog && markerLayoutMissingHint(slide, i, deck.slides.length, catalog); // #593 never-silent
+    if (markerHint) add("marker-layout-missing", markerHint, []);
 
     // 句読点はスライドでは prose に見える（体言止めが読みやすい）。読点「、」が最も可読性を落とすので
     // 強い警告（warn）、句点「。」は末尾を落とせば済むことが多いので軽い注意（info）。タイトル＋本文を走査。

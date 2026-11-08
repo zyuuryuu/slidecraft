@@ -14,9 +14,13 @@ function splitRow(line: string): string[] {
   return s.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
-function isSeparator(line: string): boolean {
-  const cells = splitRow(line);
+/** Cells that read back as a `|---|:-:|` separator row (an all-dash row is not representable as data). */
+export function isSeparatorCells(cells: string[]): boolean {
   return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
+}
+
+function isSeparator(line: string): boolean {
+  return isSeparatorCells(splitRow(line));
 }
 
 /** A `| … |` table row (not the separator). */
