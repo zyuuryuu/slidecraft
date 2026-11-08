@@ -653,6 +653,9 @@
     "aiHelpSection": "AI & help",
     "help": "Help (documentation)"
   },
+  "menu": {
+    "opensDialog": "{{title}}…"
+  },
   "toolbar": {
     "undo": "Undo (⌘/Ctrl+Z)",
     "redo": "Redo (⌘/Ctrl+Shift+Z, Ctrl+Y)",

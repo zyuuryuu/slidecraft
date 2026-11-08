@@ -44,7 +44,7 @@ export function SettingsPanel({ onClose, onHelp, onAiSettings }: SettingsPanelPr
           <div className="my-1 border-t border-edge" />
           {onAiSettings && (
             <button type="button" onClick={run(onAiSettings)} className={item}>
-              ✨ {t("aiSettings.title")}
+              ✨ {t("menu.opensDialog", { title: t("aiSettings.title") })}
             </button>
           )}
           {onHelp && (

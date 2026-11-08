@@ -16,9 +16,18 @@ import { DeckIRSchema, type DeckIR } from "./slide-schema";
 import { loadTemplate, type TemplateData } from "./template-loader";
 import { loadZipSafe, readCappedString, readCappedBytes, readEntryString, ZIP_LIMITS } from "./zip-safe";
 
-/** The `.scft` format version this build writes and reads natively (meta.json.version).
- *  Bump it ONLY together with a `PROJECT_MIGRATIONS[old]` step so older files stay openable. */
-export const PROJECT_VERSION = 1;
+/** The newest `.scft` format version this build writes and reads natively (meta.json.version).
+ *  Bump it ONLY together with a `PROJECT_MIGRATIONS[old]` step so older files stay openable.
+ *  v2 (#673) = a deck that carries `figures` (2+ body visuals on a slide, #392). A save writes the
+ *  LOWEST version that holds the deck (projectVersionFor), so a figures-less deck stays v1. */
+export const PROJECT_VERSION = 2;
+
+/** The version a deck is saved as (#673): 2 when any slide carries `figures`, else 1. A v1-only build
+ *  (#121 gate, no migrations) refuses v2 as "too new" instead of letting its zod silently drop the 2nd+
+ *  visuals; a figures-less deck keeps writing v1 so its `.scft` stays byte-identical and openable there. */
+export function projectVersionFor(deck: DeckIR): 1 | 2 {
+  return deck.slides.some((s) => s.figures !== undefined) ? 2 : 1;
+}
 
 /** Why a `.scft` was refused on its meta.json.version (#121). `code` is stable for callers/tests;
  *  `message` is the user-facing text shown by the existing never-silent open-error path. */
@@ -42,9 +51,14 @@ export class ProjectVersionError extends Error {
 }
 
 /** One step per OLD version: `PROJECT_MIGRATIONS[v]` converts a raw (pre-zod) deck.json of
- *  version v into version v+1. Empty today — v1 is the first format; add a step when bumping. */
+ *  version v into version v+1. Add a step when bumping. */
 export type ProjectMigrations = Readonly<Record<number, (rawDeck: unknown) => unknown>>;
-export const PROJECT_MIGRATIONS: ProjectMigrations = {};
+export const PROJECT_MIGRATIONS: ProjectMigrations = {
+  // 1 → 2 (#673): identity. v2 only ADDS the optional `figures`; a v1 deck (singular fields only) is
+  // already a valid v2 deck, and the singular field stays authoritative (slideFigures / withFigures, R8)
+  // — so nothing is rewritten on open (#392 段 0: an old .scft opens to the DeckIR it was saved as).
+  1: (rawDeck) => rawDeck,
+};
 
 /** Bring a raw deck.json of `fileVersion` up to `current` (pure; #121). Same version → the input
  *  itself. Newer than `current`, or any missing step in the chain → ProjectVersionError (never a
@@ -121,7 +135,7 @@ export async function bundleProject(
   const zip = new JSZip();
   zip.file("deck.json", JSON.stringify(deck, null, 2));
   zip.file("template.pptx", await template.zip.generateAsync({ type: "uint8array" }));
-  const meta: ProjectMeta = { version: PROJECT_VERSION, templateName: opts.templateName, savedAt: opts.savedAt };
+  const meta: ProjectMeta = { version: projectVersionFor(deck), templateName: opts.templateName, savedAt: opts.savedAt };
   zip.file("meta.json", JSON.stringify(meta, null, 2));
   return zip.generateAsync({ type: "uint8array" });
 }

@@ -653,6 +653,9 @@
     "aiHelpSection": "AI とヘルプ",
     "help": "ヘルプ（ドキュメント）"
   },
+  "menu": {
+    "opensDialog": "{{title}}…"
+  },
   "toolbar": {
     "undo": "元に戻す (⌘/Ctrl+Z)",
     "redo": "やり直す (⌘/Ctrl+Shift+Z・Ctrl+Y)",

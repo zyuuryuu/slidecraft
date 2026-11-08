@@ -103,7 +103,7 @@ describe("#614 ⚙ のメニュー: 言語・テーマ・ヘルプ・AI 接続�
   it("ヘルプ（ドキュメント）と AI 接続設定への入口がある", () => {
     const b = buttons(panel());
     expect(b).toContain("? ヘルプ（ドキュメント）");
-    expect(b).toContain("✨ AI 接続設定"); // #653: 呼び名は aiSettings.title の 1 キー
+    expect(b).toContain("✨ AI 接続設定…"); // #653: 呼び名は aiSettings.title の 1 キー／#669: ダイアログを開く印「…」は menu.opensDialog が足す
   });
 
   it("入口が渡されないときは、その項目を出さない", () => {
