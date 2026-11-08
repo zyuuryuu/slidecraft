@@ -16,6 +16,7 @@ import { FIELD_ROWS, matchFieldRow, type FieldKind } from "./field-rows";
 import { parseInline } from "./md-inline";
 import { matchListItem } from "./list-markers";
 import { stripCommentOnlyLines } from "./md-comments";
+import { extractSlideMarker, splitQuoteAttribution } from "./slide-markers";
 
 // ── Title slide field → placeholder idx mapping ──
 
@@ -229,7 +230,9 @@ export function parseSlideBlock(
   const notes = noteSplit.notes ? linesToParagraphs(trimBodyLines(noteSplit.notes)) : undefined;
   // `<!-- section -->` は章境界の宣言（スライド属性）— 本文から取り除きフラグ化（#151）。
   const sectionSplit = extractSectionFlag(noteSplit.content);
-  lines = sectionSplit.content;
+  // `<!-- statement -->` / `<!-- quote -->` も同じくスライド属性（#593）— 本文から取り除き groupKind へ。
+  const markerSplit = extractSlideMarker(sectionSplit.content);
+  lines = markerSplit.content;
   const sectionBreak = sectionSplit.sectionBreak;
   let layout = "auto";
   const placeholders: PlaceholderContent[] = [];
@@ -365,6 +368,7 @@ export function parseSlideBlock(
       ...(sectionBreak ? { sectionBreak: true } : {}),
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
       // is plain columns and carries no hint.
+      // A statement/quote marker on a grouped slide is superseded by the separator kind (contradictory input).
       ...(separatorType !== "col" ? { groupKind: separatorType } : {}),
       ...(currentSections.length ? { currentSteps: currentSections } : {}), // `<!-- step * -->` (#401)
       sourceLineStart: startLine,
@@ -372,7 +376,9 @@ export function parseSlideBlock(
     };
   }
 
-  // Standard parsing (no separators)
+  // Standard parsing (no separators). A quote's attribution line (—/―/--, last line) → idx 2 (#593).
+  const quote = markerSplit.marker === "quote" ? splitQuoteAttribution(lines) : undefined;
+  if (quote) lines = quote.content;
   let inCodeBlock = false;
   let codeBlockLang = "";
   let codeBlockLines: string[] = [];
@@ -504,6 +510,7 @@ export function parseSlideBlock(
     if (existing) existing.paragraphs.push(...bodyParas);
     else placeholders.push({ idx: "1", paragraphs: bodyParas });
   }
+  if (quote?.attribution) placeholders.push({ idx: "2", paragraphs: [{ segments: parseInline(quote.attribution) }] });
 
   if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image && !notes?.length) return null;
 
@@ -533,6 +540,7 @@ export function parseSlideBlock(
     ...(image ? { image } : {}),
     ...(notes?.length ? { notes } : {}),
     ...(sectionBreak ? { sectionBreak: true } : {}),
+    ...(markerSplit.marker ? { groupKind: markerSplit.marker } : {}),
     sourceLineStart: startLine,
     sourceLineEnd: startLine + sourceLen - 1,
   };
