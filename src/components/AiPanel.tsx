@@ -22,6 +22,8 @@ interface AiPanelProps {
   currentSlideMd?: string;
   /** The focused slide's setField idx list (describeEditableFields) — sent with the slide Markdown. */
   currentSlideFields?: string;
+  /** The focused slide's DATA-op targets (describeEditableData, #106 P3) — table rows / series / tasks / cards. */
+  currentSlideData?: string;
   /** Apply the edited slide back to the focused slide. */
   onApplySlide?: (markdown: string, instruction?: string) => void;
   /** Reconcile+validate an edit AS IT WILL APPLY, for the review (diff = real result + warnings).
@@ -51,6 +53,7 @@ export default function AiPanel({
   onClose,
   currentSlideMd,
   currentSlideFields = "",
+  currentSlideData = "",
   onApplySlide,
   onPreviewSlideEdit,
   activeSlideNum,
@@ -196,8 +199,8 @@ export default function AiPanel({
     if (autoRetriedRef.current || aiGenerating) return;
     autoRetriedRef.current = true;
     setRetrying(true);
-    aiRetry(slideEditUserPrompt(currentSlideMd, currentSlideFields, editPreview.retryInstruction));
-  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, currentSlideFields, adopted, bestOfN]);
+    aiRetry(slideEditUserPrompt(currentSlideMd, currentSlideFields, editPreview.retryInstruction, currentSlideData));
+  }, [editPreview, aiGenerating, aiRetry, currentSlideMd, currentSlideFields, currentSlideData, adopted, bestOfN]);
 
   // 却下 / 閉じる — discard the foreground result and re-arm the one-shot self-repair.
   const closePreview = useCallback(() => {
@@ -230,7 +233,7 @@ export default function AiPanel({
     setSelIdx(0);
     // One slide in, one slide out (text + any figure) — far fewer tokens than the deck. best-of-N (>1)
     // fans out N candidates and lets the adoption gate pick the best; N=1 is the plain single generate.
-    const prompt = slideEditUserPrompt(currentSlideMd, currentSlideFields, userRequest);
+    const prompt = slideEditUserPrompt(currentSlideMd, currentSlideFields, userRequest, currentSlideData);
     if (bestOfN > 1) ai.generateBest(prompt, "slide", bestOfN);
     else ai.generate(prompt, "slide");
   };
