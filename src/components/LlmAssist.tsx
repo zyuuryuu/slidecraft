@@ -41,11 +41,11 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   const [diagramType, setDiagramType] = useState<DiagramTypeChoice>("auto");
   const [userRequest, setUserRequest] = useState("");
 
-  // The AI connection settings fold + manual copy/paste fallback (UI-only state). #653: the fold
-  // starts OPEN whenever the dialog opens with an unusable connection (connection.ok=false), so a
-  // first-time user lands on what to fill in; after that it is the user's to toggle.
-  // "checking"（モデル一覧の取得中・内蔵 AI の起動中）は未設定ではないので展開しない（PR #664 レビュー B-1）。
-  const needsSetup = !ai.connection.ok && ai.connection.tone !== "checking";
+  // The AI connection settings fold + manual copy/paste fallback (UI-only state). #653/#669: the fold
+  // starts OPEN only when the dialog opens with a connection the USER must fix (needsUserAction —
+  // decided by computeConnection alone, R8). Waiting (checking/starting, PR #664 レビュー B-1) and the
+  // builtin runtime that auto-starts on generate stay folded. After that it is the user's to toggle.
+  const needsSetup = ai.connection.needsUserAction;
   const [showSettings, setShowSettings] = useState(() => needsSetup);
   const [wasOpen, setWasOpen] = useState(isOpen);
   if (isOpen !== wasOpen) {
