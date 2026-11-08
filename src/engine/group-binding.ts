@@ -10,6 +10,7 @@
  */
 import type { LayoutInfo, PlaceholderInfo } from "./template-loader";
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
+import { isGroupedSlide } from "./slide-markers";
 import { bindContentByRole, resolveBinding, isBlankParagraphs, type BindingPlan, type ContentRef, type PlaceholderRef } from "./placeholder-binding";
 import { slideIdxRole, placeholderRole } from "./template-catalog";
 import { detectGroups, bakedText } from "./group-layout";
@@ -26,7 +27,7 @@ export type { GroupSlot, GroupSlotRole, GroupLayoutShape } from "./group-layout"
  */
 export function groupEditorPlan(slide: SlideIR, layout: LayoutInfo): { metaPhs: PlaceholderInfo[]; columns: number } | null {
   const shape = detectGroups(layout);
-  if (!shape || !slide.groupKind) return null;
+  if (!shape || !isGroupedSlide(slide)) return null;
   const groupPhIdxs = new Set(shape.groups.flat().map((s) => s.phIdx));
   return { metaPhs: layout.placeholders.filter((p) => !groupPhIdxs.has(p.idx)), columns: shape.groups.length };
 }
@@ -61,7 +62,7 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
   const out = new Map<string, PlaceholderContent>();
   const overlay = emptyOverlay();
   const shape = detectGroups(layout);
-  if (!shape || !slide.groupKind) return { content: out, overlay };
+  if (!shape || !isGroupedSlide(slide)) return { content: out, overlay };
 
   const isGroupIdx = (i: string) => /^[1-9]$/.test(i);
   const groupPhIdxs = new Set(shape.groups.flat().map((s) => s.phIdx));
@@ -159,7 +160,7 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
  */
 export function slideBindingPlan(slide: SlideIR, layout: LayoutInfo): BindingPlan {
   const shape = detectGroups(layout);
-  if (!slide.groupKind || !shape) return resolveBinding(slide, layout.placeholders);
+  if (!isGroupedSlide(slide) || !shape) return resolveBinding(slide, layout.placeholders); // statement/quote: not a group (#593)
 
   const bound = expandGroups(slide, layout);
   const hasCtrTitle = layout.placeholders.some((p) => p.type.toLowerCase().includes("ctrtitle"));

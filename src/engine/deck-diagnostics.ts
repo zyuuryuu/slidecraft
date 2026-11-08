@@ -26,6 +26,7 @@ import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
 import { columnAugmentHint } from "./layout-augment-plan";
+import { markerLayoutMissingHint } from "./slide-marker-hint";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -59,7 +60,8 @@ export type ReviewRuleId =
   | "figure-dropped"
   | "pre-separator-dropped"
   | "section-footer-injected"
-  | "missing-column-layout";
+  | "missing-column-layout"
+  | "marker-layout-missing";
 
 export interface ReviewRule {
   id: ReviewRuleId;
@@ -90,6 +92,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "pre-separator-dropped", level: "warn" },
   { id: "section-footer-injected", level: "info" },
   { id: "missing-column-layout", level: "info" },
+  { id: "marker-layout-missing", level: "info" },
 ];
 
 const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
@@ -165,6 +168,8 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
         add("unknown-layout-pin", `レイアウト「${slide.layout}」はこのテンプレにありません。auto 選択で「${resolved}」に代替しました${others}`, []);
       }
     }
+    const markerHint = catalog && markerLayoutMissingHint(slide, i, deck.slides.length, catalog); // #593 never-silent
+    if (markerHint) add("marker-layout-missing", markerHint, []);
 
     // 句読点はスライドでは prose に見える（体言止めが読みやすい）。読点「、」が最も可読性を落とすので
     // 強い警告（warn）、句点「。」は末尾を落とせば済むことが多いので軽い注意（info）。タイトル＋本文を走査。

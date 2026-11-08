@@ -348,6 +348,35 @@ For the figure notation itself, see [Diagrams](/en/guide/diagrams).
 
 ---
 
+## Statements and quotes `<!-- statement -->` / `<!-- quote -->`
+
+Put one of these on a line of its own anywhere in the slide (outside a code fence). It sets the shape of the whole slide; it does not split the body into regions.
+
+A **statement** (a slide that makes one big point) takes `<!-- statement -->`. Write the sentence as the `# heading`; body text below it becomes a small supporting line.
+
+```markdown
+<!-- statement -->
+# Are you spending 15 minutes to find what you need?
+
+Internal survey (n=120)
+```
+
+A **quote** takes `<!-- quote -->`. Write the quotation as the body. A **last line** that starts with `—`, `―`, or `--` is the attribution (who said it) and goes in its own box. Do not use `>` for the quote (`>` is the subtitle notation).
+
+```markdown
+<!-- quote -->
+# What customers say
+
+"Past proposals come up with a single question."
+
+— Pilot team manager
+```
+
+- The layouts picked are `Statement.1Message.Single` / `Quote.1Message.Single+1Attribution` in generated templates, and `02_ステートメント` / `07_引用` in the Magazine template. A slide without the marker never lands on these.
+- On a template without such a layout, a statement falls back to a section divider (heading only) or a body layout (with body text), and a quote falls back to a body layout (the attribution goes in the second body box when there is one). `get_deck_issues` then reports the info `marker-layout-missing`.
+- A `<!-- slide: … -->` pin that the template has wins over the marker.
+- If the same slide also has region separators such as `<!-- col -->`, the separator kind wins and the marker is ignored.
+
 ## Speaker notes `<!-- note -->`
 
 Put `<!-- note -->` on **its own line**, and everything from there to the **end of the slide (the next `---`)** becomes that slide's speaker notes. The note body is plain Markdown (multiple lines, bullets, `**bold**` allowed) and is never shown on the slide face.
