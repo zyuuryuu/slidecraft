@@ -184,6 +184,15 @@ export function computeConnection(a: {
   if (preset.native) {
     if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint") };
     if (!cfg.model.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.modelNotSelected") };
+    // Green only on a VERIFIED key: the Models API list fetched with it (#691 — never on the fixed list).
+    if (modelsLoading) return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };
+    if (modelsError) {
+      const status = /\bHTTP (\d{3})\b/.exec(modelsError)?.[1];
+      if (status === "401") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.apiKeyInvalid"), hint: i18n.t("aiStatus.apiKeyInvalidHint") };
+      if (status === "403") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.apiKeyForbidden"), hint: i18n.t("aiStatus.apiKeyForbiddenHint") };
+      return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: modelsError };
+    }
+    if (!models.includes(cfg.model)) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.checkModelName"), hint: models.length ? i18n.t("aiStatus.modelsAvailableHint", { count: models.length }) : undefined };
     return { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.usingModel", { model: cfg.model }) };
   }
   if (provider === "builtin") {

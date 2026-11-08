@@ -113,7 +113,13 @@
     "checkModelNameHint": "Check the model name",
     "selectModel": "Select a model",
     "modelsAvailableHint": "{{count}} models available",
-    "connectedOk": "{{model}} (connected · {{count}} models)"
+    "connectedOk": "{{model}} (connected · {{count}} models)",
+    "apiKeyInvalid": "Invalid API key",
+    "apiKeyInvalidHint": "Re-enter a key issued in the Anthropic Console",
+    "apiKeyForbidden": "This key can't use the models",
+    "apiKeyForbiddenHint": "Check the key's permissions (workspace / organization settings)",
+    "checkModelName": "Check the model name",
+    "localOnlyNoCheck": "Local-model-only mode is on, so the cloud connection isn't checked"
   },
   "aiTasks": {
     "taskCount": "{{count}} tasks",

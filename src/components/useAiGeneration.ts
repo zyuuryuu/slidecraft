@@ -11,6 +11,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import i18n from "../i18n";
 import type { LayoutCatalog } from "../engine/template-catalog";
+import { useProviderModels } from "./useProviderModels";
 import { generateWithAI, listProviderModels, providerPreset, isLocalTarget, type ProviderId, type AiRequest } from "../ipc/ai";
 import { parseDiagramType, type DiagramType } from "../engine/llm-prompts";
 import { runningInTauri } from "../ipc/commands";
@@ -78,7 +79,6 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
   }, []);
   // Setup-assist state: local Ollama probe (null = not yet checked) + once-flags.
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
-  const [modelsLoading, setModelsLoading] = useState(false);
   const hadSavedConfig = useRef(saved.hadSaved);
   const didAutoSelect = useRef(false);
   // Holds startBuiltin so runTask (defined earlier) can auto-start the runtime on first use
@@ -148,38 +148,9 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     [provider],
   );
 
-  // Installed/available models → a dropdown instead of free-text model names.
-  const [models, setModels] = useState<string[]>([]);
-  const [modelsError, setModelsError] = useState<string | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
-  const refreshModels = useCallback(() => setRefreshTick((t) => t + 1), []);
-
-  const curBaseURL = cfg.baseURL;
-  const curApiKey = cfg.apiKey;
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional loading flag set as the fetch begins
-    setModelsLoading(true);
-    listProviderModels(provider, curBaseURL, curApiKey)
-      .then((list) => {
-        if (!cancelled) {
-          setModels(list);
-          setModelsError(null);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setModels([]);
-          setModelsError(e instanceof Error ? e.message : String(e));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setModelsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [provider, curBaseURL, curApiKey, refreshTick]);
+  // `models` = the list the provider actually returned (the connection check, #691); `modelChoices` = what
+  // the model dropdown offers (exposed to the UI as `models`). They differ only for an unverified Claude key.
+  const { models, modelsError, modelsLoading, refreshModels, modelChoices } = useProviderModels(provider, cfg.baseURL, cfg.apiKey, localModelOnly);
 
   const canGenerate = useCallback(
     (userRequest: string) =>
@@ -427,7 +398,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
     generating, result, setResult, error, notice,
     canGenerate, generate, retry, generateBest, candidates, bestOfRunning, cancel, reset,
     tasks: docTasks, setActiveDocId, submit, submitAndWait, cancelTask, clearTasks,
-    models, modelsError, modelsLoading, refreshModels,
+    models: modelChoices, modelsError, modelsLoading, refreshModels,
     ollamaModels, switchToOllama, connection,
     switchToBuiltin, stopBuiltin, builtinStatus, weightsPresent, builtinModel,
     localModelOnly, setLocalModelOnly, localBlocked,
