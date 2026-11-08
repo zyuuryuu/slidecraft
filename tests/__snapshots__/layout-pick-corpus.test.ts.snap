@@ -112,6 +112,38 @@ exports[`#589 corpus: マガジン以外の全マスターで自動レイアウ�
 }
 `;
 
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > エグゼクティブ_Executive_TemplateOnly.pptx 1`] = `
+{
+  "closing": "Closing.1Ask+1Decision ×1",
+  "columns": "Column.2Body.Equal ×1",
+  "diagram": "Content.1Body.Single ×1",
+  "fiveBullets": "Content.1Body.Single ×1",
+  "image": "Content.1Body.Single ×1",
+  "oneBullet": "Content.1Body.Single ×1",
+  "paragraph": "Content.1Body.Single ×1",
+  "section": "Section.1Title.Single ×1",
+  "table": "Content.1Body.Single ×1",
+  "twelveBullets": "Content.1Body.Single ×1",
+  "twoBullets": "Content.1Body.Single ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > エグゼクティブ_Executive_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "Closing.1Ask+1Decision ×1",
+  "columns": "Column.2Body.Equal ×1",
+  "diagram": "Content.1Body.Single ×1",
+  "fiveBullets": "Content.1Body.Single ×1",
+  "image": "Content.1Body.Single ×1",
+  "oneBullet": "Content.1Body.Single ×1",
+  "paragraph": "Content.1Body.Single ×1",
+  "section": "Section.1Title.Single ×1",
+  "table": "Content.1Body.Single ×1",
+  "twelveBullets": "Content.1Body.Single ×1",
+  "twoBullets": "Content.1Body.Single ×1",
+}
+`;
+
 exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > セールスピッチ_Pitch_TemplateOnly.pptx 1`] = `
 {
   "closing": "Closing.1CTA+1Contact ×1",

@@ -1,5 +1,42 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped template > エグゼクティブ_Executive_TemplateOnly.pptx 1`] = `
+{
+  "slide1.xml ビジュアル基準デッキ": "7407dbec7247ff03440ac7b66c09781e3db07fe7bc8bd456ab0ccb2a574374ac",
+  "slide1.xml.rels ビジュアル基準デッキ": "b0ff42826d877c8160189529b299cae0cada618096465eb407e16cef501e21c9",
+  "slide10.xml 本文とコード": "99414daf646d8189e46ec01780e1971cee4445b64b094cf1d3794dd6835ef450",
+  "slide10.xml.rels 本文とコード": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
+  "slide11.xml 表と図（現状は重なる）": "55bfa41781782516f1e04304dc527b0afa9f5a5a8445f29b9e25eafe255e0da0",
+  "slide11.xml.rels 表と図（現状は重なる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide12.xml col 本文｜図": "d685a07a4577d6038a1988dc9b85a7c91081e3bc57725930e207610379ffa8b6",
+  "slide12.xml.rels col 本文｜図": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
+  "slide13.xml col 表｜図": "255512867b328be85c4ac253b45f2cd3772a06d2279c63b73e506c3dc761f825",
+  "slide13.xml.rels col 表｜図": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
+  "slide14.xml col 本文｜画像": "9578c055195de6d9d57f5669ca82dc06609e92cddf1bc818a84f885c3f522cdd",
+  "slide14.xml.rels col 本文｜画像": "d347b968a8a2ed3926cdfcb666164d4e490578b054f2ea02129b2e9d44dd3af4",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "e84c8d793b5582e341e292ab38a67911e68c4db24cbfd75267fca26a6848d3c2",
+  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide16.xml Mermaid": "3029fb511424d5e16b9d8dd30bcac0ee009c43c675e837200725335c11c6e7bb",
+  "slide16.xml.rels Mermaid": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide2.xml 図だけ": "08ed47bc6a52ba1e55c2f6fc18e568a0aa12427edf068c35324ef86b11dae6a4",
+  "slide2.xml.rels 図だけ": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide3.xml 表だけ": "ce397dca6a285a66455bac8cb4992f33b436bc318de1de3e3384fae7dd0b2d15",
+  "slide3.xml.rels 表だけ": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide4.xml コードだけ": "167ef25531dc665e66f10f8fb5eee4488d2ffd000df2306c1ea73cddcaf0d2e5",
+  "slide4.xml.rels コードだけ": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide5.xml 画像だけ": "5f692c1b59b34aab0f77128141079b811917b7fe3fb1e690d8a079d78d77683d",
+  "slide5.xml.rels 画像だけ": "91d73550de56d07418f22d3654b9bf68d50efac9b0c48055ecec3ae3f18ae304",
+  "slide6.xml 画像の属性つき": "dd4e4d7b39f003af154fec0d3a05aab57391bb5ec09313a1cba64c14a6748cd4",
+  "slide6.xml.rels 画像の属性つき": "0ecb4a51acf870a05fb5901f43761817d233a0123bef361c20f96fffd9c825b3",
+  "slide7.xml 背面画像": "e1c1d325c502407661eb5645c7c4664c5bde65c2b0f3845391fea721af0845e8",
+  "slide7.xml.rels 背面画像": "88f64c7b729e41883647f74609c4f2b5613264f36200d7f63651a89dfc190821",
+  "slide8.xml 本文と図": "81ff60e7e8913d322af42fb54df8ff5e59c5b1ceead1b463513b36a8f1b19677",
+  "slide8.xml.rels 本文と図": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
+  "slide9.xml 本文と表": "e4bf7064c8a0fccfc557c5029817914fe273a98d022b0e1b7cb2e0ab2ff9ca20",
+  "slide9.xml.rels 本文と表": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
+}
+`;
+
 exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped template > セールスピッチ_Pitch_TemplateOnly.pptx 1`] = `
 {
   "slide1.xml ビジュアル基準デッキ": "a53046dc3c533e625abb9af5520a832d60db0cce2d7d120b773d041bf06164b8",
@@ -229,6 +266,243 @@ exports[`#392 段 0: slideRoleRegions (template-independent role + body-region c
     "fallback": "Column.2Body.Equal",
     "regions": 2,
     "role": "columns",
+  },
+}
+`;
+
+exports[`#392 段 0: visual placement per shipped template (auto layout · ordinal → placeholder · collisions) > エグゼクティブ_Executive_TemplateOnly.pptx 1`] = `
+{
+  "0 ビジュアル基準デッキ": {
+    "bodyIdxs": [],
+    "collisions": [],
+    "layout": "Title.1Title.Single",
+    "occupancy": {},
+    "resolved": {},
+    "unbound": [],
+  },
+  "1 図だけ": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "diagram",
+    },
+    "resolved": {
+      "diagram": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "10 表と図（現状は重なる）": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [
+      {
+        "idx": "1",
+        "kinds": [
+          "diagram",
+          "table",
+        ],
+      },
+    ],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "table",
+    },
+    "resolved": {
+      "diagram": "1 → 1",
+      "table": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "11 col 本文｜図": {
+    "bodyIdxs": [
+      "1",
+      "2",
+    ],
+    "collisions": [],
+    "layout": "Column.2Body.Equal",
+    "occupancy": {
+      "2": "diagram",
+    },
+    "resolved": {
+      "diagram": "2 → 2",
+    },
+    "unbound": [],
+  },
+  "12 col 表｜図": {
+    "bodyIdxs": [
+      "1",
+      "2",
+    ],
+    "collisions": [],
+    "layout": "Column.2Body.Equal",
+    "occupancy": {
+      "1": "table",
+      "2": "diagram",
+    },
+    "resolved": {
+      "diagram": "2 → 2",
+      "table": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "13 col 本文｜画像": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "image",
+    },
+    "resolved": {
+      "image": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "14 図が 2 つ（現状は先の図が落ちる）": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "diagram",
+    },
+    "resolved": {
+      "diagram": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "15 Mermaid": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "mermaid",
+    },
+    "resolved": {
+      "mermaidBlock": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "2 表だけ": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "table",
+    },
+    "resolved": {
+      "table": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "3 コードだけ": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "code",
+    },
+    "resolved": {
+      "code": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "4 画像だけ": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "image",
+    },
+    "resolved": {
+      "image": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "5 画像の属性つき": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {
+      "1": "image",
+    },
+    "resolved": {
+      "image": "1 → 1",
+    },
+    "unbound": [],
+  },
+  "6 背面画像": {
+    "bodyIdxs": [
+      "1",
+    ],
+    "collisions": [],
+    "layout": "Content.1Body.Single",
+    "occupancy": {},
+    "resolved": {
+      "image": "1 → behind",
+    },
+    "unbound": [],
+  },
+  "7 本文と図": {
+    "bodyIdxs": [
+      "1",
+      "2",
+    ],
+    "collisions": [],
+    "layout": "Column.2Body.Equal",
+    "occupancy": {
+      "2": "diagram",
+    },
+    "resolved": {
+      "diagram": "2 → 2",
+    },
+    "unbound": [],
+  },
+  "8 本文と表": {
+    "bodyIdxs": [
+      "1",
+      "2",
+    ],
+    "collisions": [],
+    "layout": "Column.2Body.Equal",
+    "occupancy": {
+      "2": "table",
+    },
+    "resolved": {
+      "table": "2 → 2",
+    },
+    "unbound": [],
+  },
+  "9 本文とコード": {
+    "bodyIdxs": [
+      "1",
+      "2",
+    ],
+    "collisions": [],
+    "layout": "Column.2Body.Equal",
+    "occupancy": {
+      "2": "code",
+    },
+    "resolved": {
+      "code": "2 → 2",
+    },
+    "unbound": [],
   },
 }
 `;

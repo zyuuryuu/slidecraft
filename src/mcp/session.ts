@@ -17,6 +17,7 @@ import { parseMdReport } from "../engine/md-parser";
 import { serializeMd } from "../engine/md-serializer";
 import { distillDeckReport, contentBodyBox, buildIndexMap } from "../engine/distill";
 import { diagnoseDeck, parseNoticesToIssues, splitInfoIssues, type DeckIssue, type ReviewRuleId } from "../engine/deck-diagnostics";
+import { densityIssues } from "../engine/density-hint"; // #596: get_deck_issues reads the template's density targets (template.styleDensity)
 import { withoutDisabledRules as rulesOn, disabledRuleIds } from "../engine/review-rule-toggle";
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
@@ -155,7 +156,7 @@ export function getDiagnostics(s: Session): { budget: { maxBullets: number; char
   // #148: parseNotices (e.g. a dropped 2nd table) live on the session — deck-diagnostics can't
   // reconstruct them from `deck` alone, so every read merges the persisted notices back in.
   // #247: off の規則は落とし、何が off かを添える（未指定＝空なら key ごと無し → payload は従来と byte-identical）。
-  const issues = rulesOn([...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices)], s.disabledReviewRules);
+  const issues = rulesOn([...diagnoseDeck(deck, catalog, template.layouts), ...parseNoticesToIssues(deck, s.parseNotices), ...densityIssues(deck, template.styleDensity)], s.disabledReviewRules);
   return s.disabledReviewRules.size ? { budget: budgetOf(catalog), issues, disabledReviewRules: disabledRuleIds(s.disabledReviewRules) } : { budget: budgetOf(catalog), issues };
 }
 export function getCatalog(s: Session) {

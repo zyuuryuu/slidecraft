@@ -15,6 +15,7 @@ import { slideMarker, type SlideMarkerKind } from "./slide-markers";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { nestedLevelFontSize } from "./nested-level-font";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
+import { readStyleDensity, type StyleDensity } from "./style-meta";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
 import { slideFigures } from "./slide-figures";
 
@@ -155,6 +156,7 @@ export interface TemplateData {
   masterImages: ImageDeco[]; // the master's own <p:pic> logos/graphics (base layer, data URIs)
   themeColors: Record<string, string>; // scheme token → hex (bg1/bg2/tx1/tx2/accent1-6…), clrMap-resolved
   themeFonts: ThemeFonts; // theme fontScheme major/minor typefaces — resolves +mj-lt/+mn-lt references
+  styleDensity?: StyleDensity; // #596: the preset's density/targets from docProps/custom.xml (style-meta.ts); absent = no targets
 }
 
 /** The theme's fontScheme typefaces, used to resolve `+mj-lt`/`+mn-lt` master references to real names. */
@@ -808,11 +810,13 @@ export async function loadTemplate(
   // doesn't declare its own (A1). Preview/HTML-only, same as masterBgColor.
   const masterBackgroundImage = await backgroundImageSrc(masterXml, masterRelMap, "ppt/slideMasters", zip);
   const masterBackgroundGradient = masterBackgroundImage ? undefined : backgroundGradientCss(masterXml, themeColors);
+  const styleDensity = await readStyleDensity(zip);
 
   return {
     layouts, zip, presentationXml, presentationRels, contentTypes,
     masterTitleStyle, masterBodyStyle, masterBgColor, masterDecorations, masterStaticTexts, masterImages,
     masterBackgroundImage, masterBackgroundGradient, themeColors, themeFonts,
+    ...(styleDensity ? { styleDensity } : {}),
   };
 }
 

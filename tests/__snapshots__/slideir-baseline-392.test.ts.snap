@@ -4712,6 +4712,645 @@ edges:
 }
 `;
 
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-06-executive-brief.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "拠点統合で年 4.2 億円を削減",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "結論: 関東 3 拠点を 1 拠点に統合する投資を承認いただきたい",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-11",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "12",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "経営会議資料・社外秘",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 8,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": undefined,
+        "groupKind": "statement",
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "分散した 3 拠点が利益を毎年 4 億円削っている",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 13,
+        "sourceLineStart": 10,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "要約",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "callout",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本日は統合案（A 案）の承認をお願いしたい",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "関東 3 拠点を新拠点 1 つに統合",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "初期投資 9 億円・回収 2.1 年",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "12 月の承認で来年 4 月に着工",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 23,
+        "sourceLineStart": 15,
+      },
+      {
+        "groupKind": "kpi",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "削減効果",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "年間コスト削減",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "4.2 億円",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "統合 2 年目以降の平年度ベース",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 32,
+        "sourceLineStart": 25,
+      },
+      {
+        "groupKind": "kpi",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "3 つの効果",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "物流費",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "−18%",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "在庫",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "−25%",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "納期",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "当日化",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 48,
+        "sourceLineStart": 34,
+      },
+      {
+        "groupKind": "compare",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "選択肢の比較",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "A 案 1 拠点に統合",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "削減 4.2 億円／年",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "投資 9 億円",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "B 案 現状維持と改善",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "削減 0.8 億円／年",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "投資 1 億円",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 62,
+        "sourceLineStart": 50,
+      },
+      {
+        "groupKind": "step",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "進め方",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2026 年 12 月",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "経営会議で承認",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2027 年 4 月",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "新拠点の着工",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2028 年 1 月",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "3 拠点を順に移管",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 78,
+        "sourceLineStart": 64,
+      },
+      {
+        "groupKind": "card",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "主なリスクと対策",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "人員",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "配置転換を 1 年前に告知",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "移管",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "1 拠点ずつ段階移行",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "需要",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "能力に 20% の余裕",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 94,
+        "sourceLineStart": 80,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "現場との調整状況",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "拠点長 3 名とは合意済み",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "労働組合へは 12 月に説明",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "顧客への告知は着工の 3 か月前",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "既存契約の解約費は投資に含む",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 103,
+        "sourceLineStart": 96,
+      },
+      {
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "本日ご相談したいこと",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "A 案（1 拠点への統合）の承認",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "選択肢: A 案を承認／B 案で再検討",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "期限: 12 月 15 日の経営会議",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 114,
+        "sourceLineStart": 105,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
 exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/sample-deck.md 1`] = `
 {
   "deck": {
@@ -8855,6 +9494,125 @@ Source: 価格は仮置き
 - 11 月中: パイロット部門の選定
 - 12 月: 試験運用キックオフ
 - 連絡先: hubble-pj@example.com
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/manuscript-06-executive-brief.md 1`] = `
+"# 拠点統合で年 4.2 億円を削減
+## 結論: 関東 3 拠点を 1 拠点に統合する投資を承認いただきたい
+
+Date: 2026-11
+Footer: 経営会議資料・社外秘
+
+---
+
+<!-- statement -->
+# 分散した 3 拠点が利益を毎年 4 億円削っている
+
+
+---
+
+# 要約
+
+- 関東 3 拠点を新拠点 1 つに統合
+- 初期投資 9 億円・回収 2.1 年
+- 12 月の承認で来年 4 月に着工
+
+Takeaway: 本日は統合案（A 案）の承認をお願いしたい
+
+---
+
+# 削減効果
+
+<!-- kpi -->
+### 年間コスト削減
+- **4.2 億円**
+- 統合 2 年目以降の平年度ベース
+
+
+---
+
+# 3 つの効果
+
+<!-- kpi -->
+### 物流費
+- −18%
+
+<!-- kpi -->
+### 在庫
+- −25%
+
+<!-- kpi -->
+### 納期
+- 当日化
+
+
+---
+
+# 選択肢の比較
+
+<!-- compare -->
+### A 案 1 拠点に統合
+- 削減 4.2 億円／年
+- 投資 9 億円
+
+<!-- compare -->
+### B 案 現状維持と改善
+- 削減 0.8 億円／年
+- 投資 1 億円
+
+
+---
+
+# 進め方
+
+<!-- step -->
+### 2026 年 12 月
+- 経営会議で承認
+
+<!-- step -->
+### 2027 年 4 月
+- 新拠点の着工
+
+<!-- step -->
+### 2028 年 1 月
+- 3 拠点を順に移管
+
+
+---
+
+# 主なリスクと対策
+
+<!-- card -->
+### 人員
+- 配置転換を 1 年前に告知
+
+<!-- card -->
+### 移管
+- 1 拠点ずつ段階移行
+
+<!-- card -->
+### 需要
+- 能力に 20% の余裕
+
+
+---
+
+# 現場との調整状況
+
+- 拠点長 3 名とは合意済み
+- 労働組合へは 12 月に説明
+- 顧客への告知は着工の 3 か月前
+- 既存契約の解約費は投資に含む
+
+---
+
+# 本日ご相談したいこと
+
+A 案（1 拠点への統合）の承認
+
+- 選択肢: A 案を承認／B 案で再検討
+- 期限: 12 月 15 日の経営会議
 "
 `;
 
