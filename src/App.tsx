@@ -67,7 +67,7 @@ export default function App() {
     handleGenerateToc, handleRegenerateStaticToc,
     diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
-    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
+    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, setHostDocTemplate, editLockedRef, collabRef,
   } = useDeckController();
   const { t } = useTranslation();
   // 表示用の materialize 済み deck（#275）: 左サムネイル一覧（SlideList）と右プレビュー（SlidePreview）
@@ -245,6 +245,7 @@ export default function App() {
     getMasterBytes,
     // Link the tab that was active on 開始 to the seed's host doc (so switching back re-targets here).
     onSeedDoc: (docId) => linkHostDoc(activeId, docId),
+    applyHostTemplate: setHostDocTemplate, // #616: an AI template swap reaches the tab mirroring that host doc
     // Mode (b): an AI-created deck opens as a BACKGROUND tab (no view switch). Unbundle the full
     // .scft (deck + template) so the new tab renders with its OWN master, not the current one.
     onNewHostDoc: async (docId, title, dataBase64) => {
