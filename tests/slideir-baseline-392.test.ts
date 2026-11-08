@@ -38,6 +38,7 @@ describe("#392 段 0: corpus is the committed one (CI reads the same files)", ()
       "samples/deck-02-diagrams.md",
       "samples/deck-03-report-charts.md",
       "samples/deck-04-stress-edgecases.md",
+      "samples/deck-05-report-form.md", // #597（PR #608）で追加された報告書版の基準デッキ
       "samples/manuscript-01-business-proposal.md",
       "samples/manuscript-02-tech-report.md",
       "samples/manuscript-03-howto-guide.md",

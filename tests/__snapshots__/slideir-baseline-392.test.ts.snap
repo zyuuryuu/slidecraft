@@ -2212,6 +2212,551 @@ edges:
 }
 `;
 
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/deck-05-report-form.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "社内ナレッジ検索ツール「Hubble」導入提案",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "検討報告書",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "情報システム部",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "11",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026-11",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 10,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "1. 背景",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "callout",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "情報資産はあるが組織として再利用できていない",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "事業拡大で各部門のドキュメント・ノウハウが急増",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "保管先はストレージ・チャット・SaaS・個人 PC",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "所在を知る人が限られ組織として再利用が進まない",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "新人は「誰に聞くか」で半日を費やす場面も",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 21,
+        "sourceLineStart": 12,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2. 課題",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2.1 横断して探せない",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ツールごとの検索のみ・手作業で突き合わせ",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2.2 表現の揺れに弱い",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "ファイル名・タイトルの完全一致に依存",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2.3 属人化",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "問い合わせがベテランに集中",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "退職とともにナレッジが失われるリスク",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 35,
+        "sourceLineStart": 23,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "3. 提案: ナレッジ検索ツール「Hubble」",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "主要な社内ツールと連携し横断検索",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "自然言語の問いかけに要約つきで回答",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "文意を理解するため表現の揺れに強い",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "アクセス権限は既存の認証基盤と統合",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "※ 各メンバーが本来閲覧できる範囲のみを検索対象とする",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 46,
+        "sourceLineStart": 37,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "4. 期待効果",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "source",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "原稿「期待効果」（社内試算）",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 60,
+        "sourceLineStart": 48,
+        "table": {
+          "header": true,
+          "placeholderIdx": "1",
+          "rows": [
+            [
+              "指標",
+              "現状",
+              "導入後",
+            ],
+            [
+              "検索時間（1 件あたり平均）",
+              "15 分",
+              "2 分",
+            ],
+            [
+              "問い合わせ件数（月間）",
+              "—",
+              "約 40% 減",
+            ],
+            [
+              "新人立ち上がり期間",
+              "3 週間",
+              "2 週間",
+            ],
+            [
+              "対象ドキュメント数（初期連携）",
+              "—",
+              "約 12 万件",
+            ],
+            [
+              "投資回収",
+              "—",
+              "導入 12 カ月",
+            ],
+          ],
+        },
+      },
+      {
+        "groupKind": "step",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "5. 導入スケジュール",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "1 カ月目",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "データソースの棚卸し",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "権限設計",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "2〜3 カ月目",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "パイロット部門で試験運用",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "4 カ月目〜",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "精度と運用ルールを調整し全社展開",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "4",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "展開後",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "利用状況をモニタリング",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "四半期ごとに改善",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 82,
+        "sourceLineStart": 62,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "6. 結論",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "「探せない」を横断検索で解消し組織の時間を取り戻す",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "段階導入でリスクを抑え 12 カ月で投資回収を見込む",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "次の判断事項: パイロット部門の選定",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 90,
+        "sourceLineStart": 84,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
 exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-01-business-proposal.md 1`] = `
 {
   "deck": {
@@ -6905,6 +7450,96 @@ edges:
 
 <!-- slide: Closing.1Message.Single -->
 # 次の四半期で連携基盤を刷新し全国展開へ
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/deck-05-report-form.md 1`] = `
+"# 社内ナレッジ検索ツール「Hubble」導入提案
+## 検討報告書
+
+Category: 情報システム部
+Date: 2026-11
+
+---
+
+# 1. 背景
+
+- 事業拡大で各部門のドキュメント・ノウハウが急増
+- 保管先はストレージ・チャット・SaaS・個人 PC
+- 所在を知る人が限られ組織として再利用が進まない
+- 新人は「誰に聞くか」で半日を費やす場面も
+
+Takeaway: 情報資産はあるが組織として再利用できていない
+
+---
+
+# 2. 課題
+
+### 2.1 横断して探せない
+- ツールごとの検索のみ・手作業で突き合わせ
+
+### 2.2 表現の揺れに弱い
+- ファイル名・タイトルの完全一致に依存
+
+### 2.3 属人化
+- 問い合わせがベテランに集中
+- 退職とともにナレッジが失われるリスク
+
+---
+
+# 3. 提案: ナレッジ検索ツール「Hubble」
+
+- 主要な社内ツールと連携し横断検索
+- 自然言語の問いかけに要約つきで回答
+- 文意を理解するため表現の揺れに強い
+- アクセス権限は既存の認証基盤と統合
+
+※ 各メンバーが本来閲覧できる範囲のみを検索対象とする
+
+---
+
+# 4. 期待効果
+
+| 指標 | 現状 | 導入後 |
+| --- | --- | --- |
+| 検索時間（1 件あたり平均） | 15 分 | 2 分 |
+| 問い合わせ件数（月間） | — | 約 40% 減 |
+| 新人立ち上がり期間 | 3 週間 | 2 週間 |
+| 対象ドキュメント数（初期連携） | — | 約 12 万件 |
+| 投資回収 | — | 導入 12 カ月 |
+
+Source: 原稿「期待効果」（社内試算）
+
+---
+
+# 5. 導入スケジュール
+
+<!-- step -->
+### 1 カ月目
+- データソースの棚卸し
+- 権限設計
+
+<!-- step -->
+### 2〜3 カ月目
+- パイロット部門で試験運用
+
+<!-- step -->
+### 4 カ月目〜
+- 精度と運用ルールを調整し全社展開
+
+<!-- step -->
+### 展開後
+- 利用状況をモニタリング
+- 四半期ごとに改善
+
+
+---
+
+# 6. 結論
+
+- 「探せない」を横断検索で解消し組織の時間を取り戻す
+- 段階導入でリスクを抑え 12 カ月で投資回収を見込む
+- 次の判断事項: パイロット部門の選定
 "
 `;
 
