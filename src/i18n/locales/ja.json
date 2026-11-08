@@ -113,7 +113,13 @@
     "checkModelNameHint": "モデル名を確認",
     "selectModel": "モデルを選択",
     "modelsAvailableHint": "{{count}} 個のモデルが利用可",
-    "connectedOk": "{{model}}（接続OK・{{count}} モデル）"
+    "connectedOk": "{{model}}（接続OK・{{count}} モデル）",
+    "apiKeyInvalid": "API キーが無効です",
+    "apiKeyInvalidHint": "Anthropic Console で発行したキーを入れ直してください",
+    "apiKeyForbidden": "このキーではモデルを使えません",
+    "apiKeyForbiddenHint": "キーの権限（ワークスペース・組織の設定）を確認してください",
+    "checkModelName": "モデル名を確認",
+    "localOnlyNoCheck": "ローカルモデル限定モードのため、クラウドへの接続確認はしません"
   },
   "aiTasks": {
     "taskCount": "{{count}} 件のタスク",

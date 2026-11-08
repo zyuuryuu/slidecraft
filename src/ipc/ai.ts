@@ -6,7 +6,7 @@
  * OpenAI, OpenRouter, Groq, local Ollama/LM Studio, etc.).
  */
 
-import { generateWithClaude } from "./claude";
+import { generateWithClaude, listClaudeModels } from "./claude";
 import { generateWithOpenAICompat } from "./openai-compat";
 import { appFetch } from "./app-fetch";
 import { systemPromptForMode, type DiagramType } from "../engine/llm-prompts";
@@ -161,20 +161,23 @@ export function generateWithAI(req: AiRequest): Promise<string> {
   });
 }
 
-// Known Claude models (no public list endpoint via the SDK path).
-const CLAUDE_MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"];
+/** Known Claude models — DISPLAY candidates for the model dropdown before / without a successful Models
+ *  API check. Never evidence that the connection works (#691): the connection is judged on the list
+ *  listProviderModels("claude") actually fetched with the key. */
+export const CLAUDE_MODEL_CANDIDATES = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"];
 
 /**
  * List the models the provider actually has available, so the UI can offer a
  * dropdown of installed models (e.g. local Ollama tags) instead of free text.
- * Uses the OpenAI-compatible `GET {baseURL}/models` for non-native providers.
+ * Uses the OpenAI-compatible `GET {baseURL}/models` for non-native providers, and the Anthropic Models
+ * API (authenticated with the key) for Claude — so the list doubles as the connection/key check.
  */
 export async function listProviderModels(
   provider: ProviderId,
   baseURL: string,
   apiKey: string,
 ): Promise<string[]> {
-  if (provider === "claude") return CLAUDE_MODELS;
+  if (provider === "claude") return listClaudeModels(apiKey);
   assertValidBaseURL(baseURL); // same key-leak guard on the model-listing path (ADR-0016 F1)
   const base = baseURL.trim().replace(/\/+$/, "");
   const res = await appFetch(`${base}/models`, {
