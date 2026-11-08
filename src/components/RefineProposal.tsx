@@ -10,7 +10,8 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import DiffView from "./DiffView";
-import type { RefineResult, RefineChange } from "../engine/refine";
+import type { RefineResult, RefineChange, RouteRecord } from "../engine/refine";
+import type { SlideEditRoute } from "../engine/slide-edit-route";
 
 export default function RefineProposal({
   proposal,
@@ -32,6 +33,21 @@ export default function RefineProposal({
     edit: t("refineProposal.leverEdit"),
   };
 
+  // #106 P4: which route an AI reply took (partial ops vs whole-slide Markdown) — shown per AI change.
+  const ROUTE_LABEL: Record<SlideEditRoute, string> = {
+    "field-ops": t("refineProposal.routeFieldOps"),
+    "data-ops": t("refineProposal.routeDataOps"),
+    "diagram-ops": t("refineProposal.routeDiagramOps"),
+    design: t("refineProposal.routeDesign"),
+    "figure-yaml": t("refineProposal.routeFigureYaml"),
+    markdown: t("refineProposal.routeMarkdown"),
+    fallback: t("refineProposal.routeFallback"),
+  };
+  const routeOf = (c: RefineChange): RouteRecord | undefined =>
+    c.kind === "ai" ? proposal.routes?.find((r) => r.applied && r.slideIndex === c.slideIndex) : undefined;
+  const routeTag = (r: RouteRecord) =>
+    ROUTE_LABEL[r.route] + (r.skipped > 0 ? t("refineProposal.skippedSuffix", { n: r.skipped }) : "");
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCancel();
@@ -44,6 +60,8 @@ export default function RefineProposal({
   const detCount = changes.filter((c) => c.kind === "deterministic").length;
   const aiCount = changes.filter((c) => c.kind === "ai").length;
   const nothing = changes.length === 0;
+  // A reply that changed nothing but carried notices (every op skipped / malformed fallback) — never silent.
+  const unapplied = (proposal.routes ?? []).filter((r) => !r.applied && (r.notices?.length ?? 0) > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/60 p-6" role="dialog" aria-modal="true" aria-label={t("refineProposal.dialogLabel")}>
@@ -68,6 +86,13 @@ export default function RefineProposal({
 
         {/* Change list (before → after) */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+          {unapplied.map((r, i) => (
+            <div key={`u${i}`} className="border border-amber-300/30 rounded px-2.5 py-1.5 text-[11px]">
+              <span className="text-accent-soft font-medium">{t("refineProposal.slideN", { n: r.slideIndex + 1 })}</span>{" "}
+              <span className="text-amber-300/80">{t("refineProposal.notApplied", { route: routeTag(r) })}</span>
+              <ul className="mt-1 text-muted list-disc pl-4">{r.notices!.map((n, k) => <li key={k}>{n}</li>)}</ul>
+            </div>
+          ))}
           {changes.map((c, i) => (
             <div key={i} className="border border-surface rounded">
               <div className="px-2.5 py-1 bg-canvas text-[11px] flex items-center gap-2 border-b border-surface">
@@ -76,7 +101,11 @@ export default function RefineProposal({
                 <span className={c.kind === "ai" ? "text-purple-300" : "text-faint"}>
                   {c.kind === "ai" ? t("refineProposal.kindAi") : t("refineProposal.kindDeterministic")}
                 </span>
+                {(() => { const r = routeOf(c); return r ? <span className="text-faint">{routeTag(r)}</span> : null; })()}
               </div>
+              {c.warnings && c.warnings.length > 0 && (
+                <ul className="px-2.5 pt-1.5 text-[11px] text-amber-300/80 list-disc pl-6">{c.warnings.map((w, k) => <li key={k}>{w}</li>)}</ul>
+              )}
               <div className="p-2">
                 <DiffView before={c.beforeMd} after={c.afterMd} />
               </div>
