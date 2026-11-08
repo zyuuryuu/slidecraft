@@ -233,6 +233,17 @@ function markKpiValue(shape: GroupLayoutShape, layout: LayoutInfo): GroupLayoutS
   return { ...shape, groups };
 }
 
+/**
+ * #638 — a kpi group's VALUE (big-number) box, by the SAME judgment as markKpiValue (R8): the slot it tagged
+ * "value" (value above its label — canonical KPI.*Value), else the dominantValueSlot it left as body (label
+ * above value — report/magazine 09_KPIハイライト, 05_ビッグナンバー). Undefined for non-kpi shapes and groups
+ * without a dominant font (KPI.4Value.Grid). Binding writes this box's paragraphs without a bullet.
+ */
+export function kpiValueSlot(shape: GroupLayoutShape, group: GroupSlot[], layout: LayoutInfo): GroupSlot | undefined {
+  if (shape.kind !== "kpi") return undefined;
+  return group.find((s) => s.role === "value") ?? dominantValueSlot(group, layout);
+}
+
 // #593: localized/plain names of a single hero-number layout (one huge KPI + its label/notes).
 const HERO_NUMBER_NAME = /ビッグナンバー|big\s*number|hero\s*(?:number|kpi|stat)/i;
 

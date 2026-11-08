@@ -13,7 +13,7 @@ import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
 import { isGroupedSlide } from "./slide-markers";
 import { bindContentByRole, resolveBinding, isBlankParagraphs, type BindingPlan, type ContentRef, type PlaceholderRef } from "./placeholder-binding";
 import { slideIdxRole, placeholderRole } from "./template-catalog";
-import { detectGroups, bakedText } from "./group-layout";
+import { detectGroups, bakedText, kpiValueSlot } from "./group-layout";
 import { planFieldRescue } from "./field-rescue";
 import { splitHeadingIcon, headingIconGeometry, frameAround, unionBox, emptyOverlay, type GroupOverlay } from "./group-overlay";
 
@@ -58,6 +58,16 @@ export function groupCellOverlay(slide: SlideIR, layout: LayoutInfo): GroupOverl
 
 /** Bold every run of a current step's heading (#401 — sectionNavParagraphs' "current = bold"). */
 const boldRuns = (p: Paragraph): Paragraph => ({ ...p, segments: p.segments.map((s) => ({ ...s, bold: true })) });
+
+/** A plain (non-list) paragraph — drops the list fields that only mean something on a bullet (#638). */
+const unbullet = (p: Paragraph): Paragraph => {
+  if (!p.bullet) return p;
+  const plain = { ...p };
+  delete plain.bullet;
+  delete plain.level;
+  delete plain.ordered;
+  return plain;
+};
 
 function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<string, PlaceholderContent>; overlay: GroupOverlay } {
   const out = new Map<string, PlaceholderContent>();
@@ -131,6 +141,11 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
       bodyParas.forEach((p, j) => buckets[Math.min(j, buckets.length - 1)].push(p));
       bodySlots.forEach((s, j) => { if (buckets[j].length) out.set(s.phIdx, { idx: s.phIdx, paragraphs: buckets[j] }); });
     }
+    // #638: the KPI value box shows a number, not a list item — its `- **4.2 億円**` line arrives as a bullet,
+    // which would inherit the master's lvl1 glyph ("•4.2 億円"). Unbulleted → export writes <a:buNone/>.
+    const kpiValuePh = kpiValueSlot(shape, col, layout)?.phIdx;
+    const kpiValue = kpiValuePh ? out.get(kpiValuePh) : undefined;
+    if (kpiValue) out.set(kpiValue.idx, { ...kpiValue, paragraphs: kpiValue.paragraphs.map(unbullet) });
 
     // chrome number → EDITABLE slide content (decision ③), preserving the baked format's number
     // ("1"→"i+1", "STEP 1"→"STEP i+1"). Empty groups get no chrome → clean.
