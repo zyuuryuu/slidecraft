@@ -117,6 +117,50 @@ describe("ログ 1 行の形（純関数）", () => {
   });
 });
 
+describe("#631: 編集経路（route／skipped）の記録 — optional・METRICS_VERSION 据え置き", () => {
+  const base = { tool: "set_slide_markdown", profile: "solo" as const, startMs: 0, endMs: 1, args: {}, result: { content: [{ type: "text" as const, text: JSON.stringify({ ok: true }) }] } };
+  it("buildRecord: 観測に route があれば route／skipped が JSONL に出る（無ければ出ない）", () => {
+    const r = buildRecord({ ...base, obs: { docId: "d", route: { route: "field-ops", skipped: 2 } } });
+    expect(r).toMatchObject({ v: 1, route: "field-ops", skipped: 2 });
+    expect(JSON.parse(formatMetricsLine(r))).toMatchObject({ route: "field-ops", skipped: 2 });
+    const plain = buildRecord({ ...base, obs: { docId: "d" } });
+    expect(plain).not.toHaveProperty("route");
+    expect(plain).not.toHaveProperty("skipped");
+  });
+  it("parseMetricsLines: 旧行（route 無し）と新行（route 有り）を同じ版で両方読む", () => {
+    const old = '{"v":1,"ts":"2026-11-07T10:00:00.000Z","tool":"set_slide_markdown","profile":"solo","doc":"d","ms":1,"outcome":"ok","inChars":1,"outChars":1}';
+    const neu = formatMetricsLine(buildRecord({ ...base, obs: { docId: "d", route: { route: "fallback", skipped: 0 } } }));
+    const { records, skipped } = parseMetricsLines(`${old}\n${neu}\n`);
+    expect(skipped).toBe(0);
+    expect(records).toHaveLength(2);
+    expect(records[0].route).toBeUndefined();
+    expect(records[1]).toMatchObject({ route: "fallback", skipped: 0 });
+  });
+  it("実サーバ: set_slide_markdown の Markdown／ops／skip／不正配列／guard 拒否がそれぞれの経路で残る", async () => {
+    const rec = memRecorder();
+    const c = await connect(rec);
+    const call = (name: string, args: Record<string, unknown> = {}) => c.callTool({ name, arguments: args });
+    await call("open_project", { dataBase64: bundleB64 });
+    const slide = JSON.parse(((await call("get_deck")) as unknown as { content: Array<{ text: string }> }).content[0].text).slides[1];
+    const body = slide.placeholders.find((p: { idx: string }) => p.idx !== "0" && p.idx !== "15").idx as string;
+    rec.lines.length = 0;
+    await call("set_slide_markdown", { index: 1, markdown: `# 中身\n\n- ${SECRET}` });
+    await call("set_slide_markdown", { index: 1, markdown: JSON.stringify([{ op: "setField", idx: body, text: SECRET }]) });
+    await call("set_slide_markdown", { index: 1, markdown: JSON.stringify([{ op: "setField", idx: "99", text: "x" }]) });
+    await call("set_slide_markdown", { index: 1, markdown: JSON.stringify([{ op: "setField", idx: body }]) });
+    await call("set_slide_markdown", { index: 99, markdown: "[]" });
+    const rs = rec.lines.map((l) => JSON.parse(l) as MetricsRecord);
+    expect(rs.map((r) => [r.route, r.skipped, r.outcome])).toEqual([
+      ["markdown", 0, "ok"],
+      ["field-ops", 0, "ok"],
+      ["field-ops", 1, "ok"],
+      ["fallback", 0, "ok"],
+      [undefined, undefined, "reject"],
+    ]);
+    for (const l of rec.lines) expect(l).not.toContain(SECRET);
+  });
+});
+
 describe("差し込み点: 実サーバの全ツール呼出が 1 行ずつ記録される", () => {
   type CallRes = { content: Array<{ text?: string }>; isError?: boolean };
   const call = async (c: Client, name: string, args: Record<string, unknown> = {}) => (await c.callTool({ name, arguments: args })) as unknown as CallRes;

@@ -18,7 +18,7 @@ import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backg
 import { readStyleDensity, type StyleDensity } from "./style-meta";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
 import { layoutPinHonored } from "./layout-pin";
-import { slideRoleRegions, CANONICAL_FALLBACK, pickRoleLayout, tableForPick } from "./slide-role-regions";
+import { slideRoleRegions, CANONICAL_FALLBACK, pickRoleLayout, tableForPick, roleCountMismatch } from "./slide-role-regions";
 
 // ── Types ──
 
@@ -921,14 +921,13 @@ export function suggestLayouts(
   if (!catalog || catalog.length === 0) return [];
   const asAuto = { ...slide, layout: "auto" };
   const chosen = autoSelectLayout(asAuto, slideIndex, totalSlides, catalog);
-  const { role, regions } = slideRoleRegions(slide, slideIndex, totalSlides);
+  const { role, regions, visual } = slideRoleRegions(slide, slideIndex, totalSlides);
   const usableBody = (e: LayoutCatalog[number]) =>
     e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0);
   const hasPictureFrame = (e: LayoutCatalog[number]) => e.placeholders.some((p) => p.role === "picture");
   const hasImage = !!slide.image;
   const fit = (e: LayoutCatalog[number]): number => {
-    let s = e.role === role ? 0 : 50; // same role first
-    if (regions !== undefined) s += Math.abs(e.bodyCount - regions) * 5; // then region-count fit
+    let s = roleCountMismatch(e, role, regions, visual); // same role first, then region/picture-frame count fit
     s += e.name.match(/\+/g)?.length ?? 0; // prefer the simpler variant
     if (hasImage) {
       if (hasPictureFrame(e)) s -= 50; // an image slide prefers a picture-frame layout

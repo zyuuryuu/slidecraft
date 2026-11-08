@@ -23,7 +23,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { createHash } from "crypto";
 import JSZip from "jszip";
-import { openProject, bundleProject, PROJECT_VERSION } from "../src/engine/project-io";
+import { openProject, bundleProject } from "../src/engine/project-io";
 import { loadTemplate } from "../src/engine/template-loader";
 import { generatePptx } from "../src/engine/placeholder-filler";
 import { parseMd } from "../src/engine/md-parser";
@@ -49,10 +49,11 @@ async function slideHashes(deck: DeckIR, tplBytes: Uint8Array): Promise<string[]
 }
 
 describe("#392 段 0: a v1 .scft saved today opens to the same DeckIR", () => {
-  it("the fixture is a v1 file and this build still writes v1", async () => {
-    expect(PROJECT_VERSION).toBe(1);
-    const { meta } = await openProject(bytes);
+  it("the fixture is a v1 file and this build still writes v1 for it (#673: v2 only when a slide carries figures)", async () => {
+    const { deck, template, meta } = await openProject(bytes);
     expect(meta).toEqual({ version: 1, templateName: "技術報告 スタンダード水色", savedAt: "2026-11-08T00:00:00.000Z" });
+    const resaved = await JSZip.loadAsync(await bundleProject(deck, template, meta));
+    expect(JSON.parse(await resaved.file("meta.json")!.async("string")).version).toBe(1);
   });
   it("openProject → deck deep-equals the stored deck.json (no field dropped or rewritten by migrate/zod)", async () => {
     const { deck } = await openProject(bytes);

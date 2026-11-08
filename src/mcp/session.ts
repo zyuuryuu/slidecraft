@@ -70,7 +70,7 @@ export function assertIndex(deck: DeckIR, i: number): void {
 /** One slide → round-trippable Markdown, with 'auto' RESOLVED first so a lone slide isn't
  *  re-pinned to Title by autoSelectLayout's first-slide rule. ADR-0030 stage B: `layouts` hands the
  *  serializer the binding authority (slideBindingPlan) so the readout can't diverge from export. */
-function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undefined, layouts?: TemplateData["layouts"]): string {
+export function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undefined, layouts?: TemplateData["layouts"]): string {
   const sl = deck.slides[i];
   // Unconditional (#435): a pin this template has is returned as-is; one it lacks degrades exactly as export does.
   const resolved = autoSelectLayout(sl, i, deck.slides.length, catalog);
@@ -78,7 +78,7 @@ function slideToMarkdown(deck: DeckIR, i: number, catalog: LayoutCatalog | undef
   return serializeMd({ slides: [{ ...sl, layout: resolved }] }, tpl);
 }
 
-function zodErr(issues: { path: PropertyKey[]; message: string }[]): string {
+export function zodErr(issues: { path: PropertyKey[]; message: string }[]): string {
   return issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; ");
 }
 
@@ -209,7 +209,7 @@ function replaceSlideNotices(s: Session, i: number, fresh: readonly ParseNotice[
   s.parseNotices = [...s.parseNotices.filter((n) => n.slideIndex !== i), ...fresh.map((n) => ({ ...n, slideIndex: i }))];
 }
 
-function fitTail(s: Session, deck: DeckIR, catalog: LayoutCatalog, layouts: TemplateData["layouts"]): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
+export function fitTail(s: Session, deck: DeckIR, catalog: LayoutCatalog, layouts: TemplateData["layouts"]): { diagnostics: DeckIssue[]; budget: { maxBullets: number; charsPerBullet: number } | null } {
   // ADR-0030 stage A: pass the raw layouts so every mutation's tail surfaces unbound content too — the
   // new_project → edit → get_deck_issues loop must not have a blind spot vs get_deck_issues (#97 ②a / #135).
   // #148: same for the session's persisted parse notices (a dropped 2nd table etc.).

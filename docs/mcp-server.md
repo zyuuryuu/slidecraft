@@ -145,7 +145,7 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 視覚 | `get_slide_html(index)` | 1スライドの**現在の描画を自己完結 HTML 文字列**で返す＝`get_slide_image` と同一の共有 HTML（script ゼロ・CSP・フォント埋め込み済）。ローカル Chrome/Edge が無い環境向け＝呼び出し側の任意の手段でラスタ化できる。`slide://{index}/html` リソースにも同じ内容がある |
 | 視覚 | `get_deck_image(start?, columns?, maxSlides?)` | deck **全枚（または `start` からの範囲）のサムネイルを 1 枚の PNG**（image content＋`{from,count,total,columns,width,height,truncated,nextStart?}` の text 1 行）で返す＝**仕上がり確認は最後にこれを 1 回**（#522・1 枚ずつ `get_slide_image` を呼ぶ 29 往復を 1 往復に）。各セルは `get_slide_image` と**同一の共有描画**を CSS で縮小したもの（第 2 の描画経路なし・R8）で、左上に 0-based index を描く。既定 5 列・最大 30 枚・幅 1920px（30 枚で約 180KB・画素予算 3.2Mpx を超える列数指定は幅を自動縮小）。超過分は `truncated:true`＋`nextStart` で続きを取る。ブラウザ要件・未検出時の案内は `get_slide_image` と同じ。細部を読むなら `get_slide_image(index)` |
 | 視覚 | `get_deck_html(start?, columns?, maxSlides?)` | `get_deck_image` と同一のコンタクトシートを**自己完結 HTML 文字列**で返す（`{html, from, count, total, columns, width, height, truncated, nextStart?}`・script ゼロ・CSP・フォント埋め込み済）。ブラウザ無し環境向け |
-| 編集(内容) | `set_slide_markdown(index, markdown)` | 1スライドを差し替え（図/mermaid 自動保持・zod 検証・不正は never-silent 拒否） |
+| 編集(内容) | `set_slide_markdown(index, markdown)` | 1スライドを差し替え（図/mermaid 自動保持・zod 検証・不正は never-silent 拒否）。`markdown` が ops の JSON 配列（`setField`／`setCell`／図の `nodeUpdate` 等）なら GUI と同じ `routeSlideEdit` で差分適用し、応答に `route`・`skipped`・`notices` を足す（不正な配列は全文フォールバック＋告知・#631） |
 | 編集(内容) | `set_deck_markdown(markdown)` | ⚠ deck 全体を置換（図は保持されない・1枚だけなら set_slide_markdown / insert_slide） |
 | 編集(内容) | `split_overflowing_slides()` | 決定論レバー：溢れた本文をフォント縮小なしで分割。`changedSlides`（新 index）を返す |
 | 編集(内容) | `convert_bullets_to_table(index)` | 決定論レバー：key-value 箇条書き → GFM 表。対象なしは `{ok:true, changed:false, status:"not-applicable"}` |

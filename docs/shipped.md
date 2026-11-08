@@ -4,6 +4,8 @@
 
 ## 基盤・アーキテクチャ
 
+- **#392（複数ビジュアル）段 2・段 3 — 配置と描画・GUI/MCP 追随（完了）** — 段 2: `slideRoleRegions`／`visual-placement` が全ビジュアル（`placedFigures`）の ordinal を見て別々の body 枠に置き、表＋図の重なりを解消、```diagram×2 → `Chart.2Chart.Equal`・本文＋図×2 → `Column.*`、無ければ退化＋`figure-dropped`、chart 役割の候補絞り・col 前の画像順、PPTX/HTML/painter golden（PR #657）。段 3: SlideEditor のビジュアル一覧（↑↓🗑・2 つ目以降のソース欄）は `withFigures` の 1 本（`withFigures ∘ slideFigures = id`）、MCP `set_slide_diagram`／`applyFigureYaml`／`previewFigureEdit` に `figure`（何番目か・省略時は最初の diagram、無ければ最初の Mermaid）、`carryFigures` で図ごとの引き継ぎ、`.scft` は v1 据え置き（`figures` 付きだけ v2 は #673） （#392・PR #657・#667・2026-11-08）
+- **CI: llamafile 取得のリトライ＋キャッシュ** — `scripts/download-retry.mjs`（fetch/sleep 注入の純関数・5xx と接続エラーは 2s/4s/8s で最大 4 試行・4xx は即失敗・SHA256 不一致は再試行しない）を `stage-llamafile.mjs` が呼び、`ci.yml` の `build` は版＋target キーの `actions/cache` でヒット時はネットワークに出ない。pinned 版と SHA256 検証は不変（ADR-0017） （#663・PR #675・2026-11-08）
 - **#392（複数ビジュアル）段 3 — GUI・MCP の追随** — ビジュアルの一覧の書き込みを `slide-figure-edit.withFigures` の 1 本に（読みの `slideFigures` の逆・正は単数フィールド）。SlideEditor は 2 つ以上のスライドだけに一覧（順序・削除・2 つ目以降の図の編集）を出し、全ビジュアルの枠に本文欄を出さない（`visualOccupancy`）。MCP `set_slide_diagram` に `figure`（何番目の図か）。テキスト編集の引き継ぎは図ごと（`carryFigures`・MCP と GUI の一致テスト）。画像の編集枠と出典行のキャプション高さも配置に追随。`.scft` は旧形式のまま正しい（migrate 不要） （#392 段 3・2026-11-08）
 - **#392（複数ビジュアル）段 2 — 2 つ目以降のビジュアルも別々の枠に描く** — 1 スライドの図・表・コード・画像を出現順に別々の body 枠へ置く（ordinal 解決は `figure-placement.placedFigures` の 1 経路・SlideIR は不変）。表＋図の重なり（#434）を構造的に解消、図×2 は `Chart.2Chart.Equal`（無ければ 2 カラム）、本文＋ビジュアルは Column.2/3Body へ。PPTX・プレビュー／HTML・診断が同じ配置を読む（R8）。枠が足りないものだけ info `figure-dropped`。単一ビジュアルのスライドは PPTX・HTML とも byte-identical （#392 段 2・2026-11-08）
 - **UX ゲート（ADR-0039・ADR-0031 の G4）** — 「UX が良い」の定義は ISO 9241-11（効果・効率・満足）、原則は ISO 9241-110:2020 の 7 原則に Nielsen／Shneiderman／Norman を対応づけた 1 枚（`docs/design/ux-principles.md`）。法則（Hick・Fitts・Miller–Cowan・段階的開示・認知負荷・WCAG 2.2）から導いた UX 予算を `tests/ux-budget.test.tsx` の ratchet で守り（常設ボタン ≤7・帯 1 本・区画 ≤4・記号 1 対 1・ネスト ≤2・i18n 漏れは現在値凍結）、GUI の PR はヒューリスティック評価（重大度 3 以上はマージ阻害）、PR テンプレに「UX への影響」欄 （ADR-0039・PR #647・#648／PR #651・2026-11-08）
@@ -70,6 +72,7 @@
 
 ## AI編集の深化
 
+- **collab の GUI ロールの `save_project` は読み取り扱い** — projection の `templateRev` pull（`save_project` → `openProject`）が host doc の `dirty`／`savedAt` を下ろしていた。GUI ロール（`x-slidecraft-role: gui`）は `saveProjectBytes(s, false)` で dirty に触れず、AI ロールと solo は従来どおり。dirty の真実は `Session.dirty` 1 本 （#633・PR #661・2026-11-08）
 - **refine／batch 編集に ops を配線・振り分けを engine の 1 関数に（#106 P4）** — AI 返答の振り分け（図 ops → setField → DATA ops → Markdown）を `useDeckController` から `src/engine/slide-edit-route.ts` の `routeSlideEdit` へ移設し、GUI の適用・プレビュー・`batchEditDeck`・`refineDeck` Lv3 が同じ関数を通る（oracle 12 経路の一致テスト）。batch の依頼文は GUI と同じ `slideEditUserPrompt`。`RefineResult.routes` に経路と skip 数。MCP 側の記録は #631（P4b） （#629・PR #632・2026-11-08）
 - **DATA ops — 表セル・グラフ系列・ガント・KPI の部分編集（#106 P3）** — AI パネルの 1 枚編集で、変えたセル／値だけを JSON 配列（`setCell`／`setSeriesValue`／`setTask`／`setCard`）で返す経路を追加。適用先は既存の `table.rows`／DiagramSpec（第 2 の表現を作らない）。表せないセル・曖昧な系列名・タスク名衝突は skip＋告知、不正な配列は全文編集へフォールバック。ops の結果 ≡ Markdown 経路の `parseMd` を一致テストで固定（R8） （#106 P3・PR #603・2026-11-08）
 - **新規デッキ生成で書式違反のあった枚だけを 1 回再生成** — 弱いモデルの壊れた `\uXXXX` を floor（違反要素を除外して告知）が除外した枚だけを、1 枚専用プロンプト（`slide-retry`）で各 1 回だけ再生成し、違反ゼロで parse できた場合に限り差し替える。直らなければ floor の結果と告知を残し、再試行の有無と結果を notices に追記（never-silent）。正常デッキは byte-identical・呼び出し回数不変 （#107・PR #585・2026-11-07）
@@ -86,6 +89,9 @@
 
 ## テンプレ・マスター
 
+- **マーケ プリセット「Campaign」＋画像構造** — 全面画像＋キャプション（`Hero.1Image+1Caption`）・テキスト＋画像並置・2×2 グリッド（`Gallery.4Image.Grid`）・色面の章扉など 6 LayoutDef（`PRESET_LAYOUTS`）、`samples/manuscript-07`（10 枚・自動分割 0・消失系 0）、出荷テンプレ（内蔵 6 本目）・見本 golden。画像構造は #392 の `figures[]`＋段 2 の配置（`placedFigures` 1 経路）。画像面積比の計測と目標帯の較正は #671 （#598・PR #668・2026-11-08）
+- **章扉の章一覧固定を `SectionNav.1TitleList.Single` を持つテンプレに限る** — `<!-- section -->` が `SectionNav` を持たないテンプレ（出荷 3 本）で本文レイアウトに落ちていた。pin 受容判定を `layout-pin.ts` の `layoutPinHonored` に一本化し、選択と書き出しの両経路が同関数（23 マスターの一致テスト）。技術報告・公文書・マガジン → `01_章扉`、Executive は byte-identical。section 役レイアウトが無いテンプレ（Pitch）の告知は #662 （#637・PR #658・2026-11-08）
+- **KPI タイルの説明行（kpi グループの body 枠・ラベル枠へ流れる説明行）も `buNone`** — #638 の値枠に続き、kpi グループの見出しでない段落は KPI.2〜4 の単一枠分岐でも箇条記号を消す。判定は `shape.kind === "kpi"` と role のみ（R8）。KPI 以外は 1216 ファイルの slide XML 比較で byte-identical （#645・PR #656・2026-11-08）
 - **マーケ プリセット「Campaign」＋画像構造** — オフホワイト・低彩度 accent 1 色・明朝見出し・左右 1.2in・ヘッダ帯なし。新レイアウト（プリセット専用）: 全面画像＋キャプション `Image.FullBleed+1Caption`・左キャプション｜右画像 `Media.1Caption+1Image`・並置 `Gallery.2Image.Equal`・2×2 `Gallery.4Image.Grid`・色面の章扉 `Section.1Title.ColorField`・下寄せの締め `Closing.1Notes.Bottom`。画像だけのスライドは枠数の一致する Gallery、本文なしの behind 画像は全面画像へ（該当レイアウトの無いテンプレは従来どおり）。`samples/manuscript-07-campaign.md`（10 枚・消失 0）・出荷テンプレ（内蔵 6 本目）・見本 golden （#598・2026-11-08）
 - **エグゼクティブ プリセット「Executive」＋密度の目標帯診断** — ダーク navy・accent 1 色・巨大 KPI・Ask 締め `Closing.1Ask+1Decision`（新・プリセット専用）・`samples/manuscript-06-executive-brief.md`（10 枚）・出荷テンプレ（内蔵 5 本目）・見本 golden。`StylePreset.density` → `docProps/custom.xml` → `get_deck_issues` の `density-target`（info・既存テンプレでは 0 件）の 1 経路。本文倍率は **21pt 以下の枠だけ**に掛ける `scale.bodyMaxPt` を `presetRecipe` に入れ（KPI 値の溢れを根治）、Pitch にも適用 （#596・PR #635・2026-11-08）
 - **セールスピッチ プリセット「Pitch」** — 14 レイアウト（Statement・Quote・CTA・Media・Summary 含む）・配色（白 canvas＋濃いブランド色＋高彩度 accent）・`samples/manuscript-05-sales-pitch.md`（14 枚・自動分割 0・消失系 0）・出荷テンプレ（内蔵 4 本目）・全レイアウト見本 golden。既存出力は 82 parts byte-identical。`PRESET_ARTIFACTS` が唯一の出荷先定義 （#595・PR #639・2026-11-08）
@@ -167,6 +173,7 @@
 
 ## 協働・MCP
 
+- **`kpi-value-overflow`（warn）: KPI の値が値枠に 1 行で収まらないときに `get_deck_issues` が告げる** — 幅見積りは `title-fit.ts` の `measureLines`（式は不変・R8）、値枠判定は `group-layout.ts` の `kpiValueSlot`。コーパス 27 テンプレ × 13 デッキで誤検知 0・真陽性 3（「4.2 億円」72pt／52pt）。hint との適用範囲の整合は #670 （#643・PR #659・2026-11-08）
 - **collab で `augment_template`／`adjust_template` のテンプレ差し替えを GUI へ同期** — `deckChanged` に ADDITIVE な `templateChanged`/`templateName`、`templateRev` で GUI が `save_project` → `openProject` の既存経路で pull。rev は進めるが undo 履歴に積まない。solo 限定を外し `tool-profiles` を ALL に。stale 拒否後の再 pull を template-only 短絡が潰す欠陥（レビュー D1）を修正 （#616・PR #619・2026-11-08）
 - **Claude Desktop 用 `.mcpb` バンドル＋接続診断 `slidecraft-mcp --doctor`** — release.yml が win32-x64／darwin-arm64 の `.mcpb`（manifest 0.3・同梱 Node・SHA256SUMS 入り）を Release 資産に添付。`--doctor` は MCP server を自己 spawn して `server/discover`→`initialize`→`tools/list` を順に検査し、GUI の「接続テスト」は同じ関数を呼ぶ（判定の重複なし・レポート無しは NG） （#517 子 3・4・PR #617・2026-11-08）
 - **不正な ```diagram を `diagram-invalid` として報告（never-silent）** — `type: flow` のようにスキーマが拒否する図は空のまま無警告で出力されていた。parse 失敗の理由を捨てない `parseDiagramYamlResult` を 1 経路にし、`get_deck_issues` が zod の理由付きで warn、`validate_deck` は `diagramErrors` を返して `ok: false`（export ゲート）。export と `schema.ts` は不変 （#587・PR #590・2026-11-07）
@@ -230,6 +237,8 @@
 
 ## UX・配布
 
+- **メニューのネストを 2 段以内に（HTML 書き出しの遷移をファイルのメニュー内の 1 行に）** — ファイル ▾ → 🌐 HTML ▸ → 遷移の 3 段を、HTML 行の直下に 4 択のセグメント行（ThemeToggle と同形）として置き、UX 予算のネスト凍結リストを 4 → 0 に（`tooDeep(2)` が実効化＝ratchet 縮小）。遷移 4 値の挙動は e2e で `data-transition` を実証。案 1（並列 4 項目）・2a（保存ダイアログ）・2b（⚙）はヒューリスティック評価で重大度 3 （#650・PR #660・2026-11-08）
+- **AI 接続設定まわりの UX（ヒューリスティック評価 重大度 2 の 4 件）** — 「接続設定」「AI 設定」「AI の接続設定…」の 3 表記を `aiSettings.title` 1 キーに、`modelsEmpty` をプロバイダ別（Ollama／remote）に、「AI で生成」ダイアログ内では候補数を隠す（`surface="dialog"`）、未接続（`checking` を除く）なら初回だけ接続設定を展開、`tone → 色クラス` の写像を `toneClass` 1 関数に。ADR-0039 G4-c の初適用 （#653・PR #664・2026-11-08）
 - **UX 細部の整理** — AI 接続設定の入力欄を `AiSettingsPopover` 1 か所に（「AI で生成」ダイアログはそれを描画）、英語のままのラベル（Markdown／Layout／⟳ Auto／区切り線ツールチップ／StatusBar／図の形式名／LlmAssist）を辞書へ、StatusBar の `spec={null}` 経路を整理、コメントとツールチップ（Ctrl+Y）修正。ヒューリスティック評価の重大度 2 は #653 （#615・PR #652・2026-11-08）
 - **上部バーを文書の操作だけに（12 → 7 ボタン）＋アイコンの役割を固定** — 言語・テーマ・ヘルプ・AI 接続設定を ⚙（`SettingsMenu`）に集約。✨ は AI だけ（目次生成・更新通知は別記号）、＋は追加だけ、取り込みは 📥、Re-make は 🔁。「Draft」→「原稿」。許可リスト grep で後退を防ぐ。docs ja/en 更新 （#614・PR #641・2026-11-08）
 - **上部の帯を 1 本の通知枠（NoticeSlot）に** — 更新通知・取り込み結果・テンプレ調整の帯を同時 1 本に（優先: 調整 ＞ 取り込み ＞ 更新、隠れた数は「+N」バッジ）。判定は純関数 `noticeSlotPlan` 1 つ。`App.tsx` 709 → 699 行。DocTabs と ReviewBar は枠の外 （#613・PR #640・2026-11-08）

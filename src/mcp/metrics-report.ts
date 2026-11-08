@@ -15,6 +15,7 @@
  */
 import type { McpProfile } from "./tool-profiles";
 import type { MetricsRecord } from "./metrics";
+import { OPS_ROUTES } from "../engine/slide-edit-route";
 
 export interface ReportOptions {
   /** 集計対象のツール名の一覧＝TOOL_PROFILES のキー（R8: 第 2 の一覧を作らない — 呼び出し側が渡す）。 */
@@ -37,7 +38,9 @@ export interface Evidence {
   convertBulletsCalls: number;
   guideAliasShare: number | null;
 }
-export interface MetricsReport { totalCalls: number; tools: ToolStat[]; unknownTools: { tool: string; calls: number }[]; windows: WindowStat[]; units: UnitStat[]; evidence: Evidence }
+/** #631: 編集経路。recorded＝route を持つ記録（旧行は数えない）・ops＝そのうち OPS_ROUTES（R8: engine の集合）。 */
+export interface RouteStat { recorded: number; ops: number; opsShare: number | null; skipped: number }
+export interface MetricsReport { totalCalls: number; tools: ToolStat[]; unknownTools: { tool: string; calls: number }[]; windows: WindowStat[]; units: UnitStat[]; evidence: Evidence; routes: RouteStat }
 
 export const DEFAULT_WINDOW_GAP_MS = 30 * 60_000;
 
@@ -110,7 +113,10 @@ export function aggregateMetrics(all: readonly MetricsRecord[], opts: ReportOpti
     convertBulletsCalls: calls("convert_bullets_to_table"),
     guideAliasShare: ratio(guides, guides + calls("bootstrap")),
   };
-  return { totalCalls: records.length, ...toolStats(records, opts.tools), windows, units, evidence };
+  const routed = records.filter((r) => r.route !== undefined);
+  const ops = routed.filter((r) => OPS_ROUTES.has(r.route!)).length;
+  const routes: RouteStat = { recorded: routed.length, ops, opsShare: ratio(ops, routed.length), skipped: routed.reduce((n, r) => n + (r.skipped ?? 0), 0) };
+  return { totalCalls: records.length, ...toolStats(records, opts.tools), windows, units, evidence, routes };
 }
 
 const pct = (x: number | null): string => (x === null ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -136,5 +142,7 @@ export function renderMetricsReport(rep: MetricsReport): string {
   L.push(`| get_project_info / 窓 | ${num(e.projectInfoPerWindow, 2)} |`);
   L.push(`| convert_bullets_to_table 呼出 | ${e.convertBulletsCalls} |`);
   L.push(`| 旧ガイド 4 本 /(旧ガイド + bootstrap) | ${pct(e.guideAliasShare)} |`);
+  const rt = rep.routes;
+  L.push(`| 編集経路: ops / 経路を記録した呼出（#106） | ${pct(rt.opsShare)}（${rt.ops}/${rt.recorded}・skip ${rt.skipped}） |`);
   return L.join("\n") + "\n";
 }

@@ -55,14 +55,17 @@ const HOT_TOOLS = [
 // #392 段 3（set_slide_diagram の引数 `figure` 追加・意図した inputSchema の拡張。型は number＝SDK の整数境界
 // 約 50 字を避け、意味の説明は bootstrap.toolNotes.diagram へ置いて describe は 1 句）でホット 7,924 → 7,980 字。
 // 宣言して上限を実測値に更新（全体は 19,050 以内に収まったので据え置き）。
-const HOT_CHAR_LIMIT = 7980;
+// #631（set_slide_markdown が ops の JSON 配列も受ける・統括裁定 (A)「説明文の追記は 1 文」）でホット 7,980 → 7,999 字。
+// 宣言して上限を実測値に更新（inputSchema は不変＝markdown は string のまま中身で判定）。
+const HOT_CHAR_LIMIT = 7999;
 // #554（export_pptx の引数 `charts` 追加・意図した inputSchema の拡張）で全体 17,577 → 17,752 字。宣言して上限を更新。
 // #247（set_review_rules 追加・意図したツール面の拡張。id の enum は schema に載せずサーバ側検証＝+450 字に抑えた）で
 // 全体 17,752 → 18,202 字。宣言して上限を更新。
 // #568 段 3 / #570 段 3（augment_template / adjust_template 追加・意図したツール面の拡張。レシピの書式は
 // bootstrap.toolNotes.templateDerive へ置き説明文は 1 行に抑えた — 2 本で +794 字、うち約 200 字/本は SDK の固定部分）で
 // 全体 18,199 → 18,993 字。宣言して上限を更新。
-const ALL_CHAR_LIMIT = 19050;
+// #631（同上・set_slide_markdown 説明文 +19 字）で全体 19,049 → 19,068 字。宣言して上限を実測値に更新。
+const ALL_CHAR_LIMIT = 19068;
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> };
 type CallRes = { content: Array<{ text?: string }>; isError?: boolean };
