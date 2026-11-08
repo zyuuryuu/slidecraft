@@ -129,18 +129,31 @@ export async function adjustDocTemplate(s: Session, recipeJson: string) {
 // ── get_deck_issues: 本文倍率の提案（#570 段 3）──
 const suggestionCache = new WeakMap<TemplateData, WeakMap<DeckIR, OverflowScaleSuggestion | null>>();
 
+/** 今のレシピの本文倍率に相対倍率 factor を掛けた**絶対**レシピ（adjust_template は元テンプレから作り直すため）。
+ *  hint の試算と、hints に載せる提案レシピの両方がこれを使う（同じレシピを試算し、同じレシピを提案する）。 */
+function scaledRecipe(prev: TemplateAdjustRecipe | undefined, factor: number): TemplateAdjustRecipe {
+  const body = Math.round((prev?.scale?.body ?? 1) * factor * 10000) / 10000;
+  return { ...(prev ?? {}), scale: { ...(prev?.scale ?? {}), body } };
+}
+
 /** 溢れがあるときだけ提案を 1 件足す（無ければ入力の配列をそのまま返す＝応答は従来どおり）。
- *  hint 用に、adjust_template に渡す**絶対**レシピ（前回の本文倍率 × 提案倍率）も返す。 */
+ *  hint 用に、adjust_template に渡す**絶対**レシピ（前回の本文倍率 × 提案倍率）も返す。
+ *  試算は adjust_template と同じ build（元テンプレ bytes ＋ 絶対レシピ・合成も同じ固定順）で作る（PR #682・R8）。
+ *  派生がまだ無い doc では元＝今のテンプレ・レシピ無しなので、従来の「今の bytes × 候補倍率」と同じ bytes になる。 */
 export async function withOverflowScaleHint(s: Session, issues: DeckIssue[]): Promise<{ issues: DeckIssue[]; recipe?: string }> {
   if (countOverflows(issues) === 0 || s.disabledReviewRules.has("overflow-scale-hint")) return { issues };
   const { deck, template } = requireLoaded(s);
   let byDeck = suggestionCache.get(template);
   if (!byDeck) suggestionCache.set(template, (byDeck = new WeakMap()));
   let sug = byDeck.get(deck);
-  if (sug === undefined) byDeck.set(deck, (sug = (await suggestBodyScale(await bytesOf(template), deck)) ?? null));
+  if (sug === undefined) {
+    const d = await derivationOf(s);
+    const trial = async (factor: number) => {
+      const r = await build({ ...d, recipe: scaledRecipe(d.recipe, factor) });
+      return r.failures.length ? undefined : r.bytes; // 合成が通らない倍率は適用もできない → 候補から外す
+    };
+    byDeck.set(deck, (sug = (await suggestBodyScale(await bytesOf(template), deck, trial)) ?? null));
+  }
   if (!sug) return { issues };
-  const prev = derivations.get(s)?.recipe;
-  const body = Math.round((prev?.scale?.body ?? 1) * sug.scale * 10000) / 10000;
-  const recipe = JSON.stringify({ ...(prev ?? {}), scale: { ...(prev?.scale ?? {}), body } });
-  return { issues: [...issues, overflowScaleIssue(sug, issues)], recipe };
+  return { issues: [...issues, overflowScaleIssue(sug, issues)], recipe: JSON.stringify(scaledRecipe(derivations.get(s)?.recipe, sug.scale)) };
 }

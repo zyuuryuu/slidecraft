@@ -48,7 +48,8 @@ export interface TemplateAdjustRecipe {
   fonts?: { latin?: FontMapEntry[]; ea?: FontMapEntry[]; scope?: FontScope };
   /** Per-class factor (1 = unchanged). Omitted class = 1. `bodyMaxPt`: the body factor only applies to
    *  body frames whose largest pre-scale size is ≤ this (pt); larger display frames keep their size.
-   *  Omitted = every body frame (the #570 behaviour). */
+   *  Omitted = decided by bodyMaxPtFor: a preset-derived template (meta styleDensity) keeps the preset's
+   *  scope (only the frames the preset scaled); any other template scales every body frame (#570). */
   scale?: Partial<Record<SizeClass, number>> & { bodyMaxPt?: number };
 }
 
@@ -91,6 +92,7 @@ function sizeStep(scale: TemplateAdjustRecipe["scale"]): SizeStep | undefined {
   const cap = scale?.bodyMaxPt;
   if (cap !== undefined && !(Number.isFinite(cap) && cap > 0)) throw new RangeError(`bodyMaxPt must be a positive number: ${cap}`);
   if (f.title === 1 && f.body === 1 && f.other === 1) return undefined;
+  // bodyMaxPt is only validated here; the cap itself is resolved by bodyMaxPtFor (it also reads the meta — R8).
   return { f };
 }
 
