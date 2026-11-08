@@ -154,6 +154,39 @@ describe("出荷テンプレ（public/templates/slide/エグゼクティブ_Exec
     }
   });
 
+  // PR #635 裁定 B: 本文倍率（20/14）は 21pt 以下の枠だけ。KPI の値（大数字）は倍率前のサイズのまま。
+  it("KPI.1/KPI.3 の値枠のフォントは倍率前（LayoutDef）と同じ・ラベル枠（本文の帯）は倍率が掛かる", async () => {
+    const defs = presetToSpec(EXECUTIVE_PRESET, PRESET_LIBRARY).layouts!;
+    const z = await JSZip.loadAsync(shipped);
+    const layoutXml = async (name: string) => {
+      for (const p of Object.keys(z.files).filter((n) => /^ppt\/slideLayouts\/slideLayout\d+\.xml$/.test(n))) {
+        const xml = await z.file(p)!.async("string");
+        if (xml.includes(`<p:cSld name="${name}"`)) return xml;
+      }
+      throw new Error(name);
+    };
+    const lvl1Pt = (xml: string, ph: string) =>
+      Number(xml.match(new RegExp(`name="${ph.replace(/\./g, "\\.")}"(?:(?!</p:sp>).)*?<a:defRPr\\b[^>]*\\bsz="(\\d+)"`))![1]) / 100;
+    const cases: [string, string[], string[]][] = [
+      ["KPI.1Value.Single", ["Value.Center"], ["ValueLabel.Center"]],
+      ["KPI.3Value.Equal", ["Value1", "Value2", "Value3"], ["Label1", "Label2", "Label3"]],
+      ["Closing.1Ask+1Decision", ["Ask.Center"], ["Decision.Bottom"]],
+    ];
+    for (const [layout, values, labels] of cases) {
+      const def = defs.find((d) => d.name === layout)!;
+      const xml = await layoutXml(layout);
+      const fs = (ph: string) => def.placeholders.find((p) => p.name === ph)!.fontSize;
+      for (const ph of values) {
+        expect(fs(ph), `${layout} ${ph}`).toBeGreaterThan(21);
+        expect(lvl1Pt(xml, ph), `${layout} ${ph}`).toBe(fs(ph));
+      }
+      for (const ph of labels) {
+        expect(fs(ph), `${layout} ${ph}`).toBeLessThanOrEqual(21);
+        expect(lvl1Pt(xml, ph), `${layout} ${ph}`).toBe(Math.round(fs(ph) * (20 / 14) * 2) / 2);
+      }
+    }
+  });
+
   it("左右余白 1.0in: 本文枠の左端が 1.0in", () => {
     const def = presetToSpec(EXECUTIVE_PRESET, PRESET_LIBRARY).layouts!.find((d) => d.name === "Content.1Body.Single")!;
     expect(def.placeholders.find((p) => p.name === "Body.Center")!.x).toBeCloseTo(1.0, 6);

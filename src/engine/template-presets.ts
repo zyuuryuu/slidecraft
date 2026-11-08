@@ -4,7 +4,8 @@
  * スタイル＝配色・書体・密度（本文サイズ・左右余白）＋レイアウトの部分集合（#580 段 1: 報告書 6 変種は
  * 選ばれるレイアウトが全スライドで一致し、差は配色と書体だけだった）。プリセットは TemplateSpec に
  * 落として writeTemplate に渡す。幾何の正本は LayoutDef の 1 経路（R8）で、密度は既存の経路に乗せる:
- *   - bodyPt: #570 の adjustTemplate の本文倍率（bodyPt ÷ MASTER_BODY_PT）。第 2 のサイズ規則を作らない。
+ *   - bodyPt: #570 の adjustTemplate の本文倍率（bodyPt ÷ MASTER_BODY_PT・本文の帯 21pt 以下の枠だけ＝
+ *     PRESET_BODY_MAX_PT）。第 2 のサイズ規則を作らない。
  *   - marginIn: LayoutDef の枠を左右方向に縮める純粋変換 withHorizontalMargin（既定 0.8in では恒等）。
  *   - maxBodyLines / maxLineChars（#596）: 文字量の目標帯。生成テンプレのメタ（style-meta.ts）に書き、
  *     get_deck_issues の density-target が読む。目標の無いプリセット（REPORT_PRESET）の出力は不変。
@@ -111,10 +112,16 @@ export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] 
   return { name: preset.name, fonts: { ...preset.fonts }, palette: { ...preset.palette }, layouts };
 }
 
-/** 密度のうちサイズ分を #570 の変換レシピに落とす（基準どおりなら空＝無変換）。 */
+/**
+ * 本文倍率を掛ける枠の上限（pt）＝本文の大きさの帯（基準 14pt の 1.5 倍）。これを超える枠は大数字・
+ * ステートメントなど表示用サイズで、幅は基準サイズ前提のため倍率を掛けると溢れる（PR #635 裁定 B）。
+ */
+export const PRESET_BODY_MAX_PT = MASTER_BODY_PT * 1.5;
+
+/** 密度のうちサイズ分を #570 の変換レシピに落とす（基準どおりなら空＝無変換）。倍率は本文の帯の枠だけ。 */
 export function presetRecipe(preset: StylePreset): TemplateAdjustRecipe {
   const body = preset.density.bodyPt / MASTER_BODY_PT;
-  return body === 1 ? {} : { scale: { body } };
+  return body === 1 ? {} : { scale: { body, bodyMaxPt: PRESET_BODY_MAX_PT } };
 }
 
 /**

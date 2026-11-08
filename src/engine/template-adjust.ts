@@ -14,6 +14,10 @@
  *   bodyStyle→本文、otherStyle→その他）と、master／レイアウトの**全** `<a:defRPr sz>`（`defPPr` と
  *   `lvlNpPr` の両方）。図形の系統は loader の placeholderRole（レイアウト）／ph type（master）で決め、
  *   placeholder でない図形はその他。0.5pt 単位に丸め、[1pt, 400pt] に収める（1pt の区切り線枠は 1pt のまま）。
+ *   本文倍率の上限 `scale.bodyMaxPt`（任意・既定なし＝全枠）: 指定すると本文系の枠のうち、倍率前の最大 sz
+ *   （＝lvl1。入れ子段は lvl1 から導いた小さい値）がその値以下の枠だけに掛け、大数字などの表示用サイズの
+ *   枠は据え置く（PR #635 裁定 B）。判定は枠（txStyles のブロック／`<p:sp>`）単位で、段ごとには判定しない
+ *   （22pt の枠の lvl2 だけが拡大されて親子が逆転するのを防ぐ）。
  *   run に直書きされた sz（静的ラベルの `<a:rPr sz>`）は対象外。容量見積りはマスターの sz を読む 1 経路の
  *   ままで、デッキ側に倍率を持たない（R8）。
  *
@@ -37,8 +41,16 @@ export type SizeClass = "title" | "body" | "other";
 
 export interface TemplateAdjustRecipe {
   fonts?: { latin?: FontMapEntry[]; ea?: FontMapEntry[]; scope?: FontScope };
-  /** Per-class factor (1 = unchanged). Omitted class = 1. */
-  scale?: Partial<Record<SizeClass, number>>;
+  /** Per-class factor (1 = unchanged). Omitted class = 1. `bodyMaxPt`: the body factor only applies to
+   *  body frames whose largest pre-scale size is ≤ this (pt); larger display frames keep their size.
+   *  Omitted = every body frame (the #570 behaviour). */
+  scale?: Partial<Record<SizeClass, number>> & { bodyMaxPt?: number };
+}
+
+/** Normalised size step: per-class factors plus the optional body cap (hundredths of a point). */
+export interface SizeStep {
+  f: Record<SizeClass, number>;
+  bodyMaxSz?: number;
 }
 
 const THEME_PART = "ppt/theme/theme1.xml";
@@ -66,11 +78,14 @@ function fontMap(entries: FontMapEntry[] | undefined): Map<string, string> {
   return m;
 }
 
-/** Normalised factors: undefined when every class is 1 (no size change at all). */
-function factors(scale: TemplateAdjustRecipe["scale"]): Record<SizeClass, number> | undefined {
+/** Normalised size step: undefined when every class is 1 (no size change at all). */
+function sizeStep(scale: TemplateAdjustRecipe["scale"]): SizeStep | undefined {
   const f = { title: scale?.title ?? 1, body: scale?.body ?? 1, other: scale?.other ?? 1 };
   for (const v of Object.values(f)) scaleSz(100, v); // validate (throws RangeError)
-  return f.title === 1 && f.body === 1 && f.other === 1 ? undefined : f;
+  const cap = scale?.bodyMaxPt;
+  if (cap !== undefined && !(Number.isFinite(cap) && cap > 0)) throw new RangeError(`bodyMaxPt must be a positive number: ${cap}`);
+  if (f.title === 1 && f.body === 1 && f.other === 1) return undefined;
+  return cap === undefined ? { f } : { f, bodyMaxSz: Math.round(cap * 100) };
 }
 
 /** Replace `typeface="X"` in a tag when X is in the map (theme tokens like `+mj-lt` never are). */
@@ -126,19 +141,28 @@ function typeClass(type: string): SizeClass {
 
 const STYLE_CLASS: Record<string, SizeClass> = { titleStyle: "title", bodyStyle: "body", otherStyle: "other" };
 
+const DEF_RPR_SZ = /(<(?:\w+:)?defRPr\b[^>]*?\bsz=")(\d+)(")/g;
+
+/** Largest `<a:defRPr sz>` of a frame (its lvl1; nested levels are derived smaller). 0 when none. */
+const frameMaxSz = (frag: string) => Math.max(0, ...[...frag.matchAll(DEF_RPR_SZ)].map((m) => Number(m[2])));
+
 /**
  * Scale every `<a:defRPr sz>` of one master/layout part. ONE pass over the part with an alternation, so a
  * size is scaled exactly once: a txStyles block → its class, a `<p:sp>` → `classOf(ph)` (null ph = a
  * non-placeholder shape → other), and any stray defRPr outside both (e.g. a table frame) → other.
+ * With `bodyMaxSz`, a body block/frame whose largest size exceeds it is left as is (decided per frame).
  */
 export function scaleStylePart(
   xml: string,
-  f: Record<SizeClass, number>,
+  step: SizeStep,
   classOf: (ph: { type: string; idx: string }) => SizeClass,
 ): string {
+  const { f, bodyMaxSz } = step;
   // A class at ×1 is passed through untouched (no re-rounding of e.g. 10.25pt, no clamping).
   const scaleIn = (frag: string, c: SizeClass) =>
-    f[c] === 1 ? frag : frag.replace(/(<(?:\w+:)?defRPr\b[^>]*?\bsz=")(\d+)(")/g, (_m, a: string, v: string, b: string) => `${a}${scaleSz(Number(v), f[c])}${b}`);
+    f[c] === 1 || (c === "body" && bodyMaxSz !== undefined && frameMaxSz(frag) > bodyMaxSz)
+      ? frag
+      : frag.replace(DEF_RPR_SZ, (_m, a: string, v: string, b: string) => `${a}${scaleSz(Number(v), f[c])}${b}`);
   const RE = /<(\w+:)(titleStyle|bodyStyle|otherStyle)\b[^>]*>[\s\S]*?<\/\1\2>|<(\w+:)sp(?:\s[^>]*)?>[\s\S]*?<\/\3sp>|<(?:\w+:)?defRPr\b[^>]*>/g;
   return xml.replace(RE, (m: string, _p1: string | undefined, style: string | undefined) => {
     if (style) return scaleIn(m, STYLE_CLASS[style]);
@@ -230,7 +254,7 @@ export function recipeFor(slots: ThemeFontSlots, c: AdjustChoice): TemplateAdjus
 
 /** True when the recipe cannot change anything (no effective font entry, every factor 1). */
 export function isNoopRecipe(r: TemplateAdjustRecipe): boolean {
-  return fontMap(r.fonts?.latin).size === 0 && fontMap(r.fonts?.ea).size === 0 && !factors(r.scale);
+  return fontMap(r.fonts?.latin).size === 0 && fontMap(r.fonts?.ea).size === 0 && !sizeStep(r.scale);
 }
 
 /** Write `xml` back only when it changed, keeping the entry's original date (deterministic bytes). */
@@ -249,7 +273,7 @@ export async function adjustTemplate(bytes: ArrayBuffer | Uint8Array, recipe: Te
   const latin = fontMap(recipe.fonts?.latin);
   const ea = fontMap(recipe.fonts?.ea);
   const inline = (recipe.fonts?.scope ?? "theme+inline") === "theme+inline";
-  const f = factors(recipe.scale);
+  const f = sizeStep(recipe.scale);
   const copy = () => new Uint8Array(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   if (isNoopRecipe(recipe)) return copy();
 

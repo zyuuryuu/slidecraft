@@ -13,7 +13,7 @@ import JSZip from "jszip";
 import { readEntryString } from "./zip-safe";
 
 export interface StyleDensity {
-  bodyPt: number; // 本文の基準サイズ（pt）。MASTER_BODY_PT との比で本文系のサイズ全体に掛かる
+  bodyPt: number; // 本文の基準サイズ（pt）。MASTER_BODY_PT との比で本文の帯（21pt 以下）の枠に掛かる
   marginIn: number; // 左右の余白（inch）。BASE_DENSITY.marginIn からの差で枠を左右に縮める／広げる
   // ── 文字量の目標帯（#596）。あるときだけ get_deck_issues が density-target（info）を出す ──
   maxBodyLines?: number; // 本文枠 1 つあたりの行（段落）の上限。グループの見出し（### 行）は数えない
