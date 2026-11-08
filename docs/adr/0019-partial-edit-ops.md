@@ -69,6 +69,15 @@ Option A（単発リテイク）でも弱モデルは複雑な構造編集で取
 - **不正な setField 配列**（text 欠落・他種 op 混在）は ops として適用せず全文経路へフォールバックし、`[opsフォールバック]` 告知を editNotice／プレビュー warnings に出す。
 - **MCP ツールは増やさない**（ADR-0037「口は薄く」。`set_slide_markdown` で足りる）。
 
+#### P3 DATA ops（表・グラフ・ガント・KPI）＝ 2026-11-08 実装（#106 P3）
+
+- **語彙**（`src/engine/chart-edit-ops.ts`・純粋 R2）：`setCell {row, col, text}`（`slide.table.rows`）／`setSeriesValue {series: 番号 or 名前, index, value}`（xychart・radar の `series`）／`setTask {name, newName?, start?, end?, status?, section?}`（gantt の `tasks`）／`setCard {index, value?, label?, delta?, trend?}`（kpi の `cards`）。番号はすべて 0 始まり。TEXT／図 CONTENT／ARRANGEMENT ops と語彙が交わらない。
+- **番号の決め方**：表の `row` は `slide.table.rows` の添字そのまま（`header: true` なら row 0 が見出し行）。gantt のタスクは**スキーマに id が無いため名前で指定**（同名が複数なら特定不能として skip＋告知）。KPI のフィールドは `KpiSchema` のカード項目どおり（`sub` は無い）。
+- **適用は既存の表現に直接書く（第 2 の表現を作らない）**：表は `table.rows` のセルだけ差し替え（他の行は同一配列）。図は `applyToFigure`（図 ops と同じ raw YAML 再出力）。R8 一致テスト＝「ops の結果 ≡ 同じ編集をスライド Markdown 上で行い parseMd した結果」（`tests/chart-edit-ops.test.ts`／`tests/edit-path-agreement.test.ts`）。図の YAML は図 ops と同じく再出力される＝**データは一致・書式（flow/block 形式）は変わりうる**。正規形（`yaml.dump` 済み）の図では変更行以外は byte-identical。
+- **never-silent**：表なし・範囲外・改行入りセル・系列／タスク不明・同名タスク・終了 < 開始・図が別種・図が schema 不正は skip＋告知。何も変わらなければ元スライドを返す。不正な配列は全文フォールバック＋`[opsフォールバック]` 告知。
+- **モデルへの提示**：依頼文に `Data:` 一覧（表の行・系列・タスク・カード）を添える（`describeEditableData`・`slideEditUserPrompt` の第 4 引数）。表・グラフが無いスライドの依頼文は不変。一覧が無い依頼（batch）では DATA ops を使わず (A) とプロンプトで明示。
+- **GUI**：`routeFieldEdit(...) ?? routeDataEdit(...)`（同じ戻り型）として P2 の分岐に相乗り。MCP ツールは増やさない（裁定）。
+
 ## Consequences
 
 - **未変更フィールドは再出力されない＝変わらない**（drift は op した箇所のみに局在）。オフラインでも高速（出力トークンが編集規模に比例）。

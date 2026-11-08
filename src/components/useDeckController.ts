@@ -13,6 +13,7 @@ import { distillDeck } from "../engine/distill";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
 import { routeFieldEdit, describeEditableFields } from "../engine/field-edit-ops";
+import { routeDataEdit, describeEditableData } from "../engine/chart-edit-ops";
 import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
@@ -505,9 +506,9 @@ export function useDeckController() {
           return;
         }
       }
-      // ①' Placeholder TEXT ops (#106 P2・ADR-0019): only the rewritten fields, merged by the field
-      // editor's own primitive. Unknown idx → skipped + announced; malformed → full-text path + notice.
-      const field = old ? routeFieldEdit(old, raw) : null;
+      // ①' Placeholder TEXT ops (#106 P2) / DATA ops — table cell, chart value, gantt task, KPI card (P3).
+      // Only the changed parts are merged. Unknown target → skipped + announced; malformed → full text + notice.
+      const field = old ? routeFieldEdit(old, raw) ?? routeDataEdit(old, raw) : null;
       if (field?.kind === "ops") {
         setEditNotice(field.notices.length > 0 ? field.notices.join(" ｜ ") : null);
         handleSlideUpdate(activeSlide, field.slide, "commit");
@@ -562,8 +563,8 @@ export function useDeckController() {
         ];
         return { afterMd: figureFence(merged) ?? "", warnings, beforeMd: figureFence(s) ?? "" };
       }
-      // Placeholder TEXT ops (#106 P2): review the merged slide's Markdown (before = currentSlideMd).
-      const field = routeFieldEdit(s, raw);
+      // Placeholder TEXT / DATA ops (#106 P2/P3): review the merged slide's Markdown (before = currentSlideMd).
+      const field = routeFieldEdit(s, raw) ?? routeDataEdit(s, raw);
       if (field?.kind === "ops") {
         const layout = autoSelectLayout(field.slide, activeSlide, deck!.slides.length, catalog);
         return { afterMd: slideMarkdown({ ...field.slide, layout }, catalog, templateData), warnings: field.notices };
@@ -620,6 +621,7 @@ export function useDeckController() {
   })();
   // The idx list a setField op can name (#106 P2) — sent to the model next to currentSlideMd.
   const currentSlideFields = deck?.slides[activeSlide] ? describeEditableFields(deck.slides[activeSlide]) : "";
+  const currentSlideData = deck?.slides[activeSlide] ? describeEditableData(deck.slides[activeSlide]) : ""; // #106 P3
 
   // Per-slide Markdown editing: the Markdown is the full source for this slide,
   // so parse it and replace the active slide (coalesced for live typing).
@@ -708,7 +710,7 @@ export function useDeckController() {
     undoDeck, redoDeck, canUndo, canRedo, handleEditorChange, handleLoadTemplate, applyMasterBytes, applyMasterBytesWithRepair, applyMasterBytesAsRemake, applyMasterBytesAsAugmented, applyMasterBytesAsAdjusted,
     handleOpen, handleSave, handleGenerate, handleExportHtml, handleSaveProject, handleOpenProject, handleOpenProjectFile, hasContent,
     handleLlmImport, handleAiApply, handleStartEditing, handleEnterImport, handleCancelInitialize, handleStructureManuscript, handleSlideUpdate,
-    handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields, handleSlideMdChange,
+    handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint, diagnostics, contentBox, activeSlideIssues, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields, currentSlideData, handleSlideMdChange,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     handleGenerateToc, handleRegenerateStaticToc,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
