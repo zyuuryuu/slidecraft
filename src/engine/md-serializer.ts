@@ -20,6 +20,7 @@ import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { serializeParagraphs, getPlaceholderText, figureBlock, figureMd, imageLine, notesLines, fieldRowLines, getSeparatorType, columnFigures, singleBodyFigure, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
+import { slideMarker, markerLine, isGroupedSlide } from "./slide-markers";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
 
 export type { SerializeTemplate } from "./md-serializer-plan";
@@ -82,6 +83,10 @@ function serializeSlide(
   if (slide.sectionBreak) {
     lines.push("<!-- section -->");
   }
+  // `<!-- statement -->` / `<!-- quote -->` (#593) — a slide attribute like section; the parser strips it
+  // wherever it sits, so writing it here (before the pin) round-trips.
+  const marker = slideMarker(slide);
+  if (marker) lines.push(markerLine(marker));
 
   // Emit the layout directive only when it was explicitly set. "auto" slides stay
   // directive-free so they round-trip as "auto" (re-resolved deterministically on
@@ -97,7 +102,7 @@ function serializeSlide(
   // authority (slideBindingPlan on the RESOLVED layout) instead of the name-based namespace fork below.
   // Grouped slides keep the legacy branch until stage E unifies expandGroups — their column readout is
   // positional (content idx 1..N), which the plan's transformed cell copies cannot key.
-  const layoutInfo = slide.groupKind ? undefined : tpl?.layouts.find((l) => l.name === layout);
+  const layoutInfo = isGroupedSlide(slide) ? undefined : tpl?.layouts.find((l) => l.name === layout);
   if (layoutInfo) {
     serializeByPlan(slide, layout, layoutInfo, lines);
   } else {
@@ -144,7 +149,7 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
   // A grouped slide (card/step/kpi) is NEVER a title slide — even if autoSelectLayout resolves it to a
   // Title layout — so it must not take the title branch (which would read the title from the empty
   // title-namespace idx and drop the columns + groupKind). Gate the title branch on !groupKind.
-  if (!slide.groupKind && hasTitleNsContent) {
+  if (!isGroupedSlide(slide) && hasTitleNsContent) {
     // Title namespace: idx 0 = title, idx 1 = subtitle, idx 10/11/12 = meta fields.
     const title = getPlaceholderText(slide, TITLE_NS.title);
     const subtitle = getPlaceholderText(slide, TITLE_NS.subtitle);
@@ -179,7 +184,8 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
     // trailing figure into the last column). A table is the SAME — UNLESS it's genuinely
     // column-scoped (#100: bound to its own region beside other real column content), which
     // columnFigures / singleBodyFigure (shared with md-serializer-plan, R8) distinguish from that mis-pin.
-    const sepType = slide.groupKind ?? getSeparatorType(layout);
+    // A statement/quote marker slide (#593) is single-body on any layout — same rule as serializeByPlan.
+    const sepType = slideMarker(slide) ? null : (slide.groupKind ?? getSeparatorType(layout));
 
     if (sepType && !singleBodyFigure(slide)) {
       // Multi-section: each numbered region (column) becomes a section. A region may

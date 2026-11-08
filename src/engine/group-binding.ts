@@ -10,6 +10,7 @@
  */
 import type { LayoutInfo, PlaceholderInfo } from "./template-loader";
 import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
+import { isGroupedSlide } from "./slide-markers";
 import { bindContentByRole, resolveBinding, isBlankParagraphs, type BindingPlan, type ContentRef, type PlaceholderRef } from "./placeholder-binding";
 import { slideIdxRole, placeholderRole } from "./template-catalog";
 import { detectGroups, bakedText } from "./group-layout";
@@ -27,7 +28,7 @@ export type { GroupSlot, GroupSlotRole, GroupLayoutShape } from "./group-layout"
  */
 export function groupEditorPlan(slide: SlideIR, layout: LayoutInfo): { metaPhs: PlaceholderInfo[]; columns: number } | null {
   const shape = detectGroups(layout);
-  if (!shape || !slide.groupKind) return null;
+  if (!shape || !isGroupedSlide(slide)) return null;
   const groupPhIdxs = new Set(shape.groups.flat().map((s) => s.phIdx));
   return { metaPhs: layout.placeholders.filter((p) => !groupPhIdxs.has(p.idx)), columns: shape.groups.length };
 }
@@ -62,7 +63,7 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
   const out = new Map<string, PlaceholderContent>();
   const overlay = emptyOverlay();
   const shape = detectGroups(layout);
-  if (!shape || !slide.groupKind) return { content: out, overlay };
+  if (!shape || !isGroupedSlide(slide)) return { content: out, overlay };
 
   const isGroupIdx = (i: string) => /^[1-9]$/.test(i);
   const groupPhIdxs = new Set(shape.groups.flat().map((s) => s.phIdx));
@@ -91,7 +92,12 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
       const para = split ? split.paragraph : p;
       return isCurrent ? boldRuns(para) : para;
     });
-    const bodyParas = c.paragraphs.filter((p) => !p.heading);
+    // #593: a KPI value box (group-layout markKpiValue) takes the FIRST body paragraph — the number; the
+    // rest flows through the heading/body slots below exactly as a value-less group's body would.
+    const valueSlot = col.find((s) => s.role === "value");
+    const allBody = c.paragraphs.filter((p) => !p.heading);
+    const bodyParas = valueSlot ? allBody.slice(1) : allBody;
+    if (valueSlot && allBody.length) out.set(valueSlot.phIdx, { idx: valueSlot.phIdx, paragraphs: allBody.slice(0, 1) });
     const headSlot = col.find((s) => s.role === "heading");
     const bodySlots = col.filter((s) => s.role === "body");
     const chromeSlot = col.find((s) => s.role === "chrome");
@@ -154,7 +160,7 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
  * judges it. Pure (R2).
  */
 export function slideBindingPlan(slide: SlideIR, layout: LayoutInfo): BindingPlan {
-  const grouped = !!slide.groupKind && !!detectGroups(layout);
+  const grouped = isGroupedSlide(slide) && !!detectGroups(layout); // statement/quote: not a group (#593)
   const plan = grouped ? groupBindingPlan(slide, layout) : resolveBinding(slide, layout.placeholders);
   // #597: the fixed fallback for slot-less rows — planned on the SAME render map export/preview draw (R8).
   const { rescues } = planFieldRescue(slide, layout, grouped ? expandGroups(slide, layout) : bindContentByRole(slide, layout.placeholders));

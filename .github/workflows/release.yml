@@ -115,14 +115,17 @@ jobs:
             args: "--target aarch64-apple-darwin"
             triple: aarch64-apple-darwin
             overlay: ""
+            mcpb: darwin-arm64 # Claude Desktop bundle target (scripts/mcpb-manifest.mjs)
           - platform: ubuntu-latest # .deb + .AppImage
             args: ""
             triple: x86_64-unknown-linux-gnu
             overlay: "--config src-tauri/tauri.bundle.linux.conf.json"
+            mcpb: "" # no Claude Desktop on Linux → no .mcpb
           - platform: windows-latest # .msi + .exe (NSIS)
             args: ""
             triple: x86_64-pc-windows-msvc
             overlay: ""
+            mcpb: win32-x64
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -193,6 +196,23 @@ jobs:
           # /usr/bin/node, #527). Must match scripts/node-sidecar.mjs bundleConfigArgs (pinned by tests).
           args: ${{ matrix.args }} --config src-tauri/tauri.bundle.conf.json ${{ matrix.overlay }}
 
+      # Claude Desktop bundle (#517 子 3): manifest + cli.cjs + this leg's staged node (already ad-hoc signed on
+      # macOS above), packed by the official MCPB packer — `mcpb` comes from package-lock (@anthropic-ai/mcpb,
+      # devDependency; --no-install = never fetch an unpinned copy), and `pack` validates the manifest schema.
+      # cli.cjs exists here: tauri-action ran beforeBuildCommand (npm run build:mcp:bundled). Uploaded by tag
+      # to the single draft create-release made (#501), like checksums-and-sbom does.
+      - name: Build + upload the Claude Desktop bundle (.mcpb)
+        if: matrix.mcpb != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/build-mcpb.mjs ${{ matrix.mcpb }}
+          npx --no-install mcpb pack "dist/mcpb/${{ matrix.mcpb }}" "dist/mcpb/slidecraft-${{ matrix.mcpb }}.mcpb"
+          gh release upload "${{ github.ref_name }}" "dist/mcpb/slidecraft-${{ matrix.mcpb }}.mcpb" \
+            --repo "${{ github.repository }}" --clobber
+
       # Provenance attestation for the installers this job just built (#257) — ties each artifact
       # back to this workflow run/commit via the GitHub attestations API (`gh attestation verify`).
       # Split per-OS because subject-path globs that match zero files make the action fail.
@@ -248,7 +268,7 @@ jobs:
         run: npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2
         with:
           tool: cargo-cyclonedx
       - name: cargo SBOM (CycloneDX)
@@ -264,7 +284,7 @@ jobs:
         # asset from a prior attempt back into the new checksum file.
         run: |
           gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --dir dist \
-            -p '*.dmg' -p '*.msi' -p '*.exe' -p '*.AppImage' -p '*.deb' -p '*.rpm'
+            -p '*.dmg' -p '*.msi' -p '*.exe' -p '*.AppImage' -p '*.deb' -p '*.rpm' -p '*.mcpb'
 
       - name: Generate SHA256SUMS
         working-directory: dist
