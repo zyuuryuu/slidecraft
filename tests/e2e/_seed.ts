@@ -45,7 +45,7 @@ Date: 2026-07-08
 
 /** Seed a deck via the real Draft flow (Markdown in → スライドにする → Edit). */
 export async function seedDeck(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Draft/ }).click();
+  await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
   const editor = page.locator(".cm-editor .cm-content");
   await editor.click();
   await page.keyboard.press("Control+a");

@@ -20,9 +20,9 @@ Template operations live in the **🎨 master menu** on the top bar.
 | Section | Items |
 |---------|-------|
 | **Select** | the registered masters (✓ marks the current one; 🗑 deletes imported ones only) |
-| **Import** | Import master (.pptx) / Keep the design (Re-make) |
+| **Import** | 📥 Import master (.pptx) / 🔁 Keep the design (Re-make) |
 | **Modify** | 🔤 Adjust template (fonts / sizes)… / 🧩 Augment template… / ⓘ Show the latest intake result |
-| **New** | Create template… |
+| **New** | ＋ Create template… |
 
 The master menu in the Draft screen has only Select and Import (the adjust strip, the augment result and the creation dialog appear in the main view, so close Draft first). While live collaboration is connected or a template adjustment is open, the master menu is disabled.
 
@@ -70,7 +70,7 @@ Images placed on a layout or master (such as a company logo) are rendered as-is 
 
 ## 1-b. Importing the theme only (Re-make)
 
-Next to "Import a master (.pptx)" there is one more intake point: **"✨ Import the theme only (Re-make)."** This one **extracts only the fonts, colors, background, and logo** from a company template, transplants them onto SlideCraft's own polished layouts, and creates a new template.
+Next to "Import a master (.pptx)" there is one more intake point: **"🔁 Import the theme only (Re-make)."** This one **extracts only the fonts, colors, background, and logo** from a company template, transplants them onto SlideCraft's own polished layouts, and creates a new template.
 
 ### Which should you choose?
 
