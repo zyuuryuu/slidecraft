@@ -22,7 +22,7 @@ import { withoutDisabledRules as rulesOn, disabledRuleIds } from "../engine/revi
 import type { ParseNotice, SlideParseNotice } from "../engine/parse-notice";
 import { visualizeKeyValueMd } from "../engine/slide-rewrite";
 import { mermaidToDiagramSpec, type DiagramFormat } from "../engine/mermaid-to-diagram";
-import { figureSourceToYaml, placeFigureYaml, resolvedBodyCount, carryOmittedBlocks, editedDiagramError } from "../engine/apply-slide-edit";
+import { figureSourceToYaml, placeFigureYaml, resolvedBodyCount, carryOmittedBlocks, editedDiagramError, figureTargetError } from "../engine/apply-slide-edit";
 import { buildSlideFix, slideFixRequest } from "../engine/slide-fix";
 import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
 import { generatePptx } from "../engine/placeholder-filler";
@@ -299,16 +299,16 @@ export function visualizeKeyValue(s: Session, i: number) {
   return { ok: true as const, changed: true as const, beforeMd: before, afterMd: slideToMarkdown(s.deck, i, catalog, template.layouts), ...fitTail(s, s.deck, catalog, template.layouts) };
 }
 
-/** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid. Validates + canonicalizes to
- *  YAML. Replaces an existing diagram (a coexisting Mermaid block is kept) / GRADUATES a Mermaid block to a native diagram, OR — for a
- *  text-only slide (S5) — ADDS a figure into a body region of the RESOLVED layout: the placeholder is a
- *  1-based body ORDINAL resolved role-wise from the catalog (alien-safe, mirrors the GUI's nthBody),
- *  defaulting to the 1st body region; `placeholderIdxArg` targets another region on a multi-body layout.
- *  A layout with NO body region is rejected. `created` reports add (true) vs replace (false). */
-export function setDiagram(s: Session, i: number, source: string, format: DiagramFormat, placeholderIdxArg?: string) {
+/** Set a slide's figure from a DiagramSpec source (yaml/json) or Mermaid (validated → YAML). Replaces the
+ *  diagram (a coexisting Mermaid is kept) / GRADUATES a Mermaid block, or `figure` (#392 段 3) = the n-th figure
+ *  (range-checked); a text-only slide (S5) ADDS one at the 1-based body ORDINAL `placeholderIdxArg` (default
+ *  1) of the RESOLVED layout (role-wise, alien-safe; none → rejected). `created`: add (true) vs replace. */
+export function setDiagram(s: Session, i: number, source: string, format: DiagramFormat, placeholderIdxArg?: string, figure?: number) {
   const { deck, catalog, template } = requireLoaded(s);
   assertIndex(deck, i);
   const slide = deck.slides[i];
+  const targetErr = figureTargetError(slide, figure); // shared with the GUI's applyFigureYaml target (R8)
+  if (targetErr) return { ok: false as const, error: targetErr };
   const created = !slide.diagram && !slide.mermaidBlock;
   // Placement guard first — a figureless slide with no body region rejects with 配置先 BEFORE any
   // source-parse error (pre-S5 order): require a body region on the resolved layout (role-based = alien-safe).
@@ -324,10 +324,9 @@ export function setDiagram(s: Session, i: number, source: string, format: Diagra
   const src = figureSourceToYaml(source, format);
   if ("error" in src) return { ok: false as const, error: src.error };
   const before = slideToMarkdown(deck, i, catalog, template.layouts);
-  // Replace / graduate / add-and-coexist is shared with the GUI's applyFigureYaml (#220); the pin is kept
-  // (A2) — the guard above validated the ordinal against THIS slide's resolved layout.
+  // Replace / graduate / add-and-coexist shared with the GUI's applyFigureYaml (#220); pin kept (A2).
   const slides = [...deck.slides];
-  slides[i] = placeFigureYaml(slide, src.yaml, { placeholderIdx });
+  slides[i] = placeFigureYaml(slide, src.yaml, { placeholderIdx, figure });
   s.deck = { ...deck, slides };
   const afterMd = slideToMarkdown(s.deck, i, catalog, template.layouts);
   const changed = afterMd !== before;
@@ -397,12 +396,12 @@ export function validate(s: Session) {
 }
 
 // ── persist / export (caller decides base64-over-stdio vs writing under --root) ──
-export async function saveProjectBytes(s: Session): Promise<Uint8Array> {
+/** #633: markSaved=false is a READ (the collab GUI's pull) — the same bytes, but dirty/savedAt stay untouched. */
+export async function saveProjectBytes(s: Session, markSaved = true): Promise<Uint8Array> {
   const { deck, template } = requireLoaded(s);
   const savedAt = new Date().toISOString();
   const bytes = await bundleProject(deck, template, { templateName: s.meta.templateName, savedAt });
-  s.meta = { ...s.meta, savedAt };
-  s.dirty = false;
+  if (markSaved) { s.meta = { ...s.meta, savedAt }; s.dirty = false; }
   return bytes;
 }
 

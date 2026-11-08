@@ -156,6 +156,12 @@ export function postProcessAiResult(mode: AiMode, raw: string, catalog?: LayoutC
 
 export interface ConnectionStatus { ok: boolean; tone: "ok" | "warn" | "err" | "checking"; label: string; hint?: string; }
 
+/** The status dot's colour for a connection tone — the ONE mapping shared by the AI dock pill, the
+ *  settings popover and the 「AIで生成」 dialog (R8, #653). */
+export function toneClass(tone: ConnectionStatus["tone"]): string {
+  return tone === "ok" ? "text-green-400" : tone === "err" ? "text-red-400" : tone === "checking" ? "text-muted" : "text-amber-400";
+}
+
 /** Derive a human-readable connection status for the CURRENT provider + an actionable hint when it
  *  isn't ready. Pure function of the resolved config/runtime state, so the hook just feeds it values. */
 export function computeConnection(a: {

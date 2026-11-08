@@ -224,8 +224,8 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   tool("convert_bullets_to_table", { description: "決定論レバー: key-value 箇条書きを GFM 表に", inputSchema: { ...index, ...doc, ...cc } }, (a, extra) => mutate(extra, a.docId, "convert_bullets_to_table", (s) => S.visualizeKeyValue(s, a.index), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }));
   tool(
     "set_slide_diagram",
-    { description: "図の【中身】を DiagramSpec(yaml/json) か Mermaid の文字列で設定（既存図は置換・無ければ追加）。構文と例は get_diagram_guide・配置は apply_design_intent", inputSchema: { ...index, source: z.string().describe("文字列で渡す（オブジェクト不可）"), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body の 1-based 番号（既定 1）"), ...doc, ...cc } },
-    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }),
+    { description: "図の【中身】を DiagramSpec(yaml/json) か Mermaid の文字列で設定（既存図は置換・無ければ追加）。構文と例は get_diagram_guide・配置は apply_design_intent", inputSchema: { ...index, source: z.string().describe("文字列で渡す（オブジェクト不可）"), format: z.enum(["yaml", "json", "mermaid"]), placeholderIdx: z.string().optional().describe("body の 1-based 番号（既定 1）"), figure: z.number().optional().describe("何番目か（既定は図優先）"), ...doc, ...cc } },
+    (a, extra) => mutate(extra, a.docId, "set_slide_diagram", (s) => S.setDiagram(s, a.index, a.source, a.format, a.placeholderIdx, a.figure), { opId: a.opId, expectedRev: a.expectedRev, index: a.index }),
   );
   tool(
     "apply_design_intent",
@@ -252,7 +252,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     (a, extra) =>
       run(async () => {
         const s = sessionOf(extra, a.docId);
-        return persistScopedOrBase64(s, await S.saveProjectBytes(s), "scft", a.filename);
+        return persistScopedOrBase64(s, await S.saveProjectBytes(s, !host.guiClient), "scft", a.filename) // #633: GUI = read;
       }),
   );
   tool(

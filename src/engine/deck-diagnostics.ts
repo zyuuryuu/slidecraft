@@ -19,13 +19,14 @@ import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
-import { visualOccupancy, visualCollisions, figureRegions, type VisualKind } from "./visual-placement";
+import { visualOccupancy, visualCollisions, figureRegions, unboundVisuals, type VisualKind } from "./visual-placement";
 import { placedFigures } from "./figure-placement";
 import { tableOverflow } from "./table-fit"; // #436/#444: the SAME judgment the auto pick uses (R8)
 import { isBlankParagraphs, contentHead } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
+import { kpiValueOverflows } from "./kpi-overflow";
 import { columnAugmentHint } from "./layout-augment-plan";
 import { rescueMessage } from "./field-rescue";
 import { FIGURE_KIND_LABEL } from "./slide-figures";
@@ -212,10 +213,11 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const regions = figureRegions(slide, layout.placeholders);
 
       // #392 段 2 never-silent: on a slide with 2+ visuals, one this layout has no region for is not drawn
-      // (it stays in the Markdown). A lone visual keeps its historical solo/region handling.
-      const lostFigs = regions.length >= 2 ? regions.filter((r) => !r.ph) : [];
+      // (it stays in the Markdown) — unboundVisuals is that ONE judgment (段 3, R8). A lone visual keeps its
+      // historical handling (no diagnostic here).
+      const lostFigs = regions.length >= 2 ? unboundVisuals(slide, layout.placeholders) : [];
       if (lostFigs.length > 0) {
-        const what = [...new Set(lostFigs.map((r) => FIGURE_KIND_LABEL[r.figure.kind]))].join("・");
+        const what = [...new Set(lostFigs.map((r) => FIGURE_KIND_LABEL[r.kind]))].join("・");
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "figure-dropped", level: RULE_LEVEL["figure-dropped"], message: `${what}（${lostFigs.length}個）はこのレイアウト（${layout.name}）に置き場（本文の枠）が無く、出力（PPTX/プレビュー）に描画されません（Markdown には保持されます）。枠の多いレイアウトにするか、スライドを分けてください`, levers: ["split"] });
       }
 
@@ -281,6 +283,11 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
           message: `タイトルがこのレイアウト（${layout.name}）のタイトル枠に収まりません（${fit.basePt}pt→下限 ${fit.fontPt}pt まで縮小しても推定 ${fit.lines}行 > 枠 ${fit.maxLines}行）。はみ出して表示されます。タイトルを短くしてください`,
           levers: ["condense"],
         });
+      }
+
+      // #643 never-silent: a KPI value that wraps in its value box (same box / plan / width estimate, R8).
+      for (const o of kpiValueOverflows(slide, layout, plan)) {
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "kpi-value-overflow", level: RULE_LEVEL["kpi-value-overflow"], message: `KPI の値「${o.text}」がこのレイアウト（${layout.name}）の値の枠（${o.placeholder.name}）に 1 行で収まりません（${o.fontPt}pt で推定 ${o.lines} 行）。折り返して表示が崩れ、隣の枠と重なることがあります。値を短くしてください（単位や補足は次の行へ）`, levers: ["condense"] });
       }
     });
   }

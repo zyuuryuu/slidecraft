@@ -128,8 +128,8 @@ function embeddedFontsFor(deck: DeckIR, template: TemplateData, env: NodeJS.Proc
  *  call so a whole-deck sheet doesn't redo it per slide. */
 function preparedDeck(session: Session) {
   const { deck, template } = requireLoaded(session);
-  const prepared = materializeDerivedSlides(deck);
-  return { prepared, template, catalog: buildCatalog(template) };
+  const catalog = buildCatalog(template);
+  return { prepared: materializeDerivedSlides(deck, catalog), template, catalog };
 }
 
 /** SSR ONE slide's markup (SlideCard, exportMode, 96dpi) — THE single render path (R8): the

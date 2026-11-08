@@ -77,7 +77,7 @@ export const TOOL_NOTES = {
   visual:
     "get_slide_image / get_deck_image は共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影する。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定。get_slide_html / get_deck_html は同一描画の自己完結 HTML（script ゼロ・CSP・フォント埋め込み済）で、Chrome/Edge が無い環境では呼び出し側がラスタ化する",
   diagram:
-    "set_slide_diagram は図の【中身】：source に DiagramSpec（yaml/json）か Mermaid を文字列で渡し format で種別を指定（検証＋native YAML 化）。図/mermaid のあるスライドは置換、text スライドは body 領域へ追加（created で判別）。placeholderIdx は multi-body レイアウトで何番目の body か（1-based・既定 1）。各図タイプの構文と JSON 例は get_diagram_guide(type)",
+    "set_slide_diagram は図の【中身】：source に DiagramSpec（yaml/json）か Mermaid を文字列で渡し format で種別を指定（検証＋native YAML 化）。図/mermaid のあるスライドは置換、text スライドは body 領域へ追加（created で判別）。placeholderIdx は multi-body レイアウトで何番目の body か（1-based・既定 1）。図が 2 つ以上のスライドは figure で何番目の図（図・mermaid を出現順に 1-based）を置換（範囲外は拒否・図の追加は set_slide_markdown）。figure 省略時は最初の図（diagram）、無ければ最初の mermaid を置換する＝番号 1 とは限らない（[mermaid, 図] のスライドで省略すると 2 番目の図が対象。mermaid を替えるなら figure:1）。各図タイプの構文と JSON 例は get_diagram_guide(type)",
   designIntent:
     "apply_design_intent は図の【配置】：intent に ops 配列の JSON 文字列。op は regionSplit{arrangement: text-left | text-right | diagram-only}・emphasize{nodeId, level: high | medium（既定 high）}・relayout{direction: TB | LR | RL | BT}。エンジンが座標を計算＋クランプする。図/mermaid のあるスライドのみ",
   structure:

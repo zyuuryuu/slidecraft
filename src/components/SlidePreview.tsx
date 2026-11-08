@@ -677,8 +677,8 @@ export default function SlidePreview({
   // 章名変更は次のレンダーで自動反映される（deck 状態には導出内容を持たない）。呼び出し側が既に
   // materialize 済みを渡すとき（preMaterialized）は素通しする（#275・二重 materialize の回避）。
   const deck = useMemo(
-    () => (deckProp && !preMaterialized ? materializeDerivedSlides(deckProp) : deckProp),
-    [deckProp, preMaterialized],
+    () => (deckProp && !preMaterialized ? materializeDerivedSlides(deckProp, catalog) : deckProp),
+    [deckProp, preMaterialized, catalog],
   );
 
   // Fit the slide to the available pane by default (the fixed 72-dpi render overflowed

@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } fro
 import { useTranslation } from "react-i18next";
 import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration } from "./useAiGeneration";
+import { toneClass } from "./ai-generation-types";
 import DiffView from "./DiffView";
 import AiTasksPanel from "./AiTasksPanel";
 import { slideEditUserPrompt } from "../engine/deck-plan-prompts";
@@ -41,7 +42,7 @@ interface AiPanelProps {
   batchRunning?: boolean;
   /** Pre-fill the instruction box (ReviewBar "✨直す" handoff). `ts` re-seeds on repeat. */
   seed?: { prompt: string; ts: number };
-  /** ⚙ → 「AI の接続設定」 (#614): a value opens the settings popover on the assist tab; the panel then
+  /** ⚙ → 「AI 接続設定」 (#614): a value opens the settings popover on the assist tab; the panel then
    *  calls onSettingsOpened so the request is consumed (a later plain open of the dock doesn't re-pop it). */
   openSettingsTs?: number;
   onSettingsOpened?: () => void;
@@ -261,11 +262,6 @@ export default function AiPanel({
     }
   };
 
-  const toneColor =
-    ai.connection.tone === "ok" ? "text-green-400"
-    : ai.connection.tone === "err" ? "text-red-400"
-    : ai.connection.tone === "checking" ? "text-muted"
-    : "text-amber-400";
 
   return (
     <div className="relative border-t border-accent/40 bg-void flex flex-col shrink-0" style={{ height: panelH }}>
@@ -300,11 +296,11 @@ export default function AiPanel({
             onClick={() => setShowSettings((v) => !v)}
             title={t("aiPanel.settingsPillTitle", {
               label: ai.connection.label,
-              hint: ai.connection.hint ? " — " + ai.connection.hint : "",
+              hint: ai.connection.hint ? " — " + ai.connection.hint : "", settings: t("aiSettings.title"),
             })}
             className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
           >
-            <span className={`${toneColor} leading-none`}>●</span>
+            <span className={`${toneClass(ai.connection.tone)} leading-none`}>●</span>
             <span className="truncate">{ai.connection.label}</span>
             <span className="text-muted leading-none">⚙</span>
           </button>
@@ -323,7 +319,7 @@ export default function AiPanel({
 
       {hubTab === "collab" ? collabTab : (
       <>
-      {/* AI settings popover — anchored below the header pill; a transparent backdrop closes it. */}
+      {/* AI connection settings popover — anchored below the header pill; a transparent backdrop closes it. */}
       {showSettings && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
