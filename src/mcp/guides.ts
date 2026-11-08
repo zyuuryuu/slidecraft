@@ -83,7 +83,7 @@ export const TOOL_NOTES = {
   structure:
     "構造 4 本（insert/delete/move/duplicate_slide）は surgical：他スライドの図/レイアウトは byte-identical に保たれる（set_deck_markdown は保たない）。insert_slide の position 既定 before・duplicate_slide は structuredClone 複製で既定 after・move_slide の from===to は no-op・delete_slide は最後の 1 枚を拒否し deletedMd を返す",
   templateDerive:
-    "adjust_template / augment_template（stdio 単独＝solo のみ・collab では未登録）は doc のテンプレを派生に差し替える（元テンプレ不変・deck は変えず undo の外）。毎回「元テンプレ＋レシピ」から 書体置換→倍率→合成 の固定順で作り直す（倍率は重ならない・先に足した構造は保たれる）。recipe は JSON 文字列 {fonts?:{latin?:[{from,to}],ea?:[{from,to}],scope?:\"theme\"|\"theme+inline\"(既定)},scale?:{title?,body?,other?}}（倍率・0.5pt 丸め・1〜400pt）。augment の structures は columns-2/3・compare-2・card-3・kpi-3/4（省略で全部・既にある構造は skipped に理由）、rule は steps(既定)|ratio。get_deck_issues の overflow-scale-hint は adjust_template に渡す recipe を hints に載せる",
+    "adjust_template / augment_template は doc のテンプレを派生に差し替える（元テンプレ不変・deck は変えず undo の外・collab では GUI にも反映）。毎回「元テンプレ＋レシピ」から 書体置換→倍率→合成 の固定順で作り直す（倍率は重ならない・先に足した構造は保たれる）。recipe は JSON 文字列 {fonts?:{latin?:[{from,to}],ea?:[{from,to}],scope?:\"theme\"|\"theme+inline\"(既定)},scale?:{title?,body?,other?}}（倍率・0.5pt 丸め・1〜400pt）。augment の structures は columns-2/3・compare-2・card-3・kpi-3/4（省略で全部・既にある構造は skipped に理由）、rule は steps(既定)|ratio。get_deck_issues の overflow-scale-hint は adjust_template に渡す recipe を hints に載せる",
 } as const;
 
 /** The contract DIGEST that rides EVERY session-entry return (open/new/select_document) — the
@@ -98,7 +98,7 @@ export function contractDigest(s: Session) {
     budget,
     capacity: "容量は get_slide(i) で実測できる（capacity.usedLines/maxLines・overBudget・predictedSplit）",
     separators:
-      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）。2 案の対比は `<!-- compare -->` を 2 つ、変化の前後（As-is→To-be）は `<!-- before -->` → `<!-- after -->` の順に 1 つずつ（比較レイアウト＋矢印＋Before/After ラベル）",
+      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）。2 案の対比は `<!-- compare -->` を 2 つ、変化の前後（As-is→To-be）は `<!-- before -->` → `<!-- after -->` の順に 1 つずつ（比較レイアウト＋矢印＋Before/After ラベル）。スライド全体の形は `<!-- statement -->`（大きな 1 文＝`# 見出し`・本文は補足行）／`<!-- quote -->`（引用文＝本文・`—` で始まる最終行が帰属）を単独行で（該当レイアウトが無いテンプレでは退化し marker-layout-missing）",
     notes:
       "スピーカーノートは `<!-- note -->` を単独行で置き、以降スライド末尾（次の `---`）までが素の Markdown のノート本文（#150）。スライドは疎に・詳細はノートへ",
     sections:

@@ -25,6 +25,9 @@ import { applyFieldEdit } from "../src/engine/placeholder-binding";
 import { textToParagraphs } from "../src/engine/field-text";
 import { routeFieldEdit } from "../src/engine/field-edit-ops";
 import { slideFigures } from "../src/engine/slide-figures";
+import { routeDataEdit } from "../src/engine/chart-edit-ops";
+import { DiagramSpecSchema } from "../src/engine/schema";
+import { loadYaml } from "../src/engine/yaml-io";
 
 let templateBytes: Buffer;
 beforeAll(() => {
@@ -326,4 +329,39 @@ describe("#106 P2 agreement: setField ops (AI door) ≡ field editor (GUI door) 
       expect(r.slide).toEqual(fieldEditor(slide, idx, text));
     });
   }
+});
+
+// ── #106 P3: DATA edits (table cell / chart value / gantt task / KPI card) — the AI DATA-ops door ≡ the
+// Markdown editor door (handleSlideMdChange → parseMd of the edited slide Markdown). The GUI routes
+// DATA ops right beside setField (routeFieldEdit ?? routeDataEdit). No MCP door (統括裁定: no new tools).
+describe("#106 P3 delegation: the GUI controller routes AI output through routeDataEdit in BOTH apply and preview", () => {
+  it("routeDataEdit sits beside routeFieldEdit (same result shape, same branch)", () => {
+    const ctl = readFileSync(resolve(__dirname, "../src/components/useDeckController.ts"), "utf8");
+    expect(ctl).toMatch(/import \{[^}]*\brouteDataEdit\b[^}]*\} from "\.\.\/engine\/chart-edit-ops"/);
+    expect(ctl.match(/routeFieldEdit\([^)]*\) \?\? routeDataEdit\(/g)?.length).toBe(2);
+  });
+});
+
+describe("#106 P3 agreement: DATA ops (AI door) ≡ editing the slide Markdown (Markdown-editor door)", () => {
+  const TABLE = "# 表\n\n| 項目 | 値 |\n| --- | --- |\n| 売上 | 100 |";
+  const XY = "# 図\n\n```diagram\ntype: xychart\nnodes: []\nxychart:\n  categories: [Q1, Q2]\n  series:\n    - kind: bar\n      name: 売上\n      values: [10, 20]\n```";
+  it("setCell ≡ the GFM table edited in Markdown", () => {
+    const slide = parseMd(TABLE).slides[0];
+    const r = routeDataEdit(slide, JSON.stringify([{ op: "setCell", row: 1, col: 1, text: "120" }]));
+    expect(r?.kind).toBe("ops");
+    if (r?.kind !== "ops") return;
+    expect(r.notices).toEqual([]);
+    expect(r.slide.table).toEqual(parseMd(TABLE.replace("| 売上 | 100 |", "| 売上 | 120 |")).slides[0].table);
+  });
+  it("setSeriesValue ≡ the figure YAML edited in Markdown (same rendered spec)", () => {
+    const slide = parseMd(XY).slides[0];
+    const r = routeDataEdit(slide, JSON.stringify([{ op: "setSeriesValue", series: 0, index: 1, value: 25 }]));
+    expect(r?.kind).toBe("ops");
+    if (r?.kind !== "ops") return;
+    const direct = parseMd(XY.replace("values: [10, 20]", "values: [10, 25]")).slides[0];
+    // The rendered spec agrees; the YAML TEXT may be re-dumped (block style) exactly as the P1 figure ops do.
+    const spec = (s: SlideIR) => DiagramSpecSchema.parse(loadYaml(s.diagram!.yaml));
+    expect(r.notices).toEqual([]);
+    expect(spec(r.slide)).toEqual(spec(direct));
+  });
 });

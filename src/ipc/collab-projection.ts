@@ -10,11 +10,18 @@
  * the low-latency bonus. Both funnel through ONE rev-guarded, serialized pump so a doc is applied
  * exactly once per rev no matter how many signals race in.
  *
+ * #616: a TEMPLATE-only change (AI augment/adjust_template) is its own rev with `templateRev === rev` in
+ * list_documents → the template is pulled out of save_project (.scft; no new read tool) and handed to onTemplate.
+ * Which of deck/template to pull per tick is decided by planPull (collab-pull-plan.ts).
+ *
  * Pure (no React / no Tauri): the hook injects the Tauri plugin-http fetch; tests drive it against a
  * real createCollabHost over Node's global fetch.
  */
 import { CollabClient, type DeckChangedEvent } from "./collab-client";
 import type { DeckIR } from "../engine/slide-schema";
+import type { TemplateData } from "../engine/template-loader";
+import { openProject } from "../engine/project-io";
+import { planPull } from "./collab-pull-plan";
 
 export type CollabStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -24,7 +31,17 @@ export interface DocSummary {
   slideCount: number;
   dirty: boolean;
   rev: number;
+  /** #616 (ADDITIVE): the rev at which the doc's template was last replaced (0 = as minted). */
+  templateRev?: number;
   shared: boolean;
+}
+
+/** #616: the doc's replaced template, pulled from the host (save_project) → App sets it on that doc's tab. */
+export interface ProjectedTemplate {
+  docId: string;
+  rev: number;
+  template: TemplateData;
+  templateName: string;
 }
 
 export interface ProjectedDeck {
@@ -47,6 +64,8 @@ export interface CollabProjectionOptions {
   pollMs?: number;
   /** A freshly-pulled deck for a NEW rev (or a newly-adopted doc) → React setDeck(next,'commit'). */
   onDeck(p: ProjectedDeck): void;
+  /** #616: the host replaced this doc's template (AI augment/adjust_template). Omit → templates are not pulled. */
+  onTemplate?(t: ProjectedTemplate): void;
   onStatus?(s: CollabStatus, detail?: string): void;
   onDocs?(docs: DocSummary[]): void;
   /** #407 follow: fired AFTER the deck at the AI edit's rev was applied via onDeck, with that edit's
@@ -106,6 +125,10 @@ export class CollabProjection {
   private pendingFollow: FollowTarget | null = null;
   private lastSlideCount = 0;
   private lastSelfSendAt = -Infinity;
+  // #616: per doc, the templateRev whose template the GUI already has (absent = the one it was opened with).
+  private readonly templateRevSeen = new Map<string, number>();
+  // A rejected/failed send left an optimistic local edit the host lacks → the next new rev MUST re-pull the deck (even template-only).
+  private forceDeckPull = false;
 
   constructor(opts: CollabProjectionOptions) {
     this.opts = opts;
@@ -191,7 +214,10 @@ export class CollabProjection {
       return { ok: false, message: msg(e) };
     } finally {
       this.sending = false;
-      if (reconcile) this.scheduleTick(); // now `sending` is false → tick() will actually pull
+      if (reconcile) {
+        this.forceDeckPull = true; // D1: re-pull the deck even if the new rev is template-only (collab-pull-plan.ts)
+        this.scheduleTick(); // now `sending` is false → tick() will actually pull
+      }
     }
   }
 
@@ -325,25 +351,45 @@ export class CollabProjection {
       return;
     }
     this.targetDocId = target.docId;
-    if (this.lastDocId === target.docId && target.rev <= this.lastRev) return; // already at this rev
-
-    const isInitial = this.lastDocId !== target.docId; // first apply of this doc → caller uses 'silent'
-    let deck: DeckIR | null;
+    const sameDoc = this.lastDocId === target.docId;
+    const templateRev = target.templateRev ?? 0;
+    const seen = this.templateRevSeen.get(target.docId) ?? 0;
+    const plan = { sameDoc, rev: target.rev, lastRev: this.lastRev, templateRev, templateRevSeen: seen, pullsTemplates: !!this.opts.onTemplate, forceDeckPull: this.forceDeckPull };
+    const { skip, needDeck, needTemplate } = planPull(plan); // #616 template-only / D1 forced re-pull
+    if (skip) return; // already at this rev
+    const isInitial = !sameDoc; // first apply of this doc → caller uses 'silent'
+    let deck: DeckIR | null = null;
+    let tpl: ProjectedTemplate | undefined;
     try {
-      deck = await this.client.callTool<DeckIR | null>("get_deck", { docId: target.docId });
+      if (needDeck) deck = await this.client.callTool<DeckIR | null>("get_deck", { docId: target.docId });
+      if (needTemplate) tpl = await this.pullTemplate(target.docId, templateRev);
     } catch (e) {
       this.failAndStop(msg(e));
       return;
     }
-    // The get_deck await is a window in which the GUI may have switched to a LOCAL tab (mirrorPaused),
+    // The pull awaits are a window in which the GUI may have switched to a LOCAL tab (mirrorPaused),
     // re-targeted another doc, or stopped. A pull that started before that must NOT land now and clobber
     // the local/other tab — re-check here and drop it WITHOUT advancing lastRev (so a resume re-applies).
     if (this.closed || this.mirrorPaused || (this.targetDocId !== null && this.targetDocId !== target.docId)) return;
     this.lastDocId = target.docId;
-    this.lastRev = target.rev;
-    this.lastSlideCount = deck?.slides.length ?? 0;
-    this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title, isInitial });
+    if (needDeck) {
+      this.lastRev = target.rev;
+      this.forceDeckPull = false;
+      this.lastSlideCount = deck?.slides.length ?? 0;
+      this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title, isInitial });
+    } else this.lastRev = Math.max(this.lastRev, target.rev); // same doc: the template-only rev is now applied
+    if (tpl) {
+      this.templateRevSeen.set(target.docId, templateRev);
+      this.opts.onTemplate?.(tpl);
+    }
     this.maybeFollow(); // after onDeck, so the GUI's jump lands on the freshly-applied deck
+  }
+
+  /** #616: the doc's current template, taken out of save_project's .scft (no extra read tool — 裁定). */
+  private async pullTemplate(docId: string, rev: number): Promise<ProjectedTemplate> {
+    const r = await this.client.callTool<{ dataBase64: string }>("save_project", { docId });
+    const { template, meta } = await openProject(Uint8Array.from(atob(r.dataBase64), (c) => c.charCodeAt(0)));
+    return { docId, rev, template, templateName: meta.templateName ?? "" };
   }
 }
 

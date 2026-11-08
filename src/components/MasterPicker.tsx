@@ -1,12 +1,17 @@
 /**
- * MasterPicker.tsx — a single pull-down button for choosing / importing the slide master.
- * The button shows the current master; clicking opens a menu of masters (the active one is highlighted),
- * with an "＋ 取り込む" item last (when importing is allowed). Used on the top bar (select + import) and
- * in the Draft header (select-only — omit onImport). Applying is gated by the caller (collab lock).
+ * MasterPicker.tsx — a single pull-down button for the slide master. The button shows the current master;
+ * clicking opens MasterMenu (#612: 選ぶ／取り込む／加工する／新規 — every template operation lives here).
+ * Used on the top bar (all operations) and in the Draft header (select + import/Re-make/delete only: the
+ * adjust panel, the augment flow's banner and the creator dialog all render behind the Draft modal).
+ * Applying is gated by the caller (collab lock / template adjust → `disabled`).
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { MasterEntry } from "./useMasterRegistry";
+import type { TemplateData } from "../engine/template-loader";
+import type { AugmentPlan } from "../engine/layout-augment-plan";
+import { MasterMenu } from "./MasterMenu";
+import { planTemplateAugmentation } from "./augment-offer";
 
 interface MasterPickerProps {
   masters: MasterEntry[];
@@ -19,16 +24,20 @@ interface MasterPickerProps {
   onRemake?: () => void;
   /** テンプレ調整 (#570): adjust the ACTIVE master's fonts / sizes into a derived master. Omit → hidden. */
   onAdjust?: () => void;
+  /** テンプレを強化 (#568/#612): add the layouts the ACTIVE template lacks. Omit → hidden. */
+  onAugment?: (plan: AugmentPlan) => void;
+  /** The active template — what 「テンプレを強化」 plans against (planned only while the menu is open). */
+  template?: TemplateData | null;
   /** Create a new template from scratch (テーマ2 S4). Omit to hide the create item. */
   onCreate?: () => void;
-  /** Re-show the last intake result summary (the transparency bar). Omit → no ⓘ (nothing imported yet). */
+  /** Re-show the last intake result summary (the transparency bar). Omit → no ⓘ item (nothing imported yet). */
   onShowInfo?: () => void;
   /** Delete an imported master (built-ins are never deletable). Omit → no delete affordance. */
   onRemove?: (id: string) => void;
   disabled?: boolean;
 }
 
-export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onAdjust, onCreate, onShowInfo, onRemove, disabled }: MasterPickerProps) {
+export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onAdjust, onAugment, template, onCreate, onShowInfo, onRemove, disabled }: MasterPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -51,6 +60,8 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
   }, [open]);
 
   const active = masters.find((m) => m.id === activeId);
+  // Planned lazily (only while open) — the plan builds the template's catalog.
+  const augmentPlan = useMemo(() => (open && onAugment && template ? planTemplateAugmentation(template) : null), [open, onAugment, template]);
 
   return (
     <div className="relative inline-flex items-center gap-1" ref={ref}>
@@ -64,89 +75,23 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
         <span className="truncate">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
       </button>
-      {onShowInfo && (
-        <button
-          onClick={onShowInfo}
-          title={t("masterPicker.showInfoTitle")}
-          className="shrink-0 w-6 h-6 rounded-full text-muted hover:text-accent-soft hover:bg-edge inline-flex items-center justify-center text-xs"
-        >
-          ⓘ
-        </button>
-      )}
-
       {open && (
-        // `top-full` anchors the menu to the BOTTOM of the trigger row (opens below it, never over it).
-        // Needed because the root is inline-flex (button + ⓘ side by side): without an explicit top an
-        // absolute child would take its static position at the flex line's TOP and overlap the toolbar.
-        <div className="absolute top-full right-0 mt-1 z-50 min-w-[220px] max-w-[320px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
-          <div className="max-h-[45vh] overflow-y-auto">
-            {masters.map((m) => {
-              const isActive = m.id === activeId;
-              return (
-                <div key={m.id} className={`group flex items-center hover:bg-edge ${isActive ? "bg-accent/15" : ""}`}>
-                  <button
-                    onClick={() => { onSelect(m.id); setOpen(false); }}
-                    className={`flex-1 min-w-0 text-left pl-3 pr-1 py-1.5 flex items-center gap-2 ${
-                      isActive ? "text-accent-soft font-medium" : "text-fg2"
-                    }`}
-                  >
-                    <span className="w-3 shrink-0 text-center">{isActive ? "✓" : ""}</span>
-                    <span className="truncate">{m.name}{m.builtin ? t("masterPicker.builtinSuffix") : ""}</span>
-                  </button>
-                  {onRemove && !m.builtin && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemove(m.id); }}
-                      title={t("masterPicker.removeTitle")}
-                      className="shrink-0 w-7 h-7 mr-1 rounded text-muted hover:text-red-400 hover:bg-void inline-flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    >
-                      🗑
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {(onImport || onRemake || onAdjust || onCreate) && <div className="my-1 h-px bg-edge" />}
-          {onImport && (
-            <button
-              onClick={() => { onImport(); setOpen(false); }}
-              title={t("masterPicker.importTitle")}
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
-            >
-              <span className="w-3 shrink-0 text-center">＋</span>
-              <span>{t("masterPicker.importLabel")}</span>
-            </button>
-          )}
-          {onRemake && (
-            <button
-              onClick={() => { onRemake(); setOpen(false); }}
-              title={t("masterPicker.remakeTitle")}
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
-            >
-              <span className="w-3 shrink-0 text-center">＋</span>
-              <span>{t("masterPicker.remakeLabel")}</span>
-            </button>
-          )}
-          {onAdjust && (
-            <button
-              onClick={() => { onAdjust(); setOpen(false); }}
-              title={t("masterPicker.adjustTitle")}
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
-            >
-              <span className="w-3 shrink-0 text-center">🔤</span>
-              <span>{t("masterPicker.adjustLabel")}</span>
-            </button>
-          )}
-          {onCreate && (
-            <button
-              onClick={() => { onCreate(); setOpen(false); }}
-              title={t("masterPicker.createTitle")}
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge"
-            >
-              <span className="w-3 shrink-0 text-center">＋</span>
-              <span>{t("masterPicker.createLabel")}</span>
-            </button>
-          )}
+        // `top-full` anchors the menu to the BOTTOM of the trigger (opens below it, never over it): the root
+        // is inline-flex, so without an explicit top an absolute child would sit at the flex line's TOP.
+        <div className="absolute top-full right-0 mt-1 z-50 min-w-[300px] max-w-[360px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
+          <MasterMenu
+            masters={masters}
+            activeId={activeId}
+            onSelect={onSelect}
+            onClose={() => setOpen(false)}
+            onImport={onImport}
+            onRemake={onRemake}
+            onAdjust={onAdjust}
+            augment={onAugment ? { plan: augmentPlan, onAugment } : undefined}
+            onShowInfo={onShowInfo}
+            onCreate={onCreate}
+            onRemove={onRemove}
+          />
         </div>
       )}
     </div>

@@ -36,6 +36,9 @@ export type LayoutRole =
   // #589: a big one-sentence layout (title-dominant, ~2-line body) — classified apart so a GENERIC
   // body slide never lands in it. No slide role targets it; explicit layout / suggestLayouts only.
   | "statement"
+  // #593: a quotation + attribution layout (マガジン 07_引用 / Quote.1Message.Single+1Attribution) — kept
+  // out of "content" the same way, so an unmarked body slide never lands in it.
+  | "quote"
   | "other";
 
 export type PlaceholderRole =
@@ -104,6 +107,8 @@ const FAMILY_TO_ROLE: Record<string, LayoutRole> = {
   process: "process",
   summary: "summary",
   closing: "closing",
+  statement: "statement", // #593 (#589 NEXT): Statement.1Message.Single
+  quote: "quote", // #593: Quote.1Message.Single+1Attribution
 };
 
 /** Layout role from its name's family (the part before the first "."). */
@@ -145,7 +150,7 @@ export function usesMetaIdxConvention(layouts: ReadonlyArray<{ name: string; pla
 /** Closing-slide vocabulary — the SINGLE source shared by the layout classifier (NAME_KEYWORDS below)
  *  AND the slide→role classifier (slideRoleRegions' isClosing), so both halves of the pipeline agree
  *  on what "closing" means. Word-anchored (\b) English + JA tokens. */
-export const CLOSING_RE = /\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑/i;
+export const CLOSING_RE = /\bclos|\bthank|\bwrap.?up\b|\bnext steps?\b|まとめ|結び|おわりに|謝辞|ご清聴|質疑|(?:次|今後)の\s*ステップ|お問い?合わ?せ|ご相談/i; // #593: JA CTA close
 
 const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\b(?:two|three|four|2|3|4|multi)\b[\s\S]*\b(?:column|content|panel|box|option)\b|compar|versus|\bvs\b/i, "columns"],
@@ -154,6 +159,7 @@ const NAME_KEYWORDS: Array<[RegExp, LayoutRole]> = [
   [/\bcode\b|\blog\b|\bsource\b|コード|ログ|ソース/i, "code"],
   [CLOSING_RE, "closing"],
   [/\bstatement\b|ステートメント/i, "statement"], // #589: before content — not a generic body
+  [/\bquote\b|\btestimonial|引用|お客様の声/i, "quote"], // #593: same reason as statement
   [/\bcontent\b|\bbody\b|\bbullet|\btext\b/i, "content"],
   [/\btitle\b|\bcover\b|\bopening\b|\bintro\b|\bheader\b|表紙|タイトル|扉絵/i, "title"],
 ];

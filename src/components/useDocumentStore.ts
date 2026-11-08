@@ -60,6 +60,7 @@ type Action =
   | { type: "history"; action: HAction<DeckIR | null> }
   | { type: "patchActiveFn"; fn: (d: DocState) => Partial<DocState> }
   | { type: "patchDoc"; id: string; patch: Partial<DocState> } // patch a SPECIFIC doc (race-free, e.g. link hostDocId)
+  | { type: "patchHostDoc"; hostDocId: string; patch: Partial<DocState> } // #616: the tab(s) mirroring a host doc
   | { type: "newDoc"; doc: DocState; activate: boolean }
   | { type: "switchDoc"; id: string }
   | { type: "closeDoc"; id: string };
@@ -101,6 +102,8 @@ export function documentReducer(s: Store, a: Action): Store {
       return mapActive(s, (d) => ({ ...d, ...a.fn(d) }));
     case "patchDoc":
       return { ...s, docs: s.docs.map((d) => (d.id === a.id ? { ...d, ...a.patch } : d)) };
+    case "patchHostDoc":
+      return s.docs.some((d) => d.hostDocId === a.hostDocId) ? { ...s, docs: s.docs.map((d) => (d.hostDocId === a.hostDocId ? { ...d, ...a.patch } : d)) } : s;
     case "newDoc": {
       const docs = [...s.docs, a.doc];
       return { docs, activeId: a.activate ? a.doc.id : s.activeId };
@@ -201,6 +204,12 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
   const closeDoc = useCallback((id: string) => dispatch({ type: "closeDoc", id }), []);
   /** Link a specific tab to a host doc (collab): race-free (targets by id, not "active"). */
   const linkHostDoc = useCallback((id: string, hostDocId: string) => dispatch({ type: "patchDoc", id, patch: { hostDocId } }), []);
+  /** #616 collab: the host replaced a doc's template (AI augment/adjust_template) → set it on the tab mirroring
+   *  that host doc (by hostDocId, not "active" — the user may have switched tabs meanwhile). Not an undo step. */
+  const setHostDocTemplate = useCallback(
+    (hostDocId: string, templateData: TemplateData, templateName: string) => dispatch({ type: "patchHostDoc", hostDocId, patch: { templateData, templateName } }),
+    [],
+  );
 
   return {
     // active-document flat API (names match the old useDeckController state exactly)
@@ -230,5 +239,6 @@ export function useDocumentStore(initialDoc: Partial<DocState> = {}) {
     switchDoc,
     closeDoc,
     linkHostDoc,
+    setHostDocTemplate,
   };
 }

@@ -146,10 +146,13 @@ describe("(b) レイアウト別背景色 bg", () => {
 });
 
 // 変更前（main ae067cc の writeTemplate）で採取した中身の指紋。既存 TemplateSpec 経路の出力不変を固定する。
+// #593 で BUILTIN_LAYOUTS に Statement / Quote / Closing(CTA) の 3 LayoutDef が増えたので再固定（PR #607 マージ時）。
+// 差分は slideLayout33〜35（＋その rels）・slideMaster1 の sldLayoutId 3 行・[Content_Types] の Override 3 行だけで、
+// 既存 32 レイアウトの XML は part 単位で byte-identical（統括が main と部分ごとの sha256 を比較して確認）。
 const LEGACY_DIGEST = {
-  midnight: "bb38623f7202c0ec3a7a91e69a369062ac02f7ab305244f4756a4841a3bb3a3a",
-  flat: "8913890e3f77648b8f1522a4e8258a6336051c81bb595f528a05cdfc6caa4dbc",
-  remake: "95a791d1e2e754dab91a42fb089d6031147f2cb3dbaaf2c512545b2f551e0977",
+  midnight: "f8396c5c842bc5a21e9ec224e346855325648c8b0b6f2aaba884fcc526de7974",
+  flat: "f747d53d852251deceef3879271df0145f9a933974894b4421d080de5ce3dab9",
+  remake: "54afa5de7b2e2d60782cb7b54f41f682616f5fd711fa4fbf8a22d478976dc5c7",
 };
 
 describe("(c) 既存出力の不変とプリセット表", () => {

@@ -65,9 +65,9 @@ export default function App() {
     handleStructureManuscript, handleSlideUpdate, handleDiagramChange, handleInsertImage, handleImageRectChange, handleApplySlide, previewSlideEdit, deckHint,
     handleAddSlide, handleDeleteSlide, handleDuplicateSlide, handleMoveSlide,
     handleGenerateToc, handleRegenerateStaticToc,
-    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields,
+    diagnostics, handleFixIssue, handleVisualizeSlide, currentSlideMd, currentSlideFields, currentSlideData,
     handleSlideMdChange, currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
-    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, editLockedRef, collabRef,
+    catalog, setDeck, docs, activeId, openDoc, switchDoc, closeDoc, linkHostDoc, setHostDocTemplate, editLockedRef, collabRef,
   } = useDeckController();
   const { t } = useTranslation();
   // 表示用の materialize 済み deck（#275）: 左サムネイル一覧（SlideList）と右プレビュー（SlidePreview）
@@ -245,6 +245,7 @@ export default function App() {
     getMasterBytes,
     // Link the tab that was active on 開始 to the seed's host doc (so switching back re-targets here).
     onSeedDoc: (docId) => linkHostDoc(activeId, docId),
+    applyHostTemplate: setHostDocTemplate, // #616: an AI template swap reaches the tab mirroring that host doc
     // Mode (b): an AI-created deck opens as a BACKGROUND tab (no view switch). Unbundle the full
     // .scft (deck + template) so the new tab renders with its OWN master, not the current one.
     onNewHostDoc: async (docId, title, dataBase64) => {
@@ -435,9 +436,9 @@ export default function App() {
         />
         <div className="flex items-center gap-2 px-3 py-2">
           {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
-              second tab. The master picker (select + import) lives here on the top bar now — the same
-              MasterPicker is also in Draft (select-only). It supersedes the old one-shot "Load Template"
-              (this registers the imported master + applies). Both are gated while collab-locked. */}
+              second tab. #612: every template operation (select / import / adjust · augment · ⓘ / create)
+              lives in this master menu; Draft shows the same MasterPicker with select + import only.
+              Both are gated while collab-locked or while a template adjust is open. */}
           <button
             onClick={handleEnterImport}
             disabled={editLocked || !!adjust.session}
@@ -452,9 +453,9 @@ export default function App() {
             onSelect={handleSelectMaster}
             onImport={handleImportMaster}
             onRemake={handleRemakeMaster}
-            onAdjust={() => void adjust.start()}
+            onAdjust={() => void adjust.start()} onAugment={editLocked || adjust.session ? undefined : handleAugmentMaster} template={templateData}
             onCreate={() => setShowTemplateCreator(true)}
-            onShowInfo={intakeResult ? () => setIntakeDismissed((d) => !d) : undefined}
+            onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
             onRemove={handleRemoveMaster}
             disabled={editLocked || !!adjust.session}
           />
@@ -475,7 +476,7 @@ export default function App() {
         onDismiss={() => setIntakeDismissed(true)}
         template={templateData}
         unbound={diagnostics.filter((d) => d.id === "unbound-content")}
-        onAugment={editLocked || !!adjust.session ? undefined : handleAugmentMaster}
+        augmentHint={!editLocked && !adjust.session}
       />
       {adjust.session && (
         <TemplateAdjustPanel session={adjust.session} busy={adjust.busy} onPreview={adjust.preview}
@@ -592,6 +593,7 @@ export default function App() {
             onClose={() => setShowAiPanel(false)}
             currentSlideMd={currentSlideMd}
             currentSlideFields={currentSlideFields}
+            currentSlideData={currentSlideData}
             onApplySlide={handleApplySlide}
             onPreviewSlideEdit={previewSlideEdit}
             activeSlideNum={activeSlide + 1}

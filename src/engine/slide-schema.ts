@@ -42,6 +42,10 @@ export const LAYOUT_NAMES = [
   "Closing.1Message.Single",
   "Closing.1Steps.Single+1Notes",
   "SectionNav.1TitleList.Single",
+  // #593 (#580 段 2-a): スタイル別の共通構造（template-layout-library-style.ts）
+  "Statement.1Message.Single",
+  "Quote.1Message.Single+1Attribution",
+  "Closing.1CTA+1Contact",
 ] as const;
 
 export type LayoutName = (typeof LAYOUT_NAMES)[number];
@@ -189,8 +193,11 @@ export const SlideIRSchema = z.object({
   // fields above say everything, so single-visual decks stay byte-identical). The singular fields keep
   // the FIRST visual of each kind (read compat). Read the list via slide-figures.slideFigures (R8).
   figures: z.array(FigureBlockSchema).optional(),
-  // `<!-- card/step/kpi/compare -->` groups → layout hint。compare（#396）・beforeAfter（#402: `<!-- before -->`/`<!-- after -->`）は optional の enum 追加
-  groupKind: z.enum(["card", "step", "kpi", "compare", "beforeAfter"]).optional(),
+  // `<!-- card/step/kpi/compare -->` groups → layout hint。compare（#396）・beforeAfter（#402: `<!-- before -->`/`<!-- after -->`）は optional の enum 追加。
+  // statement / quote（#593・R4 統括承認）は名前に反してグループではない: 区切り記号でなくスライド属性マーカー
+  // （`<!-- statement -->`/`<!-- quote -->`）で、選択のヒントとしてここに相乗りする。グループかどうかは
+  // slide-markers.isGroupedSlide で判定する。expandGroups はグループ型レイアウトのときだけ動くので影響しない。
+  groupKind: z.enum(["card", "step", "kpi", "compare", "beforeAfter", "statement", "quote"]).optional(),
   // `<!-- step * -->` 現在ステップ（#401）: 1 始まりのグループ序数（昇順）。step のみ・無印なら欠落＝byte-identical
   currentSteps: z.array(z.number().int().min(1)).optional(),
   notes: z.array(ParagraphSchema).optional(), // `<!-- note -->` 以降のスピーカーノート（ADR-0032 D1、R4 承認済み）
