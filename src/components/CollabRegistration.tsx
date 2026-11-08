@@ -17,6 +17,7 @@ import { planClaudeRegister, runClaudeRegister, type RegisterPlanLookup } from "
 import { buildRegistrationSnippets } from "./collab-panel-snippets";
 import { outcomeView, planAction, type OutcomeView } from "./claude-register-view";
 import { RegisterConfirm, RegisterResult } from "./ClaudeRegisterFlow";
+import { McpbDownload, McpDoctor } from "./CollabDiagnostics";
 
 export function CopyButton({ value }: { value: string }) {
   const { t } = useTranslation();
@@ -141,6 +142,9 @@ export default function CollabRegistration() {
 
       <Field label={t("collabPanel.addToClaudeCode")} value={snippets.claudeCode} />
       <Field label={t("collabPanel.desktopClientsLabel")} value={snippets.desktopJson} />
+      {/* #517 子 3: Claude Desktop's one-double-click install. The JSON above stays (Cursor etc. use it, and it is
+          the fallback when the latest release has no bundle). */}
+      <McpbDownload os={info?.os ?? null} />
 
       <button
         onClick={() => setJsonOpen((v) => !v)}
@@ -161,6 +165,9 @@ export default function CollabRegistration() {
           <CopyButton value={snippets.mcpJson} />
         </div>
       )}
+
+      {/* #517 子 4: does the registered server actually answer? Runs the bundled server's own --doctor. */}
+      <McpDoctor />
 
       {sourceHint && <p className="text-[10px] text-dim leading-relaxed break-words">{sourceHint}</p>}
       <p className="text-[10px] text-faint leading-relaxed">{t("collabPanel.otherClientsHint")}</p>

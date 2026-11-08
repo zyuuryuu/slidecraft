@@ -93,6 +93,8 @@ claude mcp add slidecraft -- slidecraft-mcp
 
 ### Claude Desktop / Cursor
 
+**Claude Desktop** は、リリースの Assets にある `.mcpb`（macOS: `slidecraft-darwin-arm64.mcpb`、Windows: `slidecraft-win32-x64.mcpb`）をダブルクリックするだけで導入できます（JSON 編集不要・Node 同梱）。GUI の 協働 パネルからもダウンロードできます。`.mcpb` が無い版や Cursor では、次の JSON を登録します。
+
 `claude_desktop_config.json`（Cursor は `~/.cursor/mcp.json` またはプロジェクト直下 `.cursor/mcp.json`）の `mcpServers` に登録します。
 
 ```json
@@ -104,6 +106,8 @@ claude mcp add slidecraft -- slidecraft-mcp
   }
 }
 ```
+
+> **つながらないとき**：`slidecraft-mcp --doctor` を実行すると、サーバを実際に起動して応答・版・tools の本数・`--root` を 1 画面で確認できます（GUI の 協働 パネルの「接続テスト」も同じ診断です）。詳細は [MCP サーバ仕様](https://github.com/zyuuryuu/slidecraft/blob/main/docs/mcp-server.md) を参照。
 
 ### GitHub Copilot（VS Code）
 
