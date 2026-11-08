@@ -88,6 +88,15 @@ describe("#392 段 2: レイアウト選択が「ビジュアル 2 つ」を見�
     const name = autoSelectLayout(d.slides[1], 1, 2, cat);
     expect(cat.find((e) => e.name === name)).toMatchObject({ role: "columns", bodyCount: 2 });
   });
+  it("図×2 → Chart 2 枠の無いテンプレで Chart.1Chart.Single+1Analysis（分析枠に 2 つ目が入る）を選ばず 2 カラムへ退化（PR #657 D1）", () => {
+    const d = deckOf(DD);
+    const cat = buildCatalog(midnight).filter((e) => e.name !== "Chart.2Chart.Equal");
+    expect(cat.some((e) => e.name === "Chart.1Chart.Single+1Analysis" && e.bodyCount === 2)).toBe(true); // 前提: 罠の候補が残っている
+    const name = autoSelectLayout(d.slides[1], 1, 2, cat);
+    expect(name).not.toBe("Chart.1Chart.Single+1Analysis");
+    expect(cat.find((e) => e.name === name)).toMatchObject({ role: "columns", bodyCount: 2 });
+    expect(suggestLayouts(d.slides[1], 1, 2, cat)[0]).toBe(name);
+  });
   it("表＋図 → columns 2（Column.2Body.*）", () => {
     const d = deckOf(TD);
     expect(slideRoleRegions(d.slides[1], 1, 2)).toEqual({ role: "columns", regions: 2, fallback: "Column.2Body.Equal" });
@@ -254,11 +263,16 @@ describe("#392 段 2: R8 一致 — 描かれる／告知されるが配置と�
   });
 });
 
-describe("#392 段 2: col 経路の本文画像も出現順（段 1 の既知の制限: 末尾固定）", () => {
+describe("#392 段 2: col 経路の本文画像も出現順（段 1 の既知の制限＝末尾固定を解消）", () => {
   const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   it("col 画像｜図 → figures は [image, diagram]（画像が先）", () => {
     const s = target(`<!-- col -->\n![左の画像](${PNG})\n\n<!-- col -->\n${DIAG("右")}`);
     expect(s.figures?.map((f) => f.kind)).toEqual(["image", "diagram"]);
+  });
+  it("画像 → col 図｜図（画像が最初の列より前）→ figures は [image, diagram, diagram]・配置も 1・2・3 の順（PR #657 D2）", () => {
+    const s = target(`![前の画像](${PNG})\n\n<!-- col -->\n${DIAG("左")}\n\n<!-- col -->\n${DIAG("右")}`);
+    expect(s.figures?.map((f) => f.kind)).toEqual(["image", "diagram", "diagram"]);
+    expect(placedFigures(s).map((p) => [p.figure.kind, p.ordinal])).toEqual([["image", "1"], ["diagram", "2"], ["diagram", "3"]]);
   });
   it("col 図｜画像 → [diagram, image]", () => {
     const s = target(`<!-- col -->\n${DIAG("左")}\n\n<!-- col -->\n![右の画像](${PNG})`);

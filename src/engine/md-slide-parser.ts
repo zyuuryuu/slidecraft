@@ -343,8 +343,8 @@ export function parseSlideBlock(
       }
     });
     pushFieldRows();
-    // The hoisted image (a body image, not a backdrop) is a visual too — ordered after its column's figure.
-    if (image && !image.behind) visuals.push({ f: { kind: "image", ...image }, pos: imagePos < 0 ? sections.length : imagePos + 0.5 });
+    // The hoisted image (a body image, not a backdrop) is a visual too — after its column's figure (-1 → -0.5: before the 1st column).
+    if (image && !image.behind) visuals.push({ f: { kind: "image", ...image }, pos: imagePos + 0.5 });
 
     if (placeholders.length === 0 && visuals.length === 0 && !image && !notes?.length) return null;
     const { diagram, mermaidBlock, table, figures } = figureFields(visuals.sort((a, b) => a.pos - b.pos).map((v) => v.f));

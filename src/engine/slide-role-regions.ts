@@ -114,7 +114,10 @@ export function pickRoleLayout(
   table: Pick<TableBlock, "rows" | "placeholderIdx"> | undefined,
 ): CatalogEntry | undefined {
   if (role !== "chart") return pickLayout(catalog, role, regions, hasImage, table);
-  return pickLayout(catalog.filter((e) => e.bodyCount === regions), "chart", regions, hasImage, table)
+  // Canonical names state the chart count (`Chart.<N>Chart.*`); `Chart.1Chart.Single+1Analysis` has 2
+  // bodies but 1 chart — its 2nd body is the analysis box (#657 D1). Non-canonical names: bodyCount only.
+  const chartsOk = (e: CatalogEntry) => Number(/(\d+)Chart/.exec(e.name)?.[1] ?? regions) === regions;
+  return pickLayout(catalog.filter((e) => e.bodyCount === regions && chartsOk(e)), "chart", regions, hasImage, table)
     ?? pickLayout(catalog, "columns", regions, hasImage, table);
 }
 
