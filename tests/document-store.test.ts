@@ -127,3 +127,18 @@ describe("documentReducer — document collection + ISOLATION", () => {
     expect(s.docs.map((d) => d.id)).toEqual(["c"]);
   });
 });
+
+describe("documentReducer — patchHostDoc (#616: host テンプレ差し替えをその host doc のタブへ)", () => {
+  it("hostDocId が一致するタブだけを patch し、undo 履歴・アクティブは触らない／一致が無ければ no-op", () => {
+    let s: Store = { docs: [makeDoc({ id: "a", hostDocId: "h1", templateName: "old" }), makeDoc({ id: "b", hostDocId: "h2", templateName: "keep" })], activeId: "b" };
+    s = documentReducer(s, setDeck(deck(1), "commit"));
+    const before = byId(s, "b").history;
+    s = documentReducer(s, { type: "patchHostDoc", hostDocId: "h1", patch: { templateName: "new" } });
+    expect(byId(s, "a").templateName).toBe("new");
+    expect(byId(s, "b").templateName).toBe("keep");
+    expect(byId(s, "b").history).toBe(before);
+    expect(s.activeId).toBe("b");
+    const same = documentReducer(s, { type: "patchHostDoc", hostDocId: "zzz", patch: { templateName: "x" } });
+    expect(same).toBe(s);
+  });
+});

@@ -70,7 +70,7 @@ export function useDeckController() {
     parseError, setParseError, activeSlide, setActiveSlide, selected, setSelected,
     gotoLine, setGotoLine, subMode, setSubMode, filePath, setFilePath,
     initSnapshot, setInitSnapshot,
-    docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc,
+    docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc, setHostDocTemplate,
   } = useDocumentStore({ mdText: "", templateName: BUILTIN_MASTER.name, subMode: "edit", selected: new Set([0]), title: i18n.t("controller.untitledDoc") });
 
   // A NON-blocking advisory about the last applied AI edit (structure restored / numbers changed /
@@ -633,7 +633,7 @@ export function useDeckController() {
     handleGenerateToc, handleRegenerateStaticToc,
     currentSlide, currentLayoutName, currentLayout, layoutSuggestions, handleCursorLine, handleSlideClick,
     catalog, setDeck, // exposed for the App-level refine loop (useDeckRefine)
-    docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc, // multi-document collection (tabs, P0.2)
+    docs, activeId, createDoc, openDoc, switchDoc, closeDoc, linkHostDoc, setHostDocTemplate, // multi-document collection (tabs, P0.2)
     editLockedRef, // App syncs this from collab.status to drive observe-only locking
     collabRef, // App injects the P2.5 collaboration bridge here when connected
   };

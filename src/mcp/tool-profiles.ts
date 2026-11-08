@@ -17,9 +17,8 @@
  *    close は唯一 doc を壊すだけ。
  *  - register_templates … GUI webview が master レジストリを push する口。solo には GUI が
  *    存在せず host.templates も配線されない＝常に template-registry-unavailable で死にツール。
- * collab から隠すもの（solo 専用）とその理由:
- *  - augment_template / adjust_template … doc のテンプレを差し替えるが、collab の GUI は host から deck しか
- *    pull しないため GUI 側のテンプレが古いまま残る（silent divergence）。同期経路ができるまで solo 限定。
+ * augment_template / adjust_template は PR #606 D3 で一時 solo 限定だったが、#616 でテンプレ差し替えを
+ * GUI へ同期する経路（deckChanged{templateChanged} → GUI が save_project からテンプレを pull）ができたので全プロファイル。
  *  - undo/redo は隠さない: solo でもサーバ側履歴は実動する（tests/mcp-server.test.ts の
  *    solo undo→redo round-trip が実測）。Issue #465 の基準「迷ったら見せる側へ倒す」。
  */
@@ -35,7 +34,6 @@ export function profileOf(host: { solo?: boolean; sharedOnly: boolean }): McpPro
 const ALL: readonly McpProfile[] = ["solo", "collab-gui", "collab-ai"];
 const COLLAB: readonly McpProfile[] = ["collab-gui", "collab-ai"];
 const GUI: readonly McpProfile[] = ["collab-gui"];
-const SOLO: readonly McpProfile[] = ["solo"];
 
 /** ツール名 → 登録先プロファイル。server.ts の登録順と同じ並びで列挙する。 */
 export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
@@ -93,11 +91,9 @@ export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
   use_template: ALL,
   // GUI 専用（webview → host の push 口）
   register_templates: GUI,
-  // テンプレ派生（#568 段 3 / #570 段 3）— doc のテンプレを派生に差し替える。solo 限定（PR #606 D3）: collab の GUI は
-  // host から deck だけを pull しテンプレを引かないので、collab で出すと GUI の表示と AI 側の書き出しのテンプレが
-  // 黙ってずれる。collab で出すにはテンプレ差し替えを GUI へ通知・反映する経路が要る（別 Issue）。
-  augment_template: SOLO,
-  adjust_template: SOLO,
+  // テンプレ派生（#568 段 3 / #570 段 3）— doc のテンプレを派生に差し替える。collab では GUI へ同期する（#616）。
+  augment_template: ALL,
+  adjust_template: ALL,
 };
 
 /** 表引き。未知の名前は never-silent に throw — 表への追記を強制する。 */
