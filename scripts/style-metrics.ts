@@ -7,8 +7,10 @@
  * path as the MCP tools), then per slide on the layout the export resolves:
  *   - chars          : visible text characters (placeholder text + table cells; whitespace excluded,
  *                      figures' internal labels not counted)
- *   - imageArea      : drawn image area ÷ slide area — from the export's own placement (imageRect →
- *                      drawnImage, R8: no second geometry)
+ *   - imageArea      : drawn image area ÷ slide area, summed over EVERY image the export draws (the
+ *                      behind image + each region-bound one) — read off the export's own figure plan
+ *                      (planSlideFigures over figureRegions → drawnImage, R8: no second enumeration or
+ *                      geometry; #671 — it used to read only the singular slide.image = the 1st image)
  *   - whitespace     : 1 − (content "ink" area ÷ slide area). Ink = what this slide draws ON TOP OF the
  *                      empty layout (so template decoration never counts): text boxes sized to their
  *                      estimated lines (placeholderFitBox / paragraphLines — the split estimator), the
@@ -31,7 +33,8 @@ import { placeholderFitBox } from "../src/engine/template-catalog";
 import { slideBindingPlan } from "../src/engine/group-binding";
 import { planFieldRescue, applyFieldRescue } from "../src/engine/field-rescue";
 import { paragraphLines } from "../src/engine/distill";
-import { visualOccupancy, imagePlaceholder, imageRect, drawnImage, SLIDE_IN } from "../src/engine/visual-placement";
+import { visualOccupancy, drawnImage, SLIDE_IN } from "../src/engine/visual-placement";
+import { planSlideFigures } from "../src/engine/slide-figure-ooxml";
 import type { SlideIR, PlaceholderContent, ImageRect } from "../src/engine/slide-schema";
 import type { ReviewRuleId } from "../src/engine/deck-diagnostics";
 
@@ -57,7 +60,14 @@ export interface TemplateMetrics {
 export interface StyleMetricsReport { manuscript: string; templates: TemplateMetrics[]; }
 
 /** Target bands per style (#580 評価軸). Only the bands #580 states are set; the others gate structural
- *  health only (nothing lost, nothing auto-split) until a baseline deck is measured for them. */
+ *  health only (nothing lost, nothing auto-split) until a baseline deck is measured for them.
+ *
+ *  marketing.minImageAreaRatio (#671 較正): a DECK mean, so the text-structure slides (表紙・章扉・KPI・
+ *  手順・締め) count as 0. Measured on each style's target deck with its preset (all images counted):
+ *  Campaign / samples/manuscript-07 = 0.256 (全面 1.0・左キャプション 0.419・2×2 0.565・並置 0.575 ／ 10 枚),
+ *  Pitch / manuscript-05 = 0.025, Executive / manuscript-06 = 0. 0.2 = "2 full-bleed images' worth in 10
+ *  slides": the Campaign deck passes with ~20% headroom, Pitch (8× lower) and Executive do not. The
+ *  uncalibrated #580 value 0.5 assumed a per-image-slide ratio, which no deck mean with text slides reaches. */
 export type StyleName = "report" | "official" | "pitch" | "executive" | "marketing";
 export interface TargetBand { maxCharsPerSlide?: number; minImageAreaRatio?: number; maxLossIssues: number; maxAutoSplit?: number; }
 export const STYLE_TARGETS: Record<StyleName, TargetBand> = {
@@ -65,7 +75,7 @@ export const STYLE_TARGETS: Record<StyleName, TargetBand> = {
   official: { maxLossIssues: 0, maxAutoSplit: 0 },
   pitch: { maxCharsPerSlide: 60, maxLossIssues: 0 },
   executive: { maxLossIssues: 0 },
-  marketing: { maxCharsPerSlide: 25, minImageAreaRatio: 0.5, maxLossIssues: 0 },
+  marketing: { maxCharsPerSlide: 25, minImageAreaRatio: 0.2, maxLossIssues: 0 },
 };
 
 const SLIDE_AREA = SLIDE_IN.w * SLIDE_IN.h;
@@ -78,13 +88,11 @@ function slideChars(slide: SlideIR): number {
   return text + (slide.table?.rows.flat().reduce((n, cell) => n + visible(cell), 0) ?? 0);
 }
 
-/** The drawn image rect, exactly as the export places it (or undefined when it is not drawn). */
-function imageDrawn(slide: SlideIR, layout: LayoutInfo): ImageRect | undefined {
-  if (!slide.image) return undefined;
-  const ph = imagePlaceholder(layout.placeholders, slide.image.placeholderIdx);
-  if (!slide.image.behind && !ph) return undefined;
-  const box = imageRect(slide.image, ph);
-  return box && drawnImage(slide.image, box).rect;
+/** Every drawn image rect, exactly as the export places them: its own figure plan (the behind image +
+ *  each region-bound image, from figureRegions), each fitted by drawnImage. Empty when none is drawn. */
+function imagesDrawn(slide: SlideIR, layout: LayoutInfo): ImageRect[] {
+  const plan = planSlideFigures(slide, layout.placeholders);
+  return [...(plan.behind ? [plan.behind] : []), ...plan.images].map((p) => drawnImage(p.image, p.box).rect);
 }
 
 /** The rects this slide draws over its empty layout (see the module header). */
@@ -107,8 +115,7 @@ function inkRects(slide: SlideIR, layout: LayoutInfo): ImageRect[] {
     const w = lines > 1 ? s.w : Math.min(s.w, longest * fontIn + 0.2);
     rects.push({ x: s.x, y: s.y, w, h: Math.min(s.h, lines * fontIn * 1.2 + 0.2) });
   }
-  const img = imageDrawn(slide, layout);
-  if (img) rects.push(img);
+  rects.push(...imagesDrawn(slide, layout));
   if (rescue.note) rects.push(rescue.note.rect);
   return rects;
 }
@@ -135,11 +142,11 @@ export async function measureTemplate(markdown: string, name: string, bytes: Uin
   const parsed = parseMdReport(markdown, catalog).deck.slides.length; // newProject's own parse, before the split
   const perSlide = deck.slides.map((slide, i): SlideMetrics => {
     const layout = findLayout(template, autoSelectLayout(slide, i, deck.slides.length, catalog))!;
-    const img = imageDrawn(slide, layout);
+    const imgArea = imagesDrawn(slide, layout).reduce((n, r) => n + r.w * r.h, 0);
     return {
       layout: layout.name,
       chars: slideChars(slide),
-      imageArea: round(img ? Math.min(1, (img.w * img.h) / SLIDE_AREA) : 0),
+      imageArea: round(Math.min(1, imgArea / SLIDE_AREA)),
       whitespace: round(1 - unionArea(inkRects(slide, layout)) / SLIDE_AREA),
     };
   });

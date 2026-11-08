@@ -31,7 +31,7 @@ import { slideRoleRegions } from "../src/engine/slide-role-regions";
 import { parseMd } from "../src/engine/md-parser";
 import { BUILTIN_MASTERS, BUILTIN_MASTER } from "../src/components/useMasterRegistry";
 import * as S from "../src/mcp/session";
-import { LOSS_RULES, measureTemplate } from "../scripts/style-metrics";
+import { LOSS_RULES, measureTemplate, styleMetrics, evaluateTargets } from "../scripts/style-metrics";
 import { PRESET_ARTIFACTS, buildTemplateOnly, buildShowcase } from "../scripts/gen-preset-templates";
 import type { SlideIR, PlaceholderContent } from "../src/engine/slide-schema";
 
@@ -289,6 +289,11 @@ describe("(c) 受け入れ: マーケ 10 枚を Campaign で取り込む", () =>
   it("文字量はマーケの目標帯（1 枚 25 字以下）に入る", async () => {
     const m = await measureTemplate(md(), "campaign", generated);
     expect(m.charsPerSlide).toBeLessThanOrEqual(25);
+  });
+
+  it("#671: マーケの目標帯（文字量・画像面積比〔全枠込み〕・消失 0）に入る", async () => {
+    const report = await styleMetrics("manuscript-07", md(), [{ name: "campaign", bytes: generated }]);
+    expect(evaluateTargets(report, "marketing")).toEqual([{ template: "campaign", misses: [] }]);
   });
 });
 

@@ -82,9 +82,9 @@ describe("project-io version gate (#121)", () => {
     valid = await bundleProject(parseMd(MD), template, { templateName: "T", savedAt: "x" });
   });
 
-  it("bundleProject embeds the current PROJECT_VERSION", async () => {
+  it("bundleProject embeds v1 for a figures-less deck (#673: v2 only when a slide carries figures)", async () => {
     const zip = await JSZip.loadAsync(valid);
-    expect(JSON.parse(await zip.file("meta.json")!.async("string")).version).toBe(PROJECT_VERSION);
+    expect(JSON.parse(await zip.file("meta.json")!.async("string")).version).toBe(1);
   });
 
   it("current version opens exactly as before (deck + meta unchanged)", async () => {
