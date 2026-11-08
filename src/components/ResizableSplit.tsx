@@ -6,6 +6,7 @@
  */
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 interface ResizableSplitProps {
   left: React.ReactNode;
@@ -25,6 +26,7 @@ export default function ResizableSplit({
   maxPct = 80,
   storageKey,
 }: ResizableSplitProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -77,7 +79,7 @@ export default function ResizableSplit({
       <div
         onMouseDown={onMouseDown}
         onDoubleClick={() => setPct(initialLeftPct)}
-        title="Drag to resize (double-click to reset)"
+        title={t("resizableSplit.dividerTitle")}
         className="w-1.5 shrink-0 cursor-col-resize bg-edge hover:bg-accent transition-colors"
       />
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">

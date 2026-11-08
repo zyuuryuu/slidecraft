@@ -211,7 +211,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
           aria-expanded={layoutOpen}
           className="w-full flex items-center justify-between gap-2 py-0.5 text-left group"
         >
-          <span className="text-[10px] text-faint uppercase tracking-wider">Layout</span>
+          <span className="text-[10px] text-faint uppercase tracking-wider">{t("slideEditor.layout")}</span>
           <span className="flex items-center gap-1 min-w-0 text-[11px] text-muted group-hover:text-fg2">
             <span className="truncate">{layoutLabel}</span>
             <span className="shrink-0 text-dim">{layoutOpen ? "▾" : "▸"}</span>
@@ -261,7 +261,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
                     slide.layout === "auto" ? "bg-accent border-accent text-on-accent" : "bg-field border-edge text-fg2 hover:border-accent/60"
                   }`}
                 >
-                  ⟳ Auto
+                  {t("slideEditor.resetToAuto")}
                 </button>
               </div>
             )}

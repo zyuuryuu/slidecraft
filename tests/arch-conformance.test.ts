@@ -107,7 +107,6 @@ describe("R1: 1 ファイル 400 行以下", () => {
     "components/SlideEditor.tsx", // 450
     "engine/placeholder-filler.ts", // 449
     "components/useAiGeneration.ts", // 444
-    "components/LlmAssist.tsx", // 401
     "engine/md-slide-parser.ts", // 419
     "mcp/session.ts", // 403
   ]);
