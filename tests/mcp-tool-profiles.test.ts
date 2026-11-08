@@ -21,12 +21,15 @@ import { buildServer } from "../src/mcp/server";
 import { DocRegistry, MemTemplateStore, type HostContext } from "../src/mcp/host-core";
 import { TOOL_PROFILES, isToolVisible, profileOf } from "../src/mcp/tool-profiles";
 
-/** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 38 本。
+/** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 40 本。
  *  #522 で get_deck_image / get_deck_html（deck 全枚のコンタクトシート＝ホット往復 29→1・ADR-0037 D3）を
  *  全プロファイルに追加（35→37）。#247 で set_review_rules（レビュー規則の on/off・診断の見え方の設定）を
- *  全プロファイルに追加（37→38）。 */
+ *  全プロファイルに追加（37→38）。#568 段 3 / #570 段 3 で augment_template / adjust_template（doc のテンプレを
+ *  派生に差し替える）を全プロファイルに追加（38→40）。 */
 const SHARED_TOOLS = [
+  "adjust_template",
   "apply_design_intent",
+  "augment_template",
   "bootstrap",
   "convert_bullets_to_table",
   "create_template",

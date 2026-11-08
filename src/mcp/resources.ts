@@ -15,6 +15,7 @@ import type { Session } from "./session";
 import * as S from "./session";
 import type { HostContext } from "./host-core";
 import { renderSlideHtml } from "./slide-raster";
+import { withOverflowScaleHint } from "./template-tools";
 
 type ReadResult = { contents: { uri: string; mimeType?: string; text: string }[] };
 const asJson = (uri: URL, data: unknown): ReadResult => ({
@@ -52,7 +53,12 @@ export function registerResources(server: McpServer, host: HostContext): void {
     "deck-issues",
     "deck://issues",
     { title: "deck の診断", description: "CONTENT レバー（split/condense/visualize/title）付きの課題一覧＋本文 budget（このテンプレの容量: maxBullets/charsPerBullet）", mimeType: "application/json" },
-    (uri) => asJson(uri, S.getDiagnostics(session())),
+    // #570 段 3: same issue list as get_deck_issues (incl. the body-scale suggestion when anything overflows).
+    async (uri) => {
+      const s = session();
+      const d = S.getDiagnostics(s);
+      return asJson(uri, { ...d, issues: (await withOverflowScaleHint(s, d.issues)).issues });
+    },
   );
   server.registerResource(
     "deck-capabilities",

@@ -82,6 +82,8 @@ export const TOOL_NOTES = {
     "apply_design_intent は図の【配置】：intent に ops 配列の JSON 文字列。op は regionSplit{arrangement: text-left | text-right | diagram-only}・emphasize{nodeId, level: high | medium（既定 high）}・relayout{direction: TB | LR | RL | BT}。エンジンが座標を計算＋クランプする。図/mermaid のあるスライドのみ",
   structure:
     "構造 4 本（insert/delete/move/duplicate_slide）は surgical：他スライドの図/レイアウトは byte-identical に保たれる（set_deck_markdown は保たない）。insert_slide の position 既定 before・duplicate_slide は structuredClone 複製で既定 after・move_slide の from===to は no-op・delete_slide は最後の 1 枚を拒否し deletedMd を返す",
+  templateDerive:
+    "adjust_template / augment_template は doc のテンプレを派生に差し替える（元テンプレ不変・deck は変えず undo の外）。毎回「元テンプレ＋レシピ」から 書体置換→倍率→合成 の固定順で作り直す（倍率は重ならない・先に足した構造は保たれる）。recipe は JSON 文字列 {fonts?:{latin?:[{from,to}],ea?:[{from,to}],scope?:\"theme\"|\"theme+inline\"(既定)},scale?:{title?,body?,other?}}（倍率・0.5pt 丸め・1〜400pt）。augment の structures は columns-2/3・compare-2・card-3・kpi-3/4（省略で全部・既にある構造は skipped に理由）、rule は steps(既定)|ratio。get_deck_issues の overflow-scale-hint は adjust_template に渡す recipe を hints に載せる",
 } as const;
 
 /** The contract DIGEST that rides EVERY session-entry return (open/new/select_document) — the

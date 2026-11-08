@@ -56,7 +56,10 @@ const HOT_CHAR_LIMIT = 7950;
 // #554（export_pptx の引数 `charts` 追加・意図した inputSchema の拡張）で全体 17,577 → 17,752 字。宣言して上限を更新。
 // #247（set_review_rules 追加・意図したツール面の拡張。id の enum は schema に載せずサーバ側検証＝+450 字に抑えた）で
 // 全体 17,752 → 18,202 字。宣言して上限を更新。
-const ALL_CHAR_LIMIT = 18250;
+// #568 段 3 / #570 段 3（augment_template / adjust_template 追加・意図したツール面の拡張。レシピの書式は
+// bootstrap.toolNotes.templateDerive へ置き説明文は 1 行に抑えた — 2 本で +794 字、うち約 200 字/本は SDK の固定部分）で
+// 全体 18,199 → 18,993 字。宣言して上限を更新。
+const ALL_CHAR_LIMIT = 19050;
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> };
 type CallRes = { content: Array<{ text?: string }>; isError?: boolean };

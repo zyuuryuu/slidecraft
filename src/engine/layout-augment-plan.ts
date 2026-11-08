@@ -14,8 +14,12 @@
 import { slideRoleRegions, type LayoutInfo, type PlaceholderInfo, type TemplateData } from "./template-loader";
 import type { SlideIR } from "./slide-schema";
 import { isContentBody, placeholderRole, layoutRole, type LayoutCatalog } from "./template-catalog";
-import { BUILTIN_LAYOUTS } from "./template-layout-library";
 import { columnFontSize, DEFAULT_SHRINK_RULE, type ColumnCount, type ShrinkRule } from "./column-font-shrink";
+import { AUGMENT_GROUP_SUFFIX } from "./group-layout";
+import {
+  ALL_AUGMENT_STRUCTURES, DEFAULT_AUGMENT_STRUCTURES, GROUP_STRUCTURES, STRUCTURE_LABEL, columnsOf, isGroupStructure, layoutDefGutterRatio, structureGeometry,
+  type AugmentStructure,
+} from "./layout-augment-structures";
 
 export const AUGMENT_COLUMNS: readonly ColumnCount[] = [2, 3];
 
@@ -35,32 +39,36 @@ export interface AugmentBase {
 }
 
 export interface AugmentAddition {
-  columns: ColumnCount;
+  structure: AugmentStructure;
+  columns: number; // 横に並ぶ数（N 列の N・組の数）
   name: string; // 新レイアウト名
-  idxs: string[]; // 左の列から順の placeholder idx（idx 昇順 ＝ 本文の序数順）
-  levelSizes: number[]; // 各列の lvl1..lvl4 の pt（規則適用後）
+  idxs: string[]; // 左の列から順の placeholder idx（idx 昇順 ＝ 本文の序数順）。組構造は 見出し1, 本文1, 見出し2, …
+  levelSizes: number[]; // 各列（組構造は本文枠）の lvl1..lvl4 の pt（規則適用後）
+  group?: { kind: "compare" | "card" | "kpi"; headSize: number }; // 組構造: 見出し枠の lvl1 pt
 }
 
 export interface AugmentPlan {
   rule: ShrinkRule;
   base?: AugmentBase;
   add: AugmentAddition[];
-  skipped: Array<{ columns: ColumnCount; reason: string }>;
+  skipped: Array<{ structure: AugmentStructure; columns: number; reason: string }>;
   reason?: string; // base が無いときの理由（UI にそのまま出す）
 }
 
 export interface AugmentOptions {
   rule?: ShrinkRule;
+  /** 段 2 互換: 足す列数。structures があればそちらが優先。 */
   columns?: readonly ColumnCount[];
+  /** 足す構造（#568 段 3）。省略時は段 2 と同じ 2 列・3 列だけ。 */
+  structures?: readonly AugmentStructure[];
 }
+
+/** 分割後の枠の文字縮小に使う列数（規則表は 2/3 列のみ・4 組は 3 列と同じ扱い）。 */
+export const shrinkColumns = (n: number): ColumnCount => (n <= 2 ? 2 : 3);
 
 /** LayoutDef の Column.NBody.Equal から、ガター ÷ 本文の全幅（左端の列の左〜右端の列の右）。 */
 export function columnGutterRatio(columns: ColumnCount): number {
-  const def = BUILTIN_LAYOUTS.find((d) => d.name === `Column.${columns}Body.Equal`);
-  const cols = (def?.placeholders ?? []).filter((p) => p.type === "body" && p.idx >= 1 && p.idx <= 9).sort((a, b) => a.x - b.x);
-  if (cols.length < 2) throw new Error(`LayoutDef Column.${columns}Body.Equal not found`);
-  const last = cols[cols.length - 1];
-  return (cols[1].x - (cols[0].x + cols[0].w)) / (last.x + last.w - cols[0].x);
+  return layoutDefGutterRatio(`Column.${columns}Body.Equal`);
 }
 
 /** 新レイアウト名。ドット区切りの規約名マスター（classifyLayout の T1 が名前優先）では Column.* を名乗る。 */
@@ -68,6 +76,15 @@ export function augmentedLayoutName(baseName: string, columns: ColumnCount, exis
   if (layoutRole(baseName) === "other") return `${baseName} +${columns}Body`;
   const canonical = `Column.${columns}Body.Equal`;
   return existing.includes(canonical) ? `Column.${columns}Body.Augmented` : canonical;
+}
+
+/** 組構造の新レイアウト名。素の名前は `<元名> +3Card` 等（group-layout の名前ヒントが読み戻す）、規約名
+ *  マスターは同じ family の規約名（Compare.NOption / Summary.NBlock / KPI.NValue — 既存の名前ヒントが読む）。 */
+const CANONICAL_GROUP_FAMILY = { compare: (n: number) => `Compare.${n}Option`, card: (n: number) => `Summary.${n}Block`, kpi: (n: number) => `KPI.${n}Value` };
+export function augmentedGroupLayoutName(baseName: string, kind: "compare" | "card" | "kpi", count: number, existing: readonly string[]): string {
+  if (layoutRole(baseName) === "other") return `${baseName} +${count}${AUGMENT_GROUP_SUFFIX[kind]}`;
+  const family = CANONICAL_GROUP_FAMILY[kind](count);
+  return existing.includes(`${family}.Equal`) ? `${family}.Augmented` : `${family}.Equal`;
 }
 
 const decorCount = (l: LayoutInfo) => l.decorations.length + l.images.length + l.staticTexts.length;
@@ -117,28 +134,58 @@ function effectiveLevelSizes(body: PlaceholderInfo): number[] {
 }
 
 /** 何を足すかを決める（読み取りのみ）。 */
+/** 足す構造を正規の順に（重複除去）。columns 指定は段 2 互換の写像。 */
+function wantedStructures(opts: AugmentOptions): AugmentStructure[] {
+  const asked: readonly AugmentStructure[] = opts.structures ?? (opts.columns ? opts.columns.map((n) => `columns-${n}` as AugmentStructure) : DEFAULT_AUGMENT_STRUCTURES);
+  return ALL_AUGMENT_STRUCTURES.filter((s) => asked.includes(s));
+}
+
+/** catalog に既にある、その構造のレイアウト（グループ型でない columns×N／同じ group 種×数）。 */
+function existingFor(s: AugmentStructure, catalog: LayoutCatalog) {
+  if (!isGroupStructure(s)) return catalog.find((e) => e.role === "columns" && e.bodyCount === columnsOf(s) && !e.groupKind);
+  const spec = GROUP_STRUCTURES[s];
+  return catalog.find((e) => e.groupKind === spec.kind && e.groupCount === spec.count);
+}
+
+const floorHalf = (pt: number) => Math.floor(pt * 2 + 1e-9) / 2;
+
+/** 何を足すかを決める（読み取りのみ）。 */
 export function planAugmentation(tpl: Pick<TemplateData, "layouts">, catalog: LayoutCatalog, opts: AugmentOptions = {}): AugmentPlan {
   const rule = opts.rule ?? DEFAULT_SHRINK_RULE;
-  const wanted = opts.columns ?? AUGMENT_COLUMNS;
   const skipped: AugmentPlan["skipped"] = [];
-  const missing = wanted.filter((n) => {
-    const have = catalog.find((e) => e.role === "columns" && e.bodyCount === n && !e.groupKind);
-    if (have) skipped.push({ columns: n, reason: `${n} 列のレイアウト「${have.name}」が既にあります。` });
+  const countOf = (s: AugmentStructure) => (isGroupStructure(s) ? GROUP_STRUCTURES[s].count : columnsOf(s));
+  const missing = wantedStructures(opts).filter((s) => {
+    const have = existingFor(s, catalog);
+    if (have) skipped.push({ structure: s, columns: countOf(s), reason: `${STRUCTURE_LABEL[s]}のレイアウト「${have.name}」が既にあります。` });
     return !have;
   });
   const sel = selectAugmentBase(tpl.layouts, catalog);
   if ("reason" in sel) {
-    for (const n of missing) skipped.push({ columns: n, reason: sel.reason });
+    for (const s of missing) skipped.push({ structure: s, columns: countOf(s), reason: sel.reason });
     return { rule, add: [], skipped, reason: sel.reason };
   }
   const { layout, body } = sel;
   const names = tpl.layouts.map((l) => l.name);
   const src = effectiveLevelSizes(body);
   const base: AugmentBase = { layoutIndex: layout.index, layoutName: layout.name, bodyIdx: body.idx, box: { x: body.style.x, y: body.style.y, w: body.style.w, h: body.style.h }, sourceSizes: src };
-  const add = missing.map((columns): AugmentAddition => {
-    const name = augmentedLayoutName(layout.name, columns, names);
+  const add = missing.map((structure): AugmentAddition => {
+    const n = countOf(structure);
+    const levelSizes = src.map((pt, i) => columnFontSize(pt, shrinkColumns(n), rule, i + 1));
+    if (!isGroupStructure(structure)) {
+      const columns = columnsOf(structure);
+      const name = augmentedLayoutName(layout.name, columns, names);
+      names.push(name);
+      return { structure, columns, name, idxs: columnIdxs(layout, body.idx, columns), levelSizes };
+    }
+    const { kind } = GROUP_STRUCTURES[structure];
+    const name = augmentedGroupLayoutName(layout.name, kind, n, names);
     names.push(name);
-    return { columns, name, idxs: columnIdxs(layout, body.idx, columns), levelSizes: src.map((pt, i) => columnFontSize(pt, columns, rule, i + 1)) };
+    // 見出しの文字: 本文 × LayoutDef の比（KPI 52/13・比較 16/14）。ただし LayoutDef の pt/幅 を超えない
+    // （本文が大きいテンプレで KPI の数値が狭い列に収まらず折り返すのを防ぐ — 描画で確認した事象）。
+    const geo = structureGeometry(structure);
+    const colW = (base.box.w - base.box.w * geo.gutterRatio * (n - 1)) / n;
+    const headSize = Math.max(levelSizes[0], floorHalf(Math.min(levelSizes[0] * geo.headScale, geo.headPtPerInch * colW)));
+    return { structure, columns: n, name, idxs: columnIdxs(layout, body.idx, n * 2), levelSizes, group: { kind, headSize } };
   });
   return { rule, base, add, skipped };
 }

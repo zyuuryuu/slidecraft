@@ -15,8 +15,9 @@ import { loadTemplate, type LayoutInfo, type TemplateData } from "./template-loa
 import { buildCatalog } from "./template-catalog";
 import { buildFieldMap, resolveBinding } from "./placeholder-binding";
 import { columnFontSize, type ShrinkRule } from "./column-font-shrink";
-import { columnGutterRatio, planAugmentation, type AugmentAddition, type AugmentOptions, type AugmentPlan } from "./layout-augment-plan";
-import { setLevelSizes, stripRunSizes, explicitLevelSize } from "./layout-augment-xml";
+import { columnGutterRatio, planAugmentation, shrinkColumns, type AugmentAddition, type AugmentOptions, type AugmentPlan } from "./layout-augment-plan";
+import { setLevelSizes, setLevelProps, stripRunSizes, explicitLevelSize } from "./layout-augment-xml";
+import { GROUP_STRUCTURES, isGroupStructure, structureGeometry } from "./layout-augment-structures";
 
 const EMU = 914400;
 const LAYOUT_CT = "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml";
@@ -41,34 +42,73 @@ function fnv1a(s: string): number {
   return h >>> 0;
 }
 
+type Box = { x: number; y: number; cx: number; cy: number };
+
+/** 本文枠の複製 1 つ: cNvPr の id/名前（c 番目）・ph の idx・位置を付け替える（文字はまだ触らない）。
+ *  `typedBody`: ph に type="body" を明示する（組構造 — detectGroups は body/pic 型の枠だけを組に数える。
+ *  type の無い `<p:ph idx="1"/>` は loader では型なしに読まれる）。idx 10 以上は常に明示（段 2 と同じ）。 */
+function cloneSlot(sp: string, c: number, id: number, idx: string, r: Box, typedBody = false): string {
+  const xfrm = `<a:xfrm><a:off x="${r.x}" y="${r.y}"/><a:ext cx="${r.cx}" cy="${r.cy}"/></a:xfrm>`;
+  // id and name rewritten independently inside the one <p:cNvPr> tag (attribute order is free).
+  let s = sp.replace(/<p:cNvPr\b[^>]*>/, (tag) =>
+    tag.replace(/\bid="\d+"/, `id="${id}"`).replace(/\bname="([^"]*)"/, (_m, nm: string) => `name="${c === 0 ? nm : `${nm} ${c + 1}`}"`),
+  );
+  s = s.replace(/<p:ph\b([^>]*?)(\/?)>/, (_m, attrs: string, close: string) => {
+    let at = attrs.replace(/\s*\bidx="\d+"/, "");
+    if (typedBody || Number(idx) >= 10) at = at.replace(/\s*\btype="[^"]*"/, "") + ' type="body"';
+    return `<p:ph${at} idx="${idx}"${close}>`;
+  });
+  // Geometry: replace the own xfrm, or give an inheriting <p:spPr/> an explicit one.
+  if (/<p:spPr\b[^>]*>(?:(?!<\/p:spPr>)[\s\S])*?<a:xfrm\b/.test(s)) return s.replace(/<a:xfrm\b[^>]*>[\s\S]*?<\/a:xfrm>/, xfrm);
+  if (/<p:spPr\s*\/>/.test(s)) return s.replace(/<p:spPr\s*\/>/, `<p:spPr>${xfrm}</p:spPr>`);
+  return s.replace(/(<p:spPr\b[^>]*>)/, `$1${xfrm}`);
+}
+
+/** 本文枠の文字: lvl1..4 は計画の値、元の枠が明示する lvl5..9 は同じ規則で縮める。 */
+function bodySizes(s: string, a: AugmentAddition, rule: ShrinkRule): Map<number, number> {
+  const sizes = new Map(a.levelSizes.map((pt, i) => [i + 1, pt] as const));
+  for (let k = 5; k <= 9; k++) {
+    const own = explicitLevelSize(s, k);
+    if (own !== undefined) sizes.set(k, columnFontSize(own, shrinkColumns(a.columns), rule, k));
+  }
+  return sizes;
+}
+
 /** 元の本文枠 1 つを N 列に複製する。 */
-function splitBody(sp: string, a: AugmentAddition, rule: ShrinkRule, box: { x: number; y: number; cx: number; cy: number }, firstId: number): string {
-  const gut = Math.round(box.cx * columnGutterRatio(a.columns));
+function splitBody(sp: string, a: AugmentAddition, rule: ShrinkRule, box: Box, firstId: number): string {
+  if (a.group && isGroupStructure(a.structure)) return splitGroups(sp, a, rule, box, firstId);
+  const gut = Math.round(box.cx * columnGutterRatio(shrinkColumns(a.columns)));
   const w = Math.floor((box.cx - gut * (a.columns - 1)) / a.columns);
-  const xfrm = (c: number) => `<a:xfrm><a:off x="${box.x + c * (w + gut)}" y="${box.y}"/><a:ext cx="${w}" cy="${box.cy}"/></a:xfrm>`;
   return a.idxs
     .map((idx, c) => {
-      // id and name rewritten independently inside the one <p:cNvPr> tag (attribute order is free).
-      let s = sp.replace(/<p:cNvPr\b[^>]*>/, (tag) =>
-        tag.replace(/\bid="\d+"/, `id="${firstId + c}"`).replace(/\bname="([^"]*)"/, (_m, nm: string) => `name="${c === 0 ? nm : `${nm} ${c + 1}`}"`),
-      );
-      s = s.replace(/<p:ph\b([^>]*?)(\/?)>/, (_m, attrs: string, close: string) => {
-        let at = attrs.replace(/\s*\bidx="\d+"/, "");
-        if (Number(idx) >= 10) at = at.replace(/\s*\btype="[^"]*"/, "") + ' type="body"';
-        return `<p:ph${at} idx="${idx}"${close}>`;
-      });
-      // Geometry: replace the own xfrm, or give an inheriting <p:spPr/> an explicit one.
-      if (/<p:spPr\b[^>]*>(?:(?!<\/p:spPr>)[\s\S])*?<a:xfrm\b/.test(s)) s = s.replace(/<a:xfrm\b[^>]*>[\s\S]*?<\/a:xfrm>/, xfrm(c));
-      else if (/<p:spPr\s*\/>/.test(s)) s = s.replace(/<p:spPr\s*\/>/, `<p:spPr>${xfrm(c)}</p:spPr>`);
-      else s = s.replace(/(<p:spPr\b[^>]*>)/, `$1${xfrm(c)}`);
-      const sizes = new Map(a.levelSizes.map((pt, i) => [i + 1, pt] as const));
-      for (let k = 5; k <= 9; k++) {
-        const own = explicitLevelSize(s, k);
-        if (own !== undefined) sizes.set(k, columnFontSize(own, a.columns, rule, k));
-      }
-      return setLevelSizes(stripRunSizes(s), sizes);
+      const s = cloneSlot(sp, c, firstId + c, idx, { x: box.x + c * (w + gut), y: box.y, cx: w, cy: box.cy });
+      return setLevelSizes(stripRunSizes(s), bodySizes(s, a, rule));
     })
     .join("");
+}
+
+/** 組構造（#568 段 3）: 本文枠を「見出し＋本文」の組 ×N に分ける。比率は LayoutDef 由来（structureGeometry）。 */
+function splitGroups(sp: string, a: AugmentAddition, rule: ShrinkRule, box: Box, firstId: number): string {
+  if (!isGroupStructure(a.structure) || !a.group) throw new Error(`not a group structure: ${a.structure}`);
+  const g = structureGeometry(a.structure);
+  const n = GROUP_STRUCTURES[a.structure].count;
+  const gut = Math.round(box.cx * g.gutterRatio);
+  const w = Math.floor((box.cx - gut * (n - 1)) / n);
+  const headH = Math.round(box.cy * g.headRatio);
+  const bodyY = box.y + Math.round(box.cy * (g.headRatio + g.gapRatio));
+  const kpi = a.group.kind === "kpi";
+  const out: string[] = [];
+  for (let k = 0; k < n; k++) {
+    const x = box.x + k * (w + gut);
+    const hc = 2 * k;
+    let head = cloneSlot(sp, hc, firstId + hc, a.idxs[hc], { x, y: box.y, cx: w, cy: headH }, true);
+    head = setLevelSizes(stripRunSizes(head), new Map([[1, a.group.headSize]]));
+    out.push(setLevelProps(head, 1, { bold: g.headBold, algn: g.align, noBullet: true }));
+    let body = cloneSlot(sp, hc + 1, firstId + hc + 1, a.idxs[hc + 1], { x, y: bodyY, cx: w, cy: box.y + box.cy - bodyY }, true);
+    body = setLevelSizes(stripRunSizes(body), bodySizes(body, a, rule));
+    out.push(g.align || kpi ? setLevelProps(body, 1, { algn: g.align, noBullet: kpi }) : body);
+  }
+  return out.join("");
 }
 
 /** 計画どおりに合成した bytes と、足したレイアウト。計画が空なら入力 bytes をそのまま返す。 */
@@ -117,7 +157,7 @@ export async function augmentTemplate(source: ArrayBuffer | Uint8Array, plan: Au
     const name = escAttr(a.name);
     let xml = baseXml.replace(bodySp, splitBody(bodySp, a, plan.rule, box, firstId));
     xml = xml.replace(/<p:sldLayout\b[^>]*>/, (root) => {
-      let r = root.replace(/\s+type="[^"]*"/, "").replace(/^<p:sldLayout\b/, `<p:sldLayout type="${a.columns === 2 ? "twoObj" : "cust"}"`);
+      let r = root.replace(/\s+type="[^"]*"/, "").replace(/^<p:sldLayout\b/, `<p:sldLayout type="${a.columns === 2 && !a.group ? "twoObj" : "cust"}"`);
       if (/\sname="/.test(r)) r = r.replace(/(\sname=")[^"]*"/, `$1${name}"`); // non-standard attr some generators write (the loader reads the first name=)
       return r;
     });
@@ -160,7 +200,7 @@ function bijectionFailures(l: LayoutInfo): string[] {
 }
 
 /** 検査ゲート。空配列なら合格。 */
-export function verifyAugmentation(before: TemplateData, after: TemplateData, added: readonly Pick<AugmentedLayout, "name" | "columns">[]): string[] {
+export function verifyAugmentation(before: TemplateData, after: TemplateData, added: readonly (Pick<AugmentedLayout, "name" | "columns"> & Partial<Pick<AugmentedLayout, "structure">>)[]): string[] {
   const failures: string[] = [];
   const n = before.layouts.length;
   if (after.layouts.length !== n + added.length) failures.push(`レイアウト数が想定外（${n} + ${added.length} ≠ ${after.layouts.length}）`);
@@ -174,7 +214,11 @@ export function verifyAugmentation(before: TemplateData, after: TemplateData, ad
     const e = catAfter.find((x) => x.name === a.name);
     const l = after.layouts.find((x) => x.name === a.name);
     if (!e || !l) { failures.push(`(b) 新レイアウト「${a.name}」が読み込めない`); continue; }
-    if (e.role !== "columns" || e.bodyCount !== a.columns || !e.hasTitle)
+    if (a.structure && isGroupStructure(a.structure)) {
+      const spec = GROUP_STRUCTURES[a.structure];
+      if (e.groupKind !== spec.kind || e.groupCount !== spec.count || !e.hasTitle)
+        failures.push(`(b) 「${a.name}」が ${spec.kind}×${spec.count} にならない（group=${e.groupKind ?? "なし"}×${e.groupCount ?? 0}）`);
+    } else if (e.role !== "columns" || e.bodyCount !== a.columns || !e.hasTitle)
       failures.push(`(b) 「${a.name}」が columns×${a.columns} にならない（role=${e.role}・body=${e.bodyCount}）`);
     failures.push(...bijectionFailures(l).map((f) => `(c) ${f}`));
   }

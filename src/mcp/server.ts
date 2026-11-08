@@ -23,6 +23,7 @@ import * as T from "./templates";
 import * as St from "./structure";
 import * as R from "./reads";
 import * as N from "./next-steps";
+import * as TT from "./template-tools";
 import { setReviewRules } from "./review-rules";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
@@ -178,7 +179,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   tool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeckMarkdown(sessionOf(extra, a.docId))));
   tool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideMarkdown(sessionOf(extra, a.docId), a.index)));
   tool("get_slide", { description: "1スライドの構造化 read＝編集計画（capacity・predictedSplit・issues・markdown 等。項目は bootstrap）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => R.getSlide(sessionOf(extra, a.docId), a.index)));
-  tool("get_deck_issues", { description: "deck の診断（split/condense/visualize/title レバー・budget・次の一手 hints）。export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(() => { const d = S.getDiagnostics(sessionOf(extra, a.docId)); return { ...d, hints: N.nextStepHints(d.issues) }; }));
+  tool("get_deck_issues", { description: "deck の診断（split/condense/visualize/title レバー・budget・次の一手 hints）。export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(async () => { const s = sessionOf(extra, a.docId); const d = S.getDiagnostics(s); const h = await TT.withOverflowScaleHint(s, d.issues); return { ...d, issues: h.issues, hints: N.nextStepHints(h.issues, h.recipe) }; }));
   tool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
   tool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
   tool("get_slide_fix_request", { description: "1スライドの修正 packet（埋めて set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
@@ -366,6 +367,11 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
         return { ok: true as const, count: a.templates.length };
       }),
   );
+
+  // ── template derivation (#568 段 3 / #570 段 3) ── the open doc's template → a DERIVED one (source untouched;
+  // rebuilt from source + recipe in the fixed order fonts → scale → augment). Logic in template-tools.ts.
+  tool("augment_template", { description: "無い構造（列・比較・カード・KPI）を合成した派生テンプレを doc に適用（元は不変・bootstrap）", inputSchema: { structures: z.array(z.enum(["columns-2", "columns-3", "compare-2", "card-3", "kpi-3", "kpi-4"])).optional(), rule: z.enum(["steps", "ratio"]).optional(), ...doc } }, (a, extra) => run(() => TT.augmentDocTemplate(sessionOf(extra, a.docId), a.structures, a.rule)));
+  tool("adjust_template", { description: "書体/文字サイズのレシピで派生テンプレを doc に適用（元は不変・bootstrap）", inputSchema: { recipe: z.string().describe('JSON 文字列 例 {"scale":{"body":0.9}}'), ...doc } }, (a, extra) => run(() => TT.adjustDocTemplate(sessionOf(extra, a.docId), a.recipe)));
 
   // ── read-only deck state as MCP resources (deck://… , slide://{i}/markdown) ──
   // A per-transport config flag, not a mode split (ADR-0033 D1): solo stdio defaults ON (no GUI, so

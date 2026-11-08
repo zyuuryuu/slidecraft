@@ -11,19 +11,23 @@ import type { DeckIssue } from "../engine/deck-diagnostics";
 
 export interface NextStepHint {
   slideIndex: number;
-  tool: "split_overflowing_slides" | "convert_bullets_to_table" | "get_slide_fix_request";
+  tool: "split_overflowing_slides" | "convert_bullets_to_table" | "get_slide_fix_request" | "adjust_template";
   reason: string;
-  args?: { index: number };
+  args?: { index: number } | { recipe: string };
 }
 
 /** Pure diagnostics → hints. Precedence per issue: overflow (split lever) → split (a deck-wide lever,
  *  emitted once); key-value (visualize lever, no split) → convert_bullets_to_table(index); long-bullets
  *  / missing-title (condense / title) → get_slide_fix_request(index). */
-export function nextStepHints(issues: DeckIssue[]): NextStepHint[] {
+export function nextStepHints(issues: DeckIssue[], scaleRecipe?: string): NextStepHint[] {
   const hints: NextStepHint[] = [];
   let splitEmitted = false;
   for (const iss of issues) {
-    if (iss.levers.includes("split")) {
+    // #570 段 3: the body-scale suggestion (template-tools.withOverflowScaleHint) → adjust_template with its
+    // ABSOLUTE recipe (the doc's previous body factor × the suggested one — adjust_template rebuilds from the source).
+    if (iss.id === "overflow-scale-hint") {
+      if (scaleRecipe) hints.push({ slideIndex: iss.slideIndex, tool: "adjust_template", reason: iss.message, args: { recipe: scaleRecipe } });
+    } else if (iss.levers.includes("split")) {
       if (!splitEmitted) {
         hints.push({ slideIndex: iss.slideIndex, tool: "split_overflowing_slides", reason: iss.message });
         splitEmitted = true;

@@ -89,6 +89,10 @@ export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
   use_template: ALL,
   // GUI 専用（webview → host の push 口）
   register_templates: GUI,
+  // テンプレ派生（#568 段 3 / #570 段 3）— doc のテンプレを派生に差し替える。collab の GUI はテンプレを host から
+  // 引かない（deck だけを pull）ので、collab で使うと GUI の表示と AI 側の書き出しのテンプレがずれる（PR 本文参照）。
+  augment_template: ALL,
+  adjust_template: ALL,
 };
 
 /** 表引き。未知の名前は never-silent に throw — 表への追記を強制する。 */
