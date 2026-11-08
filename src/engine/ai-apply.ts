@@ -7,7 +7,9 @@
  * the slide's existing diagram.
  */
 import type { SlideIR } from "./slide-schema";
-import { figureSourceToYaml, placeFigureYaml, resolvedBodyCount, editedDiagramError } from "./apply-slide-edit";
+import { figureSourceToYaml, placeFigureYaml, resolvedBodyCount, editedDiagramError, figureTargetError } from "./apply-slide-edit";
+import { slideFigures } from "./slide-figures";
+import { diagramFigureNumbers } from "./slide-figure-edit";
 import type { LayoutCatalog } from "./template-catalog";
 import { parseMd } from "./md-parser";
 import { serializeMd, type SerializeTemplate } from "./md-serializer";
@@ -47,16 +49,23 @@ function sanitizeFigureSource(raw: string): string {
  * region re-autos — where MCP set_diagram rejects, the adoption path has no reject channel.
  */
 export interface FigureLayoutCtx { index: number; total: number; catalog: LayoutCatalog }
-export function applyFigureYaml(slide: SlideIR, raw: string, ctx?: FigureLayoutCtx): SlideIR | null {
+export function applyFigureYaml(slide: SlideIR, raw: string, ctx?: FigureLayoutCtx, figure?: number): SlideIR | null {
   const src = figureSourceToYaml(sanitizeFigureSource(raw), "yaml");
   if ("error" in src) return null; // invalid → not a figure-YAML edit
+  // #392 段 3: `figure` = the n-th figure to replace (MCP set_slide_diagram's `figure`); out of range → null.
+  if (figure !== undefined) return figureTargetError(slide, figure) ? null : placeFigureYaml(slide, src.yaml, { figure });
   const adding = !slide.diagram && !slide.mermaidBlock;
   const bodyless = adding && ctx && slide.layout !== "auto" && resolvedBodyCount(slide, ctx.index, ctx.total, ctx.catalog).bodyCount < 1;
   return placeFigureYaml(bodyless ? { ...slide, layout: "auto" } : slide, src.yaml);
 }
 
-/** A slide's current figure as its fenced source block (```diagram / ```mermaid), or undefined. */
-export function figureFence(slide: SlideIR): string | undefined {
+/** A slide's current figure as its fenced source block (```diagram / ```mermaid), or undefined. `figure`
+ *  (#392 段 3) = the n-th figure (diagram / Mermaid in source order, 1-based); omitted = the first. */
+export function figureFence(slide: SlideIR, figure?: number): string | undefined {
+  if (figure !== undefined) {
+    const f = slideFigures(slide)[(diagramFigureNumbers(slide)[figure - 1] ?? 0) - 1];
+    return f?.kind === "diagram" ? "```diagram\n" + f.yaml + "\n```" : f?.kind === "mermaid" ? "```mermaid\n" + f.mermaid + "\n```" : undefined;
+  }
   if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
   if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
   return undefined;
@@ -77,10 +86,10 @@ export interface FigureEditPreview {
  * the diagram change. Returns null when `raw` is not a figure-YAML edit (caller uses the Markdown diff).
  * Pure (R2).
  */
-export function previewFigureEdit(slide: SlideIR, raw: string, ctx?: FigureLayoutCtx): FigureEditPreview | null {
-  const applied = applyFigureYaml(slide, raw, ctx);
+export function previewFigureEdit(slide: SlideIR, raw: string, ctx?: FigureLayoutCtx, figure?: number): FigureEditPreview | null {
+  const applied = applyFigureYaml(slide, raw, ctx, figure);
   if (!applied) return null;
-  return { beforeMd: figureFence(slide) ?? "", afterMd: figureFence(applied) ?? raw.trim() };
+  return { beforeMd: figureFence(slide, figure) ?? "", afterMd: figureFence(applied, figure) ?? raw.trim() };
 }
 
 /** What an AI content edit resolves to, computed BEFORE adoption. */

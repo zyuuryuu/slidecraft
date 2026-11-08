@@ -29,6 +29,8 @@ export interface StylePreset {
   // 内蔵の +1Kicker やスタイル別 LayoutDef（#593 以降）が LAYOUT_NAMES に無い名前を持つため。
   layouts: readonly string[];
   density: StyleDensity;
+  // ヘッダ帯なし（#598 Campaign）: TemplateSpec.flatContent に渡す（light 系の帯を外し、見出しを暗色へ）。
+  flatContent?: boolean;
 }
 
 /** プリセットが名前で引けるレイアウト全体: 内蔵（BUILTIN_LAYOUTS）＋プリセット専用（PRESET_LAYOUTS・#595〜）。 */
@@ -99,7 +101,9 @@ export function withHorizontalMargin(def: LayoutDef, marginIn: number): LayoutDe
   const c = SLIDE_W / 2;
   if (!(marginIn >= 0 && marginIn < c)) throw new RangeError(`marginIn out of range: ${marginIn}`);
   const k = (c - marginIn) / (c - BASE_DENSITY.marginIn);
-  return { ...def, placeholders: def.placeholders.map((p) => ({ ...p, x: c + (p.x - c) * k, w: p.w * k })) };
+  // 全幅の枠（全面画像 Image.FullBleed+1Caption・#598）は余白の外側まで描くのが目的なので縮めない。
+  const fullWidth = (p: LayoutDef["placeholders"][number]) => p.x <= 0 && p.x + p.w >= SLIDE_W;
+  return { ...def, placeholders: def.placeholders.map((p) => (fullWidth(p) ? p : { ...p, x: c + (p.x - c) * k, w: p.w * k })) };
 }
 
 /** プリセット → TemplateSpec（レイアウトは `library` から名前で引き、余白を掛ける）。未知の名前は throw。 */
@@ -110,7 +114,7 @@ export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] 
     if (!def) throw new Error(`StylePreset "${preset.name}": unknown layout "${name}"`);
     return withHorizontalMargin(def, preset.density.marginIn);
   });
-  return { name: preset.name, fonts: { ...preset.fonts }, palette: { ...preset.palette }, layouts };
+  return { name: preset.name, fonts: { ...preset.fonts }, palette: { ...preset.palette }, layouts, ...(preset.flatContent ? { flatContent: true } : {}) };
 }
 
 /**
@@ -179,4 +183,48 @@ export const PITCH_PRESET: StylePreset = Object.freeze({
     "Closing.1CTA+1Contact",
   ]),
   density: Object.freeze({ ...BASE_DENSITY, bodyPt: 18 }),
+}) as StylePreset;
+
+/**
+ * マーケ「Campaign」（#598・#580 段 3。芸術／ポートフォリオの観点を吸収）。画像が主役で文字は少なく、余白を大きく取る。
+ *  - 配色: canvas も background もオフホワイト（表紙・ステートメント・締めも同じ地＝タイポ中心）。accent は低彩度の
+ *    1 色（色面の章扉の地・カテゴリ）、本文はグレー、見出し・大数字は墨色。
+ *  - 書体: 見出しは明朝／セリフ（Georgia ＋ 游明朝）、本文は細めのゴシック（Segoe UI Light ＋ 游ゴシック Light）。
+ *  - 密度: 本文 14pt（基準どおり＝倍率なし）・左右 1.2in・ヘッダ帯なし（flatContent）。
+ *  - レイアウト 13: 画像構造 4（全面画像＋キャプション・左キャプション｜右画像・並置 2 枚・2×2 グリッド）、
+ *    色面の章扉、下寄せ小文字の締め（以上プリセット専用）＋表紙・ステートメント・本文・2 列・KPI 3・ステップ 3・
+ *    `<!-- section -->` の章扉（SectionNav・書き出し時に固定される名前。無いと本文レイアウトに落ちる）。
+ *    色面の章扉は SectionNav より前に置く（タイトルだけのスライドは同点で先に並ぶ方が選ばれる）。
+ */
+export const CAMPAIGN_PRESET: StylePreset = Object.freeze({
+  name: "マーケ Campaign",
+  palette: Object.freeze({
+    background: "F6F3EE",
+    canvas: "F6F3EE",
+    titleText: "1F1E1C",
+    bodyText: "4A4846",
+    subtle: "66625D",
+    muted: "8F8A84",
+    accent: "6F604F",
+    accent2: "7E8C86",
+    emphasis: "1F1E1C",
+  }),
+  fonts: Object.freeze({ major: "Georgia", minor: "Segoe UI Light", majorEa: "Yu Mincho", minorEa: "Yu Gothic Light" }),
+  layouts: Object.freeze([
+    "Title.1Title.Single",
+    "Statement.1Message.Single",
+    "Content.1Body.Single",
+    "Column.2Body.Equal",
+    "Image.FullBleed+1Caption",
+    "Media.1Caption+1Image",
+    "Gallery.2Image.Equal",
+    "Gallery.4Image.Grid",
+    "KPI.3Value.Equal",
+    "Process.3Step.Sequential",
+    "Section.1Title.ColorField",
+    "SectionNav.1TitleList.Single",
+    "Closing.1Notes.Bottom",
+  ]),
+  density: Object.freeze({ ...BASE_DENSITY, marginIn: 1.2 }),
+  flatContent: true,
 }) as StylePreset;

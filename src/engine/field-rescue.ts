@@ -26,6 +26,7 @@ import { placeholderRole, slideIdxRole } from "./template-catalog";
 import { fieldSlotOf } from "./field-rows";
 import { visualOccupancy, SLIDE_IN } from "./visual-placement";
 import { CAPTION_H, CAPTION_COLOR } from "./image-caption";
+import { slideFigures } from "./slide-figures";
 import { escXml } from "./md-to-ooxml";
 
 /** Note box height (inches) — one line; fits the 0.25in gap between a report body and its footer band. */
@@ -119,8 +120,9 @@ function sourceNote(
   const x = Math.min(...boxes.map((b) => b.x));
   const right = Math.max(...boxes.map((b) => b.x + b.w));
   let bottom = Math.max(...boxes.map((b) => b.y + b.h));
-  // #399 an image's alt caption already sits under a body-figure image — stack the note below it.
-  if (slide.image && !slide.image.behind && slide.image.alt.trim()) bottom += CAPTION_H;
+  // #399 an image's alt caption already sits under a body-figure image — stack the note below it (any
+  // body image, #392 段 3: a caption on the 2nd image only must not be overlapped either).
+  if (slideFigures(slide).some((f) => f.kind === "image" && f.alt.trim())) bottom += CAPTION_H;
   const y = Math.max(0, Math.min(bottom, SLIDE_IN.h - NOTE_H));
   const value = source.paragraphs.map(textOf).filter((t) => t !== "").join(" / ");
   const text = /^(?:出典|source\b)/i.test(value) ? value : SOURCE_LABEL + value;

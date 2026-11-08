@@ -91,6 +91,14 @@ describe("#643 kpi-value-overflow", () => {
     const hits: string[] = [];
     for (const [tn, t] of tpls) for (const [mn, md] of mds) for (const iss of kpiIssues(diagnose(md, t))) hits.push(`${tn} | ${mn} | ${iss.slideIndex}`);
     // LibreOffice で「4.2 / 億円」と 2 行に折り返し、下の KPI補足 と重なることを確認済み（PR 本文に画像）。
-    expect(hits).toEqual(["報告書テンプレート_マガジン_生成りコーラル_全レイアウト見本.pptx | manuscript-06-executive-brief.md | 3"]);
+    // Campaign（#598）は同じスライドを KPI.3Value.Equal（値枠 52pt・幅狭）に置くので、同じ「4.2 億円」が
+    // 推定 2 行になる＝真陽性（統括が PR #668 マージ時に実測して追加）。並びは readdir 依存なので sort で比較。
+    expect([...hits].sort()).toEqual(
+      [
+        "報告書テンプレート_マガジン_生成りコーラル_全レイアウト見本.pptx | manuscript-06-executive-brief.md | 3",
+        "マーケ_Campaign_TemplateOnly.pptx | manuscript-06-executive-brief.md | 3",
+        "マーケ_Campaign_全レイアウト見本.pptx | manuscript-06-executive-brief.md | 3",
+      ].sort(),
+    );
   }, 60_000);
 });

@@ -8,9 +8,25 @@
  */
 import type { SlideIR, LayoutName, TableBlock } from "./slide-schema";
 import { pickLayout, CLOSING_RE, type LayoutCatalog, type LayoutRole, type CatalogEntry } from "./template-catalog";
-import { placedFigures } from "./figure-placement";
+import { placedFigures, type PlacedFigure } from "./figure-placement";
 
-export interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; }
+export interface RolePick { role: LayoutRole; regions: number | undefined; fallback: string; visual?: VisualRole; }
+
+/** #598: a slide made of images alone, which an image-structure layout fits better than its text role. A HINT
+ *  on top of the role (which stays content / columns, so every caller that reads the role is unchanged):
+ *  pickRoleLayout takes a layout of this role with exactly `count` picture frames when the template has one,
+ *  and the old pick otherwise — templates without Image.* / Gallery.* layouts choose byte-identically.
+ *   - gallery: a title, no body text, 2+ body visuals that are all images (a grid / diptych / logo wall).
+ *   - image: a title, no body text, no body visual, and a behind image (`{behind=1}` = the full-bleed backdrop).
+ *  One image with no text stays content (Media.* — Pitch's logo slide); a behind image under text is a backdrop. */
+export interface VisualRole { role: "image" | "gallery"; count: number; }
+
+function visualRole(slide: SlideIR, placed: readonly PlacedFigure[], hasTitle: boolean, textBody: boolean): VisualRole | undefined {
+  if (!hasTitle || textBody) return undefined;
+  if (placed.length === 0) return slide.image?.behind ? { role: "image", count: 1 } : undefined;
+  const images = placed.length >= 2 && !slide.image?.behind && placed.every((p) => p.figure.kind === "image");
+  return images ? { role: "gallery", count: placed.length } : undefined;
+}
 
 /** The no-template answer of autoSelectLayout, keyed by the slide's role (+ region count) in the
  *  canonical vocabulary — NOT by index into LAYOUT_NAMES' file order, which encoded the 30-layout
@@ -32,6 +48,13 @@ export const CANONICAL_FALLBACK = {
  *  Shared by autoSelectLayout (pick the single best) and suggestLayouts (rank candidates), so the
  *  auto pick and the suggestion list can never disagree about the slide's intent. */
 export function slideRoleRegions(slide: SlideIR, slideIndex: number, totalSlides: number): RolePick {
+  const pick = classifySlide(slide, slideIndex, totalSlides);
+  if (pick.role !== "content" && pick.role !== "columns") return pick;
+  const visual = visualRole(slide, placedFigures(slide), slide.placeholders.some((p) => p.idx === "15"), slide.placeholders.some((p) => /^[1-9]$/.test(p.idx)));
+  return visual ? { ...pick, visual } : pick;
+}
+
+function classifySlide(slide: SlideIR, slideIndex: number, totalSlides: number): RolePick {
   const idxs = new Set(slide.placeholders.map((p) => p.idx));
   const hasTitle = idxs.has("15");
   const hasCtrTitle = idxs.has("0");
@@ -112,7 +135,14 @@ export function pickRoleLayout(
   regions: number | undefined,
   hasImage: boolean,
   table: Pick<TableBlock, "rows" | "placeholderIdx"> | undefined,
+  visual?: VisualRole,
 ): CatalogEntry | undefined {
+  if (visual) {
+    // #598: the image-structure layout whose picture frames match the image count; none → the old pick below.
+    const frames = (e: CatalogEntry) => e.placeholders.filter((p) => p.role === "picture").length;
+    const hit = pickLayout(catalog.filter((e) => frames(e) === visual.count), visual.role, undefined, true);
+    if (hit) return hit;
+  }
   if (role !== "chart") return pickLayout(catalog, role, regions, hasImage, table);
   // Canonical names state the chart count (`Chart.<N>Chart.*`); `Chart.1Chart.Single+1Analysis` has 2
   // bodies but 1 chart — its 2nd body is the analysis box (#657 D1). Non-canonical names: bodyCount only.

@@ -874,7 +874,7 @@ export function autoSelectLayout(
   // Classify into a semantic role + number of body regions, then resolve a concrete layout. WITH a
   // catalog we pick from what the LOADED template actually offers (template-driven); WITHOUT one we
   // fall back to the canonical layout names (so behavior is unchanged when no template is supplied).
-  const { role, regions, fallback } = slideRoleRegions(slide, slideIndex, totalSlides);
+  const { role, regions, fallback, visual } = slideRoleRegions(slide, slideIndex, totalSlides);
 
   if (catalog && catalog.length > 0) {
     // Degrade gracefully if THIS template lacks the ideal role (e.g. no columns):
@@ -882,7 +882,7 @@ export function autoSelectLayout(
     const hasImage = !!slide.image; // an image slide prefers a layout with a real picture frame
     const table = tableForPick(slide); // the 1st table at its placed ordinal (#444 overflow demotion)
     const picked =
-      pickRoleLayout(catalog, role, regions, hasImage, table) ?? // = pickLayout(role), but chart → columns (#392)
+      pickRoleLayout(catalog, role, regions, hasImage, table, visual) ?? // pickLayout(role); chart → columns (#392), visual (#598)
       pickLayout(catalog, "content", regions, hasImage, table) ??
       pickLayout(catalog, "content", undefined, hasImage, table) ??
       // No content role at all — try columns, then rank ANY body-bearing layout by suitability rather
