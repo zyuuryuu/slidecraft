@@ -1,5 +1,5 @@
 /**
- * LanguageToggle — a compact JA / EN segmented control for the toolbar (mirrors ThemeToggle).
+ * LanguageToggle — a compact JA / EN segmented control, shown in the ⚙ settings menu (#614; mirrors ThemeToggle).
  * Switches the react-i18next language and persists it (see src/i18n).
  */
 import { useTranslation } from "react-i18next";

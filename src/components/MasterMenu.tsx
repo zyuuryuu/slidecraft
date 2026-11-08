@@ -101,8 +101,8 @@ export function MasterMenu({ masters, activeId, onSelect, onClose, onImport, onR
       id: "intake",
       label: t("masterPicker.section.intake"),
       items: [
-        onImport && <Item key="import" icon="＋" label={t("masterPicker.importLabel")} title={t("masterPicker.importTitle")} onClick={run(onImport)} />,
-        onRemake && <Item key="remake" icon="＋" label={t("masterPicker.remakeLabel")} title={t("masterPicker.remakeTitle")} onClick={run(onRemake)} />,
+        onImport && <Item key="import" icon="📥" label={t("masterPicker.importLabel")} title={t("masterPicker.importTitle")} onClick={run(onImport)} />,
+        onRemake && <Item key="remake" icon="🔁" label={t("masterPicker.remakeLabel")} title={t("masterPicker.remakeTitle")} onClick={run(onRemake)} />,
       ].filter(Boolean),
     },
     {

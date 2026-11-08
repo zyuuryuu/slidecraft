@@ -26,14 +26,14 @@ test.describe("SlideCraft", () => {
   });
 
   test("Draft opens the modal (Markdown editor + split preview)", async ({ page }) => {
-    await page.getByRole("button", { name: /Draft/ }).click();
+    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
     await expect(page.getByText(/Slide Preview/)).toBeVisible();
     await expect(page.getByRole("button", { name: /スライドにする/ })).toBeVisible();
   });
 
   test("Draft: スライドにする commits and returns to Edit", async ({ page }) => {
-    await page.getByRole("button", { name: /Draft/ }).click();
+    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
     await page.getByRole("button", { name: /スライドにする/ }).click();
     await expect(page.getByText("Markdown Editor")).toHaveCount(0);
@@ -41,7 +41,7 @@ test.describe("SlideCraft", () => {
   });
 
   test("preview renders slide cards for the sample deck", async ({ page }) => {
-    await page.getByRole("button", { name: /Draft/ }).click();
+    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
     await page.waitForTimeout(1500); // serialize + debounced parse + distill
     const cards = page.locator("[style*='position: relative'][style*='overflow: hidden']");
     await expect(cards.first()).toBeVisible({ timeout: 8000 });
@@ -107,7 +107,7 @@ test.describe("SlideCraft", () => {
   });
 
   test("does not crash on invalid editor input (in the Draft modal)", async ({ page }) => {
-    await page.getByRole("button", { name: /Draft/ }).click();
+    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
     const editor = page.locator(".cm-editor .cm-content");
     await editor.click();
     await page.keyboard.press("Control+a");
@@ -272,13 +272,59 @@ test.describe("SlideCraft", () => {
   });
 
   test("theme toggle switches the palette and persists across reload", async ({ page }) => {
+    // #614: the theme switch lives in the ⚙ menu (not on the top bar).
+    const settings = page.getByRole("button", { name: "設定", exact: true });
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark"); // default
+    await settings.click();
     await page.getByTitle("Light").click();
     await expect(html).toHaveAttribute("data-theme", "light");
     await page.reload(); // persisted (applied before first paint → no flash)
     await expect(html).toHaveAttribute("data-theme", "light");
+    await settings.click();
     await page.getByTitle(/Modern/).click();
     await expect(html).toHaveAttribute("data-theme", "modern");
+  });
+
+  test("top bar: at most 7 always-visible buttons; settings live in ⚙ (#614)", async ({ page }) => {
+    const bar = page.getByTestId("top-bar");
+    await expect(bar.getByRole("button", { name: "📝 原稿", exact: true })).toBeVisible();
+    const visible = await bar.locator("button:visible").count();
+    expect(visible).toBeLessThanOrEqual(7);
+    // Language / theme / help are no longer on the bar itself…
+    for (const gone of ["JA", "EN", "🌙", "☀", "◐", "?"]) {
+      await expect(bar.getByRole("button", { name: gone, exact: true })).toHaveCount(0);
+    }
+    // …they are one click away in ⚙.
+    await bar.getByRole("button", { name: "設定", exact: true }).click();
+    await expect(page.getByRole("button", { name: /ヘルプ（ドキュメント）/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /AI の接続設定/ })).toBeVisible();
+    await expect(page.getByTitle("Light")).toBeVisible();
+  });
+
+  test("⚙ → language switches the UI to English and back (#614)", async ({ page }) => {
+    const bar = page.getByTestId("top-bar");
+    await bar.getByRole("button", { name: "設定", exact: true }).click();
+    await page.getByRole("button", { name: "EN", exact: true }).click();
+    await expect(bar.getByRole("button", { name: /^File/ })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "📝 Draft", exact: true })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Settings", exact: true })).toBeVisible(); // ⚙ is labelled in English too
+    await page.getByRole("button", { name: "JA", exact: true }).click(); // the menu stays open while switching
+    await expect(bar.getByRole("button", { name: /^ファイル/ })).toBeVisible();
+  });
+
+  test("⚙ → AI の接続設定 opens the AI dock with its connection settings (#614)", async ({ page }) => {
+    await page.getByTestId("top-bar").getByRole("button", { name: "設定", exact: true }).click();
+    await page.getByRole("button", { name: /AI の接続設定/ }).click();
+    await expect(page.getByText(/編集対象:/)).toBeVisible(); // the AI dock is open
+    await expect(page.getByTestId("ai-settings-popover")).toBeVisible(); // …with the settings popover
+    // The request is consumed: closing the dock and reopening it with ✨ AI does not pop settings again.
+    await page.mouse.click(5, 300); // the popover's backdrop takes the first click (dismisses it)
+    await expect(page.getByTestId("ai-settings-popover")).toHaveCount(0);
+    await page.getByTitle("閉じる", { exact: true }).last().click();
+    await expect(page.getByText(/編集対象:/)).toHaveCount(0);
+    await page.getByRole("button", { name: /✨ AI/ }).click();
+    await expect(page.getByText(/編集対象:/)).toBeVisible();
+    await expect(page.getByTestId("ai-settings-popover")).toHaveCount(0);
   });
 });
