@@ -142,7 +142,8 @@
     "helpUrlFallback": "ドキュメントを開けませんでした。こちらの URL をお使いください: {{url}}",
     "augmentTemplateTitle": "テンプレートの強化",
     "augmentSuffix": "（強化）",
-    "adjustSuffix": "（調整）"
+    "adjustSuffix": "（調整）",
+    "viewMarkdown": "Markdown"
   },
   "applyTemplate": {
     "templateUnusable": "このテンプレートは使用できません: {{reason}}",
@@ -256,7 +257,11 @@
   "diagramEditor": {
     "mermaidIncompatibleHint": "この図はアイコンや kpi/radar 等を含むため Mermaid に変換できません。YAML / JSON で編集してください。",
     "selectEditFormat": "編集フォーマットを選択",
-    "mermaidNotConvertible": "MERMAID（変換不可）"
+    "mermaidNotConvertible": "Mermaid（変換不可）",
+    "formatYaml": "YAML",
+    "formatJson": "JSON",
+    "formatMermaid": "Mermaid",
+    "valid": "✓ 正しい形式"
   },
   "diagramOverlay": {
     "resizeDragHint": "ドラッグでリサイズ",
@@ -556,7 +561,9 @@
     "aspectLock": "比固定",
     "resetRectTitle": "既定サイズ・位置に戻す（手動調整を解除）",
     "resetToDefault": "⟲ 既定に戻す",
-    "resetToFrame": "⟲ 枠にリセット"
+    "resetToFrame": "⟲ 枠にリセット",
+    "layout": "レイアウト",
+    "resetToAuto": "⟳ 自動"
   },
   "slideList": {
     "dragToReorder": "ドラッグで並べ替え",
@@ -677,5 +684,8 @@
     "applyTitle": "「{{name}}」としてマスター一覧に追加し、このデッキに適用する",
     "cancel": "キャンセル",
     "failed": "テンプレ調整に失敗しました: {{error}}"
+  },
+  "resizableSplit": {
+    "dividerTitle": "ドラッグで幅を変える（ダブルクリックで元に戻す）"
   }
 }

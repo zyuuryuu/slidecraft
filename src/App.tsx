@@ -536,7 +536,7 @@ export default function App() {
                       onClick={() => setSlideEditView("markdown")}
                       className={`px-2 py-0.5 rounded text-[11px] ${slideEditView === "markdown" ? "bg-accent text-on-accent" : "bg-field text-muted hover:text-fg"}`}
                     >
-                      Markdown
+                      {t("app.viewMarkdown")}
                     </button>
                   </div>
                 </div>

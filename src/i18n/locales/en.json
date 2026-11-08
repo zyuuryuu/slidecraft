@@ -142,7 +142,8 @@
     "helpUrlFallback": "Couldn't open the docs — use this URL instead: {{url}}",
     "augmentTemplateTitle": "Augment template",
     "augmentSuffix": " (augmented)",
-    "adjustSuffix": " (adjusted)"
+    "adjustSuffix": " (adjusted)",
+    "viewMarkdown": "Markdown"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",
@@ -256,7 +257,11 @@
   "diagramEditor": {
     "mermaidIncompatibleHint": "This diagram contains icons or kpi/radar and can't be converted to Mermaid. Please edit it in YAML / JSON.",
     "selectEditFormat": "Select edit format",
-    "mermaidNotConvertible": "MERMAID (not convertible)"
+    "mermaidNotConvertible": "Mermaid (not convertible)",
+    "formatYaml": "YAML",
+    "formatJson": "JSON",
+    "formatMermaid": "Mermaid",
+    "valid": "✓ valid"
   },
   "diagramOverlay": {
     "resizeDragHint": "Drag to resize",
@@ -556,7 +561,9 @@
     "aspectLock": "Lock ratio",
     "resetRectTitle": "Reset to default size and position (clear manual adjustments)",
     "resetToDefault": "⟲ Reset to default",
-    "resetToFrame": "⟲ Reset to frame"
+    "resetToFrame": "⟲ Reset to frame",
+    "layout": "Layout",
+    "resetToAuto": "⟳ Auto"
   },
   "slideList": {
     "dragToReorder": "Drag to reorder",
@@ -677,5 +684,8 @@
     "applyTitle": "Add as \"{{name}}\" to the master list and apply it to this deck",
     "cancel": "Cancel",
     "failed": "Template adjustment failed: {{error}}"
+  },
+  "resizableSplit": {
+    "dividerTitle": "Drag to resize (double-click to reset)"
   }
 }
