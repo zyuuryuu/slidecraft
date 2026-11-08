@@ -85,6 +85,7 @@
 
 ## テンプレ・マスター
 
+- **マーケ プリセット「Campaign」＋画像構造** — オフホワイト・低彩度 accent 1 色・明朝見出し・左右 1.2in・ヘッダ帯なし。新レイアウト（プリセット専用）: 全面画像＋キャプション `Image.FullBleed+1Caption`・左キャプション｜右画像 `Media.1Caption+1Image`・並置 `Gallery.2Image.Equal`・2×2 `Gallery.4Image.Grid`・色面の章扉 `Section.1Title.ColorField`・下寄せの締め `Closing.1Notes.Bottom`。画像だけのスライドは枠数の一致する Gallery、本文なしの behind 画像は全面画像へ（該当レイアウトの無いテンプレは従来どおり）。`samples/manuscript-07-campaign.md`（10 枚・消失 0）・出荷テンプレ（内蔵 6 本目）・見本 golden （#598・2026-11-08）
 - **エグゼクティブ プリセット「Executive」＋密度の目標帯診断** — ダーク navy・accent 1 色・巨大 KPI・Ask 締め `Closing.1Ask+1Decision`（新・プリセット専用）・`samples/manuscript-06-executive-brief.md`（10 枚）・出荷テンプレ（内蔵 5 本目）・見本 golden。`StylePreset.density` → `docProps/custom.xml` → `get_deck_issues` の `density-target`（info・既存テンプレでは 0 件）の 1 経路。本文倍率は **21pt 以下の枠だけ**に掛ける `scale.bodyMaxPt` を `presetRecipe` に入れ（KPI 値の溢れを根治）、Pitch にも適用 （#596・PR #635・2026-11-08）
 - **セールスピッチ プリセット「Pitch」** — 14 レイアウト（Statement・Quote・CTA・Media・Summary 含む）・配色（白 canvas＋濃いブランド色＋高彩度 accent）・`samples/manuscript-05-sales-pitch.md`（14 枚・自動分割 0・消失系 0）・出荷テンプレ（内蔵 4 本目）・全レイアウト見本 golden。既存出力は 82 parts byte-identical。`PRESET_ARTIFACTS` が唯一の出荷先定義 （#595・PR #639・2026-11-08）
 - **KPI の値枠の箇条記号「•」を消す** — `markKpiValue` が `value` と判定した枠へ束縛する段落に `buNone`（判定は `group-layout.ts` の 1 経路）。KPI 以外は byte-identical。説明行は #645 （#638・PR #644・2026-11-08）

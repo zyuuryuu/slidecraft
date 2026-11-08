@@ -15,7 +15,7 @@ import JSZip from "jszip";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { writePresetTemplate, PITCH_PRESET, type StylePreset } from "../src/engine/template-presets";
+import { writePresetTemplate, PITCH_PRESET, CAMPAIGN_PRESET, type StylePreset } from "../src/engine/template-presets";
 import * as S from "../src/mcp/session";
 
 export interface PresetArtifact {
@@ -31,6 +31,12 @@ export const PRESET_ARTIFACTS: readonly PresetArtifact[] = [
     templateOnly: "public/templates/slide/セールスピッチ_Pitch_TemplateOnly.pptx",
     showcase: "tests/fixtures/templates/セールスピッチ_Pitch_全レイアウト見本.pptx",
     showcaseMarkdown: "tests/fixtures/templates/セールスピッチ_Pitch_全レイアウト見本.md",
+  },
+  {
+    preset: CAMPAIGN_PRESET, // #598
+    templateOnly: "public/templates/slide/マーケ_Campaign_TemplateOnly.pptx",
+    showcase: "tests/fixtures/templates/マーケ_Campaign_全レイアウト見本.pptx",
+    showcaseMarkdown: "tests/fixtures/templates/マーケ_Campaign_全レイアウト見本.md",
   },
 ];
 
