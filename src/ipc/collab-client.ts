@@ -17,7 +17,8 @@ const NOTIFY = "notifications/slidecraft/";
 
 /** `origin` / `changedIndices` are ADDITIVE (#407): who caused it (host's view of the connection role)
  *  and which slides changed (0-based, post-change deck; absent = granularity unknown). */
-export interface DeckChangedEvent { docId: string; rev: number; opId?: string; origin?: "ai" | "gui"; changedIndices?: number[]; }
+/** `templateChanged`/`templateName` (#616, ADDITIVE): the doc's TEMPLATE was replaced at this rev (deck unchanged). */
+export interface DeckChangedEvent { docId: string; rev: number; opId?: string; origin?: "ai" | "gui"; changedIndices?: number[]; templateChanged?: boolean; templateName?: string; }
 export interface DocumentOpenedEvent { docId: string; title: string; slideCount: number; }
 export interface DocumentClosedEvent { docId: string; }
 
