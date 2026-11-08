@@ -143,4 +143,39 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
     expect(buildCatalog(templates[0].template).map((e) => e.name)).toEqual(await layoutNamesOfHost(ai!, docId));
     expect(decks.map((p) => p.rev)).toEqual([1]); // 初回採用の deck は従来どおり 1 回
   });
+
+  // D1（PR #619 統括レビュー）: GUI 編集の送信中（sending=true で tick が bail）に AI が別の rev を作ると、GUI 編集は
+  // expectedRev 古さで stale 拒否される。GUI は楽観適用済みなので、拒否後は host の deck を再 pull して画面を戻す必要がある。
+  // 送信直前に AI 操作を挟むため、projection 内部の client.callTool を set_slide_markdown の時だけラップする（決定的に再現）。
+  async function staleSendAfter(aiOp: (docId: string) => Promise<unknown>) {
+    const decks: ProjectedDeck[] = [];
+    const templates: ProjectedTemplate[] = [];
+    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
+    await proj.start();
+    const docId = await aiDoc();
+    await waitFor(() => decks.length >= 1);
+    const client = (proj as unknown as { client: CollabClient }).client;
+    const orig = client.callTool.bind(client);
+    client.callTool = (async (name: string, args?: Record<string, unknown>) => {
+      if (name === "set_slide_markdown") await aiOp(docId);
+      return orig(name, args);
+    }) as CollabClient["callTool"];
+    const sent = await proj.sendSlideMarkdown(1, "# GUI の編集\n\n- z");
+    return { decks, templates, sent, docId };
+  }
+
+  it("対照: 送信中に AI が deck を編集 → GUI 編集は stale → host の deck（rev 1）を再 pull する", async () => {
+    const { decks, sent } = await staleSendAfter((docId) => ai!.callTool("set_slide_markdown", { index: 1, markdown: "# AI\n\n- a", docId }));
+    expect(sent).toMatchObject({ ok: false, stale: true });
+    await waitFor(() => decks.some((p) => p.rev === 1));
+    expect(decks.map((p) => p.rev)).toEqual([0, 1]);
+  });
+
+  it("D1: 送信中に AI が augment_template → GUI 編集は stale → template-only rev でも deck を再 pull して楽観適用を戻す", async () => {
+    const { decks, templates, sent, docId } = await staleSendAfter((docId) => ai!.callTool("augment_template", { structures: ["kpi-4"], docId }));
+    expect(sent).toMatchObject({ ok: false, stale: true });
+    await waitFor(() => decks.some((p) => p.rev === 1) && templates.length >= 1);
+    expect(decks.map((p) => p.rev)).toEqual([0, 1]);
+    expect(buildCatalog(templates[0].template).map((e) => e.name)).toEqual(await layoutNamesOfHost(ai!, docId));
+  });
 });

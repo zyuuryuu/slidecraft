@@ -11,10 +11,8 @@
  * exactly once per rev no matter how many signals race in.
  *
  * #616: a TEMPLATE-only change (AI augment/adjust_template) is its own rev with `templateRev === rev` in
- * list_documents. The pump then pulls the template out of save_project (.scft = deck + template — no new read
- * tool) and hands it to onTemplate, and skips the deck re-apply (the deck at that rev is unchanged, so a
- * 'commit' would only add an empty GUI undo step). Keyed on list_documents (not only the push's
- * templateChanged) so the poll floor syncs it too.
+ * list_documents → the template is pulled out of save_project (.scft; no new read tool) and handed to onTemplate.
+ * Which of deck/template to pull per tick is decided by planPull (collab-pull-plan.ts).
  *
  * Pure (no React / no Tauri): the hook injects the Tauri plugin-http fetch; tests drive it against a
  * real createCollabHost over Node's global fetch.
@@ -23,6 +21,7 @@ import { CollabClient, type DeckChangedEvent } from "./collab-client";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import { openProject } from "../engine/project-io";
+import { planPull } from "./collab-pull-plan";
 
 export type CollabStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -128,6 +127,8 @@ export class CollabProjection {
   private lastSelfSendAt = -Infinity;
   // #616: per doc, the templateRev whose template the GUI already has (absent = the one it was opened with).
   private readonly templateRevSeen = new Map<string, number>();
+  // A rejected/failed send left an optimistic local edit the host lacks → the next new rev MUST re-pull the deck (even template-only).
+  private forceDeckPull = false;
 
   constructor(opts: CollabProjectionOptions) {
     this.opts = opts;
@@ -213,7 +214,10 @@ export class CollabProjection {
       return { ok: false, message: msg(e) };
     } finally {
       this.sending = false;
-      if (reconcile) this.scheduleTick(); // now `sending` is false → tick() will actually pull
+      if (reconcile) {
+        this.forceDeckPull = true; // D1: re-pull the deck even if the new rev is template-only (collab-pull-plan.ts)
+        this.scheduleTick(); // now `sending` is false → tick() will actually pull
+      }
     }
   }
 
@@ -349,13 +353,11 @@ export class CollabProjection {
     this.targetDocId = target.docId;
     const sameDoc = this.lastDocId === target.docId;
     const templateRev = target.templateRev ?? 0;
-    const needTemplate = !!this.opts.onTemplate && templateRev > (this.templateRevSeen.get(target.docId) ?? 0);
-    if (sameDoc && target.rev <= this.lastRev && !needTemplate) return; // already at this rev
-
+    const seen = this.templateRevSeen.get(target.docId) ?? 0;
+    const plan = { sameDoc, rev: target.rev, lastRev: this.lastRev, templateRev, templateRevSeen: seen, pullsTemplates: !!this.opts.onTemplate, forceDeckPull: this.forceDeckPull };
+    const { skip, needDeck, needTemplate } = planPull(plan); // #616 template-only / D1 forced re-pull
+    if (skip) return; // already at this rev
     const isInitial = !sameDoc; // first apply of this doc → caller uses 'silent'
-    // The only new rev is the template change → the deck is the one already applied; don't re-apply it.
-    const templateOnly = sameDoc && target.rev === this.lastRev + 1 && templateRev === target.rev;
-    const needDeck = !sameDoc || (target.rev > this.lastRev && !templateOnly);
     let deck: DeckIR | null = null;
     let tpl: ProjectedTemplate | undefined;
     try {
@@ -372,6 +374,7 @@ export class CollabProjection {
     this.lastDocId = target.docId;
     if (needDeck) {
       this.lastRev = target.rev;
+      this.forceDeckPull = false;
       this.lastSlideCount = deck?.slides.length ?? 0;
       this.opts.onDeck({ deck, rev: target.rev, docId: target.docId, title: target.title, isInitial });
     } else this.lastRev = Math.max(this.lastRev, target.rev); // same doc: the template-only rev is now applied
