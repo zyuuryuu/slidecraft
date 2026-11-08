@@ -9,13 +9,14 @@
  *   テンプレが新しい「元」になる（レシピはデッキに保存しない — デッキ側に倍率を持たない・R8）。
  * - 元テンプレは書き換えない（adjustTemplate / augmentAndVerify は派生 bytes を返す）。適用は new_project と同じ
  *   健全性ゲート（loadTemplate → buildCatalog → assessTemplateHealth）を通す。deck は変えない（undo 履歴の外）。
+ *   rev の前進と collab への通知（deckChanged{templateChanged}・#616）は呼び出し側（server.ts mutateTemplate →
+ *   host-core commitTemplateChange）が `changed:true` を見て行う。
  * - 何も変わらない（足すものが無い／元にできない）ときは適用せず理由を返す（never-silent）。
  */
 import { z } from "zod";
 import type { Session } from "./session";
 import { requireLoaded, getDiagnostics } from "./session";
 import { GuardError } from "./guard-errors";
-import { isToolVisible, type McpProfile } from "./tool-profiles";
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth } from "../engine/template-catalog";
 import { adjustTemplate, isNoopRecipe, type TemplateAdjustRecipe } from "../engine/template-adjust";
@@ -130,9 +131,7 @@ const suggestionCache = new WeakMap<TemplateData, WeakMap<DeckIR, OverflowScaleS
 
 /** 溢れがあるときだけ提案を 1 件足す（無ければ入力の配列をそのまま返す＝応答は従来どおり）。
  *  hint 用に、adjust_template に渡す**絶対**レシピ（前回の本文倍率 × 提案倍率）も返す。 */
-export async function withOverflowScaleHint(s: Session, issues: DeckIssue[], profile: McpProfile): Promise<{ issues: DeckIssue[]; recipe?: string }> {
-  // 提案の行き先 adjust_template が出ていないプロファイル（collab — PR #606 D3）では出さない（呼べないツールを指さない）。
-  if (!isToolVisible("adjust_template", profile)) return { issues };
+export async function withOverflowScaleHint(s: Session, issues: DeckIssue[]): Promise<{ issues: DeckIssue[]; recipe?: string }> {
   if (countOverflows(issues) === 0 || s.disabledReviewRules.has("overflow-scale-hint")) return { issues };
   const { deck, template } = requireLoaded(s);
   let byDeck = suggestionCache.get(template);
