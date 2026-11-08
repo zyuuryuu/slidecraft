@@ -2,15 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Transition } from "../engine/html-shell";
 import SettingsMenu from "./SettingsMenu";
-
-/** HTML export transition choices offered in the File menu submenu (slide = default).
- *  `labelKey` is a toolbar-namespace i18n key resolved at render time. */
-const HTML_TRANSITIONS = [
-  { v: "slide", labelKey: "toolbar.transitionSlide" },
-  { v: "fade", labelKey: "toolbar.transitionFade" },
-  { v: "zoom", labelKey: "toolbar.transitionZoom" },
-  { v: "push", labelKey: "toolbar.transitionPush" },
-] as const satisfies ReadonlyArray<{ v: Transition; labelKey: string }>; // `as const` → labelKey narrows to a valid t() key
+import HtmlTransitionPicker from "./HtmlTransitionPicker";
 
 interface ToolbarProps {
   onSave: () => void;
@@ -66,7 +58,7 @@ export default function Toolbar({
 }: ToolbarProps) {
   const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
-  const [htmlSub, setHtmlSub] = useState(false); // HTML export → transition flyout
+  const [htmlTransition, setHtmlTransition] = useState<Transition>("slide"); // #650: chosen in the File menu itself
   const btn = "px-3 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors";
 
   return (
@@ -94,7 +86,7 @@ export default function Toolbar({
       {/* File menu — project save/open (.scft = editable) + export (PPTX / Markdown). */}
       <div className="relative">
         <button
-          onClick={() => { setExportOpen((v) => !v); setHtmlSub(false); }}
+          onClick={() => setExportOpen((v) => !v)}
           className="px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi text-on-accent font-medium rounded transition-colors inline-flex items-center gap-1.5"
         >
           {generating ? t("toolbar.exporting") : t("toolbar.file")}
@@ -102,8 +94,8 @@ export default function Toolbar({
         </button>
         {exportOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => { setExportOpen(false); setHtmlSub(false); }} />
-            <div className="absolute left-0 top-full mt-1 z-50 w-60 bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
+            <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
+            <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
               {onOpenProject && (
                 <button
                   onClick={() => { setExportOpen(false); onOpenProject(); }}
@@ -134,35 +126,17 @@ export default function Toolbar({
                 <span className="text-faint text-xs">.pptx</span>
               </button>
               {onExportHtml && (
-                <div
-                  className="relative"
-                  onMouseEnter={() => hasSpec && setHtmlSub(true)}
-                  onMouseLeave={() => setHtmlSub(false)}
-                >
-                  {/* Click = export with the default (slide); hover = pick a transition. */}
+                <>
+                  {/* #650: the transition is picked in the row below (no flyout → nesting stays ≤ 2); click exports with it. */}
                   <button
-                    onClick={() => { setExportOpen(false); onExportHtml("slide"); }}
+                    onClick={() => { setExportOpen(false); onExportHtml(htmlTransition); }}
                     disabled={!hasSpec}
                     className="w-full px-3 py-1.5 text-fg hover:bg-edge disabled:opacity-40 flex items-center justify-between"
                   >
                     <span>🌐 HTML</span>
-                    <span className="text-faint text-xs">{t("toolbar.transition")} ▸</span>
                   </button>
-                  {htmlSub && hasSpec && (
-                    <div className="absolute left-full top-0 w-36 bg-canvas border border-edge rounded-lg shadow-2xl py-1">
-                      {HTML_TRANSITIONS.map(({ v, labelKey }) => (
-                        <button
-                          key={v}
-                          onClick={() => { setExportOpen(false); setHtmlSub(false); onExportHtml(v); }}
-                          className="w-full px-3 py-1.5 text-fg hover:bg-edge flex items-center justify-between"
-                        >
-                          <span>{t(labelKey)}</span>
-                          {v === "slide" && <span className="text-faint text-[10px]">{t("toolbar.transitionDefault")}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  <HtmlTransitionPicker value={htmlTransition} onChange={setHtmlTransition} disabled={!hasSpec} />
+                </>
               )}
               <button
                 onClick={() => { setExportOpen(false); onSave(); }}

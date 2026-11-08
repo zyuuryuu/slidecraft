@@ -655,7 +655,7 @@
     "saveProject": "プロジェクトを保存",
     "exportSection": "書き出す",
     "transition": "遷移",
-    "transitionDefault": "既定",
+    "transitionGroup": "HTML の遷移",
     "transitionSlide": "スライド",
     "transitionFade": "フェード",
     "transitionZoom": "ズーム",
