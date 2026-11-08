@@ -23,18 +23,24 @@ const Index = z.number().int().nonnegative();
 const SetCellOp = z.object({ op: z.literal("setCell"), row: Index, col: Index, text: z.string() });
 // series: 0-based position in the chart's series list, or its exact name.
 const SetSeriesValueOp = z.object({ op: z.literal("setSeriesValue"), series: z.union([Index, z.string()]), index: Index, value: z.number() });
+// gantt tasks carry no id in the schema — a task is named by its (unique) name; newName renames it.
+// start/end are DAY OFFSETS from gantt.startDate, as stored in the figure YAML.
+const SetTaskOp = z.object({
+  op: z.literal("setTask"), name: z.string().min(1), newName: z.string().min(1).optional(),
+  start: z.number().optional(), end: z.number().optional(), status: z.string().optional(), section: z.string().optional(),
+});
 
-export const DataEditOpsSchema = z.array(z.discriminatedUnion("op", [SetCellOp, SetSeriesValueOp])).min(1);
+export const DataEditOpsSchema = z.array(z.discriminatedUnion("op", [SetCellOp, SetSeriesValueOp, SetTaskOp])).min(1);
 export type DataEditOps = z.infer<typeof DataEditOpsSchema>;
 export type DataEditOp = DataEditOps[number];
 type CellOp = z.infer<typeof SetCellOp>;
 type FigureOp = Exclude<DataEditOp, CellOp>;
-const DATA_OPS = new Set(["setCell", "setSeriesValue"]);
+const DATA_OPS = new Set(["setCell", "setSeriesValue", "setTask"]);
 
 /** A DATA op that didn't take effect — surfaced never-silently (mirrors SkippedFieldOp). */
 export interface SkippedDataOp {
   op: DataEditOp["op"];
-  reason: "no-table" | "out-of-range" | "multiline-cell" | "no-chart" | "unparseable-figure" | "unknown-series";
+  reason: "no-table" | "out-of-range" | "multiline-cell" | "no-chart" | "unparseable-figure" | "unknown-series" | "unknown-task" | "ambiguous-task" | "invalid-range";
   message: string; // human, Japanese — ready to show as a notice
 }
 
@@ -98,7 +104,23 @@ function seriesChart(raw: RawDiagram): { series: Series[]; slots: string } | nul
 
 const NO_CHART: Record<FigureOp["op"], string> = {
   setSeriesValue: "setSeriesValue: このスライドの図は折れ線・棒（xychart）／レーダー（radar）ではないため適用しませんでした。",
+  setTask: "setTask: このスライドの図はガントチャート（gantt）ではないため適用しませんでした。",
 };
+
+type Task = { name?: unknown; start?: unknown; end?: unknown; [k: string]: unknown };
+const ganttTasks = (raw: RawDiagram): Task[] | null =>
+  raw.type === "gantt" && raw.gantt ? listOf<Task>((raw.gantt as { tasks?: unknown }).tasks) : null;
+
+/** Write the given fields onto `target`; true when any value actually changed. */
+function assign(target: Record<string, unknown>, fields: Record<string, unknown>): boolean {
+  let changed = false;
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined || target[k] === v) continue;
+    target[k] = v;
+    changed = true;
+  }
+  return changed;
+}
 
 /** Apply one figure op to the raw YAML object. Returns true when it changed a value. */
 function applyFigureOp(raw: RawDiagram, o: FigureOp, skip: (reason: SkippedDataOp["reason"], message: string) => void): boolean {
@@ -115,6 +137,18 @@ function applyFigureOp(raw: RawDiagram, o: FigureOp, skip: (reason: SkippedDataO
       values[o.index] = o.value;
       ser.values = values;
       return true;
+    }
+    case "setTask": {
+      const tasks = ganttTasks(raw);
+      if (!tasks) { skip("no-chart", NO_CHART[o.op]); return false; }
+      const hits = tasks.filter((t) => String(t.name ?? "") === o.name);
+      if (hits.length === 0) { skip("unknown-task", `setTask: タスク「${o.name}」が見つからず適用しませんでした（タスク: ${quoted(tasks.map((t) => String(t.name ?? "")))}）`); return false; }
+      if (hits.length > 1) { skip("ambiguous-task", `setTask: タスク名「${o.name}」が ${hits.length} 件あり特定できないため適用しませんでした。`); return false; }
+      const t = hits[0];
+      const start = o.start ?? Number(t.start);
+      const end = o.end ?? Number(t.end);
+      if (end < start) { skip("invalid-range", `setTask: タスク「${o.name}」の終了（${end}）が開始（${start}）より前になるため適用しませんでした。`); return false; }
+      return assign(t, { name: o.newName, start: o.start, end: o.end, status: o.status, section: o.section });
     }
   }
 }
@@ -180,6 +214,14 @@ export function describeEditableData(slide: SlideIR): string {
     out.push(`Chart series (setSeriesValue series/index, 0-based):`);
     out.push(raw.type === "xychart" ? `- categories: ${JSON.stringify(listOf(c.categories))}` : `- axes: ${JSON.stringify(listOf(c.axes))}`);
     chart.series.forEach((x, i) => out.push(`- series ${i} ${JSON.stringify(String(x.name ?? ""))}: ${JSON.stringify(listOf(x.values))}`));
+  }
+  const tasks = raw ? ganttTasks(raw) : null;
+  if (raw && tasks) {
+    out.push(`Gantt tasks (setTask by name; start/end = day offsets from ${JSON.stringify(String((raw.gantt as { startDate?: unknown }).startDate ?? ""))}):`);
+    for (const t of tasks) {
+      const str = (v: unknown) => JSON.stringify(String(v ?? ""));
+      out.push(`- ${str(t.name)}: start ${String(t.start)}, end ${String(t.end)}, status ${str(t.status)}, section ${str(t.section)}`);
+    }
   }
   return out.join("\n");
 }

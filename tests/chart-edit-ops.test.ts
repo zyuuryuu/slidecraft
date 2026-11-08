@@ -250,3 +250,51 @@ describe("applyDataEditOps — setSeriesValue", () => {
     expect(describeEditableData(md1(figMd(RADAR)))).toContain('axes: ["速度","品質","価格"]');
   });
 });
+
+// ── Gantt (setTask: keyed by task name — the schema's tasks carry no id) ──
+
+const GANTT = ["type: gantt", "nodes: []", "gantt:", "  startDate: '2026-01-01'", "  tasks:", "    - name: 設計", "      section: 計画", "      start: 0", "      end: 10", "      status: done", "    - name: 実装", "      section: 開発", "      start: 10", "      end: 30", "      status: active"].join("\n");
+
+describe("applyDataEditOps — setTask", () => {
+  it("parses: name required, at least the named fields typed", () => {
+    expect(parseDataEditOps('[{"op":"setTask","name":"実装","end":35}]')).toEqual([{ op: "setTask", name: "実装", end: 35 }]);
+    expect(parseDataEditOps('[{"op":"setTask","end":35}]')).toBeNull();
+    expect(parseDataEditOps('[{"op":"setTask","name":"実装","end":"35"}]')).toBeNull();
+  });
+
+  const cases: Array<[string, Record<string, unknown>, Array<[string, string]>]> = [
+    ["extend the end", { name: "実装", end: 35 }, [["      end: 30", "      end: 35"]]],
+    ["reschedule + status", { name: "設計", start: 2, end: 12, status: "crit" }, [["      start: 0", "      start: 2"], ["      end: 10", "      end: 12"], ["      status: done", "      status: crit"]]],
+    ["rename + move section", { name: "実装", newName: "開発・結合", section: "結合" }, [["    - name: 実装", "    - name: 開発・結合"], ["      section: 開発", "      section: 結合"]]],
+  ];
+  for (const [name, op, edits] of cases) {
+    it(`(b) R8: setTask ≡ editing the gantt YAML in the slide Markdown — ${name}`, () => {
+      const slide = md1(figMd(GANTT));
+      let body = GANTT;
+      for (const [from, to] of edits) body = body.replace(from, to);
+      const viaOps = applyDataEditOps(slide, [{ op: "setTask", ...op } as never]);
+      expect(viaOps.skipped).toEqual([]);
+      expect(specOf(viaOps.slide)).toEqual(specOf(md1(figMd(body))));
+      expect(viaOps.slide.placeholders).toBe(slide.placeholders);
+    });
+  }
+  it("(c) unknown / ambiguous task name and end < start are skipped and announced", () => {
+    const dup = md1(figMd(GANTT.replace("    - name: 実装", "    - name: 設計")));
+    expect(applyDataEditOps(dup, [{ op: "setTask", name: "設計", end: 5 }]).skipped[0].reason).toBe("ambiguous-task");
+    const slide = md1(figMd(GANTT));
+    const { slide: out, skipped } = applyDataEditOps(slide, [
+      { op: "setTask", name: "テスト", end: 40 },
+      { op: "setTask", name: "実装", end: 5 },
+    ]);
+    expect(out).toBe(slide);
+    expect(skipped.map((s) => s.reason)).toEqual(["unknown-task", "invalid-range"]);
+    expect(skipped[0].message).toContain("「設計」・「実装」");
+    expect(applyDataEditOps(md1(figMd(XY)), [{ op: "setTask", name: "設計", end: 1 }]).skipped[0].reason).toBe("no-chart");
+  });
+  it("describeEditableData lists each task with its schedule (day offsets from startDate)", () => {
+    const d = describeEditableData(md1(figMd(GANTT)));
+    expect(d).toMatch(/setTask/);
+    expect(d).toContain("2026-01-01");
+    expect(d).toContain('- "設計": start 0, end 10, status "done", section "計画"');
+  });
+});
