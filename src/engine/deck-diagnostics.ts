@@ -26,6 +26,7 @@ import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
 import { columnAugmentHint } from "./layout-augment-plan";
+import { rescueMessage } from "./field-rescue";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
@@ -59,7 +60,9 @@ export type ReviewRuleId =
   | "figure-dropped"
   | "pre-separator-dropped"
   | "section-footer-injected"
-  | "missing-column-layout";
+  | "missing-column-layout"
+  | "overflow-scale-hint"
+  | "field-row-rescued";
 
 export interface ReviewRule {
   id: ReviewRuleId;
@@ -90,6 +93,8 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "pre-separator-dropped", level: "warn" },
   { id: "section-footer-injected", level: "info" },
   { id: "missing-column-layout", level: "info" },
+  { id: "overflow-scale-hint", level: "info" }, // #570 段 3: 本文倍率の提案（MCP get_deck_issues が overflow-scale-hint.ts で足す）
+  { id: "field-row-rescued", level: "info" },
 ];
 
 const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
@@ -238,18 +243,17 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
       const plan = slideBindingPlan(slide, layout);
-      // #397/#398: a field row with no slot gets its own message naming the row, so the author knows
-      // WHICH line vanished and why (the template has no Callout/Source box on this layout).
-      const rows = plan.unbound.filter((u) => isFieldIdx(u.idx));
-      const others = plan.unbound.filter((u) => !isFieldIdx(u.idx));
-      if (others.length > 0) {
-        // #97: name WHAT vanishes (head of the first unbound item), not just how many.
-        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${others.length} 件（先頭「${contentHead(others[0].content)}」）がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
-      }
-      if (rows.length > 0) {
-        const names = rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ");
-        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `${names} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレを使ってください`, levers: [] });
-      }
+      // #397/#398: a field row with no slot gets its own message naming the row. #597: a row drawn at its
+      // fixed fallback (plan.rescued, the SAME plan export draws from) is an info instead of a warn.
+      const rescued = new Set((plan.rescued ?? []).map((r) => r.content));
+      const add = (id: ReviewRuleId, message: string) => issues.push({ slideIndex: i, title: slideTitle(slide), id, level: RULE_LEVEL[id], message, levers: [] });
+      const lost = plan.unbound.filter((u) => !rescued.has(u.content));
+      const rows = lost.filter((u) => isFieldIdx(u.idx));
+      const others = lost.filter((u) => !isFieldIdx(u.idx));
+      // #97: name WHAT vanishes (head of the first unbound item), not just how many.
+      if (others.length > 0) add("unbound-content", `内容 ${others.length} 件（先頭「${contentHead(others[0].content)}」）がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`);
+      if (rows.length > 0) add("unbound-content", `${rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ")} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレを使ってください`);
+      for (const r of plan.rescued ?? []) add("field-row-rescued", rescueMessage(r, layout.name));
 
       // #390 never-silent: body text that DID bind, but to a placeholder a visual replaces (table /
       // figure / image) or overwrites (code) — export never draws it. Reads the SAME occupancy map the

@@ -145,7 +145,8 @@ export default function App() {
     setIntakeBusy({ mode: "augment", phase: { phase: "composing" } });
     try {
       const name = templateName || "template";
-      const r = await applyMasterBytesAsAugmented(await templateData.zip.generateAsync({ type: "uint8array" }), name);
+      // Apply exactly what the confirmation listed (the plan's structures + rule), not a fresh default plan.
+      const r = await applyMasterBytesAsAugmented(await templateData.zip.generateAsync({ type: "uint8array" }), name, { structures: plan.add.map((a) => a.structure), rule: plan.rule });
       if (!r.ok || !r.augmentedBytes) { if (r.reason) setEditNotice(r.reason); return; }
       setMasterId(registerMaster(name + t("app.augmentSuffix"), r.augmentedBytes).id);
       if (r.summary) showIntake({ mode: "augment", name, summary: r.summary, ts: Date.now() });

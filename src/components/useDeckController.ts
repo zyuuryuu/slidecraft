@@ -18,6 +18,7 @@ import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasCo
 import { parseMd } from "../engine/md-parser";
 import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
 import { autoSelectLayout, suggestLayouts, findLayout } from "../engine/template-loader";
+import type { AugmentOptions } from "../engine/layout-augment-plan";
 import { applyTemplateBytes, applyTemplateBytesWithRepair, applyTemplateBytesAsFaithfulRemake, applyTemplateBytesAsAugmented, applyTemplateBytesAsAdjusted } from "./apply-template";
 import type { TemplateAdjustRecipe } from "../engine/template-adjust";
 import type { RepairPlan } from "../engine/template-repair";
@@ -206,10 +207,10 @@ export function useDeckController() {
     [setTemplateData, setTemplateName, setParseError],
   );
 
-  // #568「テンプレを強化」: 無い N 列レイアウトを合成した派生 bytes を、検査ゲートを通して適用する。
+  // #568「テンプレを強化」: 無い構造（N 列・比較・カード・KPI）を合成した派生 bytes を、検査ゲートを通して適用する。
   const applyMasterBytesAsAugmented = useCallback(
-    (buf: ArrayBuffer | Uint8Array, name: string) =>
-      applyTemplateBytesAsAugmented(buf, name, { setTemplateData, setTemplateName, setParseError }),
+    (buf: ArrayBuffer | Uint8Array, name: string, opts?: AugmentOptions) =>
+      applyTemplateBytesAsAugmented(buf, name, { setTemplateData, setTemplateName, setParseError }, opts),
     [setTemplateData, setTemplateName, setParseError],
   );
 

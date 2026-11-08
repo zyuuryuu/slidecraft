@@ -10,8 +10,9 @@
 // The download form hits the PUBLIC release URL, which only exists AFTER the draft is published; run
 // it post-publish, or pass a locally-downloaded (from the draft) .dmg path to run before publish.
 //
-// After running, copy the updated cask into the `zyuuryuu/homebrew-slidecraft` tap (see
-// packaging/homebrew/README.md) and commit.
+// On a release publish, .github/workflows/cask-mirror.yml runs this, gates it with verify-cask.mjs,
+// mirrors the result into the `zyuuryuu/homebrew-slidecraft` tap (mirror-cask.mjs) and opens a PR
+// for this repo's copy (Issue #288). Manual use is the fallback — see packaging/homebrew/README.md.
 //
 // Failures set `process.exitCode` and return rather than calling `process.exit()`: an abrupt
 // process.exit() fired from inside the async download path (while fetch's handle is still closing)
@@ -38,6 +39,25 @@ const CASK_SHA_RE = /sha256 "([0-9a-f]{64})"/g;
 export function parseCaskVersion(caskText) {
   const m = caskText.match(/version "([^"]*)"/);
   return m ? m[1] : null;
+}
+
+/**
+ * Compare dotted numeric versions ("0.10.0", leading "v" allowed, missing components = 0).
+ * Negative if a < b, 0 if equal, positive if a > b; NaN when either side has a non-numeric
+ * component, so callers fail closed instead of guessing an order. Shared by the launcher guard
+ * below and mirror-cask.mjs's no-downgrade guard (R8: one version ordering, not two).
+ */
+export function compareVersions(a, b) {
+  // parseInt (not Number): keeps the launcher guard's original reading of each component exactly.
+  const parse = (v) => String(v).replace(/^v/, "").split(".").map((n) => parseInt(n, 10));
+  const pa = parse(a);
+  const pb = parse(b);
+  if (pa.some(Number.isNaN) || pb.some(Number.isNaN)) return NaN;
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
 }
 
 /** Extract the sha256 hex strings from a cask file's text, in file order. */
@@ -110,21 +130,13 @@ async function main() {
   // which first ships in v0.2.0 (ADR-0022). Refuse to emit a cask that pairs that stanza with an older
   // version — otherwise `brew install` would fail on the missing binary target. Blocks the footgun of
   // re-cutting the cask for v0.1.0 while the source template already carries the stanza.
-  const MIN_LAUNCHER_VERSION = [0, 2, 0];
+  const MIN_LAUNCHER_VERSION = "0.2.0";
   const hasLauncherStanza = /binary\s+["'][^"']*slidecraft-mcp["']/.test(cask);
-  const semver = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10));
-  // negative if a < b, 0 if equal, positive if a > b (missing components treated as 0)
-  const cmpVersion = (a, b) => {
-    for (let i = 0; i < Math.max(a.length, b.length); i++) {
-      const d = (a[i] ?? 0) - (b[i] ?? 0);
-      if (d !== 0) return d;
-    }
-    return 0;
-  };
-  if (hasLauncherStanza && (semver.some(Number.isNaN) || cmpVersion(semver, MIN_LAUNCHER_VERSION) < 0)) {
+  const cmp = compareVersions(version, MIN_LAUNCHER_VERSION);
+  if (hasLauncherStanza && (Number.isNaN(cmp) || cmp < 0)) {
     console.error(
       `update-cask: refusing to emit a cask with the slidecraft-mcp launcher for version "${version}". ` +
-        `That launcher first ships in v${MIN_LAUNCHER_VERSION.join(".")} (ADR-0022); an older .dmg lacks it and brew install would fail.`,
+        `That launcher first ships in v${MIN_LAUNCHER_VERSION} (ADR-0022); an older .dmg lacks it and brew install would fail.`,
     );
     process.exitCode = 1;
     return;
