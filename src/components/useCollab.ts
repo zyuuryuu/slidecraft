@@ -57,9 +57,12 @@ export interface UseCollabArgs {
   onNewHostDoc?: (docId: string, title: string, dataBase64: string) => void;
   /** #407: an AI edit's changed slides, after its deck was applied (useFollowAi jumps + flashes). */
   onFollow?: (f: FollowTarget) => void;
+  /** #616: the host replaced a doc's template (AI augment/adjust_template) → set it on the tab mirroring that
+   *  host doc. Omit → the projection does not pull templates (the GUI would keep the old one). */
+  applyHostTemplate?: (hostDocId: string, template: TemplateData, templateName: string) => void;
 }
 
-export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes, onSeedDoc, onNewHostDoc, onFollow }: UseCollabArgs) {
+export function useCollab({ applyDeck, deck, templateData, templateName, masters, getMasterBytes, onSeedDoc, onNewHostDoc, onFollow, applyHostTemplate }: UseCollabArgs) {
   const available = runningInTauri();
   const [status, setStatus] = useState<CollabStatus>("idle");
   const [info, setInfo] = useState<CollabInfo | undefined>(undefined);
@@ -77,6 +80,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   const onSeedDocRef = useRef(onSeedDoc);
   const onNewHostDocRef = useRef(onNewHostDoc);
   const onFollowRef = useRef(onFollow);
+  const applyTemplateRef = useRef(applyHostTemplate);
   // Collab multi-doc bookkeeping: which host docs we've already surfaced as tabs, the seeded doc, and
   // whether the seed is resolved (until then we don't classify docs — avoids a duplicate seed tab).
   const knownDocsRef = useRef<Set<string>>(new Set());
@@ -94,6 +98,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     onSeedDocRef.current = onSeedDoc;
     onNewHostDocRef.current = onNewHostDoc;
     onFollowRef.current = onFollow;
+    applyTemplateRef.current = applyHostTemplate;
   });
 
   const start = useCallback(async () => {
@@ -112,6 +117,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
         // pollMs defaults on → the reliable floor if the SSE push stream doesn't deliver over plugin-http.
         onDeck: (p) => applyRef.current(p.deck, p.isInitial),
         onFollow: (f) => onFollowRef.current?.(f),
+        // #616: an AI template swap (augment/adjust_template) → that host doc's tab gets the new template.
+        onTemplate: (t) => applyTemplateRef.current?.(t.docId, t.template, t.templateName),
         onStatus: (s, detail) => {
           setStatus(s);
           if (s === "error") {

@@ -21,6 +21,10 @@ export interface DocEntry {
   /** Monotonic, forward-only. Bumped on every committed mutation AND on undo/redo (which mint a
    *  NEW higher rev whose deck equals a past deck), so rev never goes backwards. */
   rev: number;
+  /** #616: the rev at which the doc's TEMPLATE was last replaced (augment/adjust_template; 0 = the template it
+   *  was minted with). A template-only change is a rev of its own (commitTemplateChange) so a polling GUI can
+   *  tell "pull the template" from "pull the deck" without the push notification. */
+  templateRev: number;
   /** Undo history; INVARIANT: history.present === session.deck after every host op. */
   history: HState<DeckIR | null>;
   title: string;
@@ -60,6 +64,9 @@ export interface HostContext {
    *  (P2.5 round-trip); undo/redo and AI edits pass none → everyone re-pulls. `changedIndices` (#407)
    *  = changedIndicesOf(...) for this op; undefined when the granularity is unknown. */
   onMutated?(entry: DocEntry, tool: string, opId?: string, changedIndices?: number[]): void;
+  /** #616: the doc's TEMPLATE was replaced (deck unchanged; commitTemplateChange already advanced rev) — the
+   *  host fans out deckChanged{templateChanged:true} so the GUI pulls the new template. No-op in solo. */
+  onTemplateChanged?(entry: DocEntry, tool: string): void;
   notifyOpened?(entry: DocEntry): void;
   notifyClosed?(docId: string): void;
 }
@@ -121,13 +128,24 @@ export function createSoloHostContext(initialSession: Session): HostContext {
   };
 }
 
+/** One list_documents row. `templateRev` (#616) is ADDITIVE. */
+export interface DocListing {
+  docId: string;
+  title: string;
+  slideCount: number;
+  dirty: boolean;
+  rev: number;
+  templateRev: number;
+  shared: boolean;
+}
+
 /** A live map of docId → DocEntry. Holds NO transport/connection state (that lives in host.ts). */
 export class DocRegistry {
   private docs = new Map<string, DocEntry>();
 
   /** Mint a new entry around an already-loaded Session (its deck seeds the history). */
   create(session: Session, title: string, shared: boolean): DocEntry {
-    const entry: DocEntry = { docId: randomUUID(), session, rev: 0, history: seedHistory(session.deck), title, shared };
+    const entry: DocEntry = { docId: randomUUID(), session, rev: 0, templateRev: 0, history: seedHistory(session.deck), title, shared };
     this.docs.set(entry.docId, entry);
     return entry;
   }
@@ -157,11 +175,11 @@ export class DocRegistry {
     return this.docs.size === 1 ? this.docs.keys().next().value ?? null : null;
   }
 
-  list(opts: { sharedOnly?: boolean } = {}): { docId: string; title: string; slideCount: number; dirty: boolean; rev: number; shared: boolean }[] {
-    const out: { docId: string; title: string; slideCount: number; dirty: boolean; rev: number; shared: boolean }[] = [];
+  list(opts: { sharedOnly?: boolean } = {}): DocListing[] {
+    const out: DocListing[] = [];
     for (const e of this.docs.values()) {
       if (opts.sharedOnly && !e.shared) continue;
-      out.push({ docId: e.docId, title: e.title, slideCount: e.session.deck?.slides.length ?? 0, dirty: e.session.dirty, rev: e.rev, shared: e.shared });
+      out.push({ docId: e.docId, title: e.title, slideCount: e.session.deck?.slides.length ?? 0, dirty: e.session.dirty, rev: e.rev, templateRev: e.templateRev, shared: e.shared });
     }
     return out;
   }
@@ -201,9 +219,16 @@ export type ChangeOrigin = "ai" | "gui";
 
 /** The deckChanged notification params. ADDITIVE over the original {docId, rev, opId} (#407): `origin`
  *  lets the GUI follow only AI edits (never yank the human's view on their own edit), and
- *  `changedIndices` is present only when known. */
-export function deckChangedPayload(entry: Pick<DocEntry, "docId" | "rev">, opId: string | undefined, origin: ChangeOrigin, changedIndices: number[] | undefined): Record<string, unknown> {
-  return { docId: entry.docId, rev: entry.rev, opId, origin, ...(changedIndices ? { changedIndices } : {}) };
+ *  `changedIndices` is present only when known. #616: a template-only change carries `templateChanged:true`
+ *  + `templateName` (ADDITIVE — the deck at this rev is unchanged; the GUI pulls the template instead). */
+export function deckChangedPayload(
+  entry: Pick<DocEntry, "docId" | "rev">,
+  opId: string | undefined,
+  origin: ChangeOrigin,
+  changedIndices: number[] | undefined,
+  template?: { templateName: string },
+): Record<string, unknown> {
+  return { docId: entry.docId, rev: entry.rev, opId, origin, ...(changedIndices ? { changedIndices } : {}), ...(template ? { templateChanged: true, templateName: template.templateName } : {}) };
 }
 
 export interface CommitResult {
@@ -236,6 +261,16 @@ export async function commitMutation(entry: DocEntry, mutate: (s: Session) => un
   entry.history = historyReducer(entry.history, { type: "set", next: entry.session.deck, mode: "commit", ts: 0, coalesceMs: 0 });
   entry.rev += 1;
   return { result, changed: true, rev: entry.rev };
+}
+
+/** #616: a template-only change (augment/adjust_template) already applied to `entry.session` — the deck is
+ *  untouched, so NOTHING is pushed onto the undo history (undo would otherwise step over an empty entry), but
+ *  rev still advances (forward-only: a stale expectedRev based on the old template is rejected) and
+ *  templateRev records it. The caller applies this only when the handler reported `changed:true`. */
+export function commitTemplateChange(entry: DocEntry): number {
+  entry.rev += 1;
+  entry.templateRev = entry.rev;
+  return entry.rev;
 }
 
 export interface UndoResult {
