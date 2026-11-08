@@ -1,37 +1,19 @@
-import type { DiagramSpec } from "../engine/schema";
-
+/**
+ * StatusBar.tsx — the thin bar under the workspace. #615: it shows ONLY what no other surface shows —
+ * the full path of the opened file (the doc tab shows just its name). It used to also carry a
+ * diagram-era readout (Ready / Nodes / Edges …) that App never fed (`spec={null}` → always
+ * "No input", even with a full deck) and an "Error" word that duplicated the preview's own error
+ * panel; both are gone. With no file path there is nothing to say, so the bar isn't drawn.
+ */
 interface StatusBarProps {
-  spec: DiagramSpec | null;
-  error: string | null;
   filePath: string | null;
 }
 
-export default function StatusBar({ spec, error, filePath }: StatusBarProps) {
+export default function StatusBar({ filePath }: StatusBarProps) {
+  if (!filePath) return null;
   return (
     <div className="flex items-center gap-4 px-4 py-1 bg-panel text-xs text-muted border-t border-edge">
-      <span>
-        {error ? (
-          <span className="text-red-400">Error</span>
-        ) : spec ? (
-          <span className="text-green-400">Ready</span>
-        ) : (
-          "No input"
-        )}
-      </span>
-
-      {spec && (
-        <>
-          <span>Nodes: {spec.nodes.length}</span>
-          <span>Edges: {spec.edges.length}</span>
-          {spec.groups.length > 0 && <span>Groups: {spec.groups.length}</span>}
-          {spec.lanes.length > 0 && <span>Lanes: {spec.lanes.length}</span>}
-          <span>Type: {spec.type}</span>
-          <span>Direction: {spec.direction}</span>
-        </>
-      )}
-
-      <div className="flex-1" />
-      {filePath && <span className="text-faint truncate max-w-xs">{filePath}</span>}
+      <span className="text-faint truncate" title={filePath}>{filePath}</span>
     </div>
   );
 }

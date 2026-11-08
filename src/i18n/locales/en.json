@@ -73,7 +73,14 @@
     "modelNotInstalled": "{{model}} (not installed)",
     "refreshModels": "Fetch installed models",
     "apiKeyOptional": "API key (optional)",
-    "rememberKey": "Remember key"
+    "rememberKey": "Remember key",
+    "modelsFetchError": "Couldn't fetch the model list ({{error}}). Check the Base URL, retry with ↻, or type a name manually.",
+    "modelsEmpty": "No installed models found. Confirm a model has been pulled to this Ollama and that the Base URL points to the right Ollama, then retry with ↻.",
+    "baseUrlPlaceholder": "Base URL (e.g. https://api.openai.com/v1)",
+    "modelPlaceholder": "Model name",
+    "apiKey": "API key",
+    "showKey": "Show",
+    "hideKey": "Hide"
   },
   "aiStatus": {
     "noValidEdit": "Couldn't generate a valid edit. Try a specific instruction (e.g. summarize / format as bullets / add a diagram / translate to English).",
@@ -135,7 +142,8 @@
     "helpUrlFallback": "Couldn't open the docs — use this URL instead: {{url}}",
     "augmentTemplateTitle": "Augment template",
     "augmentSuffix": " (augmented)",
-    "adjustSuffix": " (adjusted)"
+    "adjustSuffix": " (adjusted)",
+    "viewMarkdown": "Markdown"
   },
   "applyTemplate": {
     "templateUnusable": "This template can't be used: {{reason}}",
@@ -249,7 +257,11 @@
   "diagramEditor": {
     "mermaidIncompatibleHint": "This diagram contains icons or kpi/radar and can't be converted to Mermaid. Please edit it in YAML / JSON.",
     "selectEditFormat": "Select edit format",
-    "mermaidNotConvertible": "MERMAID (not convertible)"
+    "mermaidNotConvertible": "Mermaid (not convertible)",
+    "formatYaml": "YAML",
+    "formatJson": "JSON",
+    "formatMermaid": "Mermaid",
+    "valid": "✓ valid"
   },
   "diagramOverlay": {
     "resizeDragHint": "Drag to resize",
@@ -399,17 +411,26 @@
     "diagramTypeAuto": "Auto (let AI choose)",
     "requestPlaceholderSlides": "e.g. Progress report for a CRM migration project (about 10 slides, including current-state analysis, comparison, and a roadmap)",
     "requestPlaceholderDiagram": "e.g. Network diagram for a 3-tier web app (LB→Web→App→DB, with a DMZ)",
-    "switchToOllamaTitle": "Switch to local Ollama",
-    "ollamaDetected": "🦙 Ollama detected ({{count}}) → Use it",
-    "useBuiltinTitle": "Use the offline built-in model (downloads automatically the first time)",
-    "builtinDownload": "⬇ Offline AI (first download 2.4GB)",
-    "builtinUse": "💻 Use offline AI",
-    "stopBuiltinTitle": "Stop the built-in AI and free memory (restarts automatically on the next generation)",
-    "stopBuiltin": "⏹ Stop",
-    "modelNotInstalled": "{{model}} (not installed)",
-    "refreshModelsTitle": "Fetch installed models",
-    "modelsFetchError": "Couldn't fetch the model list ({{error}}). Check the Base URL, retry with ↻, or type a name manually.",
-    "modelsEmpty": "No installed models found. Confirm a model has been pulled to this Ollama and that the Base URL points to the right Ollama, then retry with ↻."
+    "close": "Close",
+    "stepRequest": "1. What do you want to create?",
+    "modeSlides": "Slide Deck",
+    "modeDiagram": "Diagram",
+    "stepConnection": "2. AI connection",
+    "connectionSettings": "Connection settings",
+    "connectionSettingsTitle": "Show or hide the AI connection settings (the same settings as the AI dock’s ⚙)",
+    "generate": "Generate",
+    "cancel": "Cancel",
+    "generating": "Generating…",
+    "showManual": "Or copy the prompt instead",
+    "hideManual": "Hide manual copy/paste",
+    "manualLabel": "Manual — copy this prompt to your LLM",
+    "buildPrompt": "Build Prompt",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "stepResult": "3. Result",
+    "stepResultPaste": "(or paste your LLM's response here)",
+    "resultPlaceholder": "Generated Markdown / JSON appears here as the AI writes it…",
+    "importToSlideCraft": "Import to SlideCraft"
   },
   "localOnly": {
     "advancedSettings": "Advanced Settings",
@@ -540,7 +561,9 @@
     "aspectLock": "Lock ratio",
     "resetRectTitle": "Reset to default size and position (clear manual adjustments)",
     "resetToDefault": "⟲ Reset to default",
-    "resetToFrame": "⟲ Reset to frame"
+    "resetToFrame": "⟲ Reset to frame",
+    "layout": "Layout",
+    "resetToAuto": "⟳ Auto"
   },
   "slideList": {
     "dragToReorder": "Drag to reorder",
@@ -618,7 +641,7 @@
   },
   "toolbar": {
     "undo": "Undo (⌘/Ctrl+Z)",
-    "redo": "Redo (⌘/Ctrl+Shift+Z)",
+    "redo": "Redo (⌘/Ctrl+Shift+Z, Ctrl+Y)",
     "aiCollabTitle": "Co-editing: live-sharing with another AI (click to toggle the AI dock)",
     "aiRunningTitle": "{{n}} AI task(s) running",
     "aiTitle": "AI (assist, collaboration, task history)",
@@ -661,5 +684,8 @@
     "applyTitle": "Add as \"{{name}}\" to the master list and apply it to this deck",
     "cancel": "Cancel",
     "failed": "Template adjustment failed: {{error}}"
+  },
+  "resizableSplit": {
+    "dividerTitle": "Drag to resize (double-click to reset)"
   }
 }

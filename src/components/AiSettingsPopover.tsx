@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PROVIDERS } from "../ipc/ai";
 import { runningInTauri } from "../ipc/commands";
@@ -12,9 +13,12 @@ const field = "px-2 py-1 bg-field border border-edge rounded text-xs text-fg";
  * of AiPanel's inline fold into a popover so the assist panel stays focused on GENERATING, not
  * configuring (a dev switches providers often; a user sets it once — [[ux_direction]]). The hook
  * logic (useAiGeneration) is unchanged: this is a pure re-home of the same controls.
+ * #615: this is the ONLY place that edits the connection — the 「AIで生成」 dialog (LlmAssist) renders
+ * this same component instead of its own copy (tests/ux-details-615.test.tsx).
  */
 export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
   const { t } = useTranslation();
+  const [showKey, setShowKey] = useState(false);
   const toneColor =
     ai.connection.tone === "ok" ? "text-green-400"
     : ai.connection.tone === "err" ? "text-red-400"
@@ -103,7 +107,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         {!ai.preset.native && ai.provider !== "builtin" && (
           <input
             className={`${field} w-56`}
-            placeholder="Base URL"
+            placeholder={t("aiSettings.baseUrlPlaceholder")}
             value={ai.cfg.baseURL}
             onChange={(e) => ai.setField("baseURL", e.target.value)}
           />
@@ -130,7 +134,7 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
         ) : (
           <input
             className={`${field} w-40`}
-            placeholder="model"
+            placeholder={t("aiSettings.modelPlaceholder")}
             value={ai.cfg.model}
             onChange={(e) => ai.setField("model", e.target.value)}
           />
@@ -148,11 +152,13 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           <>
             <input
               className={`${field} w-56`}
-              type="password"
-              placeholder={ai.preset.keyRequired ? "API key" : t("aiSettings.apiKeyOptional")}
+              type={showKey ? "text" : "password"}
+              placeholder={ai.preset.keyRequired ? t("aiSettings.apiKey") : t("aiSettings.apiKeyOptional")}
               value={ai.cfg.apiKey}
               onChange={(e) => ai.setField("apiKey", e.target.value)}
+              autoComplete="off"
             />
+            <button type="button" data-testid="ai-key-visibility" onClick={() => setShowKey((v) => !v)} className={`${field} hover:bg-edge`}>{showKey ? t("aiSettings.hideKey") : t("aiSettings.showKey")}</button>
             <label className="flex items-center gap-1 text-xs text-muted">
               <input
                 type="checkbox"
@@ -164,6 +170,11 @@ export default function AiSettingsPopover({ ai }: { ai: AiGeneration }) {
           </>
         )}
       </div>
+      {!ai.preset.native && ai.provider !== "builtin" && ai.models.length === 0 && (
+        <span className="text-[10px] text-faint">
+          {ai.modelsError ? t("aiSettings.modelsFetchError", { error: ai.modelsError }) : t("aiSettings.modelsEmpty")}
+        </span>
+      )}
     </div>
   );
 }
