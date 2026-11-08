@@ -126,6 +126,24 @@ function classifySlide(slide: SlideIR, slideIndex: number, totalSlides: number):
   return { role: "content", regions: 1, fallback: CANONICAL_FALLBACK.content };
 }
 
+/** #672: how many picture frames a layout of the visual's role has to spare over its images — 0 = exact (the
+ *  layout pickRoleLayout takes), undefined = another role or too few frames (an image would be dropped). The ONE
+ *  frame test pickRoleLayout and suggestLayouts' ranking both read (R8). */
+export function visualFrameSlack(e: CatalogEntry, visual: VisualRole): number | undefined {
+  if (e.role !== visual.role) return undefined;
+  const slack = e.placeholders.filter((p) => p.role === "picture").length - visual.count;
+  return slack >= 0 ? slack : undefined;
+}
+
+/** suggestLayouts' role + count term: 0 for the slide's role with a fitting count, +50 for another role, +5 per
+ *  region (or spare picture frame) off. #672: a layout of the slide's VISUAL role that loses no image counts as
+ *  the slide's role, ranked by spare frames — so a Gallery slide's alternatives start with the other Gallery.*. */
+export function roleCountMismatch(e: CatalogEntry, role: LayoutRole, regions: number | undefined, visual?: VisualRole): number {
+  const slack = visual ? visualFrameSlack(e, visual) : undefined;
+  if (slack !== undefined) return slack * 5;
+  return (e.role === role ? 0 : 50) + (regions !== undefined ? Math.abs(e.bodyCount - regions) * 5 : 0);
+}
+
 /** pickLayout for the classified role. A `chart` slide (two figures) takes a chart layout with exactly
  *  that many regions, else a columns layout — never a 1-chart(+analysis) layout or a content layout with
  *  a callout box, whose 2nd "body" is a side note. Every other role: pickLayout as is (byte-identical). */
@@ -139,8 +157,7 @@ export function pickRoleLayout(
 ): CatalogEntry | undefined {
   if (visual) {
     // #598: the image-structure layout whose picture frames match the image count; none → the old pick below.
-    const frames = (e: CatalogEntry) => e.placeholders.filter((p) => p.role === "picture").length;
-    const hit = pickLayout(catalog.filter((e) => frames(e) === visual.count), visual.role, undefined, true);
+    const hit = pickLayout(catalog.filter((e) => visualFrameSlack(e, visual) === 0), visual.role, undefined, true);
     if (hit) return hit;
   }
   if (role !== "chart") return pickLayout(catalog, role, regions, hasImage, table);

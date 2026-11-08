@@ -104,7 +104,10 @@ function CAMPAIGN_LAYOUTS(): LayoutDef[] {
   return [
     // 全面画像＋左下の小さなキャプション（作品名＝スライドのタイトル）。画像は `{behind=1}` の背景画像で、
     // 全面の picture 枠の箱に描かれる（imageRect）。キャプションは画像の上に載るので canvas 色。
-    { name: "Image.FullBleed+1Caption", family: "dark", placeholders: [
+    // 地は濃色（titleText）: 画像なし（層サムネイル・全レイアウト見本）でも canvas 色の文字が読める（#672）。
+    // 背景画像はスライドの最背面に描かれて地を覆うので、画像ありの見た目は変わらない。レイアウトに置く
+    // 半透明の帯（スクリム）は同じ理由で画像の下に隠れるため使えない。
+    { name: "Image.FullBleed+1Caption", family: "dark", bg: "titleText", placeholders: [
       { ...pic(0, 0, 0, 13.333, 7.5), name: "Image.Full" },
       { name: "Caption.BottomLeft", type: "body", idx: 15, x: 0.8, y: 6.6, w: 7.5, h: 0.45, fontSize: 14, font: "minor", color: "canvas", bold: false, align: "l" },
     ]},
