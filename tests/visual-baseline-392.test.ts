@@ -6,8 +6,8 @@
  * - 入力: `tests/fixtures/slideir-baseline/visuals.md`（ビジュアル 1 つ・本文＋ビジュアル・表＋図・col・同種 2 つ・
  *   Mermaid を 1 スライドずつ）。テンプレは `public/templates/slide/*_TemplateOnly.pptx`（アプリ同梱の 3 本・commit 済み）。
  * - 既存の golden（layout-augment-golden.test.ts の 3 列テキスト）とは重ならない。
- * - **現状の「表＋図が重なる」挙動もそのまま固定している**（表と図が両方 ordinal 1 → 同じ placeholder を取り合い、
- *   visualCollisions が報告する）。#392 段 2 で別々の body 領域に置くよう変わる予定。
+ * - 段 0 では「表＋図が重なる」挙動（表と図が両方 ordinal 1 → 同じ placeholder を取り合う）を固定していた。
+ *   #392 段 2 で別々の body 領域に置くよう変わった（figure-placement）— MULTI のスライドだけ再固定。
  *
  * 更新手順: 挙動を意図して変えたときだけ `npx vitest run tests/visual-baseline-392.test.ts -u` で
  * tests/__snapshots__/visual-baseline-392.test.ts.snap を書き直す。sha256 の差分は、書き出した XML を実際に
@@ -91,12 +91,13 @@ describe("#392 段 0: visual placement per shipped template (auto layout · ordi
       expect(out).toMatchSnapshot();
     });
   }
-  it("[#392 で変わる予定] table + diagram (no col): both claim ONE placeholder → a reported collision on every template", () => {
+  it("[#392 段 2 で変更] table + diagram (no col): each gets its own body region → no collision, nothing unbound, on every template", () => {
     const i = deck.slides.findIndex((s) => titleOf(s) === MULTI[0]);
     for (const f of TEMPLATES) {
       const p = placement(loaded[f], deck.slides[i], i);
-      expect(p.collisions, f).toHaveLength(1);
-      expect(p.collisions[0].kinds, f).toEqual(["diagram", "table"]);
+      expect(p.collisions, f).toEqual([]);
+      expect(p.unbound, f).toEqual([]);
+      expect(Object.values(p.occupancy).sort(), f).toEqual(["diagram", "table"]); // two different placeholders
     }
   });
   it("single-visual and col slides have no collision on any template", () => {

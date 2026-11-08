@@ -6,16 +6,16 @@ exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templat
   "slide1.xml.rels ビジュアル基準デッキ": "b0ff42826d877c8160189529b299cae0cada618096465eb407e16cef501e21c9",
   "slide10.xml 本文とコード": "99414daf646d8189e46ec01780e1971cee4445b64b094cf1d3794dd6835ef450",
   "slide10.xml.rels 本文とコード": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
-  "slide11.xml 表と図（現状は重なる）": "55bfa41781782516f1e04304dc527b0afa9f5a5a8445f29b9e25eafe255e0da0",
-  "slide11.xml.rels 表と図（現状は重なる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide11.xml 表と図（現状は重なる）": "d45eb27f7c3121c5f39d8e0b649b3cdb11311f300bfd460294793d96f7420ffc",
+  "slide11.xml.rels 表と図（現状は重なる）": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
   "slide12.xml col 本文｜図": "d685a07a4577d6038a1988dc9b85a7c91081e3bc57725930e207610379ffa8b6",
   "slide12.xml.rels col 本文｜図": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
   "slide13.xml col 表｜図": "255512867b328be85c4ac253b45f2cd3772a06d2279c63b73e506c3dc761f825",
   "slide13.xml.rels col 表｜図": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
   "slide14.xml col 本文｜画像": "9578c055195de6d9d57f5669ca82dc06609e92cddf1bc818a84f885c3f522cdd",
   "slide14.xml.rels col 本文｜画像": "d347b968a8a2ed3926cdfcb666164d4e490578b054f2ea02129b2e9d44dd3af4",
-  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "b1cd09fd570cee52bb5dbe8f25c4274f618c33a0e4745dfa570968dd7dcade06",
-  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "09a7b46445aed73f9b0ffc531e8278326a519213c5b848ba602e02393d630a32",
+  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "32ea3d7e3a838d506caa5a4e304f5575a41c41f8a65177a799c776e8eee0396c",
   "slide16.xml Mermaid": "3029fb511424d5e16b9d8dd30bcac0ee009c43c675e837200725335c11c6e7bb",
   "slide16.xml.rels Mermaid": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
   "slide2.xml 図だけ": "08ed47bc6a52ba1e55c2f6fc18e568a0aa12427edf068c35324ef86b11dae6a4",
@@ -43,16 +43,16 @@ exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templat
   "slide1.xml.rels ビジュアル基準デッキ": "b0ff42826d877c8160189529b299cae0cada618096465eb407e16cef501e21c9",
   "slide10.xml 本文とコード": "500d9b3755887e4710583c638c9baca5bdb928b91c4bcb3b4cc07eec1d1d962c",
   "slide10.xml.rels 本文とコード": "c6fea4996707408775075cd71aaabfe60380cd3449890f6cf0b4b0dde3fe241d",
-  "slide11.xml 表と図（現状は重なる）": "d6d9e3a803ea9ac1c5154df4a745daa2e0b4de71f0ffc92942fd123d89390b99",
-  "slide11.xml.rels 表と図（現状は重なる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide11.xml 表と図（現状は重なる）": "628e3a8b3b88694b1cf5328550b6215f7d958e225c49eae42930f3743650aae1",
+  "slide11.xml.rels 表と図（現状は重なる）": "c6fea4996707408775075cd71aaabfe60380cd3449890f6cf0b4b0dde3fe241d",
   "slide12.xml col 本文｜図": "a38bf75573086d9c35f7540dfd8e9664652a1b60535cebec6e2485fe409ee55a",
   "slide12.xml.rels col 本文｜図": "c6fea4996707408775075cd71aaabfe60380cd3449890f6cf0b4b0dde3fe241d",
   "slide13.xml col 表｜図": "dfc29cacd752b1790a0c62957f0dbe0a5ab8cc4d10fff0819fd8745874063a49",
   "slide13.xml.rels col 表｜図": "c6fea4996707408775075cd71aaabfe60380cd3449890f6cf0b4b0dde3fe241d",
   "slide14.xml col 本文｜画像": "f5cde1cedc9d1af22cbfe60ee3fdc1fea57fdd2118e955a3e3cc8887f7a2ff8d",
   "slide14.xml.rels col 本文｜画像": "c593471311ffe98e167af60e84c95bc39f8b23929e6333fd69457c6f0101e95f",
-  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "6fe31d9c949d53dc0cdafedd08c233de1e5eaa28946665bdfbf9b08b2125cd44",
-  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "0d540ff86cc3e78c44072649666445d5c436a4a67e663f6a7c49c3f9b81744f2",
+  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "c6fea4996707408775075cd71aaabfe60380cd3449890f6cf0b4b0dde3fe241d",
   "slide16.xml Mermaid": "82dca0ade5fbd58b6b9a029c2f9690ab681c949dd4446264c3f9244e832d82a3",
   "slide16.xml.rels Mermaid": "0af72e5bb287f4900823317d1a3eaf7192dc15532ead71acae6b000a4fe44418",
   "slide2.xml 図だけ": "de3ec950f7eec97357d87c221d060ab18a2f835ed3c73cad8297219c22fa2f92",
@@ -80,16 +80,16 @@ exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templat
   "slide1.xml.rels ビジュアル基準デッキ": "b0ff42826d877c8160189529b299cae0cada618096465eb407e16cef501e21c9",
   "slide10.xml 本文とコード": "b7b4b1fbf76efaed70d3d2fe50c335791b1df95cbf1ffd31f5f8a37789fcff28",
   "slide10.xml.rels 本文とコード": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
-  "slide11.xml 表と図（現状は重なる）": "bf841dd6e58b562fe7d8ce7e8c48b03abd13045bdcedde7a37792e8258997dbb",
-  "slide11.xml.rels 表と図（現状は重なる）": "fe11b827a409711e106df509505d7f5ddc31830b59e94a032b9fa5322c3c0222",
+  "slide11.xml 表と図（現状は重なる）": "31cddd448100b97b462a6355370d1dcc7a0ed519ba23d3b809b3b17b59d25e4d",
+  "slide11.xml.rels 表と図（現状は重なる）": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide12.xml col 本文｜図": "93f0950dc8996a864555fb797393d985cc9c70daeee872de5a7583acc391f784",
   "slide12.xml.rels col 本文｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide13.xml col 表｜図": "6d141593d92dfa27a952a2c3462503b9fca9099c1ce0199e089d662b0de78999",
   "slide13.xml.rels col 表｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide14.xml col 本文｜画像": "5faba559b9d6eed2d8d6755fa551d051b3a4fe49d959991e6caaa5dcfe7280d6",
   "slide14.xml.rels col 本文｜画像": "b9360e434548b9ee9804877437dc32ba37722f9f6e9d1ebc95e7010f50421c12",
-  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "7f2758e2b76bc2e3553af29b9abcdd8f72d3398e2da2acd5a2b0f51f010ebbea",
-  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "fe11b827a409711e106df509505d7f5ddc31830b59e94a032b9fa5322c3c0222",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "5d52486abd3b35e9d94e96bb9c7a35b8fdda8a37f6235449144f84d7cf7cf21c",
+  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide16.xml Mermaid": "0eacb088bb6d770428876c795de2679e20e89aecc334b7c30010aeb3675e7703",
   "slide16.xml.rels Mermaid": "fe11b827a409711e106df509505d7f5ddc31830b59e94a032b9fa5322c3c0222",
   "slide2.xml 図だけ": "ac4755bfae9bd4442734e3b643a945a15803e7426d41a2044f569f5dbb9f9177",
@@ -117,16 +117,16 @@ exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templat
   "slide1.xml.rels ビジュアル基準デッキ": "b0ff42826d877c8160189529b299cae0cada618096465eb407e16cef501e21c9",
   "slide10.xml 本文とコード": "edca463a2ccd462905290d92d33cf16b214684668403af1dc612d5f097f5b467",
   "slide10.xml.rels 本文とコード": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
-  "slide11.xml 表と図（現状は重なる）": "f69f83d46f8c38e7c555d7dc329007b3a40d5e133efef5845b0a6e929c5e0f42",
-  "slide11.xml.rels 表と図（現状は重なる）": "0c8caeaab7345420f9d119c7f8561db9ff0ad27fb7a02dba73e164c5e96c09c7",
+  "slide11.xml 表と図（現状は重なる）": "74d606509708129aa81a92eed692cb60ffde9413e774ceb36f4d6d011a526228",
+  "slide11.xml.rels 表と図（現状は重なる）": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide12.xml col 本文｜図": "b7c42948d6d081cdacadc40644ca27fa3742cbcf6c5369c09fb3db18dc08e1d8",
   "slide12.xml.rels col 本文｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide13.xml col 表｜図": "f06ca5c78b742eaafbca982420b239879e950f1f15ab2068031aa2eb8730e3b2",
   "slide13.xml.rels col 表｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide14.xml col 本文｜画像": "35720359b82a9935f1f3c5168503c651037e28e628ba135bc5e3b17b7b58e15e",
   "slide14.xml.rels col 本文｜画像": "678e6b106b0a62262e67dc0087f1fe3114a84156b199bf022750eecc7bce7d47",
-  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "e5644475137f429a7c982627242c1629559e3dd578444eb684b7e7d97e366938",
-  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "0c8caeaab7345420f9d119c7f8561db9ff0ad27fb7a02dba73e164c5e96c09c7",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "cf2874b7d909d1c6743b1fa2020c0ef39148a5295aa3d6996cb01bf7bc8d81a3",
+  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
   "slide16.xml Mermaid": "df6878e4405d7ffacb1ee7daaab5290cf502dbceb2c7388ed123091eb06f1167",
   "slide16.xml.rels Mermaid": "0c8caeaab7345420f9d119c7f8561db9ff0ad27fb7a02dba73e164c5e96c09c7",
   "slide2.xml 図だけ": "b7ae97f72f570c8e716ca070398c544477f15f0d6113b4710ab7edc4aff1ae27",
@@ -154,16 +154,16 @@ exports[`#392 段 0: PPTX golden — slide XML / rels sha256 per shipped templat
   "slide1.xml.rels ビジュアル基準デッキ": "b0ff42826d877c8160189529b299cae0cada618096465eb407e16cef501e21c9",
   "slide10.xml 本文とコード": "54895391c6aacd650a360b55a6b26a67ee4938ffe7a1d8fa9f845dcd194de206",
   "slide10.xml.rels 本文とコード": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
-  "slide11.xml 表と図（現状は重なる）": "4464a6a71d5d7ad2087ee9cb39dc8c009d46630126c970c7959c9fa6e01ffd11",
-  "slide11.xml.rels 表と図（現状は重なる）": "9f6299adca2b737d92b20341979e35926328d30b940fcf1dd5793f9e680d19e0",
+  "slide11.xml 表と図（現状は重なる）": "f1b6c2db23283380a7d05d97aa08a8901b12fadf5eff514de3f20683ce6820a3",
+  "slide11.xml.rels 表と図（現状は重なる）": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
   "slide12.xml col 本文｜図": "44f8d153bdc7b4b2985492b3f91cfe69401106337afc7764e137f6c0126cf785",
   "slide12.xml.rels col 本文｜図": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
   "slide13.xml col 表｜図": "4578b0cd8dd80bd8694fa7338c1f591544aed24fa9b43ddb784ffc33c85bd9ef",
   "slide13.xml.rels col 表｜図": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
   "slide14.xml col 本文｜画像": "42a51532198c1cf3cdc52907fe9a83cce0425bc3a574c8096434502ad3f5585f",
   "slide14.xml.rels col 本文｜画像": "903eed25d490985f60f5e72b6cd90b53b5fe67cf8f858de3d8ae177e91917bda",
-  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "6e2cec675d0122899190edf4beb25d9101e6718bde6cdec4203974e9272f7c93",
-  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "9f6299adca2b737d92b20341979e35926328d30b940fcf1dd5793f9e680d19e0",
+  "slide15.xml 図が 2 つ（現状は先の図が落ちる）": "74bed9c9396eb0b428bed6e92b369c38060b456534893d204f28c4c6ef468a7e",
+  "slide15.xml.rels 図が 2 つ（現状は先の図が落ちる）": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
   "slide16.xml Mermaid": "35eccb3403a82d50ad026425a3b80d8d67096f9d19c6ea0b21403bcce9265a14",
   "slide16.xml.rels Mermaid": "9f6299adca2b737d92b20341979e35926328d30b940fcf1dd5793f9e680d19e0",
   "slide2.xml 図だけ": "0bb4de4a993538e9c4d60a0d633343c106166e533bd633c1c4990615ed11ea26",
@@ -198,9 +198,9 @@ exports[`#392 段 0: slideRoleRegions (template-independent role + body-region c
     "role": "content",
   },
   "10 表と図（現状は重なる）": {
-    "fallback": "Content.1Body.Single",
-    "regions": 1,
-    "role": "content",
+    "fallback": "Column.2Body.Equal",
+    "regions": 2,
+    "role": "columns",
   },
   "11 col 本文｜図": {
     "fallback": "Column.2Body.Equal",
@@ -218,9 +218,9 @@ exports[`#392 段 0: slideRoleRegions (template-independent role + body-region c
     "role": "content",
   },
   "14 図が 2 つ（現状は先の図が落ちる）": {
-    "fallback": "Content.1Body.Single",
-    "regions": 1,
-    "role": "content",
+    "fallback": "Chart.2Chart.Equal",
+    "regions": 2,
+    "role": "chart",
   },
   "15 Mermaid": {
     "fallback": "Content.1Body.Single",
@@ -297,19 +297,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "10 表と図（現状は重なる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
-    "collisions": [
-      {
-        "idx": "1",
-        "kinds": [
-          "diagram",
-          "table",
-        ],
-      },
-    ],
-    "layout": "Content.1Body.Single",
+    "collisions": [],
+    "layout": "Column.2Body.Equal",
     "occupancy": {
       "1": "table",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -366,11 +360,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "14 図が 2 つ（現状は先の図が落ちる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
     "collisions": [],
-    "layout": "Content.1Body.Single",
+    "layout": "Column.2Body.Equal",
     "occupancy": {
       "1": "diagram",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -534,19 +530,14 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "10 表と図（現状は重なる）": {
     "bodyIdxs": [
       "1",
+      "2",
+      "3",
     ],
-    "collisions": [
-      {
-        "idx": "1",
-        "kinds": [
-          "diagram",
-          "table",
-        ],
-      },
-    ],
-    "layout": "Content.1Body.Single",
+    "collisions": [],
+    "layout": "Column.3Body.Equal",
     "occupancy": {
       "1": "table",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -605,11 +596,14 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "14 図が 2 つ（現状は先の図が落ちる）": {
     "bodyIdxs": [
       "1",
+      "2",
+      "3",
     ],
     "collisions": [],
-    "layout": "Content.1Body.Single",
+    "layout": "Column.3Body.Equal",
     "occupancy": {
       "1": "diagram",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -776,19 +770,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "10 表と図（現状は重なる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
-    "collisions": [
-      {
-        "idx": "1",
-        "kinds": [
-          "diagram",
-          "table",
-        ],
-      },
-    ],
-    "layout": "13_本文（1カラム）",
+    "collisions": [],
+    "layout": "03_本文（2カラム）",
     "occupancy": {
       "1": "table",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -849,11 +837,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "14 図が 2 つ（現状は先の図が落ちる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
     "collisions": [],
-    "layout": "13_本文（1カラム）",
+    "layout": "03_本文（2カラム）",
     "occupancy": {
       "1": "diagram",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -1031,19 +1021,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "10 表と図（現状は重なる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
-    "collisions": [
-      {
-        "idx": "1",
-        "kinds": [
-          "diagram",
-          "table",
-        ],
-      },
-    ],
-    "layout": "02_本文（1カラム）",
+    "collisions": [],
+    "layout": "03_本文（2カラム）",
     "occupancy": {
       "1": "table",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -1100,11 +1084,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "14 図が 2 つ（現状は先の図が落ちる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
     "collisions": [],
-    "layout": "02_本文（1カラム）",
+    "layout": "03_本文（2カラム）",
     "occupancy": {
       "1": "diagram",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -1271,19 +1257,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "10 表と図（現状は重なる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
-    "collisions": [
-      {
-        "idx": "1",
-        "kinds": [
-          "diagram",
-          "table",
-        ],
-      },
-    ],
-    "layout": "08_目次",
+    "collisions": [],
+    "layout": "04_図＋説明",
     "occupancy": {
       "1": "table",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
@@ -1340,11 +1320,13 @@ exports[`#392 段 0: visual placement per shipped template (auto layout · ordin
   "14 図が 2 つ（現状は先の図が落ちる）": {
     "bodyIdxs": [
       "1",
+      "2",
     ],
     "collisions": [],
-    "layout": "08_目次",
+    "layout": "04_図＋説明",
     "occupancy": {
       "1": "diagram",
+      "2": "diagram",
     },
     "resolved": {
       "diagram": "1 → 1",
