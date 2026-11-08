@@ -7,7 +7,7 @@
 import type { SlideIR, DiagramBlock, MermaidBlock, ImageBlock, PlaceholderContent, Paragraph, FigureBlock } from "./slide-schema";
 import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
-import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
+import { detectSeparator, splitBySeparator, trimBodyLines, matchSeparator } from "./md-separators";
 import { findTableInLines, extractBodyTables } from "./md-body-table";
 import { figureFields } from "./slide-figures";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS, type LayoutRoleLookup } from "./slide-roles";
@@ -292,12 +292,13 @@ export function parseSlideBlock(
     // `source:` key inside a column's ```diagram YAML stays YAML).
     const groupContent: string[] = [];
     let groupFence = false;
+    let imagePos = -1; // #392 段 2: the column the body image sat in (source order), -1 = before the 1st
     for (const ln of lines.slice(cursor)) {
       if (ln.trim().startsWith("```")) groupFence = !groupFence;
       const row = groupFence ? null : matchFieldRow(ln.trim());
       if (row) { fieldRows.push(row); continue; }
       const img = matchImageLine(ln.trim());
-      if (img && !image) { image = img; continue; }
+      if (img && !image) { image = img; imagePos = groupContent.filter((l) => matchSeparator(l)?.type === separatorType).length - 1; continue; }
       groupContent.push(ln);
     }
 
@@ -342,11 +343,11 @@ export function parseSlideBlock(
       }
     });
     pushFieldRows();
-    // The hoisted image (a body image, not a backdrop) is a visual too — after the columns (its own line).
-    if (image && !image.behind) visuals.push({ f: { kind: "image", ...image }, pos: sections.length });
+    // The hoisted image (a body image, not a backdrop) is a visual too — after its column's figure (-1 → -0.5: before the 1st column).
+    if (image && !image.behind) visuals.push({ f: { kind: "image", ...image }, pos: imagePos + 0.5 });
 
     if (placeholders.length === 0 && visuals.length === 0 && !image && !notes?.length) return null;
-    const { diagram, mermaidBlock, table, figures } = figureFields(visuals.map((v) => v.f));
+    const { diagram, mermaidBlock, table, figures } = figureFields(visuals.sort((a, b) => a.pos - b.pos).map((v) => v.f));
 
     return {
       layout,

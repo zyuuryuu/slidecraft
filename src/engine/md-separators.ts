@@ -18,7 +18,7 @@ export function beforeAfterRole(ordinal: number): "before" | "after" {
  *  marked as the CURRENT step (#401). Only `step` takes the `*`; `<!-- card * -->` etc. stay
  *  non-separators (the pre-#401 behaviour). `before`/`after` are ONE family (beforeAfter, #402):
  *  either word opens a region, meaning is POSITIONAL (beforeAfterRole). */
-function matchSeparator(line: string): { type: SeparatorType; current: boolean } | null {
+export function matchSeparator(line: string): { type: SeparatorType; current: boolean } | null {
   const m = line.trim().match(/^<!--\s*(col|kpi|step|card|compare|before|after)\s*(\*)?\s*-->$/);
   if (!m || (m[2] && m[1] !== "step")) return null;
   const type = m[1] === "before" || m[1] === "after" ? "beforeAfter" : (m[1] as SeparatorType);

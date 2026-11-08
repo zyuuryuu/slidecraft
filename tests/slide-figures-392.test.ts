@@ -5,14 +5,14 @@
  * `figures` の意味（slide-figures.ts）: 本文ビジュアル（diagram / mermaid / table / code / 背面でない image）が
  * **2 つ以上**のスライドにだけ付き、**全件を出現順**で持つ。単数フィールド（diagram 等）は種類ごとの
  * **1 つ目**を引き続き持つ（読み込み互換）。ビジュアル一覧を読む経路は `slideFigures(slide)` 1 本（R8）。
- * 配置・描画（2 つ目以降を別の枠に描く）は段 2 — それまでは描かれないことを `figure-dropped` で告知する。
+ * 配置・描画（2 つ目以降を別の枠に描く）は段 2（figures-placement-392.test.ts）。
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { parseMd, parseMdReport } from "../src/engine/md-parser";
 import { serializeMd } from "../src/engine/md-serializer";
-import { slideFigures, undrawnFigures } from "../src/engine/slide-figures";
+import { slideFigures } from "../src/engine/slide-figures";
 import { diagnoseDeck } from "../src/engine/deck-diagnostics";
 import type { SlideIR } from "../src/engine/slide-schema";
 
@@ -194,17 +194,11 @@ describe("#392 段 1 R8: ビジュアル一覧の経路は slideFigures 1 本 �
   });
 });
 
-describe("#392 段 1: never-silent — 段 2 までは描かれない 2 つ目以降を figure-dropped で告知", () => {
-  it("undrawnFigures = 単数フィールド以外（描画経路が読まないもの）", () => {
-    const s = parseMd(`# T\n\n${DIAG("one")}\n\n${DIAG("two")}`).slides[0];
-    expect(undrawnFigures(s)).toHaveLength(1);
-    expect(undrawnFigures(parseMd(`# T\n\n${TABLE("1")}\n\n${DIAG("d")}`).slides[0])).toEqual([]);
-    expect(undrawnFigures(parseMd(`# T\n\n${DIAG("d")}`).slides[0])).toEqual([]);
-  });
-  it("diagnoseDeck が figure-dropped（info）を 1 件出す・単一ビジュアルでは出さない", () => {
+describe("#392 段 1 → 段 2: never-silent — 2 つ目以降も描かれる（置き場の無いものだけ figure-dropped）", () => {
+  // 段 1 の undrawnFigures（＝単数フィールド以外は描かれない）は段 2 で廃止。描くかどうかは配置（figureRegions）で
+  // 決まり、その告知は figure-dropped-notice.test.ts / figures-placement-392.test.ts がテンプレ付きで検査する。
+  it("テンプレ無しの diagnoseDeck は figure-dropped を出さない（描けるかはレイアウト次第）", () => {
     const deck = parseMd(`# T\n\n${DIAG("one")}\n\n${DIAG("two")}\n\n---\n\n# U\n\n${DIAG("x")}`);
-    const iss = diagnoseDeck(deck).filter((x) => x.id === "figure-dropped");
-    expect(iss.map((x) => [x.slideIndex, x.level])).toEqual([[0, "info"]]);
-    expect(iss[0].message).toContain("図の2つ目以降（1個）");
+    expect(diagnoseDeck(deck).filter((x) => x.id === "figure-dropped")).toEqual([]);
   });
 });

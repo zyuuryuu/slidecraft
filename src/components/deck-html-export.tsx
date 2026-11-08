@@ -26,6 +26,7 @@ import { embedFallbackFamily, type CjkClass } from "../engine/font-stack";
 import { cjkClassesForTemplate } from "../engine/cjk-class";
 import { subsetFontToTtf } from "./font-subsetter";
 import type { DeckIR } from "../engine/slide-schema";
+import { mermaidSources, withMermaidSvg } from "../engine/slide-figures";
 
 /** px-per-inch the slides are rendered at; the CSS shell then scales the whole stage to fit. */
 const SCALE = 96;
@@ -37,20 +38,25 @@ const SCALE = 96;
  * them via DiagramSvgOverlay synchronously. Runs in the WebView where `document` exists.
  */
 async function preRenderNonNativeMermaid(deck: DeckIR): Promise<DeckIR> {
-  const isNonNative = (s: DeckIR["slides"][number]) => s.mermaidBlock && !mermaidToDiagramSpec(s.mermaidBlock.mermaid);
-  if (!deck.slides.some(isNonNative)) return deck;
+  // Every non-native ```mermaid of the slide (#392 段 2: a 2nd+ one too).
+  const nonNative = (s: DeckIR["slides"][number]) => mermaidSources(s).filter((m) => !mermaidToDiagramSpec(m));
+  if (!deck.slides.some((s) => nonNative(s).length > 0)) return deck;
 
   const { default: mermaidLib } = await import("mermaid");
   mermaidLib.initialize(MERMAID_CONFIG);
   const slides = await Promise.all(
     deck.slides.map(async (slide, i) => {
-      if (!isNonNative(slide)) return slide;
-      try {
-        const { svg } = await mermaidLib.render(`html-mmd-${i}`, slide.mermaidBlock!.mermaid);
-        return { ...slide, mermaidBlock: { ...slide.mermaidBlock!, svgCache: svg } };
-      } catch {
-        return slide; // render failed → left without svgCache (empty box), but we tried
+      const sources = nonNative(slide);
+      if (sources.length === 0) return slide;
+      const svgs = new Map<string, string>();
+      for (const [k, src] of sources.entries()) {
+        try {
+          svgs.set(src, (await mermaidLib.render(k === 0 ? `html-mmd-${i}` : `html-mmd-${i}-${k}`, src)).svg);
+        } catch {
+          // render failed → left without svgCache (empty box), but we tried
+        }
       }
+      return svgs.size ? withMermaidSvg(slide, (m) => svgs.get(m)) : slide;
     }),
   );
   return { ...deck, slides };

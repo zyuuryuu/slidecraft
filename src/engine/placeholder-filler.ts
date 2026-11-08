@@ -7,15 +7,12 @@
  */
 
 import JSZip from "jszip";
-import { loadYaml } from "./yaml-io";
 import type { DeckIR, SlideIR, PlaceholderContent } from "./slide-schema";
-import { DiagramSpecSchema, type DiagramSpec } from "./schema";
 import type { TemplateData, LayoutInfo } from "./template-loader";
 import { autoSelectLayout, findLayout } from "./template-loader";
 import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, drawnImage, visualOccupancy } from "./visual-placement";
-import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
+import { planSlideFigures, dataUriToImage, imagePicXml, mermaidPicXml, imageWithCaptionXml, extractDiagramShapes, type SlideMedia } from "./slide-figure-ooxml";
 import { planFieldRescue, applyFieldRescue, fieldNoteShapeXml } from "./field-rescue";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "./group-binding";
 import { isGroupedSlide } from "./slide-markers";
@@ -26,9 +23,7 @@ import { createLinkRegistry } from "./hyperlink-rels";
 import { titleFontPt } from "./title-fit";
 import { paintToShapeXml, renumberShapeIds } from "./pptx-writer";
 import type { ChartsMode } from "./pptx-native-chart";
-import { nativeChartPartsForYaml, writeNativeChart, maxChartNumber, XLSX_CT, type NativeChartParts } from "./pptx-native-chart-parts";
-import { paintDiagram } from "./diagram-painter";
-import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
+import { nativeChartPartsForYaml, writeNativeChart, maxChartNumber, XLSX_CT, CHART_REL_ID, type NativeChartParts } from "./pptx-native-chart-parts";
 import { tableGraphicFrameXml } from "./table-ooxml";
 import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT, NOTES_FIRST_LINK_RID } from "./notes-ooxml";
 import { materializeDerivedSlides, sectionFooterFor } from "./deck-sections";
@@ -84,45 +79,6 @@ function replaceTextInShape(
   );
 }
 
-// ── Extract diagram shapes from PptxGenJS output ──
-
-async function extractDiagramShapes(
-  diagramYaml: string,
-  region?: { x: number; y: number; w: number; h: number },
-): Promise<string> {
-  const data = loadYaml(diagramYaml);
-  const result = DiagramSpecSchema.safeParse(data);
-  if (!result.success) {
-    throw new Error("Invalid diagram YAML: " + result.error.issues[0]?.message);
-  }
-  const spec: DiagramSpec = result.data;
-  const theme = midnightExecutive();
-  // Embedded in a titled slide → the diagram omits its own title bar so it
-  // doesn't duplicate / overlap the slide's title placeholder. When `region` is
-  // given (diagram beside body text), confine the shapes to that placeholder box.
-  // The PptxGenJS slide's shapes, nested into PowerPoint sub-groups (figure = one object; node/edge =
-  // grabbable parts) per the painter's group tree.
-  return paintToShapeXml((t) => paintDiagram(t, spec, { theme, omitTitle: true, region }));
-}
-
-/** Parse a base64 image data URI → bytes + ext + mime for OOXML media embedding. Returns null for a
- *  non-base64 data URI or a path src (those aren't embedded — no <p:pic> is emitted for them). */
-function dataUriToImage(src: string): { bytes: Uint8Array; ext: string; mime: string } | null {
-  const m = src.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
-  if (!m) return null;
-  const mime = m[1].toLowerCase();
-  const sub = mime.slice("image/".length);
-  const ext = sub === "jpeg" ? "jpg" : sub === "svg+xml" ? "svg" : sub; // png/gif/webp/bmp pass through
-  try {
-    const bin = atob(m[2].replace(/\s/g, ""));
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return { bytes, ext, mime };
-  } catch {
-    return null;
-  }
-}
-
 // ── Build slide XML from layout placeholders + content ──
 
 async function buildSlideXml(
@@ -132,19 +88,7 @@ async function buildSlideXml(
   // 同じ「テンプレに枠が無ければテンプレの意思」扱い）— 明示 Footer: が束縛済みの ftr 枠には触れない。
   sectionFooterText: string | null = null,
   charts: ChartsMode = "shapes", // #554: "native" → pie/xychart/radar as a native chart (else shapes)
-): Promise<{ xml: string; mermaidImageRId: string | undefined; imageRId: string | undefined; linkRels: string; chart?: NativeChartParts; figure?: "native" | "shapes" }> {
-  // A Mermaid block whose content is a NATIVE diagram type exports as native,
-  // editable shapes (not a rasterised mermaid.js image) — matching the preview.
-  if (slide.mermaidBlock && !slide.diagram) {
-    const nativeSpec = mermaidToDiagramSpec(slide.mermaidBlock.mermaid);
-    if (nativeSpec) {
-      slide = {
-        ...slide,
-        diagram: { yaml: diagramSpecToYaml(nativeSpec), placeholderIdx: slide.mermaidBlock.placeholderIdx },
-        mermaidBlock: undefined,
-      };
-    }
-  }
+): Promise<{ xml: string; media: SlideMedia[]; linkRels: string; charts: { parts: NativeChartParts; relId: string }[]; figures: ("native" | "shapes")[] }> {
   // Bind content to placeholders BY ROLE (not idx) via the SHARED binding — the SAME function the
   // live preview uses, so export and preview can't diverge (WYSIWYG), and any template's idx
   // convention binds correctly (an alien master's title/body idxs match through their role).
@@ -159,40 +103,11 @@ async function buildSlideXml(
   // Group-cell decorations (#400 heading icons / #401 current-step frame) from the same pass.
   const overlay = isGroupedSlide(slide) && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
 
-  // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
-  const bodyPhs = bodyPlaceholders(layout.placeholders);
-  const visualBody = (pi?: string) => nthBody(bodyPhs, pi);
-  // Which placeholders a visual replaces (skipped below) or a code block fills — the SAME map
-  // deck-diagnostics reads to report body text that would vanish under a visual (#390, R8).
-  const occupied = visualOccupancy(slide, layout.placeholders);
-  // A BEHIND image is a backmost LAYER — not bound to a placeholder, so imageBodyIdx is undefined and
-  // NO placeholder is skipped (existing content stays on top). A normal image prefers a PICTURE frame.
-  const imageBehind = !!slide.image?.behind;
-  const imageBodyIdx = slide.image && !imageBehind ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx : undefined;
-
-  // Embedded-image geometry + rId, shared by the behind (backmost) and front placements. Both use the
-  // SAME placeholder box (a behind image is a normal-sized figure, just at the back — NOT full-bleed).
-  // It takes rId3 when a mermaid PNG already holds rId2 (both can appear on a behind slide), else rId2.
-  const mermaidImageRId = slide.mermaidBlock?.svgCache && visualBody(slide.mermaidBlock.placeholderIdx) ? "rId2" : undefined;
-  const imageData = slide.image ? dataUriToImage(slide.image.src) : undefined;
-  const imageBox = imageData && (imageBehind || imageBodyIdx)
-    ? imageRect(slide.image!, imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx))
-    : undefined;
-  const imageRId = imageBox ? (mermaidImageRId ? "rId3" : "rId2") : undefined;
-  const buildImagePic = (shapeId: number): string => {
-    // Fit the image into its box the same way the browser preview does (contain/cover) so preview and
-    // export agree — the manual rect / full-slide backdrop / placeholder box, then the aspect math.
-    const { rect: r, srcRect: cr } = drawnImage(slide.image!, imageBox!);
-    const EMU = (inches: number) => Math.round(inches * 914400);
-    const srcRectXml = cr
-      ? `<a:srcRect${cr.l ? ` l="${cr.l}"` : ""}${cr.t ? ` t="${cr.t}"` : ""}${cr.r ? ` r="${cr.r}"` : ""}${cr.b ? ` b="${cr.b}"` : ""}/>`
-      : "";
-    return `<p:pic>`
-      + `<p:nvPicPr><p:cNvPr id="${shapeId}" name="Image"${imageDescrAttr(slide.image!.alt)}/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
-      + `<p:blipFill><a:blip r:embed="${imageRId}"/>${srcRectXml}<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
-      + `<p:spPr><a:xfrm><a:off x="${EMU(r.x)}" y="${EMU(r.y)}"/><a:ext cx="${EMU(r.w)}" cy="${EMU(r.h)}"/></a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
-      + `</p:pic>`;
-  };
+  // Every visual's region, media rel and draw form (#392 段 2: all of them, not just the first of each
+  // kind) — the SAME placement the preview and deck-diagnostics read (figureRegions, R8). A Mermaid block
+  // of a NATIVE diagram type is drawn as native, editable shapes (matching the preview); `occupied` is the
+  // placeholders a visual replaces (skipped below) or a code block fills (#390).
+  const fig = planSlideFigures(slide, layout.placeholders);
 
   // Hyperlinks (#393) in body text / table cells → External rels after the fixed ones (see buildSlideRels).
   const links = createLinkRegistry(FIRST_LINK_RID);
@@ -200,15 +115,15 @@ async function buildSlideXml(
   let shapes = "";
   let id = 2;
   // Backmost: the behind backdrop paints FIRST — before the placeholder shapes — never as <p:bg>.
-  if (imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
+  if (fig.behind) { shapes += imagePicXml(id, fig.behind.image, fig.behind.box, fig.behind.rId); id++; }
 
   for (const ph of layout.placeholders) {
-    const occ = occupied.get(ph.idx);
-    if (occ && occ !== "code") continue; // replaced by the visual
+    const occ = fig.occupied.get(ph.idx)?.figure;
+    if (occ && occ.kind !== "code") continue; // replaced by the visual
     // A code/log block FILLS its body placeholder with monospace text (the placeholder's own
     // lstStyle supplies the monospace font / code-box styling — we only swap the text).
-    if (occ === "code") {
-      let shapeXml = replaceTextInShape(ph.shapeXml, { idx: ph.idx, paragraphs: codeToParagraphs(slide.code!.content) });
+    if (occ?.kind === "code") {
+      let shapeXml = replaceTextInShape(ph.shapeXml, { idx: ph.idx, paragraphs: codeToParagraphs(occ.content) });
       shapeXml = shapeXml.replace(/(<p:cNvPr[^>]*id=")\d+"/, `$1${id}"`);
       shapes += shapeXml;
       id++;
@@ -232,29 +147,14 @@ async function buildSlideXml(
   }
 
   // Mermaid SVG → PNG <p:pic> in its body region (a front figure; the bytes are written to the ZIP in
-  // the export loop). rId hoisted above so a behind image can take a distinct rId.
-  if (mermaidImageRId) {
-    const s = visualBody(slide.mermaidBlock!.placeholderIdx)!.style;
-    const EMU = (inches: number) => Math.round(inches * 914400);
-    shapes += `<p:pic>`
-      + `<p:nvPicPr><p:cNvPr id="${id}" name="MermaidImage"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`
-      + `<p:blipFill><a:blip r:embed="${mermaidImageRId}"/>`
-      + `<a:stretch><a:fillRect/></a:stretch></p:blipFill>`
-      + `<p:spPr><a:xfrm>`
-      + `<a:off x="${EMU(s.x)}" y="${EMU(s.y)}"/>`
-      + `<a:ext cx="${EMU(s.w)}" cy="${EMU(s.h)}"/>`
-      + `</a:xfrm><a:prstGeom prst="rect"/></p:spPr>`
-      + `</p:pic>`;
-    id++;
+  // the export loop), then each NON-behind image LAST (in front) in its picture/body frame with its alt
+  // as a caption line directly under it (#399 — same geometry as the preview).
+  for (const m of fig.mermaidPics) { shapes += mermaidPicXml(id, m.box, m.rId); id++; }
+  for (const img of fig.images) {
+    const r = imageWithCaptionXml(id, img);
+    shapes += r.xml;
+    id = r.next;
   }
-
-  // A NON-behind image paints LAST (in front) in its picture/body frame.
-  if (!imageBehind && imageRId) { shapes += buildImagePic(id); id++; }
-  // Its alt as a caption line directly under the drawn image (#399 — same geometry as the preview).
-  const caption = !imageBehind && imageRId
-    ? imageCaption(slide.image!, imageBox!, imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx)?.style.fontColor)
-    : undefined;
-  if (caption) { shapes += imageCaptionShapeXml(id, caption); id++; }
   if (rescue.note) { shapes += fieldNoteShapeXml(id, rescue.note); id++; }
 
   if (overlay && !isEmptyOverlay(overlay)) {
@@ -263,18 +163,19 @@ async function buildSlideXml(
     id = r.next;
   }
 
-  // Add diagram shapes if present
-  // Solo diagram (idx 1) fills the slide; beside-text diagram (idx 2+) is confined to its placeholder
-  // region so it doesn't cover the bullets. A region-bound figure whose region does NOT resolve is
-  // DROPPED (and reported by unboundVisuals) rather than falling through to the solo/full-slide path:
-  // silently re-homing it would paint the figure OVER the very bullets it was meant to sit beside
-  // (#124 — reachable once the chrome gate removes a header band from the body ordinals).
-  const diagWantsRegion = slide.diagram ? (parseInt(slide.diagram.placeholderIdx) || 1) !== 1 : false;
-  const diagPh = diagWantsRegion ? visualBody(slide.diagram!.placeholderIdx) : undefined;
-  let chart: NativeChartParts | null = null;
-  if (slide.diagram && (!diagWantsRegion || diagPh)) {
-    chart = charts === "native" ? await nativeChartPartsForYaml(slide.diagram.yaml, midnightExecutive(), diagPh?.style) : null;
-    const diagramShapes = chart?.frameXml ?? await extractDiagramShapes(slide.diagram.yaml, diagPh?.style);
+  // Diagram shapes: a solo diagram (a lone one at ordinal 1) fills the slide; any other is confined to its
+  // placeholder region so it doesn't cover the bullets or the other figures. A region-bound figure whose
+  // region does NOT resolve is not in the plan (DROPPED and reported by unboundVisuals / figure-dropped)
+  // rather than falling through to the solo/full-slide path: silently re-homing it would paint the figure
+  // OVER the very content it was meant to sit beside (#124). Native charts: the 1st keeps rIdChart.
+  const chartParts: { parts: NativeChartParts; relId: string }[] = [];
+  const figures: ("native" | "shapes")[] = [];
+  for (const d of fig.diagrams) {
+    const chart = charts === "native" ? await nativeChartPartsForYaml(d.yaml, midnightExecutive(), d.region) : null;
+    const relId = chartParts.length === 0 ? CHART_REL_ID : `${CHART_REL_ID}${chartParts.length + 1}`;
+    const diagramShapes = chart ? chart.frameXml.replace(`r:id="${CHART_REL_ID}"`, `r:id="${relId}"`) : await extractDiagramShapes(d.yaml, d.region);
+    if (chart) chartParts.push({ parts: chart, relId });
+    figures.push(chart ? "native" : "shapes");
     // Re-number shape IDs (incl. nestShapeXml's <p:grpSp> 7000-range ids) in ONE document-order pass.
     // The old per-id global replace re-rewrote ids whose NEW value collided with a later oldId (#441).
     const r = renumberShapeIds(diagramShapes, id);
@@ -282,13 +183,10 @@ async function buildSlideXml(
     id = r.next;
   }
 
-  // Add a native table if present (fills its body region; editable in PowerPoint).
-  if (slide.table) {
-    const tablePh = visualBody(slide.table.placeholderIdx);
-    if (tablePh) {
-      shapes += tableGraphicFrameXml(slide.table.rows, slide.table.header, tablePh.style, id, links.rIdFor);
-      id++;
-    }
+  // Native tables (each fills its body region; editable in PowerPoint).
+  for (const t of fig.tables) {
+    shapes += tableGraphicFrameXml(t.table.rows, t.table.header, t.box, id, links.rIdFor);
+    id++;
   }
 
   // #402: a Before/After pair's direction arrow + role labels, frontmost — the SAME geometry the preview
@@ -309,8 +207,7 @@ async function buildSlideXml(
     `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
     `</p:sld>`;
 
-  const figure = slide.diagram && (!diagWantsRegion || diagPh) ? (chart ? "native" : "shapes") : undefined;
-  return { xml, mermaidImageRId, imageRId, linkRels: links.relsXml(), ...(chart ? { chart } : {}), ...(figure ? { figure } : {}) };
+  return { xml, media: fig.media, linkRels: links.relsXml(), charts: chartParts, figures };
 }
 
 /** Fixed slide rels: rId1 layout, rId2/rId3 images, rId4 notesSlide — hyperlinks (#393) start after. */
@@ -443,11 +340,11 @@ export async function generatePptx(
 
     // Build slide XML
     const built = await buildSlideXml(layout, slide, sectionFooterFor(deck, i), opts.charts);
-    const { xml: slideXml, mermaidImageRId, imageRId } = built;
-    if (built.figure) opts.onFigure?.(built.figure);
+    const slideXml = built.xml;
+    for (const f of built.figures) opts.onFigure?.(f);
     let linkRels = built.linkRels;
-    if (built.chart) {
-      const w = writeNativeChart(zip, built.chart, ++chartNum);
+    for (const c of built.charts) {
+      const w = writeNativeChart(zip, c.parts, ++chartNum, c.relId);
       linkRels += w.slideRel;
       ctEntries.push(w.ctOverride);
       mediaDefaults.set("xlsx", XLSX_CT);
@@ -456,18 +353,17 @@ export async function generatePptx(
     // Embed each referenced image with its OWN rId (a behind backdrop can coexist with a mermaid PNG,
     // so they no longer share one slot). Mermaid SVG→PNG is rasterized by the injected UI-layer canvas.
     const imageRels: { rId: string; target: string }[] = [];
-    if (mermaidImageRId && slide.mermaidBlock?.svgCache && rasterizeSvg) {
-      const pngData = await rasterizeSvg(slide.mermaidBlock.svgCache);
-      zip.file(`ppt/media/mermaid${slideNum}.png`, pngData);
-      mediaDefaults.set("png", "image/png");
-      imageRels.push({ rId: mermaidImageRId, target: `../media/mermaid${slideNum}.png` });
-    }
-    if (imageRId && slide.image) {
-      const img = dataUriToImage(slide.image.src);
-      if (img) {
-        zip.file(`ppt/media/image${slideNum}.${img.ext}`, img.bytes);
+    for (const m of built.media) {
+      if (m.source.kind === "mermaid") {
+        if (!rasterizeSvg) continue;
+        zip.file(`ppt/media/mermaid${slideNum}${m.suffix}.png`, await rasterizeSvg(m.source.svg));
+        mediaDefaults.set("png", "image/png");
+        imageRels.push({ rId: m.rId, target: `../media/mermaid${slideNum}${m.suffix}.png` });
+      } else {
+        const img = dataUriToImage(m.source.src)!; // planSlideFigures only plans decodable images
+        zip.file(`ppt/media/image${slideNum}${m.suffix}.${img.ext}`, img.bytes);
         mediaDefaults.set(img.ext, img.mime);
-        imageRels.push({ rId: imageRId, target: `../media/image${slideNum}.${img.ext}` });
+        imageRels.push({ rId: m.rId, target: `../media/image${slideNum}${m.suffix}.${img.ext}` });
       }
     }
 

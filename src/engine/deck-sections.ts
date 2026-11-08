@@ -18,6 +18,7 @@ import { TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { deckHasCjkText } from "./deck-text-collect";
 import type { LayoutCatalog } from "./template-catalog";
 import { layoutPinHonored } from "./layout-pin";
+import { placedFigures } from "./figure-placement";
 
 /** 章扉の全章リスト再掲（#167）を表示する専用レイアウト（idx15=タイトル/16=補足/1=章リスト）。 */
 export const SECTION_NAV_LIST_LAYOUT = "SectionNav.1TitleList.Single";
@@ -101,9 +102,9 @@ export function sectionNavParagraphs(sections: SectionEntry[], currentNumber: nu
  *  占有済みなら再掲リストは注入しない（no-silent-drop: 著者コンテンツを上書きしない、ADR-0030）。 */
 function usesBodyIdx1(slide: SlideIR): boolean {
   if (slide.placeholders.some((p) => p.idx === "1")) return true;
-  return [slide.diagram, slide.mermaidBlock, slide.table, slide.code, slide.image].some(
-    (b) => b && (b.placeholderIdx ?? "1") === "1",
-  );
+  // Every body visual at its placed ordinal (#392, R8) + a behind image, which has always counted here.
+  return [...placedFigures(slide).map((p) => p.ordinal), ...(slide.image?.behind ? [slide.image.placeholderIdx] : [])]
+    .some((idx) => (idx ?? "1") === "1");
 }
 
 /**

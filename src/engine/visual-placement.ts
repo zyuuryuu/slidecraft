@@ -14,12 +14,13 @@
  *
  * Pure logic (R2): no DOM / Tauri. The pointer→inch conversion and gesture state stay in components.
  */
-import type { SlideIR, ImageBlock, ImageRect } from "./slide-schema";
+import type { SlideIR, ImageBlock, ImageRect, FigureKind } from "./slide-schema";
 import type { PlaceholderInfo } from "./template-loader";
 import { placeholderRole, isContentBody } from "./template-catalog";
 import { sortByIdx } from "./placeholder-binding";
 import { intrinsicImageSize } from "./image-intrinsic";
 import { bodyOrdinalIndex } from "./body-ordinal";
+import { placedFigures, type PlacedFigure } from "./figure-placement";
 
 /**
  * The layout's BODY placeholders in stable order — a figure/table rides the Nth of these.
@@ -196,12 +197,30 @@ export function dragImageRect(
 }
 
 /** A visual (figure/table/code/image) kind, as the slide model carries it. */
-export type VisualKind = "diagram" | "mermaid" | "table" | "code" | "image";
+export type VisualKind = FigureKind;
 
 /** One visual that has no body region to live in, tagged with the ordinal it asked for. */
 export interface UnboundVisual {
   kind: VisualKind;
   placeholderIdx: string;
+}
+
+/** One placed visual (figure-placement) with the placeholder it resolves to on a layout — undefined when
+ *  the layout offers no such region. An image prefers a picture frame (imagePlaceholder); every other kind
+ *  rides the Nth body (nthBody). */
+export interface FigureRegion extends PlacedFigure {
+  ph: PlaceholderInfo | undefined;
+}
+
+/** #392 段 2: every body visual of the slide, in source order, with its resolved region — the ONE
+ *  ordinal→placeholder resolution the export, the preview, the overlay and deck-diagnostics share (R8).
+ *  Pure (R2). */
+export function figureRegions(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): FigureRegion[] {
+  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
+  return placedFigures(slide).map((p) => ({
+    ...p,
+    ph: p.figure.kind === "image" ? imagePlaceholder(layoutPlaceholders, p.ordinal) : nthBody(bodyPhs, p.ordinal),
+  }));
 }
 
 /**
@@ -211,10 +230,10 @@ export interface UnboundVisual {
  * header band now offers no region, and a silently missing table would just trade mis-injection for
  * a silent drop. Callers surface this instead.
  *
- * It OBSERVES the same resolvers the renderers use (bodyPlaceholders/nthBody/imagePlaceholder), so it
- * cannot disagree with what export/preview actually draw. Two deliberate non-drops:
- *   - a SOLO figure (ordinal 1) fills the whole slide by design — it needs no region, so a region-less
- *     layout is not a drop for it;
+ * It OBSERVES the same resolution the renderers use (figureRegions), so it cannot disagree with what
+ * export/preview actually draw. Two deliberate non-drops:
+ *   - a SOLO diagram (a lone one at ordinal 1) fills the whole slide by design — it needs no region,
+ *     so a region-less layout is not a drop for it;
  *   - a BEHIND image is a backmost layer with its own fallback box, not a bound region.
  * Scope is BINDING: a visual that fails to render for another reason (e.g. a mermaid block with no
  * rasterized svgCache) is not a binding drop and isn't reported here. Pure (R2).
@@ -223,42 +242,28 @@ export function unboundVisuals(
   slide: SlideIR,
   layoutPlaceholders: readonly PlaceholderInfo[],
 ): UnboundVisual[] {
-  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
-  const out: UnboundVisual[] = [];
-  const needsRegion = (kind: VisualKind, placeholderIdx: string) => {
-    if (!nthBody(bodyPhs, placeholderIdx)) out.push({ kind, placeholderIdx });
-  };
-  // A figure at ordinal 1 is SOLO (full-slide) — see buildSlideXml; only ordinal 2+ is region-bound.
-  const regionBound = (placeholderIdx: string) => (parseInt(placeholderIdx) || 1) !== 1;
-  if (slide.diagram && regionBound(slide.diagram.placeholderIdx)) needsRegion("diagram", slide.diagram.placeholderIdx);
-  if (slide.mermaidBlock) needsRegion("mermaid", slide.mermaidBlock.placeholderIdx);
-  if (slide.table) needsRegion("table", slide.table.placeholderIdx);
-  if (slide.code) needsRegion("code", slide.code.placeholderIdx);
-  if (slide.image && !slide.image.behind && !imagePlaceholder(layoutPlaceholders, slide.image.placeholderIdx))
-    out.push({ kind: "image", placeholderIdx: slide.image.placeholderIdx });
-  return out;
+  return figureRegions(slide, layoutPlaceholders)
+    .filter((r) => !r.ph && !(r.solo && r.figure.kind === "diagram"))
+    .map((r) => ({ kind: r.figure.kind, placeholderIdx: r.ordinal }));
 }
 
-/** One visual's claim on a layout placeholder (resolved by the SAME resolvers the renderers use). */
-interface VisualClaim {
-  kind: VisualKind;
-  idx: string;
+/** Claim precedence: code first, so a replacing visual on the same placeholder wins over it below. */
+const CLAIM_ORDER: readonly VisualKind[] = ["code", "diagram", "mermaid", "table", "image"];
+
+/** Every bound visual's resolved placeholder, in claim precedence order. A behind image is a backmost
+ *  layer, not a claim; an unresolved visual claims nothing (unboundVisuals reports it). The ONE
+ *  resolution figureAt, visualOccupancy and visualCollisions read (R8). Pure (R2). */
+function visualClaims(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): FigureRegion[] {
+  const regions = figureRegions(slide, layoutPlaceholders);
+  return CLAIM_ORDER.flatMap((k) => regions.filter((r) => r.figure.kind === k && r.ph));
 }
 
-/** Every bound visual's resolved placeholder, in export precedence order (code first, so a replacing
- *  visual wins over it below). A behind image is a backmost layer, not a claim; an unresolved visual
- *  claims nothing (unboundVisuals reports it). The ONE resolution visualOccupancy and visualCollisions
- *  both read (R8). Pure (R2). */
-function visualClaims(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): VisualClaim[] {
-  const bodyPhs = bodyPlaceholders(layoutPlaceholders);
-  const claims: VisualClaim[] = [];
-  const put = (kind: VisualKind, ph: PlaceholderInfo | undefined) => { if (ph) claims.push({ kind, idx: ph.idx }); };
-  if (slide.code) put("code", nthBody(bodyPhs, slide.code.placeholderIdx));
-  if (slide.diagram) put("diagram", nthBody(bodyPhs, slide.diagram.placeholderIdx));
-  if (slide.mermaidBlock) put("mermaid", nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx));
-  if (slide.table) put("table", nthBody(bodyPhs, slide.table.placeholderIdx));
-  if (slide.image && !slide.image.behind) put("image", imagePlaceholder(layoutPlaceholders, slide.image.placeholderIdx));
-  return claims;
+/** The visual drawn at each layout placeholder (idx → that visual). A replacing visual wins over code
+ *  on the same placeholder, as in the export. What the export / preview draw per placeholder. Pure. */
+export function figureAt(slide: SlideIR, layoutPlaceholders: readonly PlaceholderInfo[]): Map<string, FigureRegion> {
+  const at = new Map<string, FigureRegion>();
+  for (const c of visualClaims(slide, layoutPlaceholders)) at.set(c.ph!.idx, c);
+  return at;
 }
 
 /**
@@ -273,9 +278,7 @@ export function visualOccupancy(
   slide: SlideIR,
   layoutPlaceholders: readonly PlaceholderInfo[],
 ): Map<string, VisualKind> {
-  const occ = new Map<string, VisualKind>();
-  for (const c of visualClaims(slide, layoutPlaceholders)) occ.set(c.idx, c.kind);
-  return occ;
+  return new Map([...figureAt(slide, layoutPlaceholders)].map(([idx, r]) => [idx, r.figure.kind] as const));
 }
 
 /** A placeholder that 2+ visuals resolve to, with the kinds involved (in claim order). */
@@ -285,18 +288,18 @@ export interface VisualCollision {
 }
 
 /**
- * #434 never-silent: placeholders that 2+ visuals claim at once (e.g. 本文＋表＋図 — #390 moves the
- * table AND the figure beside the text to ordinal 2 independently). The export draws every one of
- * them over that placeholder (on top of each other — a solo ordinal-1 diagram spans the whole slide;
- * code is filled into the placeholder under the rest), while the preview draws only one per placeholder. Placement is NOT changed here (#392 resolves it
- * structurally); deck-diagnostics reports it. Read off the SAME claims as visualOccupancy (R8), so a
- * reported collision is always an occupied placeholder. Pure (R2).
+ * #434 never-silent: placeholders that 2+ visuals claim at once. Since #392 段 2 the ordinals are
+ * distinct (figure-placement), so 本文＋表＋図 no longer collides; what remains is two ordinals that a
+ * layout maps to ONE box (an image's picture-frame clamp, imagePlaceholder). The export draws every one
+ * of them over that placeholder, while the preview draws only one per placeholder; deck-diagnostics
+ * reports it. Read off the SAME claims as visualOccupancy (R8), so a reported collision is always an
+ * occupied placeholder. Pure (R2).
  */
 export function visualCollisions(
   slide: SlideIR,
   layoutPlaceholders: readonly PlaceholderInfo[],
 ): VisualCollision[] {
   const byIdx = new Map<string, VisualKind[]>();
-  for (const c of visualClaims(slide, layoutPlaceholders)) byIdx.set(c.idx, [...(byIdx.get(c.idx) ?? []), c.kind]);
+  for (const c of visualClaims(slide, layoutPlaceholders)) byIdx.set(c.ph!.idx, [...(byIdx.get(c.ph!.idx) ?? []), c.figure.kind]);
   return [...byIdx].filter(([, kinds]) => kinds.length > 1).map(([idx, kinds]) => ({ idx, kinds }));
 }

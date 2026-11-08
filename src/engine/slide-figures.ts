@@ -3,7 +3,8 @@
  *
  * A slide stores its visuals two ways during the #392 migration:
  * - the singular fields (`diagram` / `mermaidBlock` / `table` / `code` / `image`) — the FIRST visual of
- *   each kind. Every renderer and editor still reads these (段 2/3 move them to the list).
+ *   each kind. Editors still write these (段 3 moves them to the list); since 段 2 the renderers read the
+ *   list, placed by figure-placement.
  * - `figures` — ALL body visuals in source order, present only when the slide has ≥2 (md-slide-parser).
  *
  * slideFigures merges the two so they can never disagree: the singular field is authoritative for the
@@ -52,17 +53,6 @@ export function slideFigures(slide: SlideIR): FigureBlock[] {
 /** User-facing name of each kind (diagnostic messages). */
 export const FIGURE_KIND_LABEL: Record<FigureKind, string> = { diagram: "図", mermaid: "Mermaid 図", table: "表", code: "コード", image: "画像" };
 
-/** The visuals the renderers do not draw yet: every one that is not a singular field (the 2nd+ of a
- *  kind). Until #392 段 2 places them, deck-diagnostics reports these (never-silent). */
-export function undrawnFigures(slide: SlideIR): FigureBlock[] {
-  const seen = new Set<FigureKind>();
-  return slideFigures(slide).filter((f) => {
-    if (seen.has(f.kind)) return true;
-    seen.add(f.kind);
-    return false;
-  });
-}
-
 /** A figure without its `kind` tag = the singular block it came from (field order kept). */
 function untag<T extends FigureBlock>(f: T): Omit<T, "kind"> {
   const b: Partial<T> = { ...f };
@@ -83,4 +73,25 @@ export function figureFields(list: readonly FigureBlock[]): Pick<SlideIR, "diagr
   }
   if (list.length >= 2) out.figures = [...list];
   return out;
+}
+
+/** Every ```mermaid source of the slide (all of them, #392 段 2), in slideFigures order — what the export
+ *  pre-renders to SVG before drawing (deck-export / deck-html-export). */
+export function mermaidSources(slide: SlideIR): string[] {
+  return slideFigures(slide).flatMap((f) => (f.kind === "mermaid" ? [f.mermaid] : []));
+}
+
+/** The slide with `svgCache` set on every mermaid block whose source `svgFor` renders — the singular
+ *  field AND its `figures` copies, so slideFigures reads the same block either way. Unrendered blocks
+ *  (svgFor → undefined) are left as they are. */
+export function withMermaidSvg(slide: SlideIR, svgFor: (mermaid: string) => string | undefined): SlideIR {
+  const put = <T extends { mermaid: string }>(m: T): T => {
+    const svg = svgFor(m.mermaid);
+    return svg === undefined ? m : { ...m, svgCache: svg };
+  };
+  return {
+    ...slide,
+    ...(slide.mermaidBlock ? { mermaidBlock: put(slide.mermaidBlock) } : {}),
+    ...(slide.figures ? { figures: slide.figures.map((f) => (f.kind === "mermaid" ? put(f) : f)) } : {}),
+  };
 }
