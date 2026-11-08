@@ -66,6 +66,16 @@ Windows の注意点：
 - ユーザ PATH が極端に長い（約 1,000 文字超）場合、NSIS インストーラは **PATH を壊さないために編集を見送り**、追加すべきフォルダをダイアログで案内します。その場合は手で追加してください。
 - ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
 
+**Claude Desktop（`.mcpb`・#517）** — リリースの Assets に Claude Desktop 用バンドル `slidecraft-darwin-arm64.mcpb`（macOS Apple Silicon）/ `slidecraft-win32-x64.mcpb`（Windows x64）が付きます（このファイルが載ったリリース以降）。ダウンロードしてダブルクリック（または Claude Desktop の「設定 → 拡張機能」へドラッグ）すると導入され、JSON の手編集は要りません。中身は MCPB 形式（manifest ＋ `cli.cjs` ＋ **同梱 Node**）で、アプリ本体のインストールとは独立に動きます（Claude Desktop 内蔵の Node には依存しない・ADR-0022）。既定は `--no-fs`（base64）のままです。Linux には Claude Desktop が無いため `.mcpb` はありません。GUI の 協働 パネルにも、この OS 用の `.mcpb` のダウンロードボタンが出ます（最新リリースに無ければその旨を表示）。
+
+**接続診断（`--doctor`・#517）** — 登録したのにツールが見えないときは、登録したコマンドに `--doctor` を付けて実行します：
+
+```bash
+slidecraft-mcp --doctor              # --root <dir> を付ければその scope で起動して確認
+```
+
+サーバが**自分自身を stdio で起動**し、クライアントと同じ手順（`server/discover` → `initialize` → `tools/list`）で話しかけて、応答・版・tools の本数・モード（solo / 起動中の GUI への forward）・`--root` の設定を 1 画面に出します。最終行が `結果: OK` なら終了コード 0、どこかで失敗すれば理由（子プロセスの stderr を含む）を出して終了コード 1 です。`--metrics` は診断では無効化されます（診断の呼び出しを記録しないため）。GUI の 協働 パネルの「接続テスト」ボタンは、同梱 node ＋ `cli.cjs` でこの `--doctor` を実行して結果をそのまま表示します。
+
 > **v0.5.0 以前**のインストーラにはランチャが入っていません（`.deb` に `/usr/bin/slidecraft-mcp` は無い）。その場合は上の直接パス指定（Linux: `/usr/bin/node` ＋ `/usr/lib/SlideCraft/cli.cjs`）か、**ソースからの起動（B）**を使ってください。
 >
 > Linux で v0.5.0 の `/usr/bin/node` を**直接**登録していた場合、v0.5.1 以降へ更新すると `/usr/bin/node` は同梱されなくなります（#527）。登録を `slidecraft-mcp` の 1 行に切り替えてください（直接指定するなら `command` = `/usr/bin/slidecraft-node`）。macOS（`Contents/MacOS/node`）と Windows（`node.exe`）の同梱 Node の名前は変わりません。
