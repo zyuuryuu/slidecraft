@@ -48,7 +48,7 @@ export default function GenerateSlideMenu({ hasActiveSlide, onInsert, onRegenera
         title={t("generateSlide.buttonTitle")}
         className="w-5 h-5 -my-0.5 flex items-center justify-center rounded text-muted hover:bg-accent hover:text-on-accent text-sm leading-none disabled:opacity-40"
       >
-        ✨
+        📑
       </button>
 
       {open && (

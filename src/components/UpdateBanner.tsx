@@ -9,7 +9,7 @@ export default function UpdateBanner({ latestVersion, onDismiss }: { latestVersi
   const { t } = useTranslation();
   return (
     <div className="shrink-0 bg-surface border-b border-accent/40 flex items-center gap-2 px-3 py-2 text-xs" role="status">
-      <span className="text-accent-soft">✨</span>
+      <span className="text-accent-soft" aria-hidden>🔔</span>
       <span className="text-fg2">{t("updateBanner.message", { version: latestVersion })}</span>
       <div className="flex-1" />
       <button onClick={onDismiss} title={t("updateBanner.dismiss")} className="text-muted hover:text-fg text-base leading-none px-1">×</button>

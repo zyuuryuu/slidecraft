@@ -590,6 +590,14 @@
     "light": "Light",
     "modern": "Modern（Slate）"
   },
+  "settings": {
+    "title": "設定",
+    "buttonTitle": "設定（言語・配色・ヘルプ・AI の接続）",
+    "language": "言語",
+    "theme": "配色",
+    "help": "ヘルプ（ドキュメント）",
+    "aiSettings": "AI の接続設定…"
+  },
   "toolbar": {
     "undo": "元に戻す (⌘/Ctrl+Z)",
     "redo": "やり直す (⌘/Ctrl+Shift+Z)",
@@ -600,6 +608,7 @@
     "aiLabel": "✨ AI",
     "exporting": "書き出し中…",
     "file": "ファイル",
+    "draft": "📝 原稿",
     "openProject": "プロジェクトを開く",
     "saveProject": "プロジェクトを保存",
     "exportSection": "書き出す",

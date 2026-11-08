@@ -18,8 +18,6 @@ import { useDeckController } from "./components/useDeckController";
 import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
 import { loadDefaultMaster } from "./components/default-master";
 import MasterPicker from "./components/MasterPicker";
-import ThemeToggle from "./components/ThemeToggle";
-import LanguageToggle from "./components/LanguageToggle";
 import { useTranslation } from "react-i18next";
 import { useCollab } from "./components/useCollab";
 import { useFollowAi } from "./components/useFollowAi";
@@ -395,6 +393,7 @@ export default function App() {
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
   // re-seeds even when the same issue is clicked twice.
   const [aiSeed, setAiSeed] = useState<{ prompt: string; ts: number } | undefined>(undefined);
+  const [aiSettingsTs, setAiSettingsTs] = useState<number | undefined>(undefined); // ⚙ → AI の接続設定 (#614)
   const handleAiFix = (slideIndex: number, prompt: string) => {
     selectSlide(slideIndex);
     setShowAiPanel(true);
@@ -432,35 +431,25 @@ export default function App() {
           canUndo={editLocked ? true : canUndo}
           canRedo={editLocked ? true : canRedo}
           onHelp={handleHelp}
+          onAiSettings={() => { setShowAiPanel(true); setAiSettingsTs(Date.now()); }}
+          onDraft={handleEnterImport}
+          draftGate={editLocked ? "locked" : adjust.session ? "busy" : undefined}
+          master={
+            // #612: every template operation lives in this master menu (the Draft modal shows a reduced one).
+            <MasterPicker
+              masters={masters}
+              activeId={masterId}
+              onSelect={handleSelectMaster}
+              onImport={handleImportMaster}
+              onRemake={handleRemakeMaster}
+              onAdjust={() => void adjust.start()} onAugment={editLocked || adjust.session ? undefined : handleAugmentMaster} template={templateData}
+              onCreate={() => setShowTemplateCreator(true)}
+              onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
+              onRemove={handleRemoveMaster}
+              disabled={editLocked || !!adjust.session}
+            />
+          }
         />
-        <div className="flex items-center gap-2 px-3 py-2">
-          {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
-              second tab. #612: every template operation (select / import / adjust · augment · ⓘ / create)
-              lives in this master menu; Draft shows the same MasterPicker with select + import only.
-              Both are gated while collab-locked or while a template adjust is open. */}
-          <button
-            onClick={handleEnterImport}
-            disabled={editLocked || !!adjust.session}
-            title={editLocked ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}
-            className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge"
-          >
-            📝 Draft
-          </button>
-          <MasterPicker
-            masters={masters}
-            activeId={masterId}
-            onSelect={handleSelectMaster}
-            onImport={handleImportMaster}
-            onRemake={handleRemakeMaster}
-            onAdjust={() => void adjust.start()} onAugment={editLocked || adjust.session ? undefined : handleAugmentMaster} template={templateData}
-            onCreate={() => setShowTemplateCreator(true)}
-            onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
-            onRemove={handleRemoveMaster}
-            disabled={editLocked || !!adjust.session}
-          />
-          <LanguageToggle />
-          <ThemeToggle />
-        </div>
       </div>
 
       {/* "New version available" notice (notify-only — ADR-0021). Above IntakeSummaryBar so a fresh
@@ -600,6 +589,7 @@ export default function App() {
             onBatchEdit={editLocked ? undefined : (instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
             batchRunning={refine.refining}
             seed={aiSeed}
+            openSettingsTs={aiSettingsTs} onSettingsOpened={() => setAiSettingsTs(undefined)}
             ai={ai}
             collabConnected={editLocked}
             collabTab={

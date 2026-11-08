@@ -41,6 +41,10 @@ interface AiPanelProps {
   batchRunning?: boolean;
   /** Pre-fill the instruction box (ReviewBar "✨直す" handoff). `ts` re-seeds on repeat. */
   seed?: { prompt: string; ts: number };
+  /** ⚙ → 「AI の接続設定」 (#614): a value opens the settings popover on the assist tab; the panel then
+   *  calls onSettingsOpened so the request is consumed (a later plain open of the dock doesn't re-pop it). */
+  openSettingsTs?: number;
+  onSettingsOpened?: () => void;
   /** Shared AI instance (lifted to App) so config never diverges across surfaces. */
   ai: AiGeneration;
   /** The 協働 (live-collab) surface, folded into this hub as a second tab. Omit → no 協働 tab. */
@@ -61,6 +65,8 @@ export default function AiPanel({
   onBatchEdit,
   batchRunning,
   seed,
+  openSettingsTs,
+  onSettingsOpened,
   ai,
   collabTab,
   collabConnected,
@@ -77,7 +83,7 @@ export default function AiPanel({
 
   // Pre-fill the instruction when handed off from the ReviewBar ("✨直す"). Keyed on
   // seed.ts so re-clicking the same issue re-seeds; switches to the gen tab.
-  /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync the ReviewBar handoff (seed) into the editable instruction + tab */
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync the ReviewBar handoff (seed) / the ⚙ settings request into the instruction + tab + popover */
   useEffect(() => {
     if (seed) {
       setUserRequest(seed.prompt);
@@ -85,6 +91,10 @@ export default function AiPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed?.ts]);
+  useEffect(() => {
+    if (openSettingsTs) { setHubTab("assist"); setShowSettings(true); onSettingsOpened?.(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSettingsTs]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Resizable height: drag the top edge to grow the dock upward (persisted). The dock
@@ -317,7 +327,7 @@ export default function AiPanel({
       {showSettings && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
-          <div className="absolute right-2 top-12 z-50 w-[min(30rem,92vw)] rounded-lg border border-edge bg-canvas shadow-xl shadow-black/50">
+          <div data-testid="ai-settings-popover" className="absolute right-2 top-12 z-50 w-[min(30rem,92vw)] rounded-lg border border-edge bg-canvas shadow-xl shadow-black/50">
             <AiSettingsPopover ai={ai} />
           </div>
         </>

@@ -1,5 +1,5 @@
 /**
- * ThemeToggle — a compact 3-way segmented control (Dark / Light / Modern) for the toolbar.
+ * ThemeToggle — a compact 3-way segmented control (Dark / Light / Modern), shown in the ⚙ settings menu (#614).
  * Paints with theme tokens so it restyles itself. See useTheme / index.css.
  */
 import { useTranslation } from "react-i18next";
