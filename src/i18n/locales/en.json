@@ -608,6 +608,14 @@
     "light": "Light",
     "modern": "Modern (Slate)"
   },
+  "settings": {
+    "title": "Settings",
+    "buttonTitle": "Settings (language, theme, help, AI connection)",
+    "language": "Language",
+    "theme": "Theme",
+    "help": "Help (documentation)",
+    "aiSettings": "AI connection settings…"
+  },
   "toolbar": {
     "undo": "Undo (⌘/Ctrl+Z)",
     "redo": "Redo (⌘/Ctrl+Shift+Z)",
@@ -618,6 +626,7 @@
     "aiLabel": "✨ AI",
     "exporting": "Exporting…",
     "file": "File",
+    "draft": "📝 Draft",
     "openProject": "Open Project",
     "saveProject": "Save Project",
     "exportSection": "Export",
