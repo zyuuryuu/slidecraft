@@ -7,6 +7,7 @@
  *  2. NoticeSlot はその計画どおりに 1 本だけ描き、隠れた数をバッジで示す — 計画と描画の一致テスト（R8）。
  *  3. 帯の中身は変えない: 出ている帯は従来の部品（UpdateBanner / IntakeSummaryBar / TemplateAdjustPanel）
  *     そのままの文言で描かれる。
+ * 帯の本数の上限（1 本）は tests/ux-budget.test.tsx に集約（#648）。ここは優先順と計画・描画の一致を見る。
  * DOM 環境は無いので react-dom/server で描画して確かめる（先例 master-menu.test.tsx）。
  */
 import { describe, it, expect } from "vitest";
