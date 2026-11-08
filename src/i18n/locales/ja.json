@@ -352,9 +352,9 @@
     "unboundChip": "未束縛の内容があるスライド {{count}} 枚（出力時に消えます）",
     "unboundTitle": "どの枠にも入らない内容（このテンプレでは出力時に消えます）",
     "unboundItem": "スライド {{slide}}: {{message}}",
-    "augmentButton": "テンプレを強化（{{what}}を追加）",
     "augmentUnavailable": "テンプレの強化はできません: {{reason}}",
-    "augmented": "追加したレイアウト"
+    "augmented": "追加したレイアウト",
+    "augmentHint": "🎨 メニューの「テンプレを強化」で {{what}} を追加できます"
   },
   "lang": {
     "name": "日本語",
@@ -421,7 +421,18 @@
     "showInfoTitle": "直近の取り込み結果を表示",
     "removeTitle": "このテンプレを削除",
     "adjustTitle": "今のマスターの書体と文字サイズを一括で調整した派生テンプレを作る（元テンプレは変更しない）",
-    "adjustLabel": "テンプレ調整（書体・サイズ）…"
+    "adjustLabel": "テンプレ調整（書体・サイズ）…",
+    "section": {
+      "select": "選ぶ",
+      "intake": "取り込む",
+      "modify": "加工する",
+      "create": "新規"
+    },
+    "augmentLabel": "テンプレを強化（{{what}}を追加）…",
+    "augmentLabelPlain": "テンプレを強化",
+    "augmentTitle": "今のマスターに無いレイアウト（N 列・比較・カード・KPI）を足した派生テンプレを作る（元テンプレは変更しない）",
+    "augmentNothing": "足りないレイアウトはありません（N 列・比較・カード・KPI は揃っています）",
+    "showInfoLabel": "直近の取り込み結果を表示"
   },
   "masterReg": {
     "defaultName": "テンプレート",
