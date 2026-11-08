@@ -18,6 +18,7 @@ import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backg
 import { readStyleDensity, type StyleDensity } from "./style-meta";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
 import { slideFigures } from "./slide-figures";
+import { layoutPinHonored } from "./layout-pin";
 
 // ── Types ──
 
@@ -922,11 +923,7 @@ export function autoSelectLayout(
   // An explicit layout name is honored only if THIS template actually has it.
   // A deck pinned to ANOTHER template's names (e.g. canonical names loaded onto a
   // different master) degrades like "auto" below instead of crashing the renderer.
-  if (slide.layout !== "auto") {
-    if (!catalog || catalog.some((e) => e.name === slide.layout)) {
-      return slide.layout;
-    }
-  }
+  if (slide.layout !== "auto" && layoutPinHonored(catalog, slide.layout)) return slide.layout;
 
   // #593: a `<!-- statement -->` / `<!-- quote -->` slide routes to a layout of that ROLE (Statement.* /
   // マガジン 02_ステートメント, Quote.* / 07_引用 — no unmarked slide role targets these). Only fires on the

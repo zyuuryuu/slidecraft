@@ -16,6 +16,8 @@ import type { DeckIR, Paragraph, PlaceholderContent, SlideIR } from "./slide-sch
 import { getPlaceholderText } from "./md-serializer-shared";
 import { TITLE_NS, CONTENT_NS } from "./slide-roles";
 import { deckHasCjkText } from "./deck-text-collect";
+import type { LayoutCatalog } from "./template-catalog";
+import { layoutPinHonored } from "./layout-pin";
 
 /** 章扉の全章リスト再掲（#167）を表示する専用レイアウト（idx15=タイトル/16=補足/1=章リスト）。 */
 export const SECTION_NAV_LIST_LAYOUT = "SectionNav.1TitleList.Single";
@@ -109,11 +111,15 @@ function usesBodyIdx1(slide: SlideIR): boolean {
  * 新しい DeckIR を返す。対象スライドが無ければ**同一参照**を返す＝宣言なしデッキは新コードパスに
  * 入らない。章扉の再掲は `layout: "auto"` かつ本文（idx 1）が空のスライドにのみ注入する — 著者が
  * レイアウトをピンした、または既に本文を書いている章扉は変更しない（安全側に倒す）。
+ *
+ * `catalog`（消費点のテンプレ）が `SECTION_NAV_LIST_LAYOUT` を持たないときは、章扉を固定も注入もせず
+ * 元のまま返す（#637）— 固定しても autoSelectLayout が degrade して本文レイアウトに章一覧を描くため。
+ * 判定は autoSelectLayout と同じ layoutPinHonored（R8）。catalog 省略（テンプレ無し）は従来どおり注入する。
  */
-export function materializeDerivedSlides(deck: DeckIR): DeckIR {
+export function materializeDerivedSlides(deck: DeckIR, catalog?: LayoutCatalog): DeckIR {
   const hasToc = deck.slides.some((s) => s.derived === "toc");
-  const hasSections = deck.slides.some((s) => s.sectionBreak);
-  if (!hasToc && !hasSections) return deck;
+  const injectRecap = deck.slides.some((s) => s.sectionBreak) && layoutPinHonored(catalog, SECTION_NAV_LIST_LAYOUT);
+  if (!hasToc && !injectRecap) return deck;
   const sections = scanSections(deck);
   return {
     ...deck,
@@ -121,7 +127,7 @@ export function materializeDerivedSlides(deck: DeckIR): DeckIR {
       if (slide.derived === "toc") {
         return { ...slide, placeholders: tocPlaceholders(sections) };
       }
-      if (slide.sectionBreak && slide.layout === "auto" && !usesBodyIdx1(slide)) {
+      if (injectRecap && slide.sectionBreak && slide.layout === "auto" && !usesBodyIdx1(slide)) {
         const current = sections.find((s) => s.slideIndex === i);
         if (current) {
           return {

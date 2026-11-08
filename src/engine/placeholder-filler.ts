@@ -351,8 +351,10 @@ export async function generatePptx(
   // outcome (never-silent). Omitted / "shapes" = the pre-#554 output byte for byte.
   opts: { charts?: ChartsMode; onFigure?: (figure: "native" | "shapes") => void } = {},
 ): Promise<Uint8Array> {
+  // Catalog → layout selection adapts to THIS template (canonical = unchanged).
+  const catalog = buildCatalog(template);
   // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）。宣言なしデッキは同一参照が返る。
-  deck = materializeDerivedSlides(deck);
+  deck = materializeDerivedSlides(deck, catalog); // catalog: 章扉の章一覧はこのテンプレが受けられる時だけ（#637）
   // Clone by re-serializing + re-loading (JSZip has no clone method)
   const tplBuf = await template.zip.generateAsync({ type: "uint8array" });
   const zip = await JSZip.loadAsync(tplBuf);
@@ -382,8 +384,6 @@ export async function generatePptx(
   // inline [Content_Types].xml write here would be clobbered by that rebuild, which reads the pristine CT).
   const slideIdBase = 256;
   let chartNum = maxChartNumber(zip); // native charts are numbered above any the template already has
-  // Catalog → layout selection adapts to THIS template (canonical = unchanged).
-  const catalog = buildCatalog(template);
 
   // ── Speaker notes (#150 / ADR-0032): notes を持つスライドが 1 枚でもあるときだけ notesMaster を
   // 用意する。ノート無しデッキはこのブロック丸ごと素通り＝出力不変を構造的に担保。

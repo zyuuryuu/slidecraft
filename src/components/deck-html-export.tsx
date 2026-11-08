@@ -114,8 +114,8 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 export async function renderDeckToHtml(deck: DeckIR, template: TemplateData, opts: { title?: string; transition?: Transition } = {}): Promise<string> {
   // 派生スライド（<!-- toc -->）の内容を消費点で導出（#151）— PPTX/preview と同じ単一関数（R8）。
-  const prepared = await preRenderNonNativeMermaid(materializeDerivedSlides(deck));
   const catalog = buildCatalog(template);
+  const prepared = await preRenderNonNativeMermaid(materializeDerivedSlides(deck, catalog));
 
   const slideHtmls = prepared.slides.map((slide, i) => {
     // Resolve the layout exactly as SlidePreview does (autoSelectLayout honors/degrades pins),
