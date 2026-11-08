@@ -416,7 +416,7 @@
     "requestPlaceholderDiagram": "例: 3層Webアプリのネットワーク構成図（LB→Web→App→DB、DMZあり）",
     "close": "閉じる",
     "stepRequest": "1. 何を作りますか？",
-    "modeSlides": "スライド一式",
+    "modeSlides": "デッキ",
     "modeDiagram": "図",
     "stepConnection": "2. AI の接続",
     "connectionSettingsTitle": "AI 接続設定を開閉（AI ドックの ⚙ と同じ設定）",
