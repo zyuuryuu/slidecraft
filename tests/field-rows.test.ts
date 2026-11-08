@@ -195,10 +195,12 @@ describe("round-trip — the row survives serialize → parse, with and without 
 });
 
 describe("never-silent degrade — no slot in the template", () => {
+  // #597: on a slide WITH a text body the row is now rescued (bold head line, info — field-row-rescue.test).
+  // A card slide has no body to prepend to → it still degrades to the unbound warn checked here.
   it("技術報告 (no callout/source slot): the row is reported, not dropped silently", async () => {
     const tpl = await loadTemplate(readFileSync(GIJUTSU));
     const catalog = buildCatalog(tpl);
-    const deck = asMiddle(parseMd(TAKEAWAY_MD).slides[0]);
+    const deck = asMiddle(parseMd("# 比較\n\n<!-- card -->\n### A\n- a\n\n<!-- card -->\n### B\n- b\n\nTakeaway: 結論はこれ").slides[0]);
     const layout = findLayout(tpl, autoSelectLayout(deck.slides[1], 1, 3, catalog))!;
     expect(slideBindingPlan(deck.slides[1], layout).unbound.map((u) => u.idx)).toEqual(["callout"]);
     const issues = diagnoseDeck(deck, catalog, tpl.layouts).filter((i) => i.id === "unbound-content");
