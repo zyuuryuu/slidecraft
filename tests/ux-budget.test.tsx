@@ -27,6 +27,7 @@ import NoticeSlot from "../src/components/NoticeSlot";
 import type { IntakeResult } from "../src/components/IntakeSummaryBar";
 import type { AdjustSession } from "../src/components/useTemplateAdjust";
 import type { MasterEntry } from "../src/components/useMasterRegistry";
+import { SettingsPanel } from "../src/components/SettingsMenu";
 import { i18nLeaks, menuDepth, groupItems } from "./ux-budget-probes";
 import DeepMenu from "./fixtures/ux-budget/DeepMenu";
 
@@ -85,6 +86,7 @@ const withAllOpen = <T,>(fn: () => T): T => {
 };
 
 const noop = () => {};
+const t = (key: string) => i18n.t(key);
 const SRC = resolve(__dirname, "../src");
 const masters: MasterEntry[] = [
   { id: "builtin-gijutsu", name: "技術報告 スタンダード水色", builtin: true },
@@ -100,8 +102,9 @@ afterAll(() => {
   void i18n.changeLanguage("ja");
 });
 
-/** The top bar exactly as App wires it (every optional entry present → the worst case). */
-const topBar = () =>
+/** The top bar exactly as App wires it (every optional entry present → the worst case).
+ *  withMaster=false drops the 🎨 slot so the File and ⚙ menus can be counted on their own. */
+const topBar = (withMaster = true) =>
   renderToStaticMarkup(
     <Toolbar
       onSave={noop}
@@ -119,10 +122,10 @@ const topBar = () =>
       onHelp={noop}
       onAiSettings={noop}
       onDraft={noop}
-      master={
+      master={withMaster && (
         <MasterPicker masters={masters} activeId="builtin-gijutsu" onSelect={noop} onImport={noop} onRemake={noop}
           onAdjust={noop} onShowInfo={noop} onCreate={noop} onRemove={noop} />
-      }
+      )}
     />,
   );
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
@@ -159,6 +162,18 @@ describe("道具の自己検査（fixture）", () => {
       '<div role="group" aria-label="A"><div class="h-px"></div><div>見出し</div><div><button>1</button><button>2</button></div>' +
       '<button>3</button><img src="x"/></div><div role="group" aria-label="B"><div>見出し</div></div>';
     expect(groupItems(html)).toEqual([{ label: "A", items: 2 }, { label: "B", items: 0 }]);
+  });
+
+  it("groupItems: セグメント行（aria-pressed のボタンだけを並べた role=group）は区画でなく 1 項目（#674・§3）", () => {
+    const seg = (n: number) =>
+      `<div role="group" aria-label="seg">${Array.from({ length: n }, (_, i) => `<button aria-pressed="${i === 0}">${i}</button>`).join("")}</div>`;
+    const html =
+      `<div role="group" aria-label="A"><button>1</button><div><span>遷移</span>${seg(4)}</div>${seg(3)}<button>2</button></div>` +
+      // 押し状態を持たないボタンが混じる group は、セグメント行でなく区画のまま数える。
+      `<div role="group" aria-label="B"><button aria-pressed="true">x</button><button>y</button></div>` +
+      // 区画の外に単独で置かれたセグメント行も区画ではない。
+      seg(2);
+    expect(groupItems(html)).toEqual([{ label: "A", items: 4 }, { label: "B", items: 2 }]);
   });
 });
 
@@ -197,6 +212,21 @@ describe("UX 予算（ADR-0039）", () => {
     expect(groups.length).toBeGreaterThan(0); // 数え漏れの防止（区画を 1 つも拾えなければ道具が壊れている）
     expect(groups.length).toBeLessThanOrEqual(BUDGET.menuSections);
     for (const g of groups) expect(g.items, g.label).toBeLessThanOrEqual(BUDGET.itemsPerSection);
+  });
+
+  it(`Cowan/Miller: ファイルと ⚙ のメニューも ${BUDGET.menuSections} 区画以下・1 区画 ${BUDGET.itemsPerSection} 項目以下（#674）`, () => {
+    // 全部「開」で描いた上部バー（🎨 を除く）＝ファイル ▾ と ⚙ のメニューの中身。セグメント行（HTML の遷移・
+    // 言語・配色）は 1 項目で、区画としては現れない（§3）。区画名の一覧を固定するのは数え漏れの防止。
+    const files = [t("toolbar.projectSection"), t("toolbar.exportSection")];
+    const settings = [t("settings.displaySection"), t("settings.aiHelpSection")];
+    const groups = groupItems(withAllOpen(() => topBar(false)));
+    expect(groups.map((g) => g.label)).toEqual([...files, ...settings]);
+    expect(files.length).toBeLessThanOrEqual(BUDGET.menuSections);
+    expect(settings.length).toBeLessThanOrEqual(BUDGET.menuSections);
+    for (const g of groups) expect(g.items, g.label).toBeLessThanOrEqual(BUDGET.itemsPerSection);
+    // ⚙ の中身を単独で描いても同じ区画になる（SettingsMenu の開閉に依らない）。
+    expect(groupItems(renderToStaticMarkup(<SettingsPanel onClose={noop} onHelp={noop} onAiSettings={noop} />)).map((g) => g.label))
+      .toEqual(settings);
   });
 
   it(`段階的開示: メニューのネストは ${BUDGET.menuDepth} 段まで（凍結リストの項目を除く）`, () => {

@@ -5,14 +5,18 @@
 // runs cleanly (no stale-binfmt hijack) and can be codesigned. Assimilation is HOST-NATIVE, so the
 // target triple's OS must match the runner — true in the release matrix (each triple on its own OS).
 //
-//   node scripts/stage-llamafile.mjs [target-triple] [--force]
+//   node scripts/stage-llamafile.mjs [target-triple] [--force] [--cache-dir=<dir>]
 //
 // Default triple = the Rust host. Run BEFORE `tauri build` — or via `npm run build:desktop`.
+// The download retries transient failures (5xx / connection errors, 2s/4s/8s — #663). `--cache-dir` keeps
+// the RAW upstream APE there (CI restores it with actions/cache); a cached copy is SHA256-verified on every
+// use exactly like a fresh download, and re-downloaded if it does not match.
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, chmodSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, chmodSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { downloadWithRetry } from "./download-retry.mjs";
 
 const LLAMAFILE_VERSION = "0.10.3"; // pinned Mozilla-Ocho release
 const LLAMAFILE_SHA256 = "a7d13ccf90c3a71122f983d801692471f427fbb718d36ad1194d28a700da0b4f"; // llamafile-0.10.3-thin
@@ -21,6 +25,7 @@ const binDir = join(here, "..", "src-tauri", "binaries");
 
 const argv = process.argv.slice(2);
 const force = argv.includes("--force");
+const cacheDir = argv.find((a) => a.startsWith("--cache-dir="))?.slice("--cache-dir=".length) || undefined;
 const triple = argv.find((a) => !a.startsWith("--")) ?? execSync("rustc --print host-tuple").toString().trim();
 
 // Upstream is ONE universal APE; only the dest filename ext + native OS vary per triple. Keep a
@@ -46,20 +51,40 @@ if (existsSync(dest) && !force) {
 }
 mkdirSync(binDir, { recursive: true });
 
-const url = `https://github.com/Mozilla-Ocho/llamafile/releases/download/${LLAMAFILE_VERSION}/llamafile-${LLAMAFILE_VERSION}-thin`;
-console.log(`Downloading ${url} ...`);
-const res = await fetch(url);
-if (!res.ok) {
-  console.error(`download failed: ${res.status} ${res.statusText}`);
-  process.exit(1);
-}
-const buf = Buffer.from(await res.arrayBuffer());
-
+const thinName = `llamafile-${LLAMAFILE_VERSION}-thin`;
+const url = `https://github.com/Mozilla-Ocho/llamafile/releases/download/${LLAMAFILE_VERSION}/${thinName}`;
 // Verify the UPSTREAM APE's SHA256 BEFORE assimilating (assimilate rewrites the file → new hash).
-const got = createHash("sha256").update(buf).digest("hex");
-if (got !== LLAMAFILE_SHA256) {
-  console.error(`stage-llamafile: SHA256 mismatch — refusing to stage an unverified runtime.\n  expected ${LLAMAFILE_SHA256}\n  got      ${got}`);
-  process.exit(1);
+function verify(b) {
+  const got = createHash("sha256").update(b).digest("hex");
+  if (got !== LLAMAFILE_SHA256) {
+    throw new Error(`SHA256 mismatch — refusing to stage an unverified runtime.\n  expected ${LLAMAFILE_SHA256}\n  got      ${got}`);
+  }
+}
+
+let buf;
+const cached = cacheDir && join(cacheDir, thinName);
+if (cached && existsSync(cached)) {
+  const c = readFileSync(cached);
+  try {
+    verify(c);
+    buf = c;
+    console.log(`Using cached ${cached} (SHA256 verified)`);
+  } catch (e) {
+    console.warn(`stage-llamafile: cached ${cached} ignored (${e.message.split("\n")[0]}) — re-downloading.`);
+  }
+}
+if (!buf) {
+  console.log(`Downloading ${url} ...`);
+  try {
+    buf = await downloadWithRetry(url, { verify });
+  } catch (e) {
+    console.error(`stage-llamafile: ${e.message}`);
+    process.exit(1);
+  }
+  if (cached) {
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(cached, buf);
+  }
 }
 writeFileSync(dest, buf);
 if (m.os !== "windows") chmodSync(dest, 0o755);

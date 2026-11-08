@@ -14,6 +14,7 @@ import type { McpProfile } from "./tool-profiles";
 import type { ToolResult } from "./tool-result";
 import { buildRecord, formatMetricsLine, type CallObservation, type ChangeKind } from "./metrics";
 import type { MetricsRecorder } from "./metrics-sink";
+import type { SlideEditRoute } from "../engine/slide-edit-route";
 
 const store = new AsyncLocalStorage<CallObservation>();
 
@@ -27,6 +28,12 @@ export function noteDoc(docId: string): void {
 export function noteChange(kind: ChangeKind, changed: boolean, changedIndices?: number[]): void {
   const o = store.getStore();
   if (o) o.change = { kind, changed, changedIndices };
+}
+
+/** #631: set_slide_markdown が通った編集経路（slide-edit.ts の applySlideEdit が記す）。 */
+export function noteRoute(route: SlideEditRoute, skipped: number): void {
+  const o = store.getStore();
+  if (o) o.route = { route, skipped };
 }
 
 type Handler = (...a: unknown[]) => ToolResult | Promise<ToolResult>;

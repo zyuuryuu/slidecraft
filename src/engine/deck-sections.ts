@@ -29,11 +29,17 @@ export interface SectionEntry {
   title: string; // 章名 = 章扉のタイトル見出し（無題なら ""）
 }
 
+/** 章扉（`<!-- section -->` タグ付きスライド）かどうかの単一の判定（R8）。scanSections と診断
+ *  `marker-layout-missing`（#662・slide-marker-hint.ts）が共有する。 */
+export function isSectionDivider(slide: Pick<SlideIR, "sectionBreak">): boolean {
+  return !!slide.sectionBreak;
+}
+
 /** section タグ付きスライドを出現順にスキャンして採番する。 */
 export function scanSections(deck: DeckIR): SectionEntry[] {
   const out: SectionEntry[] = [];
   deck.slides.forEach((slide, i) => {
-    if (!slide.sectionBreak) return;
+    if (!isSectionDivider(slide)) return;
     const raw =
       getPlaceholderText(slide, TITLE_NS.title) ?? getPlaceholderText(slide, CONTENT_NS.title) ?? "";
     const title = raw.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
@@ -119,7 +125,7 @@ function usesBodyIdx1(slide: SlideIR): boolean {
  */
 export function materializeDerivedSlides(deck: DeckIR, catalog?: LayoutCatalog): DeckIR {
   const hasToc = deck.slides.some((s) => s.derived === "toc");
-  const injectRecap = deck.slides.some((s) => s.sectionBreak) && layoutPinHonored(catalog, SECTION_NAV_LIST_LAYOUT);
+  const injectRecap = deck.slides.some(isSectionDivider) && layoutPinHonored(catalog, SECTION_NAV_LIST_LAYOUT);
   if (!hasToc && !injectRecap) return deck;
   const sections = scanSections(deck);
   return {
@@ -128,7 +134,7 @@ export function materializeDerivedSlides(deck: DeckIR, catalog?: LayoutCatalog):
       if (slide.derived === "toc") {
         return { ...slide, placeholders: tocPlaceholders(sections) };
       }
-      if (injectRecap && slide.sectionBreak && slide.layout === "auto" && !usesBodyIdx1(slide)) {
+      if (injectRecap && isSectionDivider(slide) && slide.layout === "auto" && !usesBodyIdx1(slide)) {
         const current = sections.find((s) => s.slideIndex === i);
         if (current) {
           return {

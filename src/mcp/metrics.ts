@@ -16,6 +16,7 @@
 import type { ToolResult } from "./tool-result";
 import type { McpProfile } from "./tool-profiles";
 import { isOk } from "./result-contract";
+import type { SlideEditRoute } from "../engine/slide-edit-route";
 
 export const METRICS_VERSION = 1 as const;
 
@@ -28,6 +29,8 @@ export type ChangeKind = "edit" | "mint" | "undo";
 export interface CallObservation {
   docId?: string;
   change?: { kind: ChangeKind; changed: boolean; changedIndices: number[] | undefined };
+  /** #631: set_slide_markdown が通った編集経路（slide-edit.ts が記す）。 */
+  route?: { route: SlideEditRoute; skipped: number };
 }
 
 export interface MetricsRecord {
@@ -55,6 +58,10 @@ export interface MetricsRecord {
   changedN?: number | null;
   /** deck 丸ごと再生成（edit が変化し、かつ変更スライドが特定できない）＝D5-3 増分性の反例。 */
   wholeDeck?: boolean;
+  /** #631: 編集経路（routeSlideEdit の列挙語）。経路を判定した呼出だけが持つ（旧行には無い＝optional・版据え置き）。 */
+  route?: SlideEditRoute;
+  /** #631: 効かなかった op の数（Markdown 経路は 0）。route と対で出る。 */
+  skipped?: number;
 }
 
 export interface BuildRecordInput {
@@ -109,6 +116,7 @@ export function buildRecord(i: BuildRecordInput): MetricsRecord {
     inChars: i.args === undefined ? 0 : JSON.stringify(i.args).length,
     outChars: outCharsOf(i.result),
     ...(ch ? { mut: ch.kind, changed: ch.changed, changedN, wholeDeck: ch.kind === "edit" && ch.changed && changedN === null } : {}),
+    ...(i.obs.route ? { route: i.obs.route.route, skipped: i.obs.route.skipped } : {}),
   };
 }
 
