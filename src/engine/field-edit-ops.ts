@@ -37,8 +37,9 @@ export interface SkippedFieldOp {
 }
 
 /** The bare JSON array a whole reply consists of (optionally ```-fenced), or null. Same whole-string
- *  rule as parseDiagramEditOps / parseDesignIntent: prose that QUOTES an array is not an ops reply. */
-function bareArray(raw: string): unknown[] | null {
+ *  rule as parseDiagramEditOps / parseDesignIntent: prose that QUOTES an array is not an ops reply.
+ *  Shared with chart-edit-ops (#106 P3) so both TEXT and DATA ops detect a reply the same way (R8). */
+export function bareArray(raw: string): unknown[] | null {
   let t = raw.trim();
   const fence = t.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
   if (fence) t = fence[1].trim();
