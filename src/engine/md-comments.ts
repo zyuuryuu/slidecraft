@@ -12,10 +12,11 @@
 export const COMMENT_ONLY_RE = /^(?:(?:<!--(?:(?!-->).)*-->|<!--->|<!-->)\s*)+$/;
 
 /** Directive comments that carry meaning — the layout pin, the group separators, the
- *  speaker-note marker (ADR-0032 D1), and the section/toc declarations (ADR-0032 D2).
+ *  speaker-note marker (ADR-0032 D1), the section/toc declarations (ADR-0032 D2), and the
+ *  statement/quote slide markers (#593).
  *  A payload form (`<!-- note: … -->` etc.) is NOT a directive and stays in the #147
  *  drop class — only the bare markers survive. */
-export const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|compare|before|after|note|section|toc|step\s*\*)\s*-->$)/; // `step *` = #401
+export const DIRECTIVE_COMMENT_RE = /^<!--\s*(?:slide:|(?:col|kpi|step|card|compare|before|after|note|section|toc|statement|quote|step\s*\*)\s*-->$)/; // `step *` = #401
 
 /** #588: a line that is nothing but (optional complete comments, then) an UNCLOSED `<!--` — the
  *  first line of a multi-line comment. `<!-->` / `<!--->` are abrupt closes, not openers. */

@@ -11,6 +11,7 @@ import type { SlideIR, LayoutName } from "./slide-schema";
 import { pickLayout, bestBodyBearing, usesMetaIdxConvention, recoverLayoutTitle, recoverLayoutSubtitle, placeholderRole, CLOSING_RE, BUILTIN_ROLE_DESCR_PREFIX, type LayoutCatalog, type LayoutRole, type PlaceholderRole } from "./template-catalog";
 import { inferFunction, type ElementFunction } from "./master-scorer";
 import { preferFieldVariant } from "./field-variant";
+import { slideMarker, type SlideMarkerKind } from "./slide-markers";
 import { parseColorRef, resolveColor } from "./ooxml-resolve";
 import { nestedLevelFontSize } from "./nested-level-font";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
@@ -818,7 +819,8 @@ export async function loadTemplate(
 
 // Which catalog group kinds a slide.groupKind may fill. Each kind fills only its own family — card never
 // lands on a compare/課題対策 layout; that family is reached only by the explicit `<!-- compare -->` (#396).
-const GROUP_MATCH: Record<NonNullable<SlideIR["groupKind"]>, Array<"card" | "step" | "kpi" | "compare">> = {
+// statement/quote ride groupKind but are not groups (slide-markers.ts) — they route by ROLE in autoSelectLayout.
+const GROUP_MATCH: Record<Exclude<NonNullable<SlideIR["groupKind"]>, SlideMarkerKind>, Array<"card" | "step" | "kpi" | "compare">> = {
   card: ["card"],
   step: ["step"],
   kpi: ["kpi"],
@@ -839,6 +841,8 @@ const CANONICAL_FALLBACK = {
   columns3: "Column.3Body.Equal",
   closing: "Closing.1Message.Single",
   closingWithBody: "Closing.1Steps.Single+1Notes",
+  statement: "Statement.1Message.Single", // #593: `<!-- statement -->`
+  quote: "Quote.1Message.Single+1Attribution", // #593: `<!-- quote -->`
 } as const satisfies Record<string, LayoutName>;
 
 /** Classify a slide → the ideal layout ROLE + body-region count (+ a canonical fallback name).
@@ -919,12 +923,24 @@ export function autoSelectLayout(
     }
   }
 
+  // #593: a `<!-- statement -->` / `<!-- quote -->` slide routes to a layout of that ROLE (Statement.* /
+  // マガジン 02_ステートメント, Quote.* / 07_引用 — no unmarked slide role targets these). Only fires on the
+  // marker, so unmarked selection is byte-identical. A template without one degrades (never-silent:
+  // deck-diagnostics `marker-layout-missing`): a quote prefers a 2-body CONTENT layout (quote in the body,
+  // attribution in the 2nd box, no drop); otherwise both fall through to the normal selection below.
+  const marker = slideMarker(slide);
+  if (marker) {
+    if (!catalog || catalog.length === 0) return CANONICAL_FALLBACK[marker];
+    const hit = pickLayout(catalog, marker) ?? (marker === "quote" ? twoBodyContent(catalog) : undefined);
+    if (hit) return hit.name;
+  }
+
   // Group-aware: a `slide.groupKind` slide routes to the matching GROUP layout (card→card, step→step,
   // kpi→kpi, compare→compare), preferring the group-count that fits (exact, then smallest overshoot). Only fires on
   // groupKind — non-grouped selection is byte-identical. Falls through when the template has no such
   // layout (degrades to columns-with-headings via the normal path below).
-  if (slide.groupKind && catalog && catalog.length > 0) {
-    const want = GROUP_MATCH[slide.groupKind];
+  if (slide.groupKind && !marker && catalog && catalog.length > 0) {
+    const want = GROUP_MATCH[slide.groupKind as keyof typeof GROUP_MATCH];
     const need = slide.placeholders.filter((p) => /^[1-9]$/.test(p.idx)).length;
     const cands = catalog.filter((e) => e.groupKind && want.includes(e.groupKind) && (e.groupCount ?? 0) >= need);
     if (cands.length > 0) return [...cands].sort((a, b) => (a.groupCount! - need) - (b.groupCount! - need))[0].name;
@@ -954,6 +970,13 @@ export function autoSelectLayout(
     if (chosen) return chosen.name;
   }
   return fallback;
+}
+
+/** #593 quote degrade: the best plain CONTENT layout with ≥ 2 body boxes (e.g. Content.1Body.Single+1Notes).
+ *  GROUP layouts (課題と対策 / KPI / プロセス — role content by name, but their boxes are per-group cells) are
+ *  excluded: a single-body slide on one reads back without its body. */
+function twoBodyContent(catalog: LayoutCatalog): LayoutCatalog[number] | undefined {
+  return pickLayout(catalog.filter((e) => !e.groupKind && e.bodyCount >= 2), "content", 2);
 }
 
 /**

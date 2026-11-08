@@ -18,6 +18,7 @@ import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, drawnImage, vis
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
 import { planFieldRescue, applyFieldRescue, fieldNoteShapeXml } from "./field-rescue";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "./group-binding";
+import { isGroupedSlide } from "./slide-markers";
 import { isEmptyOverlay, paintGroupOverlay, withLeftInset } from "./group-overlay";
 import { beforeAfterOverlay, beforeAfterShapesXml } from "./before-after";
 import { paragraphsToOoxml, type LinkResolver } from "./md-to-ooxml";
@@ -149,14 +150,14 @@ async function buildSlideXml(
   // convention binds correctly (an alien master's title/body idxs match through their role).
   // A grouped slide (card/step/kpi) fills the layout's per-group heading/body slots via the SEPARATE
   // group path; everything else uses the canonical binder. Same Map shape → the loop below is unchanged.
-  const bound = slide.groupKind && isGroupedLayout(layout)
+  const bound = isGroupedSlide(slide) && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layout.placeholders);
   // #597: slot-less Category/Takeaway rows merged as text, a slot-less Source drawn as a note (field-rescue).
   const rescue = planFieldRescue(slide, layout, bound);
   const contentFor = applyFieldRescue(bound, rescue);
   // Group-cell decorations (#400 heading icons / #401 current-step frame) from the same pass.
-  const overlay = slide.groupKind && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
+  const overlay = isGroupedSlide(slide) && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
 
   // Diagram/mermaid/table occupies the Nth BODY region (placeholderIdx "1"→1, "2"→2…).
   const bodyPhs = bodyPlaceholders(layout.placeholders);

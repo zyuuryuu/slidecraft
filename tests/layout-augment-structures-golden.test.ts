@@ -27,8 +27,10 @@ const DECK_MD = [
   "# 表紙",
   "# 比較\n\n<!-- compare -->\n### A 案\n- 速い\n  - 高い\n\n<!-- compare -->\n### B 案\n- 安い",
   "# カード\n\n<!-- card -->\n### 収集\n- eBPF\n\n<!-- card -->\n### 分析\n- SIEM\n\n<!-- card -->\n### 運用\n- Sigma",
-  "# KPI 3\n\n<!-- kpi -->\n### 98%\n- 稼働率\n\n<!-- kpi -->\n### 1.2 秒\n- 応答\n\n<!-- kpi -->\n### 30 件\n- 障害",
-  "# KPI 4\n\n<!-- kpi -->\n### 12\n- 拠点\n\n<!-- kpi -->\n### 3.4M\n- 利用者\n\n<!-- kpi -->\n### 99.9%\n- SLA\n\n<!-- kpi -->\n### 5\n- 製品",
+    // kpi: `### ラベル` + 最初の行が値（docs/guide/markdown-authoring.md）。#593 で値枠（大きな文字の枠）への束縛が
+  // この規約どおりになったので、md もその向きに揃えた（旧版は値を見出しに書いていた）。
+  "# KPI 3\n\n<!-- kpi -->\n### 稼働率\n- 98%\n\n<!-- kpi -->\n### 応答\n- 1.2 秒\n\n<!-- kpi -->\n### 障害\n- 30 件",
+  "# KPI 4\n\n<!-- kpi -->\n### 拠点\n- 12\n\n<!-- kpi -->\n### 利用者\n- 3.4M\n\n<!-- kpi -->\n### SLA\n- 99.9%\n\n<!-- kpi -->\n### 製品\n- 5",
 ].join("\n\n---\n\n");
 
 /** key: `layout:<structure>` = the synthesized slideLayout XML; `deck:<path>` = a part of the exported deck. */
@@ -40,8 +42,8 @@ const GOLDEN: Record<string, Record<string, string>> = {
     "layout:kpi-4": "b25918054a58c8103b055d5b8906bd6322321785461adc142decac4c5127121d",
     "deck:ppt/slides/slide2.xml": "3b65229456d2597312cda798449ed884d3e8152b3e4729521da05e7b387bf2a9",
     "deck:ppt/slides/slide3.xml": "6934f904713969860a2856306289a7da5df9080add4f5ce876e8cc20166175a9",
-    "deck:ppt/slides/slide4.xml": "3e3f4fc43da0bb290272aee29db6db6fde3340b5d2d23bcd29005d84904b8e2f",
-    "deck:ppt/slides/slide5.xml": "2cd6d94b5f34466df8f60f95100c6c07cc0e50590558a44792a4e0ce6314ff29",
+    "deck:ppt/slides/slide4.xml": "ba664dbfc00b73785d46915b55edab7a23047605af7e913f73118ac1b783da24",
+    "deck:ppt/slides/slide5.xml": "dea6649ce0ad0bcb1069f5fd5b31cdec565a0f7b91aa7fa8f3ddc5bda9cbcea9",
   },
   "Dirty_Legacy43_TemplateOnly.pptx": {
     "layout:kpi-4": "2ea4bafab9e0320693d398d3e3289b0026701ed716ea1bf2d4193c6af24ea49a",
