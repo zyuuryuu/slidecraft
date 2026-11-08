@@ -24,7 +24,7 @@ Complete the [Installation Guide](/en/guide/installation) first (Windows `.msi` 
 
 SlideCraft's basic cycle has four steps.
 
-1. **Draft** — Enter your Markdown.
+1. **Draft** — Enter your Markdown (the **📝 Draft** button on the top bar).
 2. **Turn it into slides** — Pick a template, parse the Markdown, and convert it into a deck (a set of slides).
 3. **Review and adjust in the visual editor** — Check it in a what-you-see-is-what-you-get preview, then add, reorder, and use two-stage editing.
 4. **Export** — Write out `.pptx` (PowerPoint) or standalone HTML.
@@ -37,6 +37,8 @@ SlideCraft's basic cycle has four steps.
 ```
 
 Markdown (the input) and the deck (the source of truth) hold the same content and can be moved back and forth. Day to day, the visual editor is the main surface, and Markdown is always available for input and export.
+
+The top bar holds only the document's operations: **↶ ↷** (undo / redo) | **File**, **📝 Draft**, **🎨 master** | **✨ AI**, **⚙**. Language (日本語 / English), theme (Dark / Light / Modern), help (this documentation) and the AI connection settings open from **⚙** at the right end.
 
 ## ① Draft — Write Markdown
 

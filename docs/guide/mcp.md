@@ -186,7 +186,7 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
 | ツール | 役割 |
 |---|---|
 | `open_project(dataBase64)` | base64 の `.slidecraft` を読み込む。`{slideCount, diagnostics, contract}` を返す |
-| `new_project(templateBase64, markdown?)` | base64 の `.pptx` テンプレ（＋任意の Markdown）から新規作成。GUI の Draft と同じ整形パスを通る |
+| `new_project(templateBase64, markdown?)` | base64 の `.pptx` テンプレ（＋任意の Markdown）から新規作成。GUI の原稿（📝 原稿）と同じ整形パスを通る |
 | `create_template(spec?)` | テンプレの bytes が無いとき、名前＋フォント＋9 色パレットから**テンプレ PPTX を生成**して返す。欠落は preset で補完 |
 
 ### 契約を読む（書き方を知る）
