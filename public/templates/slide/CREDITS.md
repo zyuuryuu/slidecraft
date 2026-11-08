@@ -9,6 +9,7 @@ the master picker. All are original SlideCraft designs.
 - **セールスピッチ_Pitch_TemplateOnly.pptx** — a sales-pitch / proposal style (one message per slide,
   big statement, hero number, quote, CTA close). Generated from the `PITCH_PRESET` writer preset
   (`src/engine/template-presets.ts`) by `scripts/gen-preset-templates.ts` (#595).
+- **エグゼクティブ_Executive_TemplateOnly.pptx** — a dark, impact-first executive style (one message per slide, big KPI, decision-request close). Generated deterministically from the `EXECUTIVE_PRESET` writer preset by `scripts/make-executive-template.ts` (#596).
 
 (The former default, `Midnight_Executive_30_TemplateOnly.pptx` — the canonical 30-layout development
 template, also an original SlideCraft design — is no longer bundled; it is an input sample under

@@ -57,7 +57,7 @@ SlideCraft のスライドマスター（PPTX テンプレート）の定義と�
 
 ## ディレクトリの実態
 
-- **`public/templates/slide/`＝アプリが配信する公式テンプレのみ**：`*_TemplateOnly.pptx` 4 本（＝ BUILTIN_MASTERS。セールスピッチ Pitch は writer プリセットの生成物＝`scripts/gen-preset-templates.ts`）＋ `CREDITS.md`。テスト専用ファイルは置かない（衛生）。
+- **`public/templates/slide/`＝アプリが配信する公式テンプレのみ**：`*_TemplateOnly.pptx` 5 本（＝ BUILTIN_MASTERS。セールスピッチ Pitch とエグゼクティブ Executive は writer プリセットの生成物＝`scripts/gen-preset-templates.ts`／`scripts/make-executive-template.ts`）＋ `CREDITS.md`。テスト専用ファイルは置かない（衛生）。
 - **`samples/templates/`＝入力サンプル**（#117）：`Midnight_Executive_30_TemplateOnly.pptx`（旧ビルトイン既定）。同梱はしない。
   旧 public 版を走査していたテスト（タイトル可読性・病理・chrome ゲート等）は、走査範囲を縮めないためこのファイルを読む。
 - **`tests/fixtures/templates/`＝テスト専用フィクスチャ**（`public/` から退避）：`*_全レイアウト見本.pptx`（レイアウト確認用の見本デッキ）・`lrk-slides-velis_CC0.pptx`（CC0 alien fixture）・`Midnight_Executive_30_Template.pptx`（中身入りデモ）・`Midnight_Executive_30_TemplateOnly.pptx`（テスト用コピー。samples 版とはレイアウト 12〜30 の `TitleBackdrop` 図形の有無が異なる＝samples 版にだけ #274 の背景帯 patch が当たっている）。会社 `.potx` と `CX_sample_MSGothic.pptx` はここに置き **gitignore**（知財・ローカル限定）。

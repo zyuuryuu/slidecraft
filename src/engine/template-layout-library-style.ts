@@ -43,9 +43,10 @@ export const STYLE_LAYOUTS: LayoutDef[] = [
 ];
 
 /**
- * プリセット専用のレイアウト（#595〜）。STYLE_LAYOUTS と違い BUILTIN_LAYOUTS には連結しない:
+ * プリセット専用のレイアウト（#595 Pitch・#596 Executive〜）。STYLE_LAYOUTS と違い BUILTIN_LAYOUTS には連結しない:
  * 連結すると既存 TemplateSpec（作成 UI 既定・Re-make）の出力が変わる（template-presets.test.ts の
  * LEGACY_DIGEST）。プリセットからだけ名前で引く（template-presets.ts の PRESET_LIBRARY）。
+ * family 名から役割が決まる（Closing → closing）ものはカタログ側の追加が要らない。
  */
 export const PRESET_LAYOUTS: LayoutDef[] = [
   // 左テキスト｜右画像（#595 Pitch・製品紹介）。画像は picture 枠（#594 の pic 型）に入るので本文を隠さない。
@@ -71,5 +72,15 @@ export const PRESET_LAYOUTS: LayoutDef[] = [
     ]),
     { name: "Callout.Bottom", type: "body", idx: 41, x: 0.8, y: 6.1, w: 11.7, h: 0.6, fontSize: 16, font: "minor", color: "emphasis", bold: true, align: "l" },
     { name: "SlideNum.Footer", type: "sldNum", idx: 50, x: 12.0, y: 7.05, w: 1.2, h: 0.3, fontSize: 10, font: "minor", color: "muted", bold: false, align: "r" },
+  ]},
+  // Ask 締め（エグゼクティブ・#596）: 意思決定の依頼 1 文（idx 1）を大きく、選択肢／期限（idx 2）を下段に。
+  // idx 構成は Closing.1CTA+1Contact と同じ（15 / 1 / 2）＝`<!-- col -->` の 1 列目が依頼・2 列目が選択肢と期限。
+  // 本文倍率（density.bodyPt ÷ 14）は 21pt 以下の枠だけに掛かる（PR #635 裁定 B）。Ask は表示用サイズ（倍率の
+  // 対象外）なので最終サイズ 37pt を直接書く（裁定前の 26pt × 20/14 と同じ描画）。Decision 13pt は倍率が掛かる。
+  // 見出しは依頼のラベルとして accent の小さめの太字（タイトル系統は倍率の対象外）。
+  { name: "Closing.1Ask+1Decision", family: "dark", decos: [{ x: 1.2, y: 4.55, w: 1.2, h: 0.06, color: "accent" }], placeholders: [
+    { name: "SlideTitle.Header", type: "body", idx: 15, x: 1.2, y: 1.0, w: 10.9, h: 0.7, fontSize: 24, font: "major", color: "accent", bold: true, align: "l" },
+    { name: "Ask.Center", type: "body", idx: 1, x: 1.2, y: 1.9, w: 10.9, h: 2.4, fontSize: 37, font: "major", color: "titleText", bold: true, align: "l" },
+    { name: "Decision.Bottom", type: "body", idx: 2, x: 1.2, y: 4.8, w: 10.9, h: 1.6, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l" },
   ]},
 ];
