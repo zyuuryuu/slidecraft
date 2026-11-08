@@ -17,7 +17,6 @@ import { nestedLevelFontSize } from "./nested-level-font";
 import { buildRelMap, resolveBlipFillSrc, gradFillCss, backgroundImageSrc, backgroundGradientCss } from "./ooxml-fill";
 import { readStyleDensity, type StyleDensity } from "./style-meta";
 import { type Xf, IDENTITY_XF, parseGroupXf, composeXf, transformRect, topLevelBlocks, groupChildren, arcToSvg, propBlock } from "./ooxml-geom";
-import { slideFigures } from "./slide-figures";
 import { layoutPinHonored } from "./layout-pin";
 import { slideRoleRegions, CANONICAL_FALLBACK, pickRoleLayout, tableForPick } from "./slide-role-regions";
 
