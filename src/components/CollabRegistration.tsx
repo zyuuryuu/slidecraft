@@ -142,7 +142,7 @@ export default function CollabRegistration() {
 
       <Field label={t("collabPanel.addToClaudeCode")} value={snippets.claudeCode} />
       <Field label={t("collabPanel.desktopClientsLabel")} value={snippets.desktopJson} />
-      {/* #517 子 3: Claude Desktop's one-double-click install. The JSON above stays (Cursor etc. use it, and it is
+      {/* #517 子 3: Claude Desktop's no-JSON install (Settings → Extensions; #686). The JSON above stays (Cursor etc. use it, and it is
           the fallback when the latest release has no bundle). */}
       <McpbDownload os={info?.os ?? null} />
 

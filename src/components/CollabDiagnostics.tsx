@@ -1,7 +1,7 @@
 /**
  * CollabDiagnostics.tsx — two blocks of the 協働 panel's registration area (#517):
- *  - McpbDownload (子 3): Claude Desktop's `.mcpb` for THIS OS from the latest release (one double-click
- *    installs it). Every outcome is stated — loading / available / missing in that release / no Claude Desktop
+ *  - McpbDownload (子 3): Claude Desktop's `.mcpb` for THIS OS from the latest release (installed from Claude
+ *    Desktop's Settings → Extensions; #686). Every outcome is stated — loading / available / missing in that release / no Claude Desktop
  *    on this OS / lookup failed — so the JSON snippet above is never left as an unexplained only option.
  *  - McpDoctor (子 4): 接続テスト — runs the bundled server's own `--doctor` (Rust `mcp_doctor`) and shows its
  *    one-screen report verbatim.

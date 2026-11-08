@@ -238,7 +238,7 @@
     "doctorSpawnFailed": "同梱の Node を起動できませんでした（{{error}}）。",
     "doctorIpcError": "接続テストを開始できませんでした（{{error}}）。",
     "doctorBrowser": "接続テストはデスクトップ版でのみ実行できます（ブラウザ版には同梱サーバがありません）。",
-    "mcpbLabel": "Claude Desktop（.mcpb をダブルクリックで導入）",
+    "mcpbLabel": "Claude Desktop（設定 → 拡張機能 から .mcpb を導入）",
     "mcpbLoading": "最新リリースの .mcpb を確認しています…",
     "mcpbBrowser": "デスクトップ版では、この OS 用の .mcpb をここからダウンロードできます（GitHub Releases にも掲載）。",
     "mcpbDownload": ".mcpb をダウンロード（{{tag}} · {{name}}）",

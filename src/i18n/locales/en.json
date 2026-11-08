@@ -238,7 +238,7 @@
     "doctorSpawnFailed": "Could not start the bundled Node ({{error}}).",
     "doctorIpcError": "Could not start the connection test ({{error}}).",
     "doctorBrowser": "The connection test runs only in the desktop app (the browser build has no bundled server).",
-    "mcpbLabel": "Claude Desktop (double-click the .mcpb to install)",
+    "mcpbLabel": "Claude Desktop (install the .mcpb from Settings → Extensions)",
     "mcpbLoading": "Checking the latest release for a .mcpb…",
     "mcpbBrowser": "In the desktop app you can download this OS's .mcpb here (it is also on GitHub Releases).",
     "mcpbDownload": "Download the .mcpb ({{tag}} · {{name}})",
