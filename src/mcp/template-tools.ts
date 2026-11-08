@@ -15,12 +15,13 @@ import { z } from "zod";
 import type { Session } from "./session";
 import { requireLoaded, getDiagnostics } from "./session";
 import { GuardError } from "./guard-errors";
+import { isToolVisible, type McpProfile } from "./tool-profiles";
 import { loadTemplate, type TemplateData } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth } from "../engine/template-catalog";
 import { adjustTemplate, isNoopRecipe, type TemplateAdjustRecipe } from "../engine/template-adjust";
 import { augmentAndVerify } from "../engine/layout-augment";
 import { ALL_AUGMENT_STRUCTURES, type AugmentStructure } from "../engine/layout-augment-structures";
-import type { ShrinkRule } from "../engine/column-font-shrink";
+import { DEFAULT_SHRINK_RULE, type ShrinkRule } from "../engine/column-font-shrink";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import type { DeckIR } from "../engine/slide-schema";
 import { countOverflows, overflowScaleIssue, suggestBodyScale, type OverflowScaleSuggestion } from "../engine/overflow-scale-hint";
@@ -71,10 +72,13 @@ async function install(s: Session, bytes: Uint8Array, d: Derivation): Promise<{ 
 export async function augmentDocTemplate(s: Session, structures?: readonly AugmentStructure[], rule?: ShrinkRule) {
   const d = await derivationOf(s);
   const want = new Set([...(d.structures ?? []), ...(structures ?? ALL_AUGMENT_STRUCTURES)]);
-  const next: Derivation = { ...d, structures: ALL_AUGMENT_STRUCTURES.filter((x) => want.has(x)), rule: rule ?? d.rule };
+  // 省略は doc の現在の rule を保つ。比較は既定値で正規化（省略と明示 "steps" は同じ派生 — PR #606 D1）。
+  const nextRule = rule ?? d.rule;
+  const ruleChanged = (nextRule ?? DEFAULT_SHRINK_RULE) !== (d.rule ?? DEFAULT_SHRINK_RULE);
+  const next: Derivation = { ...d, structures: ALL_AUGMENT_STRUCTURES.filter((x) => want.has(x)), rule: nextRule };
   const r = await build(next);
   if (r.failures.length) return { ok: false as const, changed: false, failures: r.failures };
-  const fresh = r.added.filter((a) => !(d.structures ?? []).includes(a.structure) || rule !== d.rule);
+  const fresh = r.added.filter((a) => !(d.structures ?? []).includes(a.structure) || ruleChanged);
   const asked = new Set(structures ?? ALL_AUGMENT_STRUCTURES);
   const skipped = [
     ...r.skipped.filter((x) => asked.has(x.structure)).map((x) => ({ structure: x.structure, reason: x.reason })),
@@ -94,6 +98,14 @@ export const RecipeSchema = z
   })
   .strict();
 
+/** レシピの比較キー: no-op は「無し」と同じ・キー順に依らない。 */
+function recipeKey(r: TemplateAdjustRecipe | undefined): string {
+  if (!r || isNoopRecipe(r)) return "";
+  const canon = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Record<string, unknown>)[k])])) : v;
+  return JSON.stringify(canon(r));
+}
+
 /** adjust_template: レシピ（JSON 文字列）で書体置換・倍率を掛けた派生を適用する。前回の合成は保つ（固定順で掛け直す）。 */
 export async function adjustDocTemplate(s: Session, recipeJson: string) {
   let parsed: unknown;
@@ -105,6 +117,8 @@ export async function adjustDocTemplate(s: Session, recipeJson: string) {
   const v = RecipeSchema.safeParse(parsed);
   if (!v.success) throw new GuardError(`recipe が不正です: ${v.error.issues.map((i) => `${i.path.join(".") || "(root)"} ${i.message}`).join(" / ")}`, "invalid-argument");
   const d = await derivationOf(s);
+  // 実効レシピが今と同じ（{} 等の no-op を含む）なら適用しない — changed:true と言って何も変えない嘘を返さない（PR #606 D2）。
+  if (recipeKey(v.data) === recipeKey(d.recipe)) return { changed: false, recipe: v.data, reason: "このレシピでは doc のテンプレは変わりません（no-op か、既に適用済みのレシピ）。" };
   const next: Derivation = { ...d, recipe: v.data };
   const r = await build(next);
   if (r.failures.length) return { ok: false as const, changed: false, failures: r.failures };
@@ -116,7 +130,9 @@ const suggestionCache = new WeakMap<TemplateData, WeakMap<DeckIR, OverflowScaleS
 
 /** 溢れがあるときだけ提案を 1 件足す（無ければ入力の配列をそのまま返す＝応答は従来どおり）。
  *  hint 用に、adjust_template に渡す**絶対**レシピ（前回の本文倍率 × 提案倍率）も返す。 */
-export async function withOverflowScaleHint(s: Session, issues: DeckIssue[]): Promise<{ issues: DeckIssue[]; recipe?: string }> {
+export async function withOverflowScaleHint(s: Session, issues: DeckIssue[], profile: McpProfile): Promise<{ issues: DeckIssue[]; recipe?: string }> {
+  // 提案の行き先 adjust_template が出ていないプロファイル（collab — PR #606 D3）では出さない（呼べないツールを指さない）。
+  if (!isToolVisible("adjust_template", profile)) return { issues };
   if (countOverflows(issues) === 0 || s.disabledReviewRules.has("overflow-scale-hint")) return { issues };
   const { deck, template } = requireLoaded(s);
   let byDeck = suggestionCache.get(template);

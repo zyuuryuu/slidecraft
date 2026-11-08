@@ -24,12 +24,10 @@ import { TOOL_PROFILES, isToolVisible, profileOf } from "../src/mcp/tool-profile
 /** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 40 本。
  *  #522 で get_deck_image / get_deck_html（deck 全枚のコンタクトシート＝ホット往復 29→1・ADR-0037 D3）を
  *  全プロファイルに追加（35→37）。#247 で set_review_rules（レビュー規則の on/off・診断の見え方の設定）を
- *  全プロファイルに追加（37→38）。#568 段 3 / #570 段 3 で augment_template / adjust_template（doc のテンプレを
- *  派生に差し替える）を全プロファイルに追加（38→40）。 */
+ *  全プロファイルに追加（37→38）。#568 段 3 / #570 段 3 の augment_template / adjust_template は solo 専用
+ *  （SOLO_ONLY_TOOLS・PR #606 D3）なのでここには入れない（38 のまま）。 */
 const SHARED_TOOLS = [
-  "adjust_template",
   "apply_design_intent",
-  "augment_template",
   "bootstrap",
   "convert_bullets_to_table",
   "create_template",
@@ -72,11 +70,15 @@ const SHARED_TOOLS = [
 const COLLAB_ONLY_TOOLS = ["close_document", "list_documents", "select_document"];
 /** GUI 専用: webview が master レジストリを push する口。AI からも solo からも見えない。 */
 const GUI_ONLY_TOOLS = ["register_templates"];
+/** solo 専用（PR #606 D3）: doc のテンプレを派生に差し替える 2 本。collab の GUI は host から deck だけを pull し
+ *  テンプレを引かないので、collab に出すと GUI と AI でテンプレが黙ってずれる。同期経路ができたら collab へ広げる。
+ *  これにより「collab-gui ⊇ solo」は成り立たなくなった（全ツール＝collab-gui ∪ solo）。 */
+const SOLO_ONLY_TOOLS = ["adjust_template", "augment_template"];
 
 const sorted = (xs: string[]): string[] => [...xs].sort();
 
 const EXPECTED = {
-  solo: sorted(SHARED_TOOLS),
+  solo: sorted([...SHARED_TOOLS, ...SOLO_ONLY_TOOLS]),
   "collab-gui": sorted([...SHARED_TOOLS, ...COLLAB_ONLY_TOOLS, ...GUI_ONLY_TOOLS]),
   "collab-ai": sorted([...SHARED_TOOLS, ...COLLAB_ONLY_TOOLS]),
 } as const;
@@ -101,7 +103,7 @@ async function listToolNames(host?: HostContext): Promise<string[]> {
 }
 
 describe("プロファイル別登録のスナップショット（ADR-0037 D2 / #465 受け入れ基準）", () => {
-  it("solo（stdio 単独）: collab 専用 4 本（doc 切替 3 本＋register_templates）が隠れ、残り全部が出る", async () => {
+  it("solo（stdio 単独）: collab 専用 4 本（doc 切替 3 本＋register_templates）が隠れ、solo 専用 2 本を含む残り全部が出る", async () => {
     expect(await listToolNames()).toEqual(EXPECTED.solo);
   });
 

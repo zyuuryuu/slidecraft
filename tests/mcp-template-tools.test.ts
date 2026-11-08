@@ -21,6 +21,7 @@ import { buildCatalog } from "../src/engine/template-catalog";
 import { diagnoseDeck } from "../src/engine/deck-diagnostics";
 import { parseMd } from "../src/engine/md-parser";
 import { countOverflows } from "../src/engine/overflow-scale-hint";
+import { DocRegistry, MemTemplateStore, type HostContext } from "../src/mcp/host-core";
 
 const TECH = readFileSync(resolve(__dirname, "fixtures/templates/技術報告_スタンダード水色_全レイアウト見本.pptx"));
 const GROUPED = readFileSync(resolve(__dirname, "fixtures/templates/Dirty_Grouped_TemplateOnly.pptx"));
@@ -38,6 +39,16 @@ async function call(client: Client, name: string, args: Record<string, unknown> 
   const res = (await client.callTool({ name, arguments: args })) as unknown as CallRes;
   expect(res.isError, res.content[0]?.text).toBeFalsy();
   return JSON.parse(res.content[0]?.text ?? "null") as Record<string, unknown>;
+}
+/** collab ホスト（sharedOnly: false＝GUI ロール / true＝AI ロール）への接続。 */
+async function connectCollab(sharedOnly: boolean): Promise<{ client: Client }> {
+  const host: HostContext = { registry: new DocRegistry(), active: () => undefined, setActive: () => {}, sharedOnly, templates: new MemTemplateStore() };
+  const server = buildServer(createSession(null), { host, registerResources: false });
+  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverT);
+  const client = new Client({ name: "test", version: "1.0.0" });
+  await client.connect(clientT);
+  return { client };
 }
 const layoutsOf = async (client: Client) => ((await call(client, "get_template_capabilities")).entries as Array<{ name: string }>).map((e) => e.name);
 
@@ -85,6 +96,22 @@ describe("augment_template", () => {
     expect(again.changed).toBe(false);
   });
 
+  it("PR #606 D1: rule omitted → explicit default → omitted never re-installs (the effective rule did not change); a real rule change does", async () => {
+    const { client } = await connect();
+    await call(client, "new_project", { templateBase64: TECH.toString("base64") });
+    const first = await call(client, "augment_template", { structures: ["kpi-4"] });
+    expect(first.changed).toBe(true);
+    const explicit = await call(client, "augment_template", { structures: ["kpi-4"], rule: "steps" });
+    expect(explicit.changed).toBe(false);
+    const omitted = await call(client, "augment_template", { structures: ["kpi-4"] });
+    expect(omitted.changed).toBe(false);
+    expect(omitted.added).toEqual([]);
+    const ratio = await call(client, "augment_template", { structures: ["kpi-4"], rule: "ratio" });
+    expect(ratio.changed).toBe(true);
+    const keep = await call(client, "augment_template", { structures: ["kpi-4"] });
+    expect(keep.changed).toBe(false); // omitted keeps the doc's rule (ratio), so nothing changes
+  });
+
   it("a template with no usable base: nothing applied, the reason is returned (never-silent)", async () => {
     const { client } = await connect();
     await call(client, "new_project", { templateBase64: readFileSync(resolve(__dirname, "fixtures/templates/Dirty_AllBody_TemplateOnly.pptx")).toString("base64") });
@@ -121,6 +148,23 @@ describe("adjust_template", () => {
     await call(b.client, "adjust_template", { recipe: JSON.stringify({ scale: { body: 0.9 } }) });
     const caps = async (c: Client) => JSON.stringify((await call(c, "get_template_capabilities")).entries);
     expect(await caps(a.client)).toBe(await caps(b.client));
+  });
+
+  it("PR #606 D2: a no-op recipe {} (or the recipe already applied) is changed:false with a reason; {} after a real recipe resets it (changed:true)", async () => {
+    const { client } = await connect();
+    await call(client, "new_project", { templateBase64: TECH.toString("base64") });
+    const info0 = await call(client, "get_project_info");
+    const noop = await call(client, "adjust_template", { recipe: "{}" });
+    expect(noop.changed).toBe(false);
+    expect(String(noop.reason)).toContain("変わりません");
+    expect((await call(client, "get_project_info")).templateName).toBe(info0.templateName);
+    const r1 = await call(client, "adjust_template", { recipe: JSON.stringify({ scale: { body: 0.9 } }) });
+    expect(r1.changed).toBe(true);
+    const same = await call(client, "adjust_template", { recipe: JSON.stringify({ scale: { body: 0.9 } }) });
+    expect(same.changed).toBe(false);
+    const reset = await call(client, "adjust_template", { recipe: "{}" });
+    expect(reset.changed).toBe(true);
+    expect(reset.templateName).not.toMatch(/（調整）$/);
   });
 
   it("a malformed recipe is a modeled invalid-argument (nothing applied)", async () => {
@@ -184,4 +228,21 @@ describe("get_deck_issues — overflow-scale-hint (#570 段 3)", () => {
     const r = await call(client, "get_deck_issues");
     expect((r.issues as Array<{ id?: string }>).some((i) => i.id === "overflow-scale-hint")).toBe(false);
   });
+});
+
+describe("PR #606 D3: the template-derive tools are solo-only (collab GUI does not pull the template from the host)", () => {
+  for (const sharedOnly of [false, true]) {
+    it(`collab ${sharedOnly ? "AI" : "GUI"}: augment_template / adjust_template are not registered, and get_deck_issues never hints adjust_template`, async () => {
+      const { client } = await connectCollab(sharedOnly);
+      const names = (await client.listTools()).tools.map((t) => t.name);
+      expect(names).not.toContain("augment_template");
+      expect(names).not.toContain("adjust_template");
+      await call(client, "new_project", { templateBase64: TECH.toString("base64") });
+      await call(client, "set_slide_markdown", { index: 0, markdown: `# 本文\n\n${bullets(overN)}` });
+      const r = await call(client, "get_deck_issues");
+      expect(countOverflows(r.issues as never)).toBeGreaterThan(0); // the overflow is there …
+      expect((r.issues as Array<{ id?: string }>).some((i) => i.id === "overflow-scale-hint")).toBe(false); // … but no hint to a tool it can't call
+      expect((r.hints as Array<{ tool: string }>).some((h) => h.tool === "adjust_template")).toBe(false);
+    });
+  }
 });

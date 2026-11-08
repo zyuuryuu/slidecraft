@@ -16,6 +16,7 @@ import * as S from "./session";
 import type { HostContext } from "./host-core";
 import { renderSlideHtml } from "./slide-raster";
 import { withOverflowScaleHint } from "./template-tools";
+import { profileOf } from "./tool-profiles";
 
 type ReadResult = { contents: { uri: string; mimeType?: string; text: string }[] };
 const asJson = (uri: URL, data: unknown): ReadResult => ({
@@ -57,7 +58,7 @@ export function registerResources(server: McpServer, host: HostContext): void {
     async (uri) => {
       const s = session();
       const d = S.getDiagnostics(s);
-      return asJson(uri, { ...d, issues: (await withOverflowScaleHint(s, d.issues)).issues });
+      return asJson(uri, { ...d, issues: (await withOverflowScaleHint(s, d.issues, profileOf(host))).issues });
     },
   );
   server.registerResource(

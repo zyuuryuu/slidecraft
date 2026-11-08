@@ -30,7 +30,7 @@ import { deckTitle } from "../engine/md-serializer";
 import { type HostContext, type DocEntry, type TemplateStore, commitMutation, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
 import { GuardError } from "./guard-errors";
 import { getBootstrap } from "./bootstrap";
-import { gatedToolRegistrar } from "./tool-profiles";
+import { gatedToolRegistrar, profileOf } from "./tool-profiles";
 import type { MetricsRecorder } from "./metrics-sink";
 import { instrumentTool, noteDoc, noteChange } from "./metrics-probe";
 import { registerVisualTools } from "./visual-tools";
@@ -179,7 +179,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
   tool("get_deck_markdown", { description: "deck 全体を round-trip 可能な Markdown で。`deck://markdown` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getDeckMarkdown(sessionOf(extra, a.docId))));
   tool("get_slide_markdown", { description: "1スライドの Markdown（auto レイアウト解決済み）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideMarkdown(sessionOf(extra, a.docId), a.index)));
   tool("get_slide", { description: "1スライドの構造化 read＝編集計画（capacity・predictedSplit・issues・markdown 等。項目は bootstrap）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => R.getSlide(sessionOf(extra, a.docId), a.index)));
-  tool("get_deck_issues", { description: "deck の診断（split/condense/visualize/title レバー・budget・次の一手 hints）。export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(async () => { const s = sessionOf(extra, a.docId); const d = S.getDiagnostics(s); const h = await TT.withOverflowScaleHint(s, d.issues); return { ...d, issues: h.issues, hints: N.nextStepHints(h.issues, h.recipe) }; }));
+  tool("get_deck_issues", { description: "deck の診断（split/condense/visualize/title レバー・budget・次の一手 hints）。export 可否は validate_deck", inputSchema: doc }, (a, extra) => run(async () => { const s = sessionOf(extra, a.docId); const d = S.getDiagnostics(s); const h = await TT.withOverflowScaleHint(s, d.issues, profileOf(host)); return { ...d, issues: h.issues, hints: N.nextStepHints(h.issues, h.recipe) }; }));
   tool("get_template_capabilities", { description: "テンプレートの能力サマリ＋レイアウト一覧（生成のプロンプト文脈）。`deck://capabilities` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getCatalog(sessionOf(extra, a.docId))));
   tool("get_project_info", { description: "現在のプロジェクトのメタ情報。`deck://info` のミラー", inputSchema: doc }, (a, extra) => run(() => S.getProjectMeta(sessionOf(extra, a.docId))));
   tool("get_slide_fix_request", { description: "1スライドの修正 packet（埋めて set_slide_markdown で適用）", inputSchema: { ...index, ...doc } }, (a, extra) => run(() => S.getSlideFix(sessionOf(extra, a.docId), a.index)));
