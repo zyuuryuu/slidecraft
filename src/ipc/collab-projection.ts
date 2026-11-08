@@ -385,7 +385,7 @@ export class CollabProjection {
     this.maybeFollow(); // after onDeck, so the GUI's jump lands on the freshly-applied deck
   }
 
-  /** #616: the doc's current template, taken out of save_project's .scft (no extra read tool — 裁定). */
+  /** #616: the doc's current template, taken out of save_project's .scft (no extra read tool — 裁定). gui role → a read: host dirty untouched (#633). */
   private async pullTemplate(docId: string, rev: number): Promise<ProjectedTemplate> {
     const r = await this.client.callTool<{ dataBase64: string }>("save_project", { docId });
     const { template, meta } = await openProject(Uint8Array.from(atob(r.dataBase64), (c) => c.charCodeAt(0)));
