@@ -30,8 +30,9 @@ describe("uniqueName (master registry display-name dedup)", () => {
 
 describe("BUILTIN_MASTERS (bundled built-in templates)", () => {
   // 統括裁定 #117 による改訂: Midnight は入力サンプル（samples/templates/）へ移り、出荷は 3 本。
-  it("bundles the 3 shipped designs (技術報告 = default, first), with unique ids", () => {
-    expect(BUILTIN_MASTERS.length).toBe(3);
+  // #596: エグゼクティブ（writer プリセット）を末尾に追加して 4 本。
+  it("bundles the 4 shipped designs (技術報告 = default, first), with unique ids", () => {
+    expect(BUILTIN_MASTERS.length).toBe(4);
     expect(BUILTIN_MASTERS[0].id).toBe("builtin-gijutsu"); // 技術報告 is the default (App's initial masterId)
     expect(BUILTIN_MASTER.id).toBe(BUILTIN_MASTERS[0].id); // the exported default == the first built-in
     const ids = BUILTIN_MASTERS.map((b) => b.id);
@@ -40,6 +41,7 @@ describe("BUILTIN_MASTERS (bundled built-in templates)", () => {
     expect(names).toContain("配布資料 公文書高密度");
     expect(names).toContain("ビジュアルデッキ マガジン");
     expect(names).toContain("技術報告 スタンダード水色");
+    expect(names).toContain("エグゼクティブ Executive");
   });
 
   it("every built-in URL points to an actual TemplateOnly file served from public/", () => {

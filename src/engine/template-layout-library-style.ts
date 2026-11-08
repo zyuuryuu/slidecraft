@@ -41,3 +41,20 @@ export const STYLE_LAYOUTS: LayoutDef[] = [
     { name: "Contact.Bottom", type: "body", idx: 2, x: 1.2, y: 5.3, w: 10.9, h: 1.0, fontSize: 15, font: "minor", color: "subtle", bold: false, align: "l" },
   ]},
 ];
+
+/**
+ * プリセット専用のレイアウト（#596〜）。BUILTIN_LAYOUTS には連結しない＝作成 UI の既定（内蔵全レイアウト）・
+ * Re-make・既存の生成テンプレの出力は不変。StylePreset.layouts から名前で引く（template-presets の
+ * PRESET_LIBRARY）。family 名から役割が決まる（Closing → closing）ので、カタログ側の追加は要らない。
+ */
+export const PRESET_ONLY_LAYOUTS: LayoutDef[] = [
+  // Ask 締め（エグゼクティブ・#596）: 意思決定の依頼 1 文（idx 1）を大きく、選択肢／期限（idx 2）を下段に。
+  // idx 構成は Closing.1CTA+1Contact と同じ（15 / 1 / 2）＝`<!-- col -->` の 1 列目が依頼・2 列目が選択肢と期限。
+  // 文字サイズはプリセットの本文倍率（density.bodyPt ÷ 14）が掛かる前の値（Ask 26pt → 20/14 倍で約 37pt）。
+  // 見出しは依頼のラベルとして accent の小さめの太字（タイトル系統は倍率の対象外）。
+  { name: "Closing.1Ask+1Decision", family: "dark", decos: [{ x: 1.2, y: 4.55, w: 1.2, h: 0.06, color: "accent" }], placeholders: [
+    { name: "SlideTitle.Header", type: "body", idx: 15, x: 1.2, y: 1.0, w: 10.9, h: 0.7, fontSize: 24, font: "major", color: "accent", bold: true, align: "l" },
+    { name: "Ask.Center", type: "body", idx: 1, x: 1.2, y: 1.9, w: 10.9, h: 2.4, fontSize: 26, font: "major", color: "titleText", bold: true, align: "l" },
+    { name: "Decision.Bottom", type: "body", idx: 2, x: 1.2, y: 4.8, w: 10.9, h: 1.6, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l" },
+  ]},
+];

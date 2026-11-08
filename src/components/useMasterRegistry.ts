@@ -29,6 +29,7 @@ export const BUILTIN_MASTERS: readonly BuiltinDef[] = [
   { id: "builtin-gijutsu", name: "技術報告 スタンダード水色", url: "/templates/slide/技術報告_スタンダード水色_TemplateOnly.pptx" },
   { id: "builtin-koubunsho", name: "配布資料 公文書高密度", url: "/templates/slide/配布資料_公文書高密度_TemplateOnly.pptx" },
   { id: "builtin-magazine", name: "ビジュアルデッキ マガジン", url: "/templates/slide/ビジュアルデッキ_マガジン_TemplateOnly.pptx" },
+  { id: "builtin-executive", name: "エグゼクティブ Executive", url: "/templates/slide/エグゼクティブ_Executive_TemplateOnly.pptx" }, // #596（writer プリセット）
 ];
 const BUILTIN_URLS: ReadonlyMap<string, string> = new Map(BUILTIN_MASTERS.map((b) => [b.id, b.url]));
 const BUILTIN_ENTRIES: MasterEntry[] = BUILTIN_MASTERS.map((b) => ({ id: b.id, name: b.name, builtin: true }));

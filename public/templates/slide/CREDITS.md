@@ -6,6 +6,7 @@ the master picker. All are original SlideCraft designs.
 - **技術報告_スタンダード水色_TemplateOnly.pptx** — a clean technical-report style (standard light-blue) (default).
 - **配布資料_公文書高密度_TemplateOnly.pptx** — a dense, official-document (公文書) handout style.
 - **ビジュアルデッキ_マガジン_TemplateOnly.pptx** — a bold, magazine-style visual deck.
+- **エグゼクティブ_Executive_TemplateOnly.pptx** — a dark, impact-first executive style (one message per slide, big KPI, decision-request close). Generated deterministically from the `EXECUTIVE_PRESET` writer preset by `scripts/make-executive-template.ts` (#596).
 
 (The former default, `Midnight_Executive_30_TemplateOnly.pptx` — the canonical 30-layout development
 template, also an original SlideCraft design — is no longer bundled; it is an input sample under

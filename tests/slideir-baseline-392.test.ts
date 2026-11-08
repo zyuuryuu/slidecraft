@@ -43,6 +43,7 @@ describe("#392 段 0: corpus is the committed one (CI reads the same files)", ()
       "samples/manuscript-02-tech-report.md",
       "samples/manuscript-03-howto-guide.md",
       "samples/manuscript-04-meeting-notes.md",
+      "samples/manuscript-06-executive-brief.md", // #596 エグゼクティブの目標デッキ
       "samples/sample-deck.md",
       "tests/fixtures/slideir-baseline/visuals.md",
     ]);
