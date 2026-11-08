@@ -25,6 +25,10 @@ import { visualizeKeyValueMd } from "./slide-rewrite";
 import { serializeMd, type SerializeTemplate } from "./md-serializer";
 import { parseMd } from "./md-parser";
 import { autoSelectLayout } from "./template-loader";
+import { slideEditUserPrompt } from "./deck-plan-prompts";
+import { describeEditableFields } from "./field-edit-ops";
+import { describeEditableData } from "./chart-edit-ops";
+import { routeOpsReply, OPS_ROUTES, type SlideEditRoute, type RoutedSlideEdit } from "./slide-edit-route";
 
 export type RefineLevel = 1 | 2 | 3;
 
@@ -56,12 +60,42 @@ export interface RefineChange {
   warnings?: string[];
 }
 
+/** Which route an AI reply for one slide took (#106 P4) — the host shows / records it. `applied` = the
+ *  reply became a change; `notices` (skipped ops, malformed-ops fallback) only on an unapplied reply,
+ *  since an applied one carries them in its RefineChange.warnings. */
+export interface RouteRecord {
+  slideIndex: number;
+  route: SlideEditRoute;
+  skipped: number;
+  applied: boolean;
+  notices?: string[];
+}
+
 export interface RefineResult {
   deck: DeckIR;
   changes: RefineChange[];
   converged: boolean; // no remaining issues after the loop
   iterations: number;
+  /** One record per settled AI reply (#106 P4). Absent when no AI reply was settled (Lv1/Lv2). */
+  routes?: RouteRecord[];
 }
+
+/** An AI reply read as a candidate slide. An ops reply (bare JSON array that a route accepts) is merged
+ *  into `slide` by routeSlideEdit and serialized; any other reply keeps the Markdown path (parsed later
+ *  by the caller, byte-identical to before P4). A malformed ops array is Markdown with the fallback notice. */
+interface ReadReply { after: string; merged?: SlideIR; route: SlideEditRoute; notices: string[]; skipped: number }
+function readReply(deck: DeckIR, idx: number, raw: string, catalog: LayoutCatalog, tpl?: SerializeTemplate, instruction?: string): ReadReply {
+  const r: RoutedSlideEdit | null = routeOpsReply(deck.slides[idx], raw, instruction);
+  if (r && r.slide && OPS_ROUTES.has(r.route)) {
+    return { after: slideToMd(replaceSlide(deck, idx, r.slide), idx, catalog, tpl), merged: r.slide, route: r.route, notices: r.notices, skipped: r.skipped };
+  }
+  const fallback = r?.route === "fallback";
+  return { after: raw.trim(), route: fallback ? "fallback" : "markdown", notices: fallback ? r.notices : [], skipped: 0 };
+}
+
+const record = (slideIndex: number, r: ReadReply, applied: boolean): RouteRecord =>
+  ({ slideIndex, route: r.route, skipped: r.skipped, applied, ...(!applied && r.notices.length > 0 ? { notices: r.notices } : {}) });
+
 
 /** Serialize ONE slide to Markdown with its RESOLVED layout (so a lone slide isn't
  *  re-pinned to Title by autoSelect's first-slide rule). ADR-0030 stage B (#155): `tpl` hands the
@@ -103,6 +137,7 @@ export async function refineDeck(
   const box = contentBodyBox(catalog);
   let current = deck;
   const changes: RefineChange[] = [];
+  const routes: RouteRecord[] = [];
   let iterations = 0;
   // Per-slide AI attempt accounting. `aiDone` = slides settled for the run (succeeded,
   // cancelled, non-retryable, or retries exhausted) → never re-submitted (no task spam).
@@ -151,13 +186,15 @@ export async function refineDeck(
               opts.aiFix!(req, { slideIndex: idx, signal: opts.signal, attempt, kind: "condense", candidate: k }).then((o) => o, () => undefined),
             ),
           );
-          let best: { after: string; afterSlide?: SlideIR; verdict: ReturnType<typeof mergeVerdicts>; score: number } | undefined;
+          let best: { after: string; afterSlide?: SlideIR; verdict: ReturnType<typeof mergeVerdicts>; score: number; read: ReadReply } | undefined;
           let sawCancelled = false, sawRetryable = false;
           for (const outcome of settled) {
             if (!outcome) continue; // threw → unknown, drop this candidate
             if (!outcome.ok) { if (outcome.cancelled) sawCancelled = true; else if (outcome.retryable) sawRetryable = true; continue; }
-            const after = outcome.markdown.trim();
-            const afterSlide = after ? parseMd(after, catalog).slides[0] : undefined;
+            // #106 P4: an ops reply (e.g. one setField shortening a bullet) is merged and scored as the slide it makes.
+            const read = readReply(current, idx, outcome.markdown, catalog, opts.tpl);
+            const after = read.after;
+            const afterSlide = read.merged ?? (after ? parseMd(after, catalog).slides[0] : undefined);
             // GUARDRAIL: a small model occasionally drops a fact / drifts language / returns the wrong
             // format — AND it can drop the slide's structure (title/figure/group). A condense returns the
             // FULL slide and must preserve both, so merge the fact/language guard with the structure guard
@@ -166,7 +203,7 @@ export async function refineDeck(
               ? mergeVerdicts(validateCondense(before, after, box), validateStructure(current.slides[idx], afterSlide, "condense", catalog))
               : validateCondense(before, after, box);
             const score = (verdict.hasHard ? 1e6 : 0) + verdict.violations.length;
-            if (!best || score < best.score) best = { after, afterSlide, verdict, score };
+            if (!best || score < best.score) best = { after, afterSlide, verdict, score, read };
           }
           if (!best) {
             // No usable candidate. Cancel → settle; a retryable failure → retry within cap; else settle.
@@ -182,10 +219,14 @@ export async function refineDeck(
             continue;
           }
           aiDone.add(idx); // succeeded (or retries exhausted) → settled
-          const newSlide = best.after && best.after !== before && !best.verdict.hasHard && best.afterSlide ? reconcileEdit(current.slides[idx], best.afterSlide) : undefined;
+          // An ops merge already kept every untouched part verbatim — reconcile only the Markdown rewrite.
+          const usable = best.after && best.after !== before && !best.verdict.hasHard && best.afterSlide;
+          const newSlide = usable ? (best.read.merged ?? reconcileEdit(current.slides[idx], best.afterSlide!)) : undefined;
+          routes.push(record(idx, best.read, !!newSlide));
           if (newSlide) {
             current = replaceSlide(current, idx, newSlide);
-            changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: best.after });
+            const notices = best.read.notices;
+            changes.push({ slideIndex: idx, lever: aiIssue.levers.includes("title") ? "title" : "condense", kind: "ai", beforeMd: before, afterMd: best.after, ...(notices.length ? { warnings: notices } : {}) });
             changedThisPass = true;
           }
         }
@@ -194,7 +235,7 @@ export async function refineDeck(
     if (!changedThisPass && !pendingRetry) break; // no progress and nothing to retry → stop
   }
 
-  return { deck: current, changes, converged: diagnoseDeck(current, catalog).length === 0, iterations };
+  return { deck: current, changes, converged: diagnoseDeck(current, catalog).length === 0, iterations, ...(routes.length ? { routes } : {}) };
 }
 
 /**
@@ -211,11 +252,15 @@ export async function batchEditDeck(
   const bestOfN = Math.max(1, Math.floor(opts.bestOfN ?? 1));
   let current = deck;
   const changes: RefineChange[] = [];
+  const routes: RouteRecord[] = [];
   for (const idx of opts.indices) {
     if (opts.signal?.aborted) break;
-    if (!current.slides[idx]) continue;
+    const slide = current.slides[idx];
+    if (!slide) continue;
     const before = slideToMd(current, idx, catalog, opts.tpl);
-    const req = `Current slide:\n${before}\n\nInstruction: ${opts.instruction}`;
+    // The AI panel's request (R8, #106 P4): the slide plus the setField idx list and the table / chart
+    // listing, so the model can answer with ops instead of rewriting the whole slide.
+    const req = slideEditUserPrompt(before, describeEditableFields(slide), opts.instruction, describeEditableData(slide));
     // Best-of-N: fan out N candidates. A FREE-FORM edit has no preserve-contract (the instruction may
     // legitimately change language, e.g. "英語にして"), so we can't score by HARD violations like the
     // condense loop does. Instead pick the candidate that ACTUALLY applied the edit (after !== before)
@@ -226,29 +271,35 @@ export async function batchEditDeck(
         opts.aiFix(req, { slideIndex: idx, signal: opts.signal, attempt: 1, kind: "edit", candidate: k }).then((o) => o, () => undefined),
       ),
     );
-    let best: { after: string; afterSlide: SlideIR; warnings: string[] } | undefined;
+    let best: { after: string; afterSlide: SlideIR; warnings: string[]; read: ReadReply } | undefined;
     let bestScore = Infinity;
+    let miss: ReadReply | undefined; // the first reply that made no candidate — recorded if none did
     for (const outcome of settled) {
       if (!outcome || !outcome.ok) continue; // threw / cancelled / failed
-      const after = outcome.markdown.trim();
-      if (!after || after === before) continue; // no-op → the edit wasn't applied, not a real candidate
-      const afterSlide = parseMd(after, catalog).slides[0];
-      if (!afterSlide) continue;
+      const read = readReply(current, idx, outcome.markdown, catalog, opts.tpl, opts.instruction);
+      const after = read.after;
+      // no-op → the edit wasn't applied, not a real candidate (ops: every op skipped / changed nothing)
+      const afterSlide = !after || after === before ? undefined : read.merged ?? parseMd(after, catalog).slides[0];
+      if (!afterSlide) { miss ??= read; continue; }
       const cond = validateCondense(before, after);
       const factDrift = cond.violations.filter((w) => w.kind === "fact").length;
       if (factDrift < bestScore) {
         bestScore = factDrift;
-        // Surface (don't reject) fact/language changes so a silent number-swap or translation is caught.
-        best = { after, afterSlide, warnings: cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail) };
+        // Surface (don't reject) fact/language changes so a silent number-swap or translation is caught;
+        // skipped ops / a malformed-ops fallback come first (never silent, #106 P4).
+        const drift = cond.violations.filter((w) => w.kind === "fact" || w.kind === "language").map((w) => w.detail);
+        best = { after, afterSlide, warnings: [...read.notices, ...drift], read };
       }
     }
-    if (!best) continue; // all candidates failed / no-op'd → skip this slide (non-fatal, as before)
-    // reconcile restores any layout pin / title / meta / figure the edit dropped (structure not rejected).
-    const newSlide = reconcileEdit(current.slides[idx], best.afterSlide);
+    if (!best) { if (miss) routes.push(record(idx, miss, false)); continue; } // non-fatal skip, as before
+    // reconcile restores any layout pin / title / meta / figure a Markdown edit dropped (structure not
+    // rejected); an ops merge kept every untouched part verbatim already.
+    const newSlide = best.read.merged ?? reconcileEdit(current.slides[idx], best.afterSlide);
+    routes.push(record(idx, best.read, !!newSlide));
     if (newSlide) {
       current = replaceSlide(current, idx, newSlide);
       changes.push({ slideIndex: idx, lever: "edit", kind: "ai", beforeMd: before, afterMd: best.after, ...(best.warnings.length ? { warnings: best.warnings } : {}) });
     }
   }
-  return { deck: current, changes, converged: true, iterations: 1 };
+  return { deck: current, changes, converged: true, iterations: 1, ...(routes.length ? { routes } : {}) };
 }

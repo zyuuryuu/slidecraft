@@ -10,11 +10,9 @@ import { type HistoryMode } from "./useHistoryState";
 import { useDocumentStore } from "./useDocumentStore";
 import { buildCatalog, deckCapabilities, assessTemplateHealth } from "../engine/template-catalog";
 import { distillDeck } from "../engine/distill";
-import { parseDesignIntent, applyDesignIntentReport } from "../engine/design-intent";
-import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../engine/diagram-edit-ops";
-import { routeFieldEdit, describeEditableFields } from "../engine/field-edit-ops";
-import { routeDataEdit, describeEditableData } from "../engine/chart-edit-ops";
-import { applyFigureYaml, previewFigureEdit, figureFence, reconcileSlideEdit, figureFallbackTag } from "../engine/ai-apply";
+import { routeSlideEdit, previewRoutedEdit, editNoticeOf, type SlideEditPreview } from "../engine/slide-edit-route";
+import { describeEditableFields } from "../engine/field-edit-ops";
+import { describeEditableData } from "../engine/chart-edit-ops";
 import { addBlankSlide, deleteSlideAt, duplicateSlideAt, moveSlideTo, slideHasContent } from "../engine/deck-structure";
 import { parseMd } from "../engine/md-parser";
 import { deckMarkdown, slideMarkdown, serializeTpl } from "./deck-markdown";
@@ -474,122 +472,41 @@ export function useDeckController() {
   }, [deck, activeSlide, handleSlideUpdate]);
 
 
-  // AI panel "適用"（このスライドだけ）: parse the one edited slide and replace only
-  // the active slide, preserving any diagram/mermaid the text edit doesn't carry.
+  // AI panel "適用"（このスライドだけ）: route the reply (figure YAML / figure ops / setField / DATA ops /
+  // design intent / Markdown) through the engine's ONE router (#106 P4, R8 — the batch edit and the refine
+  // loop use the same one) and replace only the active slide. `instruction` (optional) enables the
+  // delete-intent cross-check on figure ops. Skipped ops / a malformed-ops fallback are ANNOUNCED via
+  // editNotice — never silent (ADR-0018/0019). Validation of a Markdown edit was surfaced at REVIEW
+  // (previewSlideEdit), so adoption just COMMITS the reconciled slide (one undo step).
   const handleApplySlide = useCallback(
-    // `instruction` (the user's request) is optional — when present it enables the delete-intent
-    // cross-check on figure ops (a mistargeted delete is surfaced, never blocks). ADR-0019.
     (raw: string, instruction?: string) => {
       if (!deck) return;
       const old = deck.slides[activeSlide];
-      // ⓪ Figure edit: AI mode "diagram-edit" returns a BARE DiagramSpec YAML (not Markdown). Apply
-      // it straight to the slide's diagram — parsing it as Markdown yields no diagram, so the figure
-      // edit would be silently dropped and the OLD diagram kept ("採用しても反映されない").
-      if (old) {
-        const fig = applyFigureYaml(old, raw, catalog && { index: activeSlide, total: deck.slides.length, catalog });
-        if (fig) { handleSlideUpdate(activeSlide, fig, "commit"); return; }
-      }
-      // ① Figure CONTENT ops (部分生成・ADR-0019): the model emitted a diagram-edit ops array (ONLY the
-      // changed fields). Merge deterministically — untouched nodes/labels/values stay verbatim (drift ゼロ).
-      // A skipped op (unknown id) is ANNOUNCED via editNotice, not silently dropped.
-      if (old) {
-        const editOps = parseDiagramEditOps(raw);
-        if (editOps) {
-          const { slide, skipped } = applyDiagramEditOps(old, editOps);
-          // Skipped ops (unknown id) AND delete-intent advisories (a delete the instruction never named)
-          // are ANNOUNCED via editNotice — never silent (ADR-0018/0019).
-          const notices = [
-            ...skipped.map((sk) => sk.message),
-            ...(instruction ? checkDeleteIntent(old, editOps, instruction).map((a) => a.message) : []),
-          ];
-          setEditNotice(notices.length > 0 ? notices.join(" ｜ ") : null);
-          handleSlideUpdate(activeSlide, slide, "commit");
-          return;
-        }
-      }
-      // ①' Placeholder TEXT ops (#106 P2) / DATA ops — table cell, chart value, gantt task, KPI card (P3).
-      // Only the changed parts are merged. Unknown target → skipped + announced; malformed → full text + notice.
-      const field = old ? routeFieldEdit(old, raw) ?? routeDataEdit(old, raw) : null;
-      if (field?.kind === "ops") {
-        setEditNotice(field.notices.length > 0 ? field.notices.join(" ｜ ") : null);
-        handleSlideUpdate(activeSlide, field.slide, "commit");
-        return;
-      }
-      const fallbackNotice = field?.kind === "fallback" ? field.notice : null;
-      // ② Design edit: the model returned a DesignIntent (spatial) instead of Markdown.
-      // The engine maps it to clamped geometry on the current slide, and reports any op that
-      // couldn't take effect (e.g. an emphasize whose node id the AI renamed away) so it's ANNOUNCED
-      // rather than a silent no-op (#13).
-      const intent = parseDesignIntent(raw);
-      if (intent && old) {
-        const { slide, skipped } = applyDesignIntentReport(old, intent);
-        // Advisory (an op couldn't take effect), NOT a fatal error — banner, don't blank the preview.
-        setEditNotice(skipped.length > 0 ? skipped.map((sk) => sk.message).join(" ｜ ") : null);
-        handleSlideUpdate(activeSlide, slide, "commit");
-        return;
-      }
-      // ① Content edit (Markdown). Validation + reconcile were surfaced at the REVIEW step
-      // (previewSlideEdit → the 変更プレビュー shows the reconciled result + its warnings), so the
-      // reviewer decided 採用/却下 informed. Adoption just COMMITS that same reconciled slide — no
-      // post-hoc validation, no blocking: an adopted slide is valid and always renders.
       if (!old) {
         const ns = parseMd(raw, catalog).slides[0];
         if (ns) handleSlideUpdate(activeSlide, ns, "commit");
         return;
       }
-      const rec = reconcileSlideEdit(old, raw, serializeTpl(catalog, templateData));
-      if (!rec) { if (fallbackNotice) setEditNotice(fallbackNotice); return; } // unparseable — keep the slide as-is
-      setEditNotice(fallbackNotice); // a malformed-ops fallback is announced; else clear any stale banner
-      handleSlideUpdate(activeSlide, rec.slide, "commit"); // AI edit = one discrete undo step
+      const figureCtx = catalog && { index: activeSlide, total: deck.slides.length, catalog };
+      const routed = routeSlideEdit(old, raw, { instruction, tpl: serializeTpl(catalog, templateData), figureCtx });
+      const notice = editNoticeOf(routed);
+      if (notice !== undefined) setEditNotice(notice);
+      if (routed.slide) handleSlideUpdate(activeSlide, routed.slide, "commit");
     },
     [deck, activeSlide, catalog, templateData, handleSlideUpdate, setEditNotice],
   );
 
-  // Preview an AI slide edit AS IT WILL BE APPLIED (reconciled) + its validation advisories, so the
-  // 変更プレビュー shows the real result + warnings and the reviewer decides 採用/却下 informed. Only
-  // the CONTENT-edit path reconciles; figure/design edits keep the raw diff (return null).
+  // Preview an AI slide edit AS IT WILL BE APPLIED + its advisories, so the 変更プレビュー shows the real
+  // result and the reviewer decides 採用/却下 informed. Figure edits diff the figure SOURCE; design intent
+  // keeps the raw diff (null). Same router as handleApplySlide.
   const previewSlideEdit = useCallback(
-    (raw: string, instruction?: string): { afterMd: string; warnings: string[]; beforeMd?: string; shouldRetry?: boolean; retryInstruction?: string } | null => {
+    (raw: string, instruction?: string): SlideEditPreview | null => {
       const s = deck?.slides[activeSlide];
       if (!s) return null;
-      // Figure CONTENT ops (部分生成・ADR-0019): merge the ops, then diff the figure SOURCE (old vs
-      // merged YAML) — same YAML-vs-YAML review as a bare-YAML figure edit. Surface skipped ops AND the
-      // delete-intent advisory as warnings so the ops path's adoption gate is as informative as text's.
-      const editOps = parseDiagramEditOps(raw);
-      if (editOps) {
-        const { slide: merged, skipped } = applyDiagramEditOps(s, editOps);
-        const warnings = [
-          ...skipped.map((sk) => sk.message),
-          ...(instruction ? checkDeleteIntent(s, editOps, instruction).map((a) => a.message) : []),
-        ];
-        return { afterMd: figureFence(merged) ?? "", warnings, beforeMd: figureFence(s) ?? "" };
-      }
-      // Placeholder TEXT / DATA ops (#106 P2/P3): review the merged slide's Markdown (before = currentSlideMd).
-      const field = routeFieldEdit(s, raw) ?? routeDataEdit(s, raw);
-      if (field?.kind === "ops") {
-        const layout = autoSelectLayout(field.slide, activeSlide, deck!.slides.length, catalog);
-        return { afterMd: slideMarkdown({ ...field.slide, layout }, catalog, templateData), warnings: field.notices };
-      }
-      // Figure edit (bare DiagramSpec YAML): diff the figure SOURCE (YAML-vs-YAML), not the whole
-      // slide's Markdown against raw YAML — the latter misaligns visually.
-      const fig = previewFigureEdit(s, raw, catalog && { index: activeSlide, total: deck!.slides.length, catalog });
-      if (fig) return { afterMd: fig.afterMd, warnings: [], beforeMd: fig.beforeMd };
-      if (parseDesignIntent(raw)) return null; // design → raw diff
-      const rec = reconcileSlideEdit(s, raw, serializeTpl(catalog, templateData));
-      if (!rec) return null;
-      const resolved = autoSelectLayout(rec.slide, activeSlide, deck!.slides.length, catalog);
-      // L4: a figure slide that fell to the full-Markdown path AND drifted → tag it so the "変更なし"
-      // rollback is legible (the model regenerated the whole slide instead of emitting figure ops).
-      const hadFigure = !!s.diagram || !!s.mermaidBlock;
-      // ① Option A: that SAME condition (figure slide drifted to full-Markdown) is the deterministic
-      // trigger for a single ops-bias auto-retry — AiPanel re-asks once for (B) ops. retryInstruction is
-      // the harness-authored nudge (needs the original instruction; absent for batch/✨直す w/o one).
-      const shouldRetry = hadFigure && rec.warnings.length > 0;
-      return {
-        afterMd: slideMarkdown({ ...rec.slide, layout: resolved }, catalog, templateData),
-        warnings: [...(field?.kind === "fallback" ? [field.notice] : []), ...figureFallbackTag(hadFigure, rec.warnings)],
-        ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
-      };
+      const total = deck!.slides.length;
+      const tpl = serializeTpl(catalog, templateData);
+      const routed = routeSlideEdit(s, raw, { instruction, tpl, figureCtx: catalog && { index: activeSlide, total, catalog } });
+      return previewRoutedEdit(s, raw, routed, { index: activeSlide, total, catalog, tpl });
     },
     [deck, activeSlide, catalog, templateData],
   );

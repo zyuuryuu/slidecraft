@@ -27,6 +27,17 @@ import { routeFieldEdit } from "../src/engine/field-edit-ops";
 import { routeDataEdit } from "../src/engine/chart-edit-ops";
 import { DiagramSpecSchema } from "../src/engine/schema";
 import { loadYaml } from "../src/engine/yaml-io";
+import { routeSlideEdit, previewRoutedEdit, editNoticeOf } from "../src/engine/slide-edit-route";
+import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "../src/engine/diagram-edit-ops";
+import { parseDesignIntent, applyDesignIntentReport } from "../src/engine/design-intent";
+import { previewFigureEdit, figureFence, figureFallbackTag } from "../src/engine/ai-apply";
+import { describeEditableFields } from "../src/engine/field-edit-ops";
+import { describeEditableData } from "../src/engine/chart-edit-ops";
+import { slideEditUserPrompt } from "../src/engine/deck-plan-prompts";
+import { serializeMd } from "../src/engine/md-serializer";
+import { autoSelectLayout, loadTemplate } from "../src/engine/template-loader";
+import { buildCatalog } from "../src/engine/template-catalog";
+import { batchEditDeck } from "../src/engine/refine";
 
 let templateBytes: Buffer;
 beforeAll(() => {
@@ -335,5 +346,127 @@ describe("#106 P3 agreement: DATA ops (AI door) ≡ editing the slide Markdown (
     const spec = (s: SlideIR) => DiagramSpecSchema.parse(loadYaml(s.diagram!.yaml));
     expect(r.notices).toEqual([]);
     expect(spec(r.slide)).toEqual(spec(direct));
+  });
+});
+
+// ── #106 P4: ONE router for a model's reply (R8). The AI panel's apply + preview, the batch edit and the
+// refine loop all call routeSlideEdit (src/engine/slide-edit-route.ts). The branch was MOVED out of
+// useDeckController; the oracle below is the pre-P4 GUI branch, kept verbatim as the reference, so the
+// move is pinned to change neither the slide nor the banner / review warnings on any route.
+describe("#106 P4 delegation: every door routes a reply through routeSlideEdit", () => {
+  const src = (p: string) => readFileSync(resolve(__dirname, "../src", p), "utf8");
+  it("the GUI controller calls routeSlideEdit in BOTH apply and preview, and no longer branches itself", () => {
+    const ctl = src("components/useDeckController.ts");
+    expect(ctl).toMatch(/import \{[^}]*\brouteSlideEdit\b[^}]*\} from "\.\.\/engine\/slide-edit-route"/);
+    expect(ctl.match(/\brouteSlideEdit\(/g)?.length).toBe(2);
+    expect(ctl).not.toMatch(/\b(parseDiagramEditOps|routeFieldEdit|routeDataEdit|parseDesignIntent|reconcileSlideEdit)\(/);
+  });
+  it("the router itself goes through the P1–P3 modules (routeFieldEdit ?? routeDataEdit order kept)", () => {
+    const r = src("engine/slide-edit-route.ts");
+    expect(r).toMatch(/import \{[^}]*\brouteFieldEdit\b[^}]*\} from "\.\/field-edit-ops"/);
+    expect(r).toMatch(/import \{[^}]*\brouteDataEdit\b[^}]*\} from "\.\/chart-edit-ops"/);
+    expect(r).toMatch(/import \{[^}]*\bparseDiagramEditOps\b[^}]*\} from "\.\/diagram-edit-ops"/);
+  });
+  it("refine.ts (batch + condense) reads every reply through ONE helper that calls routeOpsReply", () => {
+    const r = src("engine/refine.ts");
+    expect(r).toMatch(/import \{[^}]*\brouteOpsReply\b[^}]*\} from "\.\/slide-edit-route"/);
+    expect(r.match(/\brouteOpsReply\(/g)?.length).toBe(1); // inside readReply
+    expect(r.match(/\breadReply\(/g)?.length).toBe(3); // definition + refineDeck + batchEditDeck
+  });
+});
+
+describe("#106 P4 agreement: routeSlideEdit ≡ the pre-P4 GUI branch (apply + preview) on every route", () => {
+  type Legacy = { slide: SlideIR | null; notice: string | null | undefined };
+  // Pre-P4 handleApplySlide (old slide present), verbatim except setEditNotice → returned `notice`
+  // (undefined = the banner was not touched).
+  const legacyApply = (old: SlideIR, raw: string, instruction?: string): Legacy => {
+    const fig = applyFigureYaml(old, raw);
+    if (fig) return { slide: fig, notice: undefined };
+    const editOps = parseDiagramEditOps(raw);
+    if (editOps) {
+      const { slide, skipped } = applyDiagramEditOps(old, editOps);
+      const notices = [...skipped.map((sk) => sk.message), ...(instruction ? checkDeleteIntent(old, editOps, instruction).map((a) => a.message) : [])];
+      return { slide, notice: notices.length > 0 ? notices.join(" ｜ ") : null };
+    }
+    const field = routeFieldEdit(old, raw) ?? routeDataEdit(old, raw);
+    if (field?.kind === "ops") return { slide: field.slide, notice: field.notices.length > 0 ? field.notices.join(" ｜ ") : null };
+    const fallbackNotice = field?.kind === "fallback" ? field.notice : null;
+    const intent = parseDesignIntent(raw);
+    if (intent) {
+      const { slide, skipped } = applyDesignIntentReport(old, intent);
+      return { slide, notice: skipped.length > 0 ? skipped.map((sk) => sk.message).join(" ｜ ") : null };
+    }
+    const rec = reconcileSlideEdit(old, raw);
+    if (!rec) return { slide: null, notice: fallbackNotice ?? undefined };
+    return { slide: rec.slide, notice: fallbackNotice };
+  };
+  // Pre-P4 previewSlideEdit (catalog-less: layout resolves without a catalog, as the GUI does before load).
+  const legacyPreview = (s: SlideIR, raw: string, instruction?: string) => {
+    const editOps = parseDiagramEditOps(raw);
+    if (editOps) {
+      const { slide: merged, skipped } = applyDiagramEditOps(s, editOps);
+      const warnings = [...skipped.map((sk) => sk.message), ...(instruction ? checkDeleteIntent(s, editOps, instruction).map((a) => a.message) : [])];
+      return { afterMd: figureFence(merged) ?? "", warnings, beforeMd: figureFence(s) ?? "" };
+    }
+    const field = routeFieldEdit(s, raw) ?? routeDataEdit(s, raw);
+    if (field?.kind === "ops") {
+      const layout = autoSelectLayout(field.slide, 1, 3);
+      return { afterMd: serializeMd({ slides: [{ ...field.slide, layout }] }), warnings: field.notices };
+    }
+    const fig = previewFigureEdit(s, raw);
+    if (fig) return { afterMd: fig.afterMd, warnings: [], beforeMd: fig.beforeMd };
+    if (parseDesignIntent(raw)) return null;
+    const rec = reconcileSlideEdit(s, raw);
+    if (!rec) return null;
+    const resolved = autoSelectLayout(rec.slide, 1, 3);
+    const hadFigure = !!s.diagram || !!s.mermaidBlock;
+    const shouldRetry = hadFigure && rec.warnings.length > 0;
+    return {
+      afterMd: serializeMd({ slides: [{ ...rec.slide, layout: resolved }] }),
+      warnings: [...(field?.kind === "fallback" ? [field.notice] : []), ...figureFallbackTag(hadFigure, rec.warnings)],
+      ...(shouldRetry ? { shouldRetry, ...(instruction ? { retryInstruction: buildOpsRetryInstruction(s, instruction) } : {}) } : {}),
+    };
+  };
+
+  const TEXT = parseMd("# 中身\n\n- 一\n- 二\n- 三").slides[0];
+  const TABLE = parseMd("# 表\n\n| 項目 | 値 |\n| --- | --- |\n| 売上 | 100 |").slides[0];
+  const FIG = parseMd("# 図\n\n- 説明\n\n```diagram\ntype: flowchart\nnodes:\n  - id: a\n    label: 受付\n  - id: b\n    label: 処理 120\nedges:\n  - from: a\n    to: b\n```").slides[0];
+  const body = TEXT.placeholders.find((p) => p.idx !== "0" && p.idx !== "15")!.idx;
+  const cases: Array<[string, SlideIR, string, string?]> = [
+    ["figure YAML", FIG, NEW_YAML],
+    ["diagram ops (clean)", FIG, JSON.stringify([{ op: "nodeUpdate", id: "a", label: "窓口" }])],
+    ["diagram ops (skip + delete intent)", FIG, JSON.stringify([{ op: "removeNode", id: "b" }, { op: "nodeUpdate", id: "zz", label: "X" }]), "受付を窓口に"],
+    ["setField (clean)", TEXT, JSON.stringify([{ op: "setField", idx: body, text: "一だけ" }])],
+    ["setField (skip)", TEXT, JSON.stringify([{ op: "setField", idx: "99", text: "x" }])],
+    ["setField (malformed → fallback)", TEXT, JSON.stringify([{ op: "setField", idx: body }])],
+    ["setCell", TABLE, JSON.stringify([{ op: "setCell", row: 1, col: 1, text: "120" }])],
+    ["setCell (malformed → fallback)", TABLE, JSON.stringify([{ op: "setCell", row: -1, col: 1, text: "x" }])],
+    ["design intent", FIG, JSON.stringify([{ op: "relayout", direction: "LR" }])],
+    ["Markdown edit", TEXT, "# 中身\n\n- 一\n- 二"],
+    ["Markdown on a figure slide that drifts (retry nudge)", FIG, "# 図\n\n- 説明 999", "直して"],
+    ["unparseable", TEXT, ""],
+  ];
+  for (const [name, old, raw, instruction] of cases) {
+    it(name, () => {
+      const r = routeSlideEdit(old, raw, { instruction });
+      const legacy = legacyApply(old, raw, instruction);
+      expect(r.slide).toEqual(legacy.slide);
+      expect(editNoticeOf(r)).toEqual(legacy.notice);
+      expect(previewRoutedEdit(old, raw, r, { index: 1, total: 3 })).toEqual(legacyPreview(old, raw, instruction));
+    });
+  }
+});
+
+describe("#106 P4 agreement: the batch edit asks with the AI panel's request (slideEditUserPrompt)", () => {
+  it("same slide → byte-identical request text (Fields + Data listings included)", async () => {
+    const tpl = await loadTemplate(templateBytes);
+    const catalog = buildCatalog(tpl);
+    const deck = parseMd("# 表紙\n\n---\n\n# 表\n\n- 注記\n\n| 項目 | 値 |\n| --- | --- |\n| 売上 | 100 |", catalog);
+    const reqs: string[] = [];
+    await batchEditDeck(deck, catalog, { indices: [1], instruction: "売上を 120 に", aiFix: async (req) => { reqs.push(req); return { ok: false, cancelled: true }; } });
+    const s = deck.slides[1];
+    const slideMd = serializeMd({ slides: [{ ...s, layout: autoSelectLayout(s, 1, deck.slides.length, catalog) }] });
+    expect(describeEditableData(s)).not.toBe(""); // the listing is really exercised
+    expect(reqs).toEqual([slideEditUserPrompt(slideMd, describeEditableFields(s), "売上を 120 に", describeEditableData(s))]);
   });
 });

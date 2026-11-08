@@ -443,7 +443,16 @@
     "close": "Close",
     "cancel": "Cancel",
     "accept": "✓ Accept ({{count}})",
-    "leverPolish": "Punctuation"
+    "leverPolish": "Punctuation",
+    "routeFieldOps": "Partial edit (text)",
+    "routeDataOps": "Partial edit (table/chart)",
+    "routeDiagramOps": "Partial edit (figure)",
+    "routeDesign": "Arrangement change",
+    "routeFigureYaml": "Figure replaced",
+    "routeMarkdown": "Full rewrite",
+    "routeFallback": "Full rewrite (malformed ops)",
+    "skippedSuffix": " · {{n}} skipped",
+    "notApplied": "{{route}}: no change was applied"
   },
   "reviewBar": {
     "warnCount": "⚠ Issues {{n}}",
