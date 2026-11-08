@@ -43,6 +43,13 @@ function wholeCommentEnd(lines: string[], open: number): number {
   return -1;
 }
 
+/** Index of the closer line when line `i` opens a multi-line comment the parser drops as one unit
+ *  (#588), else −1. The ONE judgment shared by the slide splitter (#591: a `---` inside such a unit
+ *  is comment content, not a separator) and stripCommentOnlyLines (R8). Unclosed → −1 (never-silent). */
+export function commentUnitEnd(lines: string[], i: number): number {
+  return opensComment(lines[i].trim()) ? wholeCommentEnd(lines, i) : -1;
+}
+
 /**
  * #147: Drop non-directive comment-only lines (review notes / TODO markers / source IDs
  * an upstream agent or human left in the Markdown) so they never render onto a slide.
@@ -71,7 +78,7 @@ export function stripCommentOnlyLines(lines: string[]): string[] {
     } else if (COMMENT_ONLY_RE.test(t) && !DIRECTIVE_COMMENT_RE.test(t)) {
       pendingBlanks.length = 0; // the comment paragraph swallows its leading blanks
     } else {
-      const end = opensComment(t) ? wholeCommentEnd(lines, i) : -1;
+      const end = commentUnitEnd(lines, i);
       if (end >= 0) {
         pendingBlanks.length = 0;
         i = end; // skip opener … closer as one comment unit

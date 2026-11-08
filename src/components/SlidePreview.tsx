@@ -15,6 +15,8 @@ import { resolveFontToken } from "../engine/master-remake";
 import { autoSelectLayout, findLayout } from "../engine/template-loader";
 import { buildCatalog, isSectionFooterTarget } from "../engine/template-catalog";
 import { bindContentByRole } from "../engine/placeholder-binding";
+import { planFieldRescue, applyFieldRescue } from "../engine/field-rescue";
+import { FieldNoteLayer } from "./FieldNoteLayer";
 import { computeColumnWidthsEmu, computeNumericColumns, TABLE_CELL, TABLE_CELL_IN } from "../engine/table-layout";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect } from "../engine/visual-placement";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "../engine/group-binding";
@@ -262,9 +264,12 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
   const layoutPhs = layout?.placeholders ?? [];
   // WYSIWYG: share the SAME contentFor as the export — a grouped slide fills via expandGroups.
-  const contentFor = isGroupedSlide(slide) && layout && isGroupedLayout(layout)
+  const bound = isGroupedSlide(slide) && layout && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layoutPhs);
+  // #597: the export's same slot-less row fallback (field-rescue) — merged text + the source note.
+  const rescue = layout ? planFieldRescue(slide, layout, bound) : { rescues: [] };
+  const contentFor = applyFieldRescue(bound, rescue);
   // Group-cell decorations (#400 icons / #401 current-step frame) — the export's same overlay + painter.
   const overlay = isGroupedSlide(slide) && layout && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
   const bodyPhs = bodyPlaceholders(layoutPhs);
@@ -601,6 +606,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           dangerouslySetInnerHTML={{ __html: renderPaintToSvg((t) => paintGroupOverlay(t, overlay)) }}
         />
       )}
+      {rescue.note && <FieldNoteLayer note={rescue.note} scale={scale} slideW={SLIDE_W} slideH={SLIDE_H} />}
       {/* #402 Before/After arrow + role labels — frontmost, the export's geometry (renders null otherwise) */}
       <BeforeAfterOverlay slide={slide} layout={layout} themeColors={themeColors} scale={scale} slideW={SLIDE_W} slideH={SLIDE_H} />
 

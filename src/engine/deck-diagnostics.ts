@@ -26,78 +26,13 @@ import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
 import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramInvalidReason } from "./diagram-node-shrink";
 import { fitTitle, slideRoleContent } from "./title-fit";
 import { columnAugmentHint } from "./layout-augment-plan";
+import { rescueMessage } from "./field-rescue";
 import { markerLayoutMissingHint } from "./slide-marker-hint";
+import { RULE_LEVEL, type ReviewRuleId } from "./review-rules";
 
 export type Lever = "split" | "condense" | "visualize" | "title" | "polish";
 
-/**
- * REVIEW_RULES — the ONE registry of review-rule id → level (#244). Every DeckIssue this module
- * produces sets `id` from here (via RULE_LEVEL, so the level literal itself is written ONCE), and
- * `get_authoring_guide`'s `activeReviewRules` (src/mcp/guides.ts) is a literal projection of this
- * same array — so the rules an agent is told about up front can never drift from what
- * `get_deck_issues` actually flags later (R8; locked by tests/review-rules-agreement.test.ts).
- */
-export type ReviewRuleId =
-  | "missing-title"
-  | "unknown-layout-pin"
-  | "touten-used"
-  | "kuten-used"
-  | "image-markdown-leftover"
-  | "unrecognized-meta-key"
-  | "body-overflow"
-  | "title-overflow"
-  | "long-bullet"
-  | "key-value-table"
-  | "unbound-content"
-  | "visual-shadowed-content"
-  | "visual-collision"
-  | "table-overflow"
-  | "diagram-node-shrink"
-  | "diagram-invalid"
-  | "table-dropped"
-  | "image-dropped"
-  | "meta-key-dropped"
-  | "figure-dropped"
-  | "pre-separator-dropped"
-  | "section-footer-injected"
-  | "missing-column-layout"
-  | "marker-layout-missing";
-
-export interface ReviewRule {
-  id: ReviewRuleId;
-  level: "warn" | "info";
-}
-
-export const REVIEW_RULES: readonly ReviewRule[] = [
-  { id: "missing-title", level: "warn" },
-  { id: "unknown-layout-pin", level: "warn" },
-  { id: "touten-used", level: "warn" },
-  { id: "kuten-used", level: "info" },
-  { id: "image-markdown-leftover", level: "info" },
-  { id: "unrecognized-meta-key", level: "warn" },
-  { id: "body-overflow", level: "warn" },
-  { id: "title-overflow", level: "warn" },
-  { id: "long-bullet", level: "info" },
-  { id: "key-value-table", level: "info" },
-  { id: "unbound-content", level: "warn" },
-  { id: "visual-shadowed-content", level: "warn" },
-  { id: "visual-collision", level: "warn" },
-  { id: "table-overflow", level: "warn" },
-  { id: "diagram-node-shrink", level: "warn" },
-  { id: "diagram-invalid", level: "warn" },
-  { id: "table-dropped", level: "info" },
-  { id: "image-dropped", level: "info" },
-  { id: "meta-key-dropped", level: "warn" },
-  { id: "figure-dropped", level: "info" },
-  { id: "pre-separator-dropped", level: "warn" },
-  { id: "section-footer-injected", level: "info" },
-  { id: "missing-column-layout", level: "info" },
-  { id: "marker-layout-missing", level: "info" },
-];
-
-const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
-  REVIEW_RULES.map((r) => [r.id, r.level]),
-) as Record<ReviewRuleId, "warn" | "info">;
+export { REVIEW_RULES, type ReviewRuleId, type ReviewRule } from "./review-rules"; // registry split out for R1 (#593)
 
 export interface DeckIssue {
   slideIndex: number;
@@ -243,18 +178,17 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const layout = layoutByName.get(autoSelectLayout(slide, i, deck.slides.length, catalog));
       if (!layout) return;
       const plan = slideBindingPlan(slide, layout);
-      // #397/#398: a field row with no slot gets its own message naming the row, so the author knows
-      // WHICH line vanished and why (the template has no Callout/Source box on this layout).
-      const rows = plan.unbound.filter((u) => isFieldIdx(u.idx));
-      const others = plan.unbound.filter((u) => !isFieldIdx(u.idx));
-      if (others.length > 0) {
-        // #97: name WHAT vanishes (head of the first unbound item), not just how many.
-        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `内容 ${others.length} 件（先頭「${contentHead(others[0].content)}」）がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`, levers: [] });
-      }
-      if (rows.length > 0) {
-        const names = rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ");
-        issues.push({ slideIndex: i, title: slideTitle(slide), id: "unbound-content", level: RULE_LEVEL["unbound-content"], message: `${names} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレを使ってください`, levers: [] });
-      }
+      // #397/#398: a field row with no slot gets its own message naming the row. #597: a row drawn at its
+      // fixed fallback (plan.rescued, the SAME plan export draws from) is an info instead of a warn.
+      const rescued = new Set((plan.rescued ?? []).map((r) => r.content));
+      const add = (id: ReviewRuleId, message: string) => issues.push({ slideIndex: i, title: slideTitle(slide), id, level: RULE_LEVEL[id], message, levers: [] });
+      const lost = plan.unbound.filter((u) => !rescued.has(u.content));
+      const rows = lost.filter((u) => isFieldIdx(u.idx));
+      const others = lost.filter((u) => !isFieldIdx(u.idx));
+      // #97: name WHAT vanishes (head of the first unbound item), not just how many.
+      if (others.length > 0) add("unbound-content", `内容 ${others.length} 件（先頭「${contentHead(others[0].content)}」）がこのレイアウト（${layout.name}）に入りません（未束縛・出力時に消えます）`);
+      if (rows.length > 0) add("unbound-content", `${rows.map((u) => `${fieldRowName(u.idx as FieldKind)}:`).join(" / ")} 行の置き場（専用枠）がこのレイアウト（${layout.name}）にありません（出力時に消えます）。本文に書くか、枠のあるテンプレを使ってください`);
+      for (const r of plan.rescued ?? []) add("field-row-rescued", rescueMessage(r, layout.name));
 
       // #390 never-silent: body text that DID bind, but to a placeholder a visual replaces (table /
       // figure / image) or overwrites (code) — export never draws it. Reads the SAME occupancy map the

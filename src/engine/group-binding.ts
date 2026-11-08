@@ -14,6 +14,7 @@ import { isGroupedSlide } from "./slide-markers";
 import { bindContentByRole, resolveBinding, isBlankParagraphs, type BindingPlan, type ContentRef, type PlaceholderRef } from "./placeholder-binding";
 import { slideIdxRole, placeholderRole } from "./template-catalog";
 import { detectGroups, bakedText } from "./group-layout";
+import { planFieldRescue } from "./field-rescue";
 import { splitHeadingIcon, headingIconGeometry, frameAround, unionBox, emptyOverlay, type GroupOverlay } from "./group-overlay";
 
 export { detectGroups, isGroupedLayout } from "./group-layout";
@@ -159,8 +160,15 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
  * judges it. Pure (R2).
  */
 export function slideBindingPlan(slide: SlideIR, layout: LayoutInfo): BindingPlan {
-  const shape = detectGroups(layout);
-  if (!isGroupedSlide(slide) || !shape) return resolveBinding(slide, layout.placeholders); // statement/quote: not a group (#593)
+  const grouped = isGroupedSlide(slide) && !!detectGroups(layout); // statement/quote: not a group (#593)
+  const plan = grouped ? groupBindingPlan(slide, layout) : resolveBinding(slide, layout.placeholders);
+  // #597: the fixed fallback for slot-less rows — planned on the SAME render map export/preview draw (R8).
+  const { rescues } = planFieldRescue(slide, layout, grouped ? expandGroups(slide, layout) : bindContentByRole(slide, layout.placeholders));
+  return rescues.length > 0 ? { ...plan, rescued: rescues } : plan;
+}
+
+function groupBindingPlan(slide: SlideIR, layout: LayoutInfo): BindingPlan {
+  const shape = detectGroups(layout)!;
 
   const bound = expandGroups(slide, layout);
   const hasCtrTitle = layout.placeholders.some((p) => p.type.toLowerCase().includes("ctrtitle"));
