@@ -98,10 +98,20 @@ fn resolve_weights(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 /// SHA256 of a file, streamed (never buffers the whole ~2.4 GB).
 fn sha256_file(path: &Path) -> Result<String, String> {
     use sha2::{Digest, Sha256};
+    use std::io::Read;
     let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
-    Ok(format!("{:x}", hasher.finalize()))
+    // sha2 ≥0.11: the digest no longer implements io::Write and finalize() has no LowerHex — stream
+    // 1 MiB chunks through update() and hex-format the bytes ourselves.
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = file.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect())
 }
 
 /// True if the model is available (the file exists, or the SLIDECRAFT_GGUF dev override is set).
