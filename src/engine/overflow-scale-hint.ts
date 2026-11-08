@@ -55,6 +55,6 @@ export function overflowScaleIssue(s: OverflowScaleSuggestion, issues: readonly 
     level: "info",
     id: "overflow-scale-hint",
     levers: [],
-    message: `本文の文字サイズを ${s.scale} 倍にすると、溢れが ${s.before}→${s.after} 件になります（テンプレ調整で派生テンプレを作って適用・元テンプレは不変）`,
+    message: `本文の文字サイズを ${s.scale} 倍にすると、溢れが ${s.before}→${s.after} 件になります（テンプレート調整で派生テンプレートを作って適用・元のテンプレートは不変）`,
   };
 }

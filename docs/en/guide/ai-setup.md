@@ -54,7 +54,7 @@ The AI helps in two ways: "generation" and "editing." Both work with either the 
 
 ### Generation
 
-- **Slide generation** — have the AI write the Draft's Markdown / create a starting point.
+- **Slide generation** — have the AI write the Markdown in Write draft / create a starting point.
 - **Diagram generation** — generate a DiagramSpec (see [Diagrams](/en/guide/diagrams)). Diagrams use a two-step approach — "**first decide the type, then generate with instructions dedicated to that type**" — which makes it easier to get the kind you intended (e.g. `flowchart`).
 
 ### Editing and the adoption gate

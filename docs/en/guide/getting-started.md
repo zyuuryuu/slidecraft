@@ -24,7 +24,7 @@ Complete the [Installation Guide](/en/guide/installation) first (Windows `.msi` 
 
 SlideCraft's basic cycle has four steps.
 
-1. **Draft** — Enter your Markdown (the **📝 Draft** button on the top bar).
+1. **Write draft** — Write, import or AI-generate your Markdown (the **📝 Write draft** button on the top bar).
 2. **Turn it into slides** — Pick a template, parse the Markdown, and convert it into a deck (a set of slides).
 3. **Review and adjust in the visual editor** — Check it in a what-you-see-is-what-you-get preview, then add, reorder, and use two-stage editing.
 4. **Export** — Write out `.pptx` (PowerPoint) or standalone HTML.
@@ -38,9 +38,9 @@ SlideCraft's basic cycle has four steps.
 
 Markdown (the input) and the deck (the source of truth) hold the same content and can be moved back and forth. Day to day, the visual editor is the main surface, and Markdown is always available for input and export.
 
-The top bar holds only the document's operations: **↶ ↷** (undo / redo) | **File**, **📝 Draft**, **🎨 master** | **✨ AI**, **⚙**. Language (日本語 / English), theme (Dark / Light / Modern), help (this documentation) and the AI connection settings open from **⚙** at the right end.
+The top bar holds only the document's operations: **↶ ↷** (undo / redo) | **Save & Export**, **📝 Write draft**, **🎨 Template: <name>** | **✨ AI**, **⚙**. The **Save & Export** menu has two sections: "Open / Save" (open or save a `.scft` project) and "Export" (PPTX / HTML / Markdown). Writing the draft and working with templates live on their own buttons (**📝 Write draft** and **🎨 Template**), not in the Save & Export menu. Language (日本語 / English), theme (Dark / Light / Modern), help (this documentation) and the AI connection settings open from **⚙** at the right end.
 
-## ① Draft — Write Markdown
+## ① Write draft — Write Markdown
 
 When you launch SlideCraft, the first thing you do is prepare a draft in Markdown. For a new deck, start from the Initialize modal; you can also load an existing `.md` file.
 
@@ -90,7 +90,7 @@ On the title slide, lines like `Category:` / `Date:` / `Footer:` are treated as 
 The full picture of the syntax (tables, images, multi-column, KPIs, code fences) is collected in the [Markdown Authoring Guide](/en/guide/markdown-authoring). For the 12 diagram types and the 4 available via `mermaid`, see [Diagrams](/en/guide/diagrams).
 
 ::: tip Try the full showcase deck
-For a richer example, there's a **full showcase deck** (~30 slides covering native diagrams, `mermaid`, tables, multi-column, and every layout). Paste [**`samples/sample-deck.md`**](https://github.com/zyuuryuu/slidecraft/blob/main/samples/sample-deck.md) into Draft and hit "Turn it into slides" to see SlideCraft's full range at once. (This is the sample that used to load on startup through v0.2.0. Its content is in Japanese — feel free to replace the text.)
+For a richer example, there's a **full showcase deck** (~30 slides covering native diagrams, `mermaid`, tables, multi-column, and every layout). Paste [**`samples/sample-deck.md`**](https://github.com/zyuuryuu/slidecraft/blob/main/samples/sample-deck.md) into the Write draft screen and hit "Turn it into slides" to see SlideCraft's full range at once. (This is the sample that used to load on startup through v0.2.0. Its content is in Japanese — feel free to replace the text.)
 :::
 
 ## ② Turn it into slides — Pick a template and convert
