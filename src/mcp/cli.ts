@@ -34,6 +34,8 @@ import { runRelay } from "./mcp-relay";
 import { resolveScopeRoot } from "./fs-scope";
 import { createProbeAwareStdio } from "./discover-probe";
 import { createFileMetricsRecorder } from "./metrics-sink";
+import { soloReadyBanner, forwardBanner } from "./cli-banner";
+import { runDoctor } from "./doctor";
 
 async function runSolo(root: string | null, metricsPath: string | undefined): Promise<void> {
   const session = createSession(root); // root===null: --no-fs, bytes flow as base64; else scoped fs (ADR-0035)
@@ -45,7 +47,7 @@ async function runSolo(root: string | null, metricsPath: string | undefined): Pr
   // #518: the 2026-07-28 `server/discover` probe is answered in front of the SDK (discover-probe.ts);
   // every other line reaches the SDK transport byte-for-byte, so the legacy handshake is unchanged.
   await server.connect(createProbeAwareStdio());
-  process.stderr.write(`slidecraft mcp: ready (solo stdio, ${root ? `scoped fs — root=${root}` : "--no-fs / base64"}${metricsPath ? `, metrics → ${resolvePath(metricsPath)}` : ""})\n`);
+  process.stderr.write(soloReadyBanner(root, metricsPath ? resolvePath(metricsPath) : undefined));
 }
 
 /** `--<flag> <value>` — the flag's argument, or undefined if the flag wasn't passed. A present-but-empty
@@ -63,6 +65,14 @@ function parseValueFlag(argv: string[], flag: string, usage: string): string | u
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+  // #517: `--doctor` diagnoses instead of serving — it spawns this same server (with the other flags) and
+  // prints one screen; exit 0 = a client can connect. --root etc. are validated by that child, not here.
+  if (argv.includes("--doctor")) {
+    const { report, text } = await runDoctor(argv);
+    process.stdout.write(text);
+    process.exitCode = report.ok ? 0 : 1; // not process.exit(): a pipe write is async on Windows and would be cut
+    return;
+  }
   let root: string | null = null;
   const rootArg = parseValueFlag(argv, "--root", "--root にはディレクトリパスが必要です（例: --root /path/to/scope）。");
   const metricsPath = parseValueFlag(argv, "--metrics", "--metrics には JSONL の出力ファイルパスが必要です（例: --metrics ./mcp-calls.jsonl）。");
@@ -81,7 +91,7 @@ async function main(): Promise<void> {
     // writes nothing, so a --root scope has no effect there (never-silently dropped: told, not hidden).
     if (root) process.stderr.write("slidecraft mcp: note — --root is ignored while forwarding to a live GUI host (deck state lives in the host process).\n");
     if (metricsPath) process.stderr.write("slidecraft mcp: note — --metrics is ignored while forwarding (calls are logged by the host when it was started with SLIDECRAFT_MCP_METRICS).\n");
-    process.stderr.write(`slidecraft mcp: forwarding to live host at ${live.url}\n`);
+    process.stderr.write(forwardBanner(live.url));
     await runRelay(live);
     return;
   }
