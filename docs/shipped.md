@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **#392（複数ビジュアル）段 0 — 既存動作の固定テスト** — SlideIR の JSON スナップショット（samples 全部＋ビジュアル網羅 fixture）・round-trip 不動点・`visual-placement` の ordinal と `slideRoleRegions`・MCP／GUI の編集経路・`.scft` 後方互換（`visuals-v1.scft`）を、型変更の前に機械検査として固定。src は無変更 （#392 段 0・PR #610・2026-11-08）
 - **`.scft` 開封時の version 互換ゲート** — `meta.json.version` を deck.json の検証より先に読み、現行より新しい版は `PROJECT_VERSION_TOO_NEW`（「アプリを更新してください」）で拒否、古い版は `PROJECT_MIGRATIONS` の表を順に適用し途中の段が欠ければ `PROJECT_VERSION_UNSUPPORTED` で明示。黙ってフォールバックしない。meta 破損は従来どおり既定値で開く。判定は純関数 `migrateProjectDeck` に一本化 （#121・PR #559・2026-11-07）
 - **長タイトルを枠に収まるまで縮小（R7 事前計算）＋下限でも溢れたら warn `title-overflow`** — title-fit.ts の `fitTitle` がテンプレのタイトルサイズから 1pt 刻みで下げ、収まる最大サイズを返す（下限＝元サイズ×0.7・幅見積りは図ラベル縮小と共有の draw-target #228）。export（run に `sz` を焼く）・preview・診断の 3 経路が同じ関数を読む（R8）。収まるタイトルは byte-identical。Issue repro は Midnight 28→22pt で全文表示、全角 36 字以上で warn（#437 案b・PR #552・2026-11-07）
 - **図の自動縮小が可読限界を割ったら warn `diagram-node-shrink`** — WBS 級 20 ノードの orgchart がノード 0.68×0.24in（ラベル 5pt）まで黙って縮んでいたのを、export と同じ `computeLayout`／`fitTransform`／`scaledFontSize` の結果を読むだけの観測モジュール（`diagram-node-shrink.ts`・R8 一致テスト）で検出し、分割・LR⇄TB・mindmap・表化を添えて警告。しきい値 7pt は描画器自身が意図して置く最小フォント（sublabel の floor）に根拠。単独図はテンプレ無しでも判定・本文横の図は枠 fit 込みで判定。配置・出力は不変 （#473・PR #523・2026-11-06）
@@ -65,6 +66,7 @@
 
 ## AI編集の深化
 
+- **DATA ops — 表セル・グラフ系列・ガント・KPI の部分編集（#106 P3）** — AI パネルの 1 枚編集で、変えたセル／値だけを JSON 配列（`setCell`／`setSeriesValue`／`setTask`／`setCard`）で返す経路を追加。適用先は既存の `table.rows`／DiagramSpec（第 2 の表現を作らない）。表せないセル・曖昧な系列名・タスク名衝突は skip＋告知、不正な配列は全文編集へフォールバック。ops の結果 ≡ Markdown 経路の `parseMd` を一致テストで固定（R8） （#106 P3・PR #603・2026-11-08）
 - **新規デッキ生成で書式違反のあった枚だけを 1 回再生成** — 弱いモデルの壊れた `\uXXXX` を floor（違反要素を除外して告知）が除外した枚だけを、1 枚専用プロンプト（`slide-retry`）で各 1 回だけ再生成し、違反ゼロで parse できた場合に限り差し替える。直らなければ floor の結果と告知を残し、再試行の有無と結果を notices に追記（never-silent）。正常デッキは byte-identical・呼び出し回数不変 （#107・PR #585・2026-11-07）
 - **AI 単一スライド編集＝構造化 ops → 決定論マージ（部分生成）** — AI は変更フィールドのみ ops を出力しエンジンが決定論マージ（P1：DiagramEditOp/applyDiagramEditOps・drift ゼロ）、full-regen フォールバック保全 （ADR-0019・2026-07-05）
 - **AI 編集の検証は採用ゲート（描画は止めない）** — `reconcileSlideEdit` は常に描画可能なスライド＋警告を返し、`previewSlideEdit` が AiPanel DiffView＋amber バナーで accept/reject、advisory は editNotice へ（有効なスライドを空白化しない） （ADR-0018・2026-07-04）
@@ -79,6 +81,11 @@
 
 ## テンプレ・マスター
 
+- **テンプレの操作をマスターのメニュー 4 区画（選ぶ／取り込む／加工する／新規）に集約・「テンプレを強化」をどのマスターでも** — 取り込み結果の帯からしか届かなかった強化ボタンをマスターのメニューへ移し、今のテンプレに対して計画する（内蔵マスターでも強化可）。足せる構造が無いときは理由付きで無効。計画は `augment-offer.ts` の 1 関数に集約（R8） （#612・PR #618・2026-11-08）
+- **共通構造 I — `<!-- statement -->`／`<!-- quote -->` マーカー・KPI 値枠の束縛修正・CTA 締め・Statement/Quote/CTA の LayoutDef** — 1 文のステートメントと引用＋帰属を、マーカーで生成テンプレの新 3 レイアウト（`Statement.1Message.Single`・`Quote.1Message.Single+1Attribution`・`Closing.1CTA+1Contact`）やマガジンの `02_ステートメント`／`07_引用`／`05_ビッグナンバー` へ届ける。値枠が上の KPI レイアウトで数値が小枠に入っていた逆転を `markKpiValue` で修正。「次のステップ」「お問い合わせ」が締めレイアウトに。該当レイアウトが無いテンプレでは退化＋告知（never-silent）。レビュー規則の registry を `review-rules.ts` へ移設（R1） （#593・#403・PR #607・2026-11-08）
+- **テンプレを強化に比較・カード 3 枚・KPI 行（×3／×4）＋MCP `augment_template`／`adjust_template`＋本文倍率の提案** — 合成レイアウトを 2 列本文の先の組構造へ拡張（gutter／見出し比は既存 LayoutDef から計測）。MCP からも強化・調整が掛けられ（no-op は `changed:false`）、`get_deck_issues` が本文倍率の提案 `overflow-scale-hint`（info）を返す。golden（slideLayout XML・slide XML の sha256）で固定 （#568・#570 段 3・PR #606・2026-11-08）
+- **template-writer に画像枠（pic）・レイアウト別背景色・スタイルプリセット表** — 生成テンプレの LayoutDef が `pic` placeholder と `background` を持てるようになり、`StylePreset`（配色・書体・密度・レイアウト集合）から `writePresetTemplate` で決定論に書き出す。既存 TemplateSpec 経路の出力は `LEGACY_DIGEST` で byte-identical を固定 （#594・PR #609・2026-11-08）
+- **公文書・技術文書の点検 — 枠の無い Category/Source/Takeaway の救済・記法ガイド・報告書版基準デッキ** — 役割枠が無いレイアウトに落ちた field 行を本文へ救済して `field-row-rescued`（info）で告知。報告書系 6 変種の記法ガイドと `samples/deck-05-report-form.md`、スタイル評価スクリプトを追加 （#597・PR #608・2026-11-08）
 - **テンプレを強化（レイアウト合成）** — 取り込んだマスターに無い N 列（2・3 列）の本文レイアウトを、そのマスターの基本レイアウト（タイトル＋本文 1 枠）を複製して等幅に分けた slideLayout として追加する。体裁（配色・書体・装飾・フッタ）は master との relation で継承、既存パーツは byte-identical（追加のみ）。縮小規則は段規則（既定）と比率の 2 択を engine に 1 箇所。検査ゲート（既存レイアウト不変・columns×N・1:1 全単射）を通ったものだけ「（強化）」付きの別マスターとして登録。診断 `missing-column-layout` が案内 （#568 段 2・PR #581・2026-11-07）
 - **テンプレ調整（書体置換・文字サイズ倍率）** — 元テンプレは不変のまま、派生テンプレに決定論の変換を掛ける: 書体は theme の latin/ea 置換（faithful Re-make の経路を流用・対象は theme のみ／theme＋lstStyle 直書きを切替）、サイズはタイトル／本文／その他の倍率で master txStyles と layout lstStyle の全 `sz` を 0.5pt 丸めで一括変換。容量見積りはマスターの sz を読む 1 経路のまま（デッキ側に第 2 の軸を持たない）。GUI は操作帯でプレビュー即反映 （#570 段 2・PR #579・2026-11-07）
 - **ビジュアルデッキ マガジンに汎用本文レイアウト `13_本文（1カラム）`** — 汎用の本文に 2 行枠の `02_ステートメント` が選ばれ、3 行以上が自動分割・図がタイトルに重なっていた。汎用本文を追加し、`ステートメント` 系は新ロール `statement` として汎用候補から外す。他 17 マスターの選択結果は snapshot で不変 （#589・PR #599・2026-11-07）
@@ -151,6 +158,7 @@
 
 ## 協働・MCP
 
+- **Claude Desktop 用 `.mcpb` バンドル＋接続診断 `slidecraft-mcp --doctor`** — release.yml が win32-x64／darwin-arm64 の `.mcpb`（manifest 0.3・同梱 Node・SHA256SUMS 入り）を Release 資産に添付。`--doctor` は MCP server を自己 spawn して `server/discover`→`initialize`→`tools/list` を順に検査し、GUI の「接続テスト」は同じ関数を呼ぶ（判定の重複なし・レポート無しは NG） （#517 子 3・4・PR #617・2026-11-08）
 - **不正な ```diagram を `diagram-invalid` として報告（never-silent）** — `type: flow` のようにスキーマが拒否する図は空のまま無警告で出力されていた。parse 失敗の理由を捨てない `parseDiagramYamlResult` を 1 経路にし、`get_deck_issues` が zod の理由付きで warn、`validate_deck` は `diagramErrors` を返して `ok: false`（export ゲート）。export と `schema.ts` は不変 （#587・PR #590・2026-11-07）
 - **MCP 編集経路と GUI 内蔵 AI 編集経路の一本化（R8）** — 図適用（`set_diagram` ⇄ `applyFigureYaml`）を `apply-slide-edit.ts` に共有し、一致テスト `edit-path-agreement` が両経路を同一入力で突き合わせる。残る差は裁定で統一: 図の追加でユーザの layout pin を外さない（A2）、`set_slide_markdown` が省かれた表・コードを旧スライドから持ち越し、壊れた図 YAML は `invalid-argument` で拒否して保存しない（B3）。タイトル自動復元・空編集の旧スライド維持は GUI の外殻に残す （#220・PR #564 #567・2026-11-07）
 - **レビュー規則の on/off トグル `set_review_rules`** — 句読点規則などを規則 id 単位で off にでき、off の規則は `get_deck_issues`・mutation の diagnostics・`get_slide_fix_request` に出ず、`activeReviewRules` には `level:"off"` で状態が見える（guide↔診断の一致を on/off 両方で固定）。既定は全 on で byte-identical。置き場は MCP パラメータ（deck 構造には入れない） （#247・PR #563・2026-11-07）
@@ -199,6 +207,7 @@
 
 ## リリース・配布
 
+- **Homebrew cask を publish 後に tap へ自動ミラー** — release.yml の後続ジョブが `verify-cask` を前置して tap リポジトリへ PR を出す（secret 名を明記） （#288・PR #602・2026-11-08）
 - **release.yml が draft を 1 つだけ作る** — 3-OS matrix の各 leg が `tauri-action` の find-or-create で draft を競合作成していた（v0.5.0 で 2 draft）。先行ジョブ `create-release` が CHANGELOG 抽出と空ボディ検査を 1 回だけ行い draft を作成（再実行は再利用・複数 draft や公開済みタグは明示エラー）、matrix は `releaseId` で upload のみ。workflow の pin テスト 6 件 （#501・PR #560・2026-11-07）
 - **lockfile 更新用の npm を 11.21.2 に固定（`npm run npm:pinned`）** — npm 10.8.x〜11.0.0 が `edgesOut` クラッシュで `audit fix` / `install --package-lock-only` を実行できない。実測で 11.21.2 以降は正常、`npm@latest`（12 系）は node 20 非対応のため採らず。CI の `npm ci`（npm 10.8.2）が受理する lockfileVersion 3 を維持 （#495・PR #565・2026-11-07）
 - **Linux の .deb/.rpm が同梱 Node を `/usr/bin/slidecraft-node` として入れる（`/usr/bin/node` を占有しない）** — Tauri の externalBin が distro の `nodejs` パッケージと同じパスに入り衝突し得た。Linux だけ 2 枚目の overlay `tauri.bundle.linux.conf.json` でサイドカー名を変え、名前は `scripts/node-sidecar.mjs` に一本化（collab.rs・ランチャ・ci/release.yml は一致テストで固定）。CI の `verify-deb-launcher.mjs` が `usr/bin/node` の混入を失敗にする。v0.5.0 で `/usr/bin/node` を直接登録していた人の移行手順は docs/mcp-server.md （#527・PR #550・ADR-0022 Addendum・2026-11-07）

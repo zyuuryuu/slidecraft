@@ -16,7 +16,7 @@ SlideCraft をさまざまな入力で触って検証するためのサンプル
   `Draft → 整形 → 診断 → 修復` の通しテスト。
 - **構造化Markdown（`deck-*.md`）**：**📝 Draft** → 「📄 ファイルを開く」で読込 →（必要なら
   整形/レビュー）→ **✓ スライドにする**。Edit での図/表/レイアウト編集をテスト。
-- **テンプレ切替**：ツールバーのテンプレ選択（MasterPicker）で内蔵 3 本（既定＝技術報告 スタンダード水色）を
+- **テンプレ切替**：ツールバーのテンプレ選択（MasterPicker）で内蔵 4 本（既定＝技術報告 スタンダード水色）を
   切り替えるか、「＋取込」で .pptx を取り込む。
   - [`templates/Midnight_Executive_30_TemplateOnly.pptx`](templates/README.md)（canonical 30 レイアウト。
     `deck-*.md` / `sample-deck.md` の `<!-- slide: Title.1Title.Single -->` 等のレイアウト指定はこの名前。
@@ -33,6 +33,8 @@ SlideCraft をさまざまな入力で触って検証するためのサンプル
 | `manuscript-02-tech-report.md` | 負荷試験/性能レポート | 数値指標・前後比較、「指標:値」多数 |
 | `manuscript-03-howto-guide.md` | セットアップ/手順ガイド | プローズ＋番号付き手順（プロセス化の素材） |
 | `manuscript-04-meeting-notes.md` | 議事録（雑多） | 疎/密が不均一な節の構造化＋診断 |
+| `manuscript-05-sales-pitch.md` | 提案・ピッチ 14 枚（構造化済み・#580 目標デッキ A） | 内蔵「セールスピッチ Pitch」で `<!-- statement -->`・`<!-- quote -->`・ヒーロー数値・カード・テキスト＋画像・CTA 締めを確認（14 枚のまま・消失 0） |
+| `manuscript-06-executive-brief.md` | 経営会議への意思決定依頼（10 枚・構造化済み） | エグゼクティブ テンプレ（#596）の目標デッキ：結論先出しの表紙・ステートメント・巨大 KPI・Ask 締め・密度診断（9 枚目は本文 4 行で density-target が 1 件） |
 
 → 整形すると各 5〜6 枚、💡提案が 4〜5 件出ます。
 

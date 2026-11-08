@@ -18,8 +18,6 @@ import { useDeckController } from "./components/useDeckController";
 import { useMasterRegistry, BUILTIN_MASTER } from "./components/useMasterRegistry";
 import { loadDefaultMaster } from "./components/default-master";
 import MasterPicker from "./components/MasterPicker";
-import ThemeToggle from "./components/ThemeToggle";
-import LanguageToggle from "./components/LanguageToggle";
 import { useTranslation } from "react-i18next";
 import { useCollab } from "./components/useCollab";
 import { useFollowAi } from "./components/useFollowAi";
@@ -30,14 +28,13 @@ import { takePendingOpenPaths, onOpenFileRequested } from "./ipc/file-open";
 import { openDocs } from "./ipc/docs";
 import { describeRepairPlan, describeAugmentPlan } from "./components/apply-template";
 import type { AugmentPlan } from "./engine/layout-augment-plan";
-import IntakeSummaryBar, { type IntakeResult, type IntakeBusy } from "./components/IntakeSummaryBar";
-import UpdateBanner from "./components/UpdateBanner";
+import type { IntakeResult, IntakeBusy } from "./components/IntakeSummaryBar";
+import NoticeSlot from "./components/NoticeSlot";
 import { useUpdateBanner } from "./components/useUpdateBanner";
 import Onboarding from "./components/Onboarding";
 import { useOnboarding } from "./components/useOnboarding";
 import { ONBOARDING_SAMPLE_MD } from "./components/onboarding-sample";
 import TemplateCreator from "./components/TemplateCreator";
-import TemplateAdjustPanel from "./components/TemplateAdjustPanel";
 import { useTemplateAdjust } from "./components/useTemplateAdjust";
 import { writeTemplate, type TemplateSpec } from "./engine/template-writer";
 import { openProject } from "./engine/project-io";
@@ -396,6 +393,7 @@ export default function App() {
   // prompt pre-filled, so the human sees/edits the instruction before generating. `ts`
   // re-seeds even when the same issue is clicked twice.
   const [aiSeed, setAiSeed] = useState<{ prompt: string; ts: number } | undefined>(undefined);
+  const [aiSettingsTs, setAiSettingsTs] = useState<number | undefined>(undefined); // ⚙ → AI の接続設定 (#614)
   const handleAiFix = (slideIndex: number, prompt: string) => {
     selectSlide(slideIndex);
     setShowAiPanel(true);
@@ -433,55 +431,36 @@ export default function App() {
           canUndo={editLocked ? true : canUndo}
           canRedo={editLocked ? true : canRedo}
           onHelp={handleHelp}
+          onAiSettings={() => { setShowAiPanel(true); setAiSettingsTs(Date.now()); }}
+          onDraft={handleEnterImport}
+          draftGate={editLocked ? "locked" : adjust.session ? "busy" : undefined}
+          master={
+            // #612: every template operation lives in this master menu (the Draft modal shows a reduced one).
+            <MasterPicker
+              masters={masters}
+              activeId={masterId}
+              onSelect={handleSelectMaster}
+              onImport={handleImportMaster}
+              onRemake={handleRemakeMaster}
+              onAdjust={() => void adjust.start()} onAugment={editLocked || adjust.session ? undefined : handleAugmentMaster} template={templateData}
+              onCreate={() => setShowTemplateCreator(true)}
+              onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
+              onRemove={handleRemoveMaster}
+              disabled={editLocked || !!adjust.session}
+            />
+          }
         />
-        <div className="flex items-center gap-2 px-3 py-2">
-          {/* 📝 Draft = secondary action. The 協働（live-collab）surface moved INTO the ✨ AI dock as a
-              second tab. #612: every template operation (select / import / adjust · augment · ⓘ / create)
-              lives in this master menu; Draft shows the same MasterPicker with select + import only.
-              Both are gated while collab-locked or while a template adjust is open. */}
-          <button
-            onClick={handleEnterImport}
-            disabled={editLocked || !!adjust.session}
-            title={editLocked ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}
-            className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge"
-          >
-            📝 Draft
-          </button>
-          <MasterPicker
-            masters={masters}
-            activeId={masterId}
-            onSelect={handleSelectMaster}
-            onImport={handleImportMaster}
-            onRemake={handleRemakeMaster}
-            onAdjust={() => void adjust.start()} onAugment={editLocked || adjust.session ? undefined : handleAugmentMaster} template={templateData}
-            onCreate={() => setShowTemplateCreator(true)}
-            onShowInfo={intakeResult ? () => setIntakeDismissed(false) : undefined}
-            onRemove={handleRemoveMaster}
-            disabled={editLocked || !!adjust.session}
-          />
-          <LanguageToggle />
-          <ThemeToggle />
-        </div>
       </div>
 
-      {/* "New version available" notice (notify-only — ADR-0021). Above IntakeSummaryBar so a fresh
-          intake result doesn't bury a pending update notice. */}
-      {showUpdateBanner && latestVersion && <UpdateBanner latestVersion={latestVersion} onDismiss={dismissUpdateBanner} />}
-
-      {/* Intake transparency (progress + result) as a flow banner under the toolbar — never overlaps
-          the panes, the master dropdown, or the bottom Assist dock. */}
-      <IntakeSummaryBar
-        busy={intakeBusy}
-        result={intakeDismissed ? null : intakeResult}
-        onDismiss={() => setIntakeDismissed(true)}
-        template={templateData}
-        unbound={diagnostics.filter((d) => d.id === "unbound-content")}
-        augmentHint={!editLocked && !adjust.session}
+      {/* #613: ONE notice strip under the toolbar (flow, not overlay) — template adjust > intake
+          (progress/result) > update notice (ADR-0021); the others wait behind a "+N" badge. */}
+      <NoticeSlot
+        update={showUpdateBanner && latestVersion ? { latestVersion, onDismiss: dismissUpdateBanner } : null}
+        intake={{ busy: intakeBusy, result: intakeDismissed ? null : intakeResult, onDismiss: () => setIntakeDismissed(true),
+          template: templateData, unbound: diagnostics.filter((d) => d.id === "unbound-content"), augmentHint: !editLocked && !adjust.session }}
+        adjust={adjust.session ? { session: adjust.session, busy: adjust.busy, onPreview: adjust.preview,
+          onApply: (r) => void adjust.apply(r), onCancel: () => void adjust.cancel() } : null}
       />
-      {adjust.session && (
-        <TemplateAdjustPanel session={adjust.session} busy={adjust.busy} onPreview={adjust.preview}
-          onApply={(r) => void adjust.apply(r)} onCancel={() => void adjust.cancel()} />
-      )}
 
       {/* ── Edit (home): the visual editing surface is always the main; deck = truth ── */}
       <div className="flex-1 flex flex-col min-h-0" inert={bgInert}>
@@ -601,6 +580,7 @@ export default function App() {
             onBatchEdit={editLocked ? undefined : (instruction) => refine.runBatchEdit([...(selected ?? [])].sort((a, b) => a - b), instruction)}
             batchRunning={refine.refining}
             seed={aiSeed}
+            openSettingsTs={aiSettingsTs} onSettingsOpened={() => setAiSettingsTs(undefined)}
             ai={ai}
             collabConnected={editLocked}
             collabTab={

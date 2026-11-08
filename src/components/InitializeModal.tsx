@@ -78,7 +78,7 @@ export default function InitializeModal({
         {/* Header + input methods (one tidy row). #612: the master menu here is select + import only —
             adjust / augment / create show their panel, banner or dialog in the main view, behind this modal. */}
         <div className="flex items-center gap-2 px-4 py-2 border-b border-edge text-xs shrink-0">
-          <span className="text-sm text-accent-soft font-medium mr-1">📝 Draft</span>
+          <span className="text-sm text-accent-soft font-medium mr-1">{t("toolbar.draft")}</span>
           <MasterPicker masters={masters} activeId={activeMasterId} onSelect={onSelectMaster} onImport={onImportMaster} onRemake={onRemakeMaster} onRemove={onRemoveMaster} />
           <span className="w-px h-4 bg-edge mx-1" />
           <button onClick={onOpenFile} className={action} title={t("initModal.importMarkdownTitle")}>{t("initModal.importMarkdown")}</button>

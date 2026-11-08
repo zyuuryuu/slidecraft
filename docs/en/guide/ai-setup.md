@@ -21,7 +21,7 @@ Internally, enabling it starts an OpenAI-compatible server locally (on the `127.
 
 ### Enabling it and the first-time automatic model download
 
-1. In the AI settings, set the provider to "Built-in (llamafile, offline)" (the desktop default).
+1. In the AI settings (**⚙** on the top bar → "AI connection settings…", or the connection status at the top right of the ✨ AI dock), set the provider to "Built-in (llamafile, offline)" (the desktop default).
 2. **The first time only**, a model matched to your machine's capabilities (RAM and core count) is downloaded automatically. The download includes an integrity check (SHA256 verification), and is rejected if it does not match.
 3. From then on it runs from the local model file, so you can generate and edit even offline.
 
@@ -93,7 +93,7 @@ Only Claude connects via the native Anthropic SDK; everything else connects via 
 
 ### Setup steps
 
-1. Select the provider in the AI settings.
+1. Select the provider in the AI settings (**⚙** on the top bar → "AI connection settings…").
 2. Enter the **API key** (required for Claude / OpenAI / OpenRouter; often not needed for Ollama or local runtimes).
 3. For Custom, enter the **Base URL** and model name. If the endpoint supports it, the list of installed models can be fetched automatically and shown in the dropdown.
 
