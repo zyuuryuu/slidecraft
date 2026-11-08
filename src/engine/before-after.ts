@@ -34,6 +34,7 @@ import type { LayoutInfo, PlaceholderInfo, DecoRect } from "./template-loader";
 import { detectGroups } from "./group-layout";
 import { slideBindingPlan } from "./group-binding";
 import { bodyPlaceholders, nthBody } from "./visual-placement";
+import { placedFigures } from "./figure-placement";
 import { escXml } from "./md-to-ooxml";
 import { beforeAfterRole } from "./md-separators";
 
@@ -72,8 +73,7 @@ function cellRegions(slide: SlideIR, layout: LayoutInfo): { regions: ImageRect[]
       .filter((c) => c.length > 0);
     return { regions: cols.map(bbox), used: new Set(shape.groups.flat().map((s) => s.phIdx)) };
   }
-  const visuals = [slide.diagram, slide.mermaidBlock, slide.table, slide.code, slide.image?.behind ? undefined : slide.image]
-    .flatMap((v) => (v ? [v.placeholderIdx] : []));
+  const visuals = placedFigures(slide).map((p) => p.ordinal); // every body visual's placed ordinal (#392, R8)
   const cellIdxs = [...new Set([...slide.placeholders.map((c) => c.idx), ...visuals])]
     .filter((i) => /^[1-9]$/.test(i))
     .sort((a, b) => Number(a) - Number(b));

@@ -9,6 +9,7 @@
  */
 import { generatePptx } from "../engine/placeholder-filler";
 import type { DeckIR } from "../engine/slide-schema";
+import { mermaidSources, withMermaidSvg } from "../engine/slide-figures";
 import type { TemplateData } from "../engine/template-loader";
 import { MERMAID_CONFIG, rasterizeSvgToPng } from "./mermaid";
 
@@ -17,14 +18,20 @@ export async function renderDeckToPptxBytes(deck: DeckIR, templateData: Template
   mermaidLib.initialize(MERMAID_CONFIG);
   const deckWithSvg: DeckIR = {
     ...deck,
+    // Every ```mermaid of the slide (#392 段 2: a 2nd+ one too); one that fails to render is left without
+    // svgCache (not drawn, as before).
     slides: await Promise.all(deck.slides.map(async (slide, i) => {
-      if (!slide.mermaidBlock) return slide;
-      try {
-        const { svg } = await mermaidLib.render(`pptx-mmd-${i}`, slide.mermaidBlock.mermaid);
-        return { ...slide, mermaidBlock: { ...slide.mermaidBlock, svgCache: svg } };
-      } catch {
-        return slide;
+      const sources = mermaidSources(slide);
+      if (sources.length === 0) return slide;
+      const svgs = new Map<string, string>();
+      for (const [k, src] of sources.entries()) {
+        try {
+          svgs.set(src, (await mermaidLib.render(k === 0 ? `pptx-mmd-${i}` : `pptx-mmd-${i}-${k}`, src)).svg);
+        } catch {
+          // left unrendered
+        }
       }
+      return svgs.size ? withMermaidSvg(slide, (m) => svgs.get(m)) : slide;
     })),
   };
   const buffer = await generatePptx(deckWithSvg, templateData, rasterizeSvgToPng);

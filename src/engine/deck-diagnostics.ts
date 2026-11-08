@@ -19,7 +19,8 @@ import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
-import { visualOccupancy, visualCollisions, bodyPlaceholders, nthBody, type VisualKind } from "./visual-placement";
+import { visualOccupancy, visualCollisions, figureRegions, type VisualKind } from "./visual-placement";
+import { placedFigures } from "./figure-placement";
 import { tableOverflow } from "./table-fit"; // #436/#444: the SAME judgment the auto pick uses (R8)
 import { isBlankParagraphs, contentHead } from "./placeholder-binding";
 import { isFieldIdx, fieldRowName, type FieldKind } from "./field-rows";
@@ -27,7 +28,7 @@ import { diagramNodeShrink, diagramNodeShrinkMessage, parseDiagramYaml, diagramI
 import { fitTitle, slideRoleContent } from "./title-fit";
 import { columnAugmentHint } from "./layout-augment-plan";
 import { rescueMessage } from "./field-rescue";
-import { undrawnFigures, FIGURE_KIND_LABEL } from "./slide-figures";
+import { FIGURE_KIND_LABEL } from "./slide-figures";
 import { markerLayoutMissingHint } from "./slide-marker-hint";
 import { RULE_LEVEL, type ReviewRuleId } from "./review-rules";
 
@@ -47,12 +48,6 @@ export interface DeckIssue {
 }
 
 const VISUAL_LABEL: Record<VisualKind, string> = { diagram: "図", mermaid: "図", table: "表", code: "コード", image: "画像" };
-
-/** #473: a figure at body ordinal 2+ is confined to that placeholder's box by export (placeholder-filler's
- *  `diagWantsRegion`); ordinal 1 (or an unparsable idx) fills the slide. Same predicate, same default. */
-function diagramWantsRegion(placeholderIdx: string): boolean {
-  return (parseInt(placeholderIdx) || 1) !== 1;
-}
 
 // Full-width chars: a bullet longer than this reads as a sentence, not a key phrase.
 const SENTENCE_BULLET = 28;
@@ -91,8 +86,6 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
     const body = rolePlaceholder(slide, "body");
 
     if (!title.trim() && (body || isVisual)) add("missing-title", "タイトルが無い", ["title"]);
-    const undrawn = undrawnFigures(slide); // #392 段 1: kept in SlideIR, but no renderer places a 2nd+ figure of one kind yet (段 2)
-    if (undrawn.length > 0) add("figure-dropped", `${[...new Set(undrawn.map((f) => FIGURE_KIND_LABEL[f.kind]))].join("・")}の2つ目以降（${undrawn.length}個）は出力（PPTX/プレビュー）にまだ描画されません（Markdown には保持されます）。別スライドに分けるか、異なる種類のビジュアルにしてください`, ["split"]);
 
     // #435 never-silent: a `<!-- slide: X -->` pin THIS template lacks. Read off the SAME resolution
     // export/preview draw with (autoSelectLayout honors a pin the catalog has, degrades one it lacks —
@@ -135,11 +128,13 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
     const invalid = slide.diagram && diagramInvalidReason(slide.diagram.yaml);
     if (invalid) add("diagram-invalid", invalid, []);
 
-    // #473 never-silent: a SOLO figure (body ordinal 1) fills the slide as laid out — export paints
-    // computeLayout's result as-is, so the shrink is readable without a template. Read off that same
-    // result (diagramNodeShrink, R8). A beside-text figure needs its region → the layouts pass below.
-    if (slide.diagram && !diagramWantsRegion(slide.diagram.placeholderIdx)) {
-      const spec = parseDiagramYaml(slide.diagram.yaml);
+    // #473 never-silent: a SOLO figure (a lone diagram at body ordinal 1, figure-placement) fills the slide
+    // as laid out — export paints computeLayout's result as-is, so the shrink is readable without a
+    // template. Read off that same result (diagramNodeShrink, R8). A region-bound figure needs its
+    // region → the layouts pass below.
+    const solo = placedFigures(slide).find((p) => p.solo && p.figure.kind === "diagram")?.figure;
+    if (solo?.kind === "diagram") {
+      const spec = parseDiagramYaml(solo.yaml);
       const shrink = spec && diagramNodeShrink(spec);
       if (shrink) add("diagram-node-shrink", diagramNodeShrinkMessage(shrink, "スライド"), ["split"]);
     }
@@ -213,22 +208,34 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "visual-collision", level: RULE_LEVEL["visual-collision"], message: `${what}が同じ枠（${name}）に割り当てられ、出力（PPTX）では重なって描画されます（プレビューでは一方のみ表示）。<!-- col --> で分けるか別スライドに分割してください（${layout.name}）`, levers: ["split"] });
       }
 
-      // #436 never-silent: PowerPoint grows each table row to fit its 11pt text, so a long table runs
-      // past its box. Same box the export places it in (nthBody), estimate from table-layout (R8).
-      const tableBox = slide.table ? nthBody(bodyPlaceholders(layout.placeholders), slide.table.placeholderIdx)?.style : undefined;
-      const over = tableBox && tableOverflow(slide.table!.rows, tableBox);
-      if (over) {
-        issues.push({ slideIndex: i, title: slideTitle(slide), id: "table-overflow", level: RULE_LEVEL["table-overflow"], message: `表 ${slide.table!.rows.length} 行（見出し含む）はこのレイアウト（${layout.name}）の枠に収まりません（推定 ${over.fit} 行まで）。出力（PPTX）では行が文字に合わせて伸び枠の下へはみ出します。スライドの分割を検討してください`, levers: ["split"] });
+      // Every body visual's region on this layout — the SAME placement export/preview draw by (R8).
+      const regions = figureRegions(slide, layout.placeholders);
+
+      // #392 段 2 never-silent: on a slide with 2+ visuals, one this layout has no region for is not drawn
+      // (it stays in the Markdown). A lone visual keeps its historical solo/region handling.
+      const lostFigs = regions.length >= 2 ? regions.filter((r) => !r.ph) : [];
+      if (lostFigs.length > 0) {
+        const what = [...new Set(lostFigs.map((r) => FIGURE_KIND_LABEL[r.figure.kind]))].join("・");
+        issues.push({ slideIndex: i, title: slideTitle(slide), id: "figure-dropped", level: RULE_LEVEL["figure-dropped"], message: `${what}（${lostFigs.length}個）はこのレイアウト（${layout.name}）に置き場（本文の枠）が無く、出力（PPTX/プレビュー）に描画されません（Markdown には保持されます）。枠の多いレイアウトにするか、スライドを分けてください`, levers: ["split"] });
       }
 
-      // #473 never-silent: a beside-text figure is confined to its body placeholder (placeholder-filler
-      // → paintDiagram region → fitTransform), shrinking it again. Same region (nthBody) and same fit
+      // #436 never-silent: PowerPoint grows each table row to fit its 11pt text, so a long table runs
+      // past its box. Same box the export places it in (figureRegions), estimate from table-layout (R8).
+      for (const r of regions) {
+        const over = r.figure.kind === "table" && r.ph && tableOverflow(r.figure.rows, r.ph.style);
+        if (over && r.figure.kind === "table") {
+          issues.push({ slideIndex: i, title: slideTitle(slide), id: "table-overflow", level: RULE_LEVEL["table-overflow"], message: `表 ${r.figure.rows.length} 行（見出し含む）はこのレイアウト（${layout.name}）の枠に収まりません（推定 ${over.fit} 行まで）。出力（PPTX）では行が文字に合わせて伸び枠の下へはみ出します。スライドの分割を検討してください`, levers: ["split"] });
+        }
+      }
+
+      // #473 never-silent: a region-bound figure is confined to its body placeholder (placeholder-filler
+      // → paintDiagram region → fitTransform), shrinking it again. Same region (figureRegions) and same fit
       // (diagramNodeShrink, R8). An unresolved region means export drops the figure — reported as
-      // unbound, not here.
-      if (slide.diagram && diagramWantsRegion(slide.diagram.placeholderIdx)) {
-        const region = nthBody(bodyPlaceholders(layout.placeholders), slide.diagram.placeholderIdx)?.style;
-        const spec = region && parseDiagramYaml(slide.diagram.yaml);
-        const shrink = spec && diagramNodeShrink(spec, region);
+      // unbound / figure-dropped, not here.
+      for (const r of regions) {
+        if (r.figure.kind !== "diagram" || r.solo || !r.ph) continue;
+        const spec = parseDiagramYaml(r.figure.yaml);
+        const shrink = spec && diagramNodeShrink(spec, r.ph.style);
         if (shrink) {
           issues.push({ slideIndex: i, title: slideTitle(slide), id: "diagram-node-shrink", level: RULE_LEVEL["diagram-node-shrink"], message: diagramNodeShrinkMessage(shrink, "枠"), levers: ["split"] });
         }
