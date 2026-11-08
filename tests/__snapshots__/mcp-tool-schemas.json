@@ -661,6 +661,9 @@
       "placeholderIdx": {
         "type": "string"
       },
+      "figure": {
+        "type": "number"
+      },
       "docId": {
         "type": "string"
       },
