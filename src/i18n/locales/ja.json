@@ -480,7 +480,16 @@
     "close": "閉じる",
     "cancel": "キャンセル",
     "accept": "✓ 採用（{{count}} 件）",
-    "leverPolish": "句読点整形"
+    "leverPolish": "句読点整形",
+    "routeFieldOps": "部分編集（文面）",
+    "routeDataOps": "部分編集（表・グラフ）",
+    "routeDiagramOps": "部分編集（図）",
+    "routeDesign": "配置の変更",
+    "routeFigureYaml": "図の置き換え",
+    "routeMarkdown": "全文編集",
+    "routeFallback": "全文編集（ops 形式不正）",
+    "skippedSuffix": " ・ スキップ {{n}}",
+    "notApplied": "{{route}}: 変更は適用されませんでした"
   },
   "reviewBar": {
     "warnCount": "⚠ 課題 {{n}}",
