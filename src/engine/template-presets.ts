@@ -4,8 +4,11 @@
  * スタイル＝配色・書体・密度（本文サイズ・左右余白）＋レイアウトの部分集合（#580 段 1: 報告書 6 変種は
  * 選ばれるレイアウトが全スライドで一致し、差は配色と書体だけだった）。プリセットは TemplateSpec に
  * 落として writeTemplate に渡す。幾何の正本は LayoutDef の 1 経路（R8）で、密度は既存の経路に乗せる:
- *   - bodyPt: #570 の adjustTemplate の本文倍率（bodyPt ÷ MASTER_BODY_PT）。第 2 のサイズ規則を作らない。
+ *   - bodyPt: #570 の adjustTemplate の本文倍率（bodyPt ÷ MASTER_BODY_PT・本文の帯 21pt 以下の枠だけ＝
+ *     PRESET_BODY_MAX_PT）。第 2 のサイズ規則を作らない。
  *   - marginIn: LayoutDef の枠を左右方向に縮める純粋変換 withHorizontalMargin（既定 0.8in では恒等）。
+ *   - maxBodyLines / maxLineChars（#596）: 文字量の目標帯。生成テンプレのメタ（style-meta.ts）に書き、
+ *     get_deck_issues の density-target が読む。目標の無いプリセット（REPORT_PRESET・PITCH_PRESET）の出力は不変。
  * 具体的なスタイル（Pitch / Executive / Campaign）は #595/#596/#598 で足す。プリセット専用の LayoutDef
  * （BUILTIN_LAYOUTS に入れると既存出力が変わるもの）は PRESET_LAYOUTS に置き、既定の `library`
  * （PRESET_LIBRARY）から名前で引く。
@@ -14,11 +17,9 @@ import { BUILTIN_LAYOUTS, type LayoutDef, type PaletteKey } from "./template-lay
 import { PRESET_LAYOUTS } from "./template-layout-library-style";
 import { writeTemplate, MIDNIGHT_PALETTE, MASTER_BODY_PT, SLIDE_W, type TemplateSpec } from "./template-writer";
 import { adjustTemplate, type TemplateAdjustRecipe } from "./template-adjust";
+import { withStyleDensityMeta, hasDensityTargets, type StyleDensity } from "./style-meta";
 
-export interface StyleDensity {
-  bodyPt: number; // 本文の基準サイズ（pt）。MASTER_BODY_PT との比で本文系のサイズ全体に掛かる
-  marginIn: number; // 左右の余白（inch）。BASE_DENSITY.marginIn からの差で枠を左右に縮める／広げる
-}
+export type { StyleDensity } from "./style-meta";
 
 export interface StylePreset {
   name: string;
@@ -29,6 +30,9 @@ export interface StylePreset {
   layouts: readonly string[];
   density: StyleDensity;
 }
+
+/** プリセットが名前で引けるレイアウト全体: 内蔵（BUILTIN_LAYOUTS）＋プリセット専用（PRESET_LAYOUTS・#595〜）。 */
+export const PRESET_LIBRARY: readonly LayoutDef[] = Object.freeze([...BUILTIN_LAYOUTS, ...PRESET_LAYOUTS]);
 
 /** 現行の writer 既定と同じ密度（本文 14pt・左右 0.8in）。 */
 export const BASE_DENSITY: Readonly<StyleDensity> = Object.freeze({ bodyPt: MASTER_BODY_PT, marginIn: 0.8 });
@@ -46,6 +50,46 @@ export const REPORT_PRESET: StylePreset = Object.freeze({
 }) as StylePreset;
 
 /**
+ * エグゼクティブ（インパクト重視・#596）。ダークの navy に高彩度の accent 1 色（大数字も同色）、本文は明るい
+ * グレー。見出しは太いゴシック（Arial Black ＋ 游ゴシック）、本文は同系（Arial ＋ 游ゴシック）。
+ * 1 枚 1 メッセージ: 結論先出しの表紙・ステートメント・要約（箇条＋ Takeaway）・巨大 KPI・3 点要約・Ask 締め。
+ * 密度は本文 20pt・左右 1.0in・本文 3 行／1 行 45 字（超えたら get_deck_issues が density-target を出す）。
+ */
+export const EXECUTIVE_PRESET: StylePreset = Object.freeze({
+  name: "Executive",
+  palette: Object.freeze({
+    background: "0A1430", // 表紙・章扉・締めの地／本文スライドのヘッダーバー
+    canvas: "111C3D", // 本文スライドの地（ダーク）
+    titleText: "FFFFFF",
+    bodyText: "DCE2EC", // 明るいグレー
+    subtle: "A9B4C8",
+    muted: "7D89A3",
+    accent: "FFB020", // 高彩度の 1 色
+    accent2: "8FA6CC", // 比較の 2 つ目（彩度を落とし、accent を 1 色に保つ）
+    emphasis: "FFB020", // 大数字・Takeaway は accent と同じ色
+  }),
+  fonts: Object.freeze({ major: "Arial Black", minor: "Arial", majorEa: "Yu Gothic", minorEa: "Yu Gothic" }),
+  layouts: Object.freeze([
+    "Title.1Title.Single", // 結論先出しの表紙（タイトル＋サブタイトルに 1 文の結論）
+    "Statement.1Message.Single",
+    "Content.1Body.Single",
+    "Content.1Body.Single+1Callout", // 要約 1 枚（箇条 3 つ＋ Takeaway）
+    "KPI.1Value.Single", // 巨大 KPI
+    "KPI.3Value.Equal",
+    "Compare.2Option.Versus",
+    "Process.3Step.Sequential",
+    "Column.2Body.Equal", // 2 列の本文（無いと 3 列枠に入り 1 列が空く）
+    "Column.3Body.Equal", // 3 点要約（カード 3）
+    "Section.1Title.Single", // タイトルだけのスライド（マーカー無しの章扉）
+    // `<!-- section -->` の章扉: 書き出し時に materializeDerivedSlides が章一覧付きでこの名前に固定する
+    // （deck-sections.ts）。無いと本文レイアウトに落ちる。
+    "SectionNav.1TitleList.Single",
+    "Closing.1Ask+1Decision", // Ask 締め（プリセット専用）
+  ]),
+  density: Object.freeze({ bodyPt: 20, marginIn: 1.0, maxBodyLines: 3, maxLineChars: 45 }),
+}) as StylePreset;
+
+/**
  * 左右の余白を `marginIn` にする。枠（placeholder）の x/w をスライド中心まわりに一様に縮める（広げる）:
  * 基準余白 0.8in の位置が `marginIn` に来る。縦方向・装飾（全幅のヘッダーバー等）は触らない。
  * 基準と同じ値なら入力をそのまま返す（既存出力の不変）。
@@ -58,9 +102,6 @@ export function withHorizontalMargin(def: LayoutDef, marginIn: number): LayoutDe
   return { ...def, placeholders: def.placeholders.map((p) => ({ ...p, x: c + (p.x - c) * k, w: p.w * k })) };
 }
 
-/** プリセットが名前で引けるレイアウト全体: 内蔵（BUILTIN_LAYOUTS）＋プリセット専用（PRESET_LAYOUTS）。 */
-export const PRESET_LIBRARY: readonly LayoutDef[] = [...BUILTIN_LAYOUTS, ...PRESET_LAYOUTS];
-
 /** プリセット → TemplateSpec（レイアウトは `library` から名前で引き、余白を掛ける）。未知の名前は throw。 */
 export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] = PRESET_LIBRARY): TemplateSpec {
   const byName = new Map(library.map((d) => [d.name, d] as const));
@@ -72,15 +113,25 @@ export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] 
   return { name: preset.name, fonts: { ...preset.fonts }, palette: { ...preset.palette }, layouts };
 }
 
-/** 密度のうちサイズ分を #570 の変換レシピに落とす（基準どおりなら空＝無変換）。 */
+/**
+ * 本文倍率を掛ける枠の上限（pt）＝本文の大きさの帯（基準 14pt の 1.5 倍）。これを超える枠は大数字・
+ * ステートメントなど表示用サイズで、幅は基準サイズ前提のため倍率を掛けると溢れる（PR #635 裁定 B）。
+ */
+export const PRESET_BODY_MAX_PT = MASTER_BODY_PT * 1.5;
+
+/** 密度のうちサイズ分を #570 の変換レシピに落とす（基準どおりなら空＝無変換）。倍率は本文の帯の枠だけ。 */
 export function presetRecipe(preset: StylePreset): TemplateAdjustRecipe {
   const body = preset.density.bodyPt / MASTER_BODY_PT;
-  return body === 1 ? {} : { scale: { body } };
+  return body === 1 ? {} : { scale: { body, bodyMaxPt: PRESET_BODY_MAX_PT } };
 }
 
-/** プリセットからテンプレを生成する: writeTemplate → adjustTemplate（無変換なら writeTemplate の出力そのまま）。 */
+/**
+ * プリセットからテンプレを生成する: writeTemplate → adjustTemplate（無変換なら writeTemplate の出力そのまま）
+ * → 目標帯があればメタ（docProps/custom.xml）を書く（無ければ何も足さない）。
+ */
 export async function writePresetTemplate(preset: StylePreset, library?: readonly LayoutDef[]): Promise<Uint8Array> {
-  return adjustTemplate(await writeTemplate(presetToSpec(preset, library)), presetRecipe(preset));
+  const bytes = await adjustTemplate(await writeTemplate(presetToSpec(preset, library)), presetRecipe(preset));
+  return hasDensityTargets(preset.density) ? withStyleDensityMeta(bytes, preset.density) : bytes;
 }
 
 /**

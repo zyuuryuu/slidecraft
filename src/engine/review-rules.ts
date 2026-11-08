@@ -37,7 +37,8 @@ export type ReviewRuleId =
   | "missing-column-layout"
   | "overflow-scale-hint"
   | "field-row-rescued"
-  | "marker-layout-missing";
+  | "marker-layout-missing"
+  | "density-target";
 
 export interface ReviewRule {
   id: ReviewRuleId;
@@ -71,6 +72,7 @@ export const REVIEW_RULES: readonly ReviewRule[] = [
   { id: "overflow-scale-hint", level: "info" }, // #570 段 3: 本文倍率の提案（MCP get_deck_issues が overflow-scale-hint.ts で足す）
   { id: "field-row-rescued", level: "info" },
   { id: "marker-layout-missing", level: "info" },
+  { id: "density-target", level: "info" }, // #596: テンプレの密度目標（StylePreset.density）超え。get_deck_issues が density-hint.ts で足す
 ];
 
 export const RULE_LEVEL: Record<ReviewRuleId, "warn" | "info"> = Object.fromEntries(
