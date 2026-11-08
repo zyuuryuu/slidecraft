@@ -18,6 +18,9 @@
  *   （＝lvl1。入れ子段は lvl1 から導いた小さい値）がその値以下の枠だけに掛け、大数字などの表示用サイズの
  *   枠は据え置く（PR #635 裁定 B）。判定は枠（txStyles のブロック／`<p:sp>`）単位で、段ごとには判定しない
  *   （22pt の枠の lvl2 だけが拡大されて親子が逆転するのを防ぐ）。
+ *   レシピに bodyMaxPt が無くても、テンプレがプリセット由来（メタ styleDensity を持つ）なら、プリセットが
+ *   倍率を掛けた枠だけに掛ける（#670・bodyMaxPtFor が 1 か所で決める。adjust_template・GUI・
+ *   get_deck_issues の倍率提案はすべて adjustTemplate を通るので、提案と適用の範囲が一致する＝R8）。
  *   run に直書きされた sz（静的ラベルの `<a:rPr sz>`）は対象外。容量見積りはマスターの sz を読む 1 経路の
  *   ままで、デッキ側に倍率を持たない（R8）。
  *
@@ -27,7 +30,9 @@
  * Pure engine logic (R2): JSZip + string surgery only, no DOM / Tauri.
  */
 import type JSZip from "jszip";
-import { loadTemplate } from "./template-loader";
+import { loadTemplate, type TemplateData } from "./template-loader";
+import { MASTER_BODY_PT } from "./template-writer";
+import type { StyleDensity } from "./style-meta";
 import { placeholderRole } from "./template-catalog";
 import { rewriteThemeFonts } from "./faithful-remake";
 import { loadZipSafe, readEntryString, ZIP_LIMITS } from "./zip-safe";
@@ -43,7 +48,8 @@ export interface TemplateAdjustRecipe {
   fonts?: { latin?: FontMapEntry[]; ea?: FontMapEntry[]; scope?: FontScope };
   /** Per-class factor (1 = unchanged). Omitted class = 1. `bodyMaxPt`: the body factor only applies to
    *  body frames whose largest pre-scale size is ≤ this (pt); larger display frames keep their size.
-   *  Omitted = every body frame (the #570 behaviour). */
+   *  Omitted = decided by bodyMaxPtFor: a preset-derived template (meta styleDensity) keeps the preset's
+   *  scope (only the frames the preset scaled); any other template scales every body frame (#570). */
   scale?: Partial<Record<SizeClass, number>> & { bodyMaxPt?: number };
 }
 
@@ -78,14 +84,36 @@ function fontMap(entries: FontMapEntry[] | undefined): Map<string, string> {
   return m;
 }
 
-/** Normalised size step: undefined when every class is 1 (no size change at all). */
+/** Validated per-class factors: undefined when every class is 1 (no size change at all). The body cap is
+ *  decided later by bodyMaxPtFor (it may depend on the template's meta). */
 function sizeStep(scale: TemplateAdjustRecipe["scale"]): SizeStep | undefined {
   const f = { title: scale?.title ?? 1, body: scale?.body ?? 1, other: scale?.other ?? 1 };
   for (const v of Object.values(f)) scaleSz(100, v); // validate (throws RangeError)
   const cap = scale?.bodyMaxPt;
   if (cap !== undefined && !(Number.isFinite(cap) && cap > 0)) throw new RangeError(`bodyMaxPt must be a positive number: ${cap}`);
   if (f.title === 1 && f.body === 1 && f.other === 1) return undefined;
-  return cap === undefined ? { f } : { f, bodyMaxSz: Math.round(cap * 100) };
+  // bodyMaxPt is only validated here; the cap itself is resolved by bodyMaxPtFor (it also reads the meta — R8).
+  return { f };
+}
+
+/**
+ * 本文倍率を掛ける枠の上限（pt）＝本文の大きさの帯（基準 14pt の 1.5 倍）。これを超える枠は大数字・
+ * ステートメントなど表示用サイズで、幅は基準サイズ前提のため倍率を掛けると溢れる（PR #635 裁定 B）。
+ */
+export const PRESET_BODY_MAX_PT = MASTER_BODY_PT * 1.5;
+
+/**
+ * 本文倍率の適用範囲（上限 pt・undefined＝全枠）を決める唯一の関数（#670・R8）。
+ *  - レシピが bodyMaxPt を持てばそれ。
+ *  - 無く、テンプレがプリセット由来（メタ styleDensity あり）なら、プリセットが倍率を掛けた枠＝倍率前
+ *    PRESET_BODY_MAX_PT 以下だった枠を、今の bytes の大きさで表した上限（PRESET_BODY_MAX_PT を
+ *    bodyPt ÷ MASTER_BODY_PT 倍・scaleSz と同じ丸め）。生の 21pt を今の bytes に当てると、プリセットが
+ *    21pt を超えて拡大済みの本文枠（Executive の 18→25.5pt 等）まで外れてしまう（#670 の実測）。
+ *  - どちらも無ければ undefined（従来どおり全枠・プリセット由来でないテンプレは不変）。
+ */
+export function bodyMaxPtFor(scale: TemplateAdjustRecipe["scale"], density: StyleDensity | undefined): number | undefined {
+  if (scale?.bodyMaxPt !== undefined) return scale.bodyMaxPt;
+  return density ? scaleSz(PRESET_BODY_MAX_PT * 100, density.bodyPt / MASTER_BODY_PT) / 100 : undefined;
 }
 
 /** Replace `typeface="X"` in a tag when X is in the map (theme tokens like `+mj-lt` never are). */
@@ -173,8 +201,7 @@ export function scaleStylePart(
 }
 
 /** Per layout file number: placeholder (type|idx) → class, from the loader's placeholderRole. */
-async function layoutClasses(bytes: ArrayBuffer | Uint8Array): Promise<Map<number, Map<string, SizeClass>>> {
-  const tpl = await loadTemplate(bytes);
+function layoutClasses(tpl: TemplateData): Map<number, Map<string, SizeClass>> {
   const out = new Map<number, Map<string, SizeClass>>();
   for (const l of tpl.layouts) {
     const m = new Map<string, SizeClass>();
@@ -273,7 +300,7 @@ export async function adjustTemplate(bytes: ArrayBuffer | Uint8Array, recipe: Te
   const latin = fontMap(recipe.fonts?.latin);
   const ea = fontMap(recipe.fonts?.ea);
   const inline = (recipe.fonts?.scope ?? "theme+inline") === "theme+inline";
-  const f = sizeStep(recipe.scale);
+  let f = sizeStep(recipe.scale);
   const copy = () => new Uint8Array(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   if (isNoopRecipe(recipe)) return copy();
 
@@ -283,7 +310,13 @@ export async function adjustTemplate(bytes: ArrayBuffer | Uint8Array, recipe: Te
     const theme = await readEntryString(zip, THEME_PART, ZIP_LIMITS.xmlEntry);
     changed = put(zip, THEME_PART, theme, rewriteThemeFontMap(theme, latin, ea)) || changed;
   }
-  const classes = f ? await layoutClasses(bytes) : undefined;
+  let classes: Map<number, Map<string, SizeClass>> | undefined;
+  if (f) {
+    const tpl = await loadTemplate(bytes);
+    classes = layoutClasses(tpl);
+    const cap = bodyMaxPtFor(recipe.scale, tpl.styleDensity);
+    if (cap !== undefined) f = { ...f, bodyMaxSz: Math.round(cap * 100) };
+  }
   const parts = Object.keys(zip.files).filter((p) => MASTER_RE.test(p) || LAYOUT_RE.test(p)).sort();
   for (const path of parts) {
     const before = await readEntryString(zip, path, ZIP_LIMITS.xmlEntry);

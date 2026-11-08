@@ -16,7 +16,7 @@
 import { BUILTIN_LAYOUTS, type LayoutDef, type PaletteKey } from "./template-layout-library";
 import { PRESET_LAYOUTS } from "./template-layout-library-style";
 import { writeTemplate, MIDNIGHT_PALETTE, MASTER_BODY_PT, SLIDE_W, type TemplateSpec } from "./template-writer";
-import { adjustTemplate, type TemplateAdjustRecipe } from "./template-adjust";
+import { adjustTemplate, PRESET_BODY_MAX_PT, type TemplateAdjustRecipe } from "./template-adjust";
 import { withStyleDensityMeta, hasDensityTargets, type StyleDensity } from "./style-meta";
 
 export type { StyleDensity } from "./style-meta";
@@ -117,11 +117,8 @@ export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] 
   return { name: preset.name, fonts: { ...preset.fonts }, palette: { ...preset.palette }, layouts, ...(preset.flatContent ? { flatContent: true } : {}) };
 }
 
-/**
- * 本文倍率を掛ける枠の上限（pt）＝本文の大きさの帯（基準 14pt の 1.5 倍）。これを超える枠は大数字・
- * ステートメントなど表示用サイズで、幅は基準サイズ前提のため倍率を掛けると溢れる（PR #635 裁定 B）。
- */
-export const PRESET_BODY_MAX_PT = MASTER_BODY_PT * 1.5;
+/** 本文倍率を掛ける枠の上限（PR #635 裁定 B）。定義は template-adjust.ts（適用範囲の 1 か所・#670）。 */
+export { PRESET_BODY_MAX_PT };
 
 /** 密度のうちサイズ分を #570 の変換レシピに落とす（基準どおりなら空＝無変換）。倍率は本文の帯の枠だけ。 */
 export function presetRecipe(preset: StylePreset): TemplateAdjustRecipe {
