@@ -15,6 +15,8 @@
  * the table) instead of dropping it, so this notice now fires ONLY when a 2nd table is present.
  * #412: the `<!-- col -->` path reports the same kind when a later column's table replaces an earlier
  * column's ("last wins" there — the earlier table and the rest of its column are what's lost).
+ * #392 段 1: every table now survives in SlideIR `figures`, so the parser no longer emits table-dropped /
+ * image-dropped / meta-key-dropped. The kinds stay because the review-rule ids are MCP-visible (段 3).
  *
  * `image-dropped` / `meta-key-dropped`: sub-classifications of a table-dropped leftover — the
  * discarded content happened to be SHAPED like an image line / an unrecognized `Key: Value` line.
@@ -24,10 +26,9 @@
  * swallows the raw line before it can become a paragraph does the PARSER have to report it.
  */
 /*
- * `figure-dropped` (#391): a 2nd+ figure of the SAME kind (```diagram, or a flowchart ```mermaid that
- * graduates to a diagram / a non-flowchart ```mermaid image) replaced an earlier one on the slide —
- * only ONE diagram and ONE mermaid image survive per slide today ("last wins"), so the earlier
- * figure is discarded. Only the parser sees the replaced block, hence a notice (same as table-dropped).
+ * (`figure-dropped` #391 was a parser notice for a 2nd figure of one kind overwriting the 1st. #392 段 1
+ * keeps every figure in SlideIR `figures`, so the parser no longer drops one; the same review rule id
+ * is now derived from the DeckIR by deck-diagnostics while 2nd+ figures are not yet drawn.)
  */
 /*
  * `pre-separator-dropped` (#451): on a grouped slide (`<!-- col -->` / kpi / step / card / compare /
@@ -40,7 +41,6 @@ export type ParseNoticeKind =
   | "table-dropped"
   | "image-dropped"
   | "meta-key-dropped"
-  | "figure-dropped"
   | "pre-separator-dropped";
 
 export interface ParseNotice {

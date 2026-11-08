@@ -4,7 +4,8 @@
  * template-less one (md-serializer.ts). Split from md-serializer.ts for R1. Pure logic (R2).
  */
 
-import type { SlideIR, PlaceholderContent, Paragraph } from "./slide-schema";
+import type { SlideIR, PlaceholderContent, Paragraph, FigureBlock } from "./slide-schema";
+import { slideFigures } from "./slide-figures";
 import { serializeInline } from "./md-inline";
 import { tableToMarkdown } from "./md-table";
 import { orderedNumbers, listItemLine } from "./list-markers";
@@ -91,47 +92,62 @@ export function getPlaceholderText(slide: SlideIR, idx: string): string | undefi
   return serializeParagraphs(ph.paragraphs);
 }
 
-// ── Column-scoped vs. single-body table (#100) ──
+// ── Column-scoped vs. single-body figures (#100 / #392) ──
 
-/** Whether `slide.table` sits in its OWN region distinct from every OTHER real body region on the
- *  slide (another text placeholder, or a diagram/mermaid, at a DIFFERENT idx) — i.e. genuinely
- *  column-scoped. Vs. being the slide's ONLY body content, merely (mis)pinned to a
- *  Column/KPI/Process layout NAME — which must still serialize single-body (group-roundtrip.test.ts
- *  #4), else the parser would re-absorb it into a manufactured column on the next round-trip. A
- *  slide with no OTHER region is indistinguishable from that mis-pin case, so it stays single-body —
- *  a reasonable degenerate-edge collapse, not a data loss (the table's rows survive either way).
- *  Shared by both serializer readouts (R8: one calculation). */
-export function isColumnScopedTable(slide: SlideIR): boolean {
-  if (!slide.table) return false;
-  const tableIdx = parseInt(slide.table.placeholderIdx);
-  const diagIdx = slide.diagram ? parseInt(slide.diagram.placeholderIdx) : NaN;
-  const mermIdx = slide.mermaidBlock ? parseInt(slide.mermaidBlock.placeholderIdx) : NaN;
-  // Body-region idxs only (1-10, the same range the column loops below iterate) — a raw /^\d+$/
-  // test would also match the title/subtitle idxs ("15"/"16"/"0"), wrongly counting a plain title
-  // as an "other region" and column-scoping a table that's really the slide's only body content.
-  const isBodyIdx = (idx: string) => /^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 10;
-  return (
-    slide.placeholders.some((p) => isBodyIdx(p.idx) && parseInt(p.idx) !== tableIdx) ||
-    (!Number.isNaN(diagIdx) && diagIdx !== tableIdx) ||
-    (!Number.isNaN(mermIdx) && mermIdx !== tableIdx)
+const isBodyIdx = (idx: string) => /^\d+$/.test(idx) && Number(idx) >= 1 && Number(idx) <= 10;
+
+/** The figures a separator (column) readout writes into their own column: every diagram/mermaid, plus
+ *  each table that is COLUMN-SCOPED — sitting in its own region distinct from some OTHER real body
+ *  region on the slide (a text placeholder, or another column figure, at a DIFFERENT idx). A table that
+ *  is the slide's ONLY body content, merely (mis)pinned to a Column/KPI/Process layout NAME, is not:
+ *  it must still serialize single-body (group-roundtrip.test.ts #4), else the parser would re-absorb it
+ *  into a manufactured column on the next round-trip. Body-region idxs only (1-10, the range the column
+ *  loops iterate) — the title/subtitle idxs ("15"/"16"/"0") never count as an "other region".
+ *  Shared by both serializer readouts (R8: one calculation); the list itself comes from slideFigures. */
+export function columnFigures(slide: SlideIR, all: FigureBlock[] = slideFigures(slide)): FigureBlock[] {
+  const figs = all.filter((f) => f.kind === "diagram" || f.kind === "mermaid" || f.kind === "table");
+  return figs.filter((f) =>
+    f.kind !== "table" ||
+    slide.placeholders.some((p) => isBodyIdx(p.idx) && parseInt(p.idx) !== parseInt(f.placeholderIdx)) ||
+    figs.some((g) => g !== f && parseInt(g.placeholderIdx) !== parseInt(f.placeholderIdx)),
   );
 }
 
-// ── Single-body FIGURE (table / diagram / mermaid / code) → its fenced Markdown block ──
-// A table/diagram/mermaid/code is a slide-level, single-body figure — it is NOT tied to the layout
-// name. Emitting it must happen in EVERY layout branch (title / separator / single-body), else a
-// figure slide mis-pinned to a Title or a Column/KPI/Process layout serializes to nothing (silent
-// data loss that also blinds the AI to the figure it must preserve). Column-scoped diagrams/mermaid
-// in a separator layout are handled per-column separately; this is only the single-body form.
+/** Whether the slide must serialize as ONE body even on a separator layout: a code block or a body
+ *  image (never column-scoped), a table that is not column-scoped, or two figures sharing one column
+ *  (the parser reads one figure per column, #392). Shared by both readouts (R8). */
+export function singleBodyFigure(slide: SlideIR): boolean {
+  const all = slideFigures(slide); // one list, so `cols.includes(f)` compares the same objects
+  const cols = columnFigures(slide, all);
+  const idxs = cols.map((f) => parseInt(f.placeholderIdx));
+  return (
+    all.some((f) => f.kind === "code" || f.kind === "image" || (f.kind === "table" && !cols.includes(f))) ||
+    new Set(idxs).size !== idxs.length
+  );
+}
+
+// ── Body FIGURES (table / diagram / mermaid / code / image) → their Markdown blocks ──
+// A figure is slide-level, NOT tied to the layout name. Emitting it must happen in EVERY layout branch
+// (title / separator / single-body), else a figure slide mis-pinned to a Title or a Column/KPI/Process
+// layout serializes to nothing (silent data loss that also blinds the AI to the figure it must preserve).
+
+/** One figure's Markdown block (the parser reads each back into the same kind). */
+export function figureMd(f: FigureBlock): string {
+  switch (f.kind) {
+    case "table": return tableToMarkdown(f.rows);
+    case "diagram": return "```diagram\n" + f.yaml + "\n```";
+    case "mermaid": return "```mermaid\n" + f.mermaid + "\n```";
+    case "code": return "```" + (f.lang ?? "") + "\n" + f.content + "\n```";
+    case "image": return imageLine(f);
+  }
+}
+
+/** The single-body form: every body figure in slideFigures order (#392: source order), blank-line
+ *  separated, or null. A BEHIND image is a backmost layer, not a body figure — it is emitted SEPARATELY
+ *  (md-serializer) alongside the text/figures, never replacing them. */
 export function figureBlock(slide: SlideIR): string | null {
-  if (slide.table) return tableToMarkdown(slide.table.rows);
-  if (slide.diagram) return "```diagram\n" + slide.diagram.yaml + "\n```";
-  if (slide.mermaidBlock) return "```mermaid\n" + slide.mermaidBlock.mermaid + "\n```";
-  if (slide.code) return "```" + (slide.code.lang ?? "") + "\n" + slide.code.content + "\n```";
-  // A BEHIND image is a backmost layer, not a body figure — it does NOT occupy the body region, so it
-  // is emitted SEPARATELY (behindImageLine) alongside the text/figure, never replacing them.
-  if (slide.image && !slide.image.behind) return imageLine(slide.image);
-  return null;
+  const blocks = slideFigures(slide).map(figureMd);
+  return blocks.length > 0 ? blocks.join("\n\n") : null;
 }
 
 // ── Speaker notes (#150 / ADR-0032 D1) → `<!-- note -->` + Markdown body ──

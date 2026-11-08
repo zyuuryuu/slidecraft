@@ -4,11 +4,12 @@
  * inline runs (md-inline), and embedded diagram/mermaid figures. Split out
  * of md-parser.ts (R1); md-parser owns front-matter + block-splitting orchestration.
  */
-import type { SlideIR, DiagramBlock, MermaidBlock, TableBlock, CodeBlock, ImageBlock, PlaceholderContent, Paragraph } from "./slide-schema";
+import type { SlideIR, DiagramBlock, MermaidBlock, ImageBlock, PlaceholderContent, Paragraph, FigureBlock } from "./slide-schema";
 import { isSafeImageSrc } from "./slide-schema";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { detectSeparator, splitBySeparator, trimBodyLines } from "./md-separators";
-import { findTableInLines, extractBodyTable } from "./md-body-table";
+import { findTableInLines, extractBodyTables } from "./md-body-table";
+import { figureFields } from "./slide-figures";
 import { isTitleNamespace, metaFieldIdx, TITLE_NS, CONTENT_NS, type LayoutRoleLookup } from "./slide-roles";
 import type { ParseNotice } from "./parse-notice";
 import { levelFromIndent, measureIndent } from "./paragraph-nesting";
@@ -26,13 +27,10 @@ import { extractSlideMarker, splitQuoteAttribution } from "./slide-markers";
  * modelled, so it stays as a mermaid-image fallback. Keeps a single render path for
  * the common case while nothing breaks for the rest.
  */
-function mermaidToFigure(
-  mmd: string,
-  placeholderIdx: string,
-): { diagram?: DiagramBlock; mermaidBlock?: MermaidBlock } {
+function mermaidToFigure(mmd: string, placeholderIdx: string): FigureBlock {
   const spec = mermaidToDiagramSpec(mmd);
-  if (spec) return { diagram: { yaml: diagramSpecToYaml(spec), placeholderIdx } };
-  return { mermaidBlock: { mermaid: mmd, placeholderIdx } };
+  if (spec) return { kind: "diagram", yaml: diagramSpecToYaml(spec), placeholderIdx } satisfies DiagramBlock & { kind: "diagram" };
+  return { kind: "mermaid", mermaid: mmd, placeholderIdx } satisfies MermaidBlock & { kind: "mermaid" };
 }
 
 // Title-slide metadata (Category/Date/Footer) → idx is defined in slide-roles (metaFieldIdx), the
@@ -240,20 +238,11 @@ export function parseSlideBlock(
   let subtitle: string | undefined;
   const bodyLines: string[] = [];
   const titleFields: Record<string, string> = {};
-  let diagram: DiagramBlock | undefined;
-  let mermaidBlock: MermaidBlock | undefined;
-  let code: CodeBlock | undefined;
-  let image: ImageBlock | undefined;
-  // Declared here (not just in the standard-parse path below) so the separator branch can ALSO
-  // bind a column-scoped GFM table (#100) — mirroring how diagram/mermaidBlock are shared.
-  let table: TableBlock | undefined;
-  // #391: only ONE diagram / ONE mermaid image survives per slide — a later one of the same kind
-  // replaces the earlier ("last wins", unchanged until side-by-side placement lands). Report it.
-  const setFigure = (f: { diagram?: DiagramBlock; mermaidBlock?: MermaidBlock }) => {
-    if ((f.diagram && diagram) || (f.mermaidBlock && mermaidBlock)) notices?.push({ kind: "figure-dropped" });
-    if (f.diagram) diagram = f.diagram;
-    else mermaidBlock = f.mermaidBlock;
-  };
+  // #392: every body visual (diagram / mermaid / table / code / non-behind image) with its source
+  // position, sorted at the end → `figures` (≥2) + the first-of-kind singular fields (slide-figures).
+  // Nothing of the same kind is overwritten any more (the #391/#412 "last wins" drops are gone).
+  const visuals: { f: FigureBlock; pos: number }[] = [];
+  let image: ImageBlock | undefined; // the slide's FIRST image line (body image or behind backdrop)
   // #397/#398 field rows (`Takeaway:` / `Source:`) → their own canonical content (field-rows.ts), never
   // body. Repeated rows of one kind stack as paragraphs (no silent drop). Namespace-neutral (unlike meta).
   const fieldRows: { kind: FieldKind; value: string }[] = [];
@@ -339,14 +328,13 @@ export function parseSlideBlock(
       // of text — bind it to THIS column's idx so the figure coexists beside the other columns.
       const fig = extractFencedBlock(sl);
       if (fig && (fig.lang === "diagram" || fig.lang === "mermaid-shapes")) {
-        setFigure({ diagram: { yaml: fig.content, placeholderIdx: colIdx } });
+        visuals.push({ f: { kind: "diagram", yaml: fig.content, placeholderIdx: colIdx }, pos: i });
       } else if (fig && fig.lang === "mermaid") {
-        setFigure(mermaidToFigure(fig.content, colIdx));
+        visuals.push({ f: mermaidToFigure(fig.content, colIdx), pos: i });
       } else {
         const found = findTableInLines(sl);
         if (found) {
-          if (table) notices?.push({ kind: "table-dropped" }); // #412: one table per slide — the earlier column's is replaced
-          table = { rows: found.rows, header: true, placeholderIdx: colIdx };
+          visuals.push({ f: { kind: "table", rows: found.rows, header: true, placeholderIdx: colIdx }, pos: i });
         } else {
           const paras = linesToParagraphs(sl, { cellHeading: true });
           if (paras.length > 0) placeholders.push({ idx: colIdx, paragraphs: paras });
@@ -354,8 +342,11 @@ export function parseSlideBlock(
       }
     });
     pushFieldRows();
+    // The hoisted image (a body image, not a backdrop) is a visual too — after the columns (its own line).
+    if (image && !image.behind) visuals.push({ f: { kind: "image", ...image }, pos: sections.length });
 
-    if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !image && !notes?.length) return null;
+    if (placeholders.length === 0 && visuals.length === 0 && !image && !notes?.length) return null;
+    const { diagram, mermaidBlock, table, figures } = figureFields(visuals.map((v) => v.f));
 
     return {
       layout,
@@ -364,6 +355,7 @@ export function parseSlideBlock(
       ...(mermaidBlock ? { mermaidBlock } : {}),
       ...(table ? { table } : {}),
       ...(image ? { image } : {}), // a 最背面 backdrop can ride a grouped slide too
+      ...(figures ? { figures } : {}),
       ...(notes?.length ? { notes } : {}),
       ...(sectionBreak ? { sectionBreak: true } : {}),
       // The separator KIND is a layout-selection hint (card → card layout, step → process). "col"
@@ -385,14 +377,16 @@ export function parseSlideBlock(
 
   // Commit the current fence's accumulated lines to diagram/mermaid/code. Shared by the closing-fence
   // branch AND the EOF flush (#89) so an UNCLOSED fence's content isn't silently dropped.
+  // Position = between the body lines collected so far (a table starting at that line sorts after it).
   const commitCodeBlock = () => {
+    const pos = bodyLines.length - 0.5;
     if (codeBlockLang === "diagram" || codeBlockLang === "mermaid-shapes") {
-      setFigure({ diagram: { yaml: codeBlockLines.join("\n"), placeholderIdx: "1" } });
+      visuals.push({ f: { kind: "diagram", yaml: codeBlockLines.join("\n"), placeholderIdx: "1" }, pos });
     } else if (codeBlockLang === "mermaid") {
-      setFigure(mermaidToFigure(codeBlockLines.join("\n"), "1"));
+      visuals.push({ f: mermaidToFigure(codeBlockLines.join("\n"), "1"), pos });
     } else if (codeBlockLines.length > 0) {
       // Any OTHER fence (```yaml / ```python / ```log / ```) is CODE/LOG — a monospace body.
-      code = { content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" };
+      visuals.push({ f: { kind: "code", content: codeBlockLines.join("\n"), lang: codeBlockLang || undefined, placeholderIdx: "1" }, pos });
     }
   };
 
@@ -462,10 +456,12 @@ export function parseSlideBlock(
 
     // ![alt](src) ALONE on a line → an embedded image (data URI or path). Fills body region 1.
     // An optional `{x=…,y=…,w=…,h=…,fit=cover,ar=…,behind=1}` suffix carries geometry/layer attrs (案B).
-    // Only the first one becomes the figure; further images fall through to body text.
+    // The first image line becomes the image (body or behind); #392: further BODY images join the
+    // visuals when the first was a body image too. Any other image line falls through to body text.
     const img = matchImageLine(trimmed);
-    if (img && !image) {
-      image = img;
+    if (img && (!image || (!image.behind && !img.behind))) {
+      image ??= img;
+      if (!img.behind) visuals.push({ f: { kind: "image", ...img }, pos: bodyLines.length - 0.5 });
       continue;
     }
 
@@ -502,8 +498,9 @@ export function parseSlideBlock(
   // is merged into idx "1" the same way plain body text is, appending to an EXISTING idx "1" (a
   // title layout's subtitle) rather than creating a duplicate the serializer would silently drop.
   const trimmedBody = trimBodyLines(bodyLines);
-  const { table: foundTable, leftover } = extractBodyTable(trimmedBody, notices);
-  if (foundTable) table = foundTable;
+  const { tables, leftover } = extractBodyTables(trimmedBody);
+  const lead = bodyLines.findIndex((l) => l.trim() !== ""); // trimBodyLines' offset into bodyLines
+  for (const t of tables) visuals.push({ f: { kind: "table", ...t.table }, pos: lead + t.start });
   if (leftover.length > 0) {
     const bodyParas = linesToParagraphs(leftover);
     const existing = placeholders.find((p) => p.idx === "1");
@@ -512,32 +509,30 @@ export function parseSlideBlock(
   }
   if (quote?.attribution) placeholders.push({ idx: "2", paragraphs: [{ segments: parseInline(quote.attribution) }] });
 
-  if (placeholders.length === 0 && !diagram && !mermaidBlock && !table && !code && !image && !notes?.length) return null;
+  if (placeholders.length === 0 && visuals.length === 0 && !image && !notes?.length) return null;
 
   // Diagram/mermaid + body text on one slide → put the visual in the 2nd region
   // (idx 2) so it sits BESIDE the bullets (idx 1) instead of replacing them.
-  const hasBodyText = placeholders.some((p) => p.idx === "1");
-  if (hasBodyText && diagram) {
-    diagram = { ...diagram, placeholderIdx: "2" };
-  } else if (hasBodyText && mermaidBlock) {
-    mermaidBlock = { ...mermaidBlock, placeholderIdx: "2" };
-  }
   // #390: a table / code block beside body text gets the same treatment — at idx 1 it would share the
   // bullets' region, where export skips (table) or overwrites (code) the text silently. Content
   // namespace only: in the title namespace idx 1 is the SUBTITLE, not a body region to sit beside.
-  if (hasBodyText && !isTitle) {
-    if (table) table = { ...table, placeholderIdx: "2" };
-    if (code) code = { ...code, placeholderIdx: "2" };
-  }
+  // #392: applied to EVERY visual of the kind, so the singular field and `figures` agree.
+  const hasBodyText = placeholders.some((p) => p.idx === "1");
+  const shift = (f: FigureBlock): FigureBlock =>
+    hasBodyText && (f.kind === "diagram" || f.kind === "mermaid" || (!isTitle && (f.kind === "table" || f.kind === "code")))
+      ? { ...f, placeholderIdx: "2" }
+      : f;
+  const ff = figureFields(visuals.sort((a, b) => a.pos - b.pos).map((v) => shift(v.f)));
 
   return {
     layout,
     placeholders,
-    diagram,
-    mermaidBlock,
-    ...(table ? { table } : {}),
-    ...(code ? { code } : {}),
+    diagram: ff.diagram,
+    mermaidBlock: ff.mermaidBlock,
+    ...(ff.table ? { table: ff.table } : {}),
+    ...(ff.code ? { code: ff.code } : {}),
     ...(image ? { image } : {}),
+    ...(ff.figures ? { figures: ff.figures } : {}),
     ...(notes?.length ? { notes } : {}),
     ...(sectionBreak ? { sectionBreak: true } : {}),
     ...(markerSplit.marker ? { groupKind: markerSplit.marker } : {}),
