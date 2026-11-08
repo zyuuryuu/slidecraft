@@ -201,7 +201,10 @@ describe("augmentAndVerify — gates per structure", () => {
         if (spec) {
           expect([e.groupKind, e.groupCount], a.name).toEqual([spec.kind, spec.count]);
           const shape = detectGroups(l)!;
-          expect(shape.groups.every((g) => g.map((s) => s.role).join("|") === "heading|body"), a.name).toBe(true);
+          // kpi: the synthesized value box (big font, on top) is tagged "value" and the label below it becomes
+          // the heading (#593 markKpiValue) — binding then puts the number in the big box. Others: heading|body.
+          const roles = spec.kind === "kpi" ? "value|heading" : "heading|body";
+          expect(shape.groups.every((g) => g.map((s) => s.role).join("|") === roles), a.name).toBe(true);
         }
         expectBijection(l);
       }

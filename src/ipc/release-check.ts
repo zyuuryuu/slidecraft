@@ -11,14 +11,28 @@ import { evaluateUpdate } from "../engine/release-version";
 
 const RELEASES_URL = "https://api.github.com/repos/zyuuryuu/slidecraft/releases/latest";
 
-/** Fetch the latest PUBLISHED (GitHub excludes drafts/prereleases from this endpoint) release tag.
- *  Throws on any failure — checkForUpdate is the non-throwing wrapper callers should use. */
-export async function fetchLatestReleaseTag(): Promise<string> {
+/** The latest published release: its tag and downloadable assets (name + browser download URL). */
+export interface LatestRelease {
+  tag: string;
+  assets: Array<{ name: string; url: string }>;
+}
+
+/** Fetch the latest PUBLISHED (GitHub excludes drafts/prereleases from this endpoint) release.
+ *  Throws on any failure. Also the source of the .mcpb download link (mcpb-asset.ts, #517). */
+export async function fetchLatestRelease(): Promise<LatestRelease> {
   const res = await appFetch(RELEASES_URL, { headers: { Accept: "application/vnd.github+json" } });
   if (!res.ok) throw new Error(`GitHub Releases API HTTP ${res.status}`);
-  const json = (await res.json()) as { tag_name?: unknown };
+  const json = (await res.json()) as { tag_name?: unknown; assets?: unknown };
   if (typeof json.tag_name !== "string" || !json.tag_name) throw new Error("GitHub Releases API: missing tag_name");
-  return json.tag_name;
+  const assets = (Array.isArray(json.assets) ? json.assets : []).flatMap((a: { name?: unknown; browser_download_url?: unknown }) =>
+    typeof a?.name === "string" && typeof a.browser_download_url === "string" ? [{ name: a.name, url: a.browser_download_url }] : [],
+  );
+  return { tag: json.tag_name, assets };
+}
+
+/** The latest published release tag. Throws on any failure — checkForUpdate is the non-throwing wrapper. */
+export async function fetchLatestReleaseTag(): Promise<string> {
+  return (await fetchLatestRelease()).tag;
 }
 
 export type UpdateCheckResult =
