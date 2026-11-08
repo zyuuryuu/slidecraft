@@ -268,9 +268,14 @@ fn choose_parallel(gguf: &Path) -> (u32, u32) {
     const MARGIN_MB: u64 = 1536; // OS + runtime headroom
     const MAX_SLOTS: u32 = 3; // cap (the observed acceptable parallelism)
 
-    let mut sys = sysinfo::System::new();
-    sys.refresh_memory();
-    let avail_mb = sys.available_memory() / 1024 / 1024;
+    // sysinfo ≥0.40: System::new() is fallible. On failure assume no headroom (→ 1 slot).
+    let avail_mb = sysinfo::System::new()
+        .ok()
+        .map(|mut sys| {
+            sys.refresh_memory();
+            sys.available_memory() / 1024 / 1024
+        })
+        .unwrap_or(0);
     let weights_mb = std::fs::metadata(gguf).map(|m| m.len() / 1024 / 1024).unwrap_or(6144);
 
     let mut slots = 1u32;
