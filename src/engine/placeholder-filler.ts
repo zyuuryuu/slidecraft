@@ -16,6 +16,7 @@ import { buildCatalog, isSectionFooterTarget } from "./template-catalog";
 import { bindContentByRole } from "./placeholder-binding";
 import { bodyPlaceholders, nthBody, imagePlaceholder, imageRect, drawnImage, visualOccupancy } from "./visual-placement";
 import { imageCaption, imageCaptionShapeXml, imageDescrAttr } from "./image-caption";
+import { planFieldRescue, applyFieldRescue, fieldNoteShapeXml } from "./field-rescue";
 import { isGroupedLayout, expandGroups, groupCellOverlay } from "./group-binding";
 import { isEmptyOverlay, paintGroupOverlay, withLeftInset } from "./group-overlay";
 import { beforeAfterOverlay, beforeAfterShapesXml } from "./before-after";
@@ -148,9 +149,12 @@ async function buildSlideXml(
   // convention binds correctly (an alien master's title/body idxs match through their role).
   // A grouped slide (card/step/kpi) fills the layout's per-group heading/body slots via the SEPARATE
   // group path; everything else uses the canonical binder. Same Map shape → the loop below is unchanged.
-  const contentFor = slide.groupKind && isGroupedLayout(layout)
+  const bound = slide.groupKind && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
     : bindContentByRole(slide, layout.placeholders);
+  // #597: slot-less Category/Takeaway rows merged as text, a slot-less Source drawn as a note (field-rescue).
+  const rescue = planFieldRescue(slide, layout, bound);
+  const contentFor = applyFieldRescue(bound, rescue);
   // Group-cell decorations (#400 heading icons / #401 current-step frame) from the same pass.
   const overlay = slide.groupKind && isGroupedLayout(layout) ? groupCellOverlay(slide, layout) : undefined;
 
@@ -250,6 +254,7 @@ async function buildSlideXml(
     ? imageCaption(slide.image!, imageBox!, imagePlaceholder(layout.placeholders, slide.image!.placeholderIdx)?.style.fontColor)
     : undefined;
   if (caption) { shapes += imageCaptionShapeXml(id, caption); id++; }
+  if (rescue.note) { shapes += fieldNoteShapeXml(id, rescue.note); id++; }
 
   if (overlay && !isEmptyOverlay(overlay)) {
     const r = renumberShapeIds(await paintToShapeXml((t) => paintGroupOverlay(t, overlay)), id);

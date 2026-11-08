@@ -148,9 +148,18 @@
     "repairPlanHeader": "This template can't be used as-is:\n{{blocks}}\n\n",
     "repairPlanProposal": "Auto-repair proposal: assign types to {{total}} placeholder(s) in total ({{parts}}).\n",
     "repairPlanConfirm": "Format and import it?",
-    "augmentColumns": "{{n}}-column",
-    "augmentSize": "{{n}} columns {{from}}→{{to}}pt",
-    "augmentPlan": "Adds the {{what}} layout(s) this template lacks, built from the layout \"{{base}}\".\nThe look (fonts, colors, decorations, footer) is inherited from this template; body text is sized down for the narrower columns ({{sizes}}).\nExisting layouts are not changed.\n\nAugment the template?",
+    "augmentStructure": {
+      "columns-2": "2-column",
+      "columns-3": "3-column",
+      "compare-2": "comparison (2 options)",
+      "card-3": "3 cards",
+      "kpi-3": "3 KPIs",
+      "kpi-4": "4 KPIs"
+    },
+    "augmentSize": "{{label}} {{from}}→{{to}}pt",
+    "augmentSizeGroup": "{{label}} body {{from}}→{{to}}pt, heading {{head}}pt",
+    "augmentPlan": "Adds the {{what}} layout(s) this template lacks, built from the layout \"{{base}}\".\nThe look (fonts, colors, decorations, footer) is inherited from this template; body text is sized down for the narrower columns ({{sizes}}).\nExisting layouts are not changed.{{skipped}}\n\nAugment the template?",
+    "augmentPlanSkipped": "\nNot added (already present): {{list}}",
     "augmentFailed": "Template augmentation was cancelled (it did not pass the checks): {{reason}}"
   },
   "builtinRuntime": {

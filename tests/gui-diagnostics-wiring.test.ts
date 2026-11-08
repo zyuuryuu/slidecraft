@@ -24,7 +24,9 @@ import type { DeckIR, SlideIR } from "../src/engine/slide-schema";
 const GIJUTSU = resolve(__dirname, "../public/templates/slide/技術報告_スタンダード水色_TemplateOnly.pptx");
 
 // #397 のフィールド行つきスライド。枠の無いテンプレでは callout が未束縛になる。
-const TAKEAWAY_MD = "# 売上は回復基調\n\n- 3Q は前年比 +12%\n- 新規顧客が牽引\n\nTakeaway: 結論はこれ";
+// #597 以降、本文のあるスライドの Takeaway は「本文先頭の太字行」に救済される（info）ため、救済先の
+// 本文が無いカードスライドで未束縛（warn）の配線を固定する（tests/field-row-rescue.test.tsx 参照）。
+const TAKEAWAY_MD = "# 売上は回復基調\n\n<!-- card -->\n### 3Q\n- 前年比 +12%\n\n<!-- card -->\n### 新規\n- 顧客が牽引\n\nTakeaway: 結論はこれ";
 const HEALTHY_MD = "# 売上は回復基調\n\n- 3Q は前年比 +12%\n- 新規顧客が牽引";
 
 /** index-0 の表紙 coercion を避けるため、対象スライドを 3 枚デッキの中央に置く（field-rows.test と同じ）。 */

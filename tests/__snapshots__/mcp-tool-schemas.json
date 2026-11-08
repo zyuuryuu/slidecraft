@@ -1,4 +1,19 @@
 {
+  "adjust_template": {
+    "type": "object",
+    "properties": {
+      "recipe": {
+        "type": "string"
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "recipe"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
   "apply_design_intent": {
     "type": "object",
     "properties": {
@@ -26,6 +41,36 @@
       "index",
       "intent"
     ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "augment_template": {
+    "type": "object",
+    "properties": {
+      "structures": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "columns-2",
+            "columns-3",
+            "compare-2",
+            "card-3",
+            "kpi-3",
+            "kpi-4"
+          ]
+        }
+      },
+      "rule": {
+        "type": "string",
+        "enum": [
+          "steps",
+          "ratio"
+        ]
+      },
+      "docId": {
+        "type": "string"
+      }
+    },
     "$schema": "http://json-schema.org/draft-07/schema#"
   },
   "bootstrap": {

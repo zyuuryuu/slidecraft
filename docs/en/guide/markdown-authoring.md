@@ -120,7 +120,16 @@ Points to remember:
 - Unlike `Category:` and the other meta keys, a field row does not turn the slide into a title-type slide.
 - They also work on slides with region separators (`<!-- col -->` / `<!-- card -->` …): the row belongs to the whole slide, not to the last region.
 - A `Source:` line inside a code fence stays code.
-- If the template (or the pinned layout) has no box for the row, the row is **not exported**. MCP `get_deck_issues` warns that the layout has no box for the `Takeaway:` row (showing it in the app's diagnostics panel is tracked in #419). Move it into the body, or use a template that has the box.
+- If the template (or the pinned layout) has no box for the row, the row is exported at a **fixed fallback place** instead (#597), and `get_deck_issues` reports one info (`field-row-rescued`). Templates that have the box keep putting the row in it.
+
+  | Row | Where it goes when there is no box |
+  | --- | --- |
+  | `Source:` | A small (9pt) one-line note "出典：…" drawn right under the content (body, table, figure or cards). No second "出典：" is added when the value already starts with 出典 |
+  | `Takeaway:` | Added as a bold first line of the body |
+  | `Category:` (cover) | Added as one more line at the end of the subtitle (in the subtitle's place when there is no subtitle) |
+
+- When there is no fallback place either (e.g. `Takeaway:` on a cards/KPI-only slide — there is no body to add it to), the row is **not exported** and `get_deck_issues` warns that the layout has no box for the `Takeaway:` row. Move it into the body, or use a template that has the box.
+- The fallback is for export and preview only. In Markdown the row stays a `Source:` (etc.) row; reading the deck back does not mix it into the body.
 
 ## Category line `Kicker:`
 
@@ -137,11 +146,30 @@ Kicker: SECTION 02 · コスト分析
 
 Things to know:
 
-- **The canonical layouts (the Midnight Executive input sample under `samples/templates/`, and templates made with "create a new template") have a content layout with a Kicker box, `Content.1Body.Single+1Kicker`**: writing a `Kicker:` row picks that layout automatically and draws the row above the title. The built-in templates (技術報告 [default] / ビジュアルデッキ / 配布資料) do not have the box yet — there the row is not exported, as above, and `get_deck_issues` warns that the layout has no box for the `Kicker:` row. The AI guide (`get_authoring_guide`) mentions `Kicker:` only for templates that have the box.
+- **The canonical layouts (the Midnight Executive input sample under `samples/templates/`, and templates made with "create a new template") have a content layout with a Kicker box, `Content.1Body.Single+1Kicker`**: writing a `Kicker:` row picks that layout automatically and draws the row above the title. The built-in templates (技術報告 [default] / ビジュアルデッキ / 配布資料) do not have the box yet — there the row is not exported (`Kicker:` has no fallback place), and `get_deck_issues` warns that the layout has no box for the `Kicker:` row. The AI guide (`get_authoring_guide`) mentions `Kicker:` only for templates that have the box.
 - **The category line of a title slide is still `Category:`.** Writing `Kicker:` does not turn a slide into a title slide, and `Category:` keeps its meaning.
 - **To show which chapter a slide belongs to, use a chapter cover's `<!-- section -->` (below)**: on templates with a footer box, each slide from a chapter cover onward gets its chapter's name in the footer automatically. Use `Kicker:` for a label other than the chapter name.
 
 ---
+
+## Official documents and reports (numbered headings, notes, sources)
+
+These forms, common in official documents and reports, render as intended (measured in #597):
+
+| What you want | How to write it | Result |
+| --- | --- | --- |
+| Numbered slide title | `# 1. 調査の概要` / `# 1.1 背景` | Becomes the title, number included |
+| Numbered sub-heading inside a slide | `### 1.2 目的` | A sub-heading line |
+| "1.1 …" in the body | `1.1 背景` or `- 1.1 背景` | Shown literally (not auto-numbered) |
+| Auto-numbered list | `1. item` / indented `1. sub-item` | A PowerPoint auto-numbered list |
+| Notes | `※ 数値は 10 月時点` / `※1 …` / `注）…` | Ordinary paragraphs |
+| Source | `Source: 総務省 2025` | Goes into the source box; on a template without one, a small "出典：" line under the content (table above) |
+
+Watch out for:
+
+- Write slide titles with `#`. `## 2. 対応方針` is read as a **subtitle**, leaving the slide without a title (`get_deck_issues` reports a missing title).
+- Write sources as `Source:` (ASCII). A line written as `出典：…` is treated as **ordinary body text** and does not go into the source box or the source line (it is not an alias, so existing Markdown keeps exporting as before).
+- `1. ` at the start of a body line becomes an auto-numbered item. To show "1." as plain text, continue the number (`1.1`) or use `（1）`.
 
 ## GFM tables
 

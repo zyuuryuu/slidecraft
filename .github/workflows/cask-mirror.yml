@@ -1,0 +1,146 @@
+# Mirror the Homebrew cask after a release is published — Issue #288.
+#
+# Each release used to need two manual steps: (1) refresh the canonical cask's sha256 to the real dmg
+# and PR it, (2) hand-copy it into the tap repo `zyuuryuu/homebrew-slidecraft` (what `brew install`
+# actually reads). This workflow does both after publish:
+#
+#   update-cask.mjs   download the PUBLISHED dmg and rewrite version + sha256 (only possible post-publish)
+#   verify-cask.mjs   hard gate: the rewritten cask must match the published SHA256SUMS (#287), else fail
+#                     and mirror nothing
+#   mirror-cask.mjs   write the cask into a clone of the tap, then commit + push it there
+#                     (needs secret HOMEBREW_TAP_TOKEN; missing → explicit warning + skip, run stays green)
+#   gh pr create      the canonical cask goes to main via a PR (main is protected — never pushed directly)
+#
+# Lives outside release.yml on purpose: release.yml only builds a DRAFT; the dmg URL and SHA256SUMS this
+# needs exist only once a human publishes it (which is also why verify-cask is not in release.yml).
+# workflow_dispatch re-runs it for an already-published version (e.g. after adding the secret).
+name: Cask Mirror
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published version to mirror, without the leading v (e.g. 0.5.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write # push the cask/v<version> branch for the canonical-cask PR
+  pull-requests: write # open that PR
+
+concurrency:
+  group: cask-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # The PR targets the default branch, so start from it (a release event checks out the tag).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 20
+      # No npm ci: the cask scripts are dependency-free Node.
+
+      - name: Resolve version
+        id: v
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION:-${TAG#v}}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Cannot mirror '$version' — expected a published x.y.z version (tag '$TAG')." >&2
+            exit 1
+          fi
+          if [ "$PRERELEASE" = "true" ]; then
+            msg="v$version is a prerelease — the Homebrew cask tracks stable releases only; nothing mirrored."
+            echo "::notice::$msg"
+            printf '### Cask mirror skipped\n\n%s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Update the canonical cask from the published dmg
+        if: steps.v.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: node scripts/update-cask.mjs "$VERSION"
+
+      # Hard gate (#287): a cask whose sha256 does not match the published SHA256SUMS fails the run
+      # here, before anything is pushed anywhere.
+      - name: Verify the cask against the published SHA256SUMS
+        if: steps.v.outputs.skip != 'true'
+        run: node scripts/verify-cask.mjs
+
+      - name: Mirror to the tap (zyuuryuu/homebrew-slidecraft)
+        if: steps.v.outputs.skip != 'true'
+        shell: bash
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            msg="HOMEBREW_TAP_TOKEN is not set — skipped pushing v$VERSION to zyuuryuu/homebrew-slidecraft. brew users keep the previous version until the tap is updated. Add the secret (see packaging/homebrew/README.md) and re-run this workflow with version=$VERSION."
+            echo "::warning::$msg"
+            printf '### Tap mirror skipped\n\n%s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          tap="$RUNNER_TEMP/homebrew-slidecraft"
+          git clone --depth 1 "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/zyuuryuu/homebrew-slidecraft.git" "$tap"
+          node scripts/mirror-cask.mjs "$tap"
+          cd "$tap"
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::notice::Tap cask already at v$VERSION — nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/slidecraft.rb
+          git commit -m "slidecraft $VERSION"
+          git push origin HEAD
+          printf '### Tap mirrored\n\nPushed Casks/slidecraft.rb (v%s) to zyuuryuu/homebrew-slidecraft.\n' "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      # The canonical cask reaches main through a PR (main is protected). A branch that already exists
+      # (re-run) is left alone rather than force-pushed.
+      - name: Open a PR for the canonical cask
+        if: steps.v.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.event.repository.default_branch }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          cask=packaging/homebrew/Casks/slidecraft.rb
+          if git diff --quiet -- "$cask"; then
+            echo "::notice::Canonical cask on $BASE is already at v$VERSION — no PR needed."
+            exit 0
+          fi
+          branch="cask/v$VERSION"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "::warning::Branch $branch already exists — not re-pushing it; finish or close its PR."
+            exit 0
+          fi
+          git switch -c "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$cask"
+          git commit -m "chore: update Homebrew cask to v$VERSION"
+          git push -u origin "$branch"
+          gh pr create --base "$BASE" --head "$branch" \
+            --title "chore: update Homebrew cask to v$VERSION" \
+            --body "Automated by the Cask Mirror workflow (#288) after v$VERSION was published: version + sha256 rewritten by \`scripts/update-cask.mjs\` and checked against the published SHA256SUMS by \`scripts/verify-cask.mjs\`.
+
+          Note: this PR was opened with the workflow's GITHUB_TOKEN, and GitHub does not start other workflows (CI \`test\`, Verify Cask) for events it creates — see packaging/homebrew/README.md for how to get the required check to run."
