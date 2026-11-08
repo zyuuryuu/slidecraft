@@ -10,11 +10,13 @@ import { useTranslation } from "react-i18next";
 import type { SlideIR } from "../engine/slide-schema";
 import type { LayoutInfo } from "../engine/template-loader";
 import { buildFieldMap, applyFieldEdit } from "../engine/placeholder-binding";
-import { bodyPlaceholders, nthBody, imagePlaceholder, imageEditGeometry, SLIDE_IN } from "../engine/visual-placement";
+import { visualOccupancy, slideImagePlaceholder, slideImageEditGeometry, SLIDE_IN } from "../engine/visual-placement";
+import { removeFirstImage } from "../engine/slide-figure-edit";
 import { groupEditorPlan } from "../engine/group-binding";
 import { paragraphsToText, textToParagraphs } from "../engine/field-text";
 import { shiftBulletIndent } from "../engine/bullet-indent-shift";
 import DiagramEditor from "./DiagramEditor";
+import FigureList from "./FigureList";
 
 interface SlideEditorProps {
   slide: SlideIR;
@@ -126,29 +128,16 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
       ? buildFieldMap(slide, layout.placeholders)
       : slide.placeholders.map((p) => ({ phIdx: p.idx, contentIdx: p.idx }));
 
-  // Which RAW placeholder idxs are occupied by a diagram/mermaid/table? Each rides the Nth BODY
-  // placeholder, and its placeholderIdx is a 1-based body ORDINAL — NOT a raw idx. Resolve it via
-  // nthBody (exactly as the preview + export do), else on a gapped-body layout (bodies at [1,3]) the
-  // editor would show a text field OVER the diagram's box and silently drop what you type on export.
-  const bodyPhs = layout ? bodyPlaceholders(layout.placeholders) : [];
-  const visualIdx = new Set(
-    [
-      slide.diagram && nthBody(bodyPhs, slide.diagram.placeholderIdx)?.idx,
-      slide.mermaidBlock && nthBody(bodyPhs, slide.mermaidBlock.placeholderIdx)?.idx,
-      slide.table && nthBody(bodyPhs, slide.table.placeholderIdx)?.idx,
-      slide.code && nthBody(bodyPhs, slide.code.placeholderIdx)?.idx,
-      // A BEHIND image occupies no placeholder → don't suppress any field (the body text stays editable).
-      slide.image && !slide.image.behind && layout && imagePlaceholder(layout.placeholders, slide.image.placeholderIdx)?.idx,
-    ].filter((x): x is string => !!x),
-  );
-  // The concrete placeholder the image is bound to (role-resolved, as the preview/export do) — so the
-  // form can say WHICH placeholder holds it, not just that an image exists. B: a real PICTURE frame
-  // (type="pic") wins when the master has one; else it resolves to the body region as before.
-  const imagePh = slide.image && !slide.image.behind && layout ? imagePlaceholder(layout.placeholders, slide.image.placeholderIdx) : undefined;
+  // The placeholders a visual takes over (every visual, #392 段 3 — not only the first of each kind): the
+  // SAME placement the preview + export use (visualOccupancy, R8). A text field there would sit OVER the
+  // visual and what you type would be hidden on export. A behind image occupies none (body stays editable).
+  const visualIdx = new Set(layout ? visualOccupancy(slide, layout.placeholders).keys() : []);
+  // The placeholder the (first) image is drawn in (placed as the export does) — so the form can say WHICH.
+  const imagePh = slide.image && !slide.image.behind && layout ? slideImagePlaceholder(slide, layout.placeholders) : undefined;
   // Fine-tune geometry (案B): the manual rect override, else the resolved placeholder box (a behind
   // image rides the SAME box as a body figure — normal size, just at the back). Editing promotes to rect.
-  // The SAME edit geometry the preview drag uses (imageEditGeometry — front and behind, #122 / R8).
-  const imgGeom = slide.image ? imageEditGeometry(slide.image, layout?.placeholders ?? []) : undefined;
+  // The SAME edit geometry the preview drag uses (slideImageEditGeometry — front and behind, #122 / R8).
+  const imgGeom = slideImageEditGeometry(slide, layout?.placeholders ?? []);
   const imgBox = imgGeom?.box;
   const imgAspect = imgGeom?.aspect;
   const updateImageRect = (k: "x" | "y" | "w" | "h", val: number) => {
@@ -315,6 +304,9 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
         );
       })}
 
+      {/* #392 段 3: 2 つ以上のビジュアルの順序・削除・2 つ目以降の図の編集（単一ビジュアルでは出ない） */}
+      <FigureList slide={slide} onChange={onChange} />
+
       {/* Diagram / Mermaid editor with mode switching */}
       {(slide.diagram || slide.mermaidBlock) && (
         <DiagramEditor
@@ -342,7 +334,7 @@ export default function SlideEditor({ slide, layout, layoutNames, resolvedLayout
             </div>
             <button
               type="button"
-              onClick={() => { const next = { ...slide }; delete next.image; onChange(next); }}
+              onClick={() => onChange(removeFirstImage(slide))}
               title={t("slideEditor.deleteImage")}
               className="w-6 h-6 flex items-center justify-center rounded bg-field border border-edge text-fg2 hover:bg-danger hover:text-on-accent text-xs shrink-0"
             >

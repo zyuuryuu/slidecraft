@@ -19,7 +19,7 @@ import { slideBindingPlan } from "./group-binding";
 import { contentBodyBox, packParagraphs, paragraphLines } from "./distill";
 import { IMAGE_MARKDOWN_RE, unrecognizedMetaKey, type SlideParseNotice } from "./parse-notice";
 import { sectionFooterFor } from "./deck-sections";
-import { visualOccupancy, visualCollisions, figureRegions, type VisualKind } from "./visual-placement";
+import { visualOccupancy, visualCollisions, figureRegions, unboundVisuals, type VisualKind } from "./visual-placement";
 import { placedFigures } from "./figure-placement";
 import { tableOverflow } from "./table-fit"; // #436/#444: the SAME judgment the auto pick uses (R8)
 import { isBlankParagraphs, contentHead } from "./placeholder-binding";
@@ -213,10 +213,11 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       const regions = figureRegions(slide, layout.placeholders);
 
       // #392 段 2 never-silent: on a slide with 2+ visuals, one this layout has no region for is not drawn
-      // (it stays in the Markdown). A lone visual keeps its historical solo/region handling.
-      const lostFigs = regions.length >= 2 ? regions.filter((r) => !r.ph) : [];
+      // (it stays in the Markdown) — unboundVisuals is that ONE judgment (段 3, R8). A lone visual keeps its
+      // historical handling (no diagnostic here).
+      const lostFigs = regions.length >= 2 ? unboundVisuals(slide, layout.placeholders) : [];
       if (lostFigs.length > 0) {
-        const what = [...new Set(lostFigs.map((r) => FIGURE_KIND_LABEL[r.figure.kind]))].join("・");
+        const what = [...new Set(lostFigs.map((r) => FIGURE_KIND_LABEL[r.kind]))].join("・");
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "figure-dropped", level: RULE_LEVEL["figure-dropped"], message: `${what}（${lostFigs.length}個）はこのレイアウト（${layout.name}）に置き場（本文の枠）が無く、出力（PPTX/プレビュー）に描画されません（Markdown には保持されます）。枠の多いレイアウトにするか、スライドを分けてください`, levers: ["split"] });
       }
 

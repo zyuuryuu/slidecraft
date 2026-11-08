@@ -202,7 +202,9 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
     expect(s.deck!.slides[1].figures).toEqual(old.figures);
     expect(s.deck!.slides[1]).toEqual(gui.slide);
   });
-  it("#392 D1: an edit that carries a visual is respected as before (the old figures list is not carried)", async () => {
+  // #392 段 3 (per-figure carry, replaces the 段 1 D1 minimum "an edit with its own visual drops the old
+  // figures list"): the edit's i-th visual of a kind replaces the old i-th; the old ones it omits stay put.
+  it("#392 段 3: an edit that carries only the 1st of 2 diagrams replaces the 1st and keeps the 2nd on both doors", async () => {
     const s = S.createSession(null);
     await S.newProject(s, templateBytes, TWO_DIAGS);
     const old = s.deck!.slides[1];
@@ -210,10 +212,110 @@ describe("#220 agreement: apply_slide_markdown (MCP) ≡ reconcileSlideEdit (GUI
     const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
     expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
     const after = s.deck!.slides[1];
-    expect(after.figures).toBeUndefined();
-    expect(slideFigures(after).map((f) => f.kind)).toEqual(["diagram"]);
+    const ids = slideFigures(after).map((f) => (f.kind === "diagram" ? f.yaml.match(/id: (\w+)/)![1] : f.kind));
+    expect(ids).toEqual(["solo", "two"]);
     expect(after.diagram?.yaml).toContain("id: solo");
     expect(after).toEqual(gui.slide);
+  });
+  const TABLE_TWO_DIAGS = TWO_DIAGS.replace("# 中身\n\n", "# 中身\n\n| k | v |\n|---|---|\n| a | 1 |\n\n");
+  it("#392 段 3: an edit that keeps only the table carries both diagrams in their old places on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TABLE_TWO_DIAGS);
+    const old = s.deck!.slides[1];
+    expect(slideFigures(old).map((f) => f.kind)).toEqual(["table", "diagram", "diagram"]);
+    const edit = "# 中身\n\n| k | v |\n|---|---|\n| a | 9 |";
+    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
+    const after = s.deck!.slides[1];
+    expect(slideFigures(after).map((f) => f.kind)).toEqual(["table", "diagram", "diagram"]);
+    expect(after.table?.rows[1]).toEqual(["a", "9"]);
+    expect(slideFigures(after).slice(1)).toEqual(slideFigures(old).slice(1));
+    expect(after).toEqual(gui.slide);
+  });
+  it("#392 段 3: an edit that carries every visual in a new order is taken as is (its order wins) on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TABLE_TWO_DIAGS);
+    const old = s.deck!.slides[1];
+    const d = (id: string) => "```diagram\ntype: flowchart\nnodes:\n  - id: " + id + "\n    label: " + id.toUpperCase() + "\n```";
+    const edit = `# 中身\n\n${d("one")}\n\n| k | v |\n|---|---|\n| a | 1 |\n\n${d("two")}`;
+    const gui = reconcileSlideEdit(old, edit, tplOf(s))!;
+    expect(S.applySlideMarkdown(s, 1, edit).ok).toBe(true);
+    const after = s.deck!.slides[1];
+    expect(slideFigures(after).map((f) => f.kind)).toEqual(["diagram", "table", "diagram"]);
+    expect(after).toEqual(gui.slide);
+  });
+
+  // #392 段 3: set_slide_diagram `figure` (MCP) ≡ applyFigureYaml's target (GUI) — the n-th figure
+  // (diagram / Mermaid, source order). Omitted = the first diagram, else the first Mermaid (as before).
+  it("#392 段 3: figure 2 replaces only the 2nd diagram, the same on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TABLE_TWO_DIAGS);
+    const old = s.deck!.slides[1];
+    const gui = applyFigureYaml(old, NEW_YAML, undefined, 2);
+    const r = S.setDiagram(s, 1, NEW_YAML, "yaml", undefined, 2);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.created).toBe(false);
+    const after = s.deck!.slides[1];
+    expect(after).toEqual(gui);
+    const ys = slideFigures(after).map((f) => (f.kind === "diagram" ? f.yaml : f.kind));
+    expect(ys[0]).toBe("table");
+    expect(ys[1]).toContain("id: one");
+    expect(ys[2]).toBe(NEW_YAML);
+    expect(previewFigureEdit(old, NEW_YAML, undefined, 2)).toEqual({ beforeMd: figureFence(old, 2), afterMd: "```diagram\n" + NEW_YAML + "\n```" });
+    expect(figureFence(old, 2)).toContain("id: two");
+  });
+  it("#392 段 3: figure omitted on a 2-diagram slide = the 1st (unchanged); figure 1 is the same", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TWO_DIAGS);
+    const old = s.deck!.slides[1];
+    expect(applyFigureYaml(old, NEW_YAML, undefined, 1)).toEqual(applyFigureYaml(old, NEW_YAML));
+    S.setDiagram(s, 1, NEW_YAML, "yaml");
+    expect(s.deck!.slides[1]).toEqual(applyFigureYaml(old, NEW_YAML));
+    expect(s.deck!.slides[1].diagram?.yaml).toBe(NEW_YAML);
+    expect(slideFigures(s.deck!.slides[1])[1]).toEqual(slideFigures(old)[1]);
+  });
+  it("#392 段 3: figure out of range — MCP rejects (never-silent, nothing saved), the GUI target returns null", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, TWO_DIAGS);
+    const deckBefore = s.deck;
+    const r = S.setDiagram(s, 1, NEW_YAML, "yaml", undefined, 3);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("1..2");
+    expect(s.deck).toBe(deckBefore);
+    expect(applyFigureYaml(deckBefore!.slides[1], NEW_YAML, undefined, 3)).toBeNull();
+  });
+  // #392 段 3 review: on a [Mermaid, diagram] slide the numbering puts Mermaid at 1, but an OMITTED figure
+  // targets the first DIAGRAM (diagram before Mermaid, as before 段 3) — not "figure 1". Pins the wording
+  // in server.ts / guides.ts / docs to the implementation, on both doors.
+  const MERMAID_THEN_DIAG = "# 表紙\n\n---\n\n# 中身\n\n```mermaid\ngantt\n  title x\n```\n\n```diagram\ntype: flowchart\nnodes:\n  - id: one\n    label: ONE\n```";
+  it("#392 段 3: [Mermaid, diagram] with figure omitted replaces the diagram (= figure 2), Mermaid untouched, on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, MERMAID_THEN_DIAG);
+    const old = s.deck!.slides[1];
+    expect(slideFigures(old).map((f) => f.kind)).toEqual(["mermaid", "diagram"]);
+    const gui = applyFigureYaml(old, NEW_YAML);
+    expect(gui).toEqual(applyFigureYaml(old, NEW_YAML, undefined, 2));
+    const r = S.setDiagram(s, 1, NEW_YAML, "yaml");
+    expect(r.ok && r.created).toBe(false);
+    const after = s.deck!.slides[1];
+    expect(after).toEqual(gui);
+    expect(slideFigures(after).map((f) => f.kind)).toEqual(["mermaid", "diagram"]);
+    expect(slideFigures(after)[0]).toEqual(slideFigures(old)[0]);
+    expect(after.diagram?.yaml).toBe(NEW_YAML);
+  });
+  it("#392 段 3: [Mermaid, diagram] with figure 1 replaces the Mermaid, the diagram untouched, on both doors", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, templateBytes, MERMAID_THEN_DIAG);
+    const old = s.deck!.slides[1];
+    const gui = applyFigureYaml(old, NEW_YAML, undefined, 1);
+    const r = S.setDiagram(s, 1, NEW_YAML, "yaml", undefined, 1);
+    expect(r.ok && r.created).toBe(false);
+    const after = s.deck!.slides[1];
+    expect(after).toEqual(gui);
+    const figs = slideFigures(after);
+    expect(figs.map((f) => f.kind)).toEqual(["diagram", "diagram"]);
+    expect(figs[0].kind === "diagram" && figs[0].yaml).toBe(NEW_YAML);
+    expect(figs[1]).toEqual(slideFigures(old)[1]);
   });
   // Was a KNOWN DIVERGENCE (MCP stored the broken YAML). 裁定 B3: neither door stores it — the GUI keeps the
   // old valid figure + an advisory (its adoption gate), MCP rejects the whole edit (never-silent, nothing saved).
@@ -297,6 +399,21 @@ describe("#220 B3 through the MCP envelope (set_slide_markdown)", () => {
     expect(r.data).toMatchObject({ ok: true, changed: true });
     expect(String(r.data!.afterMd)).toContain("| a | b |");
     expect(String(r.data!.afterMd)).toContain("表は消した");
+  });
+
+  it("#392 段 3: set_slide_diagram {figure: 2} replaces the 2nd diagram through the envelope; out of range → ok:false", async () => {
+    const c = await client();
+    const d = (id: string) => "```diagram\ntype: flowchart\nnodes:\n  - id: " + id + "\n    label: " + id + "\n```";
+    await call(c, "new_project", { templateBase64: templateBytes.toString("base64"), markdown: `# 表紙\n\n---\n\n# 中身\n\n${d("one")}\n\n${d("two")}` });
+    const r = await call(c, "set_slide_diagram", { index: 1, source: NEW_YAML, format: "yaml", figure: 2 });
+    expect(r.data).toMatchObject({ ok: true, changed: true, created: false });
+    const md = String(r.data!.afterMd);
+    expect(md).toContain("id: one");
+    expect(md).not.toContain("id: two");
+    expect(md.indexOf("id: one")).toBeLessThan(md.indexOf("id: b"));
+    const bad = await call(c, "set_slide_diagram", { index: 1, source: NEW_YAML, format: "yaml", figure: 3 });
+    expect(bad.data).toMatchObject({ ok: false });
+    expect(String(bad.data!.error)).toContain("1..2");
   });
 });
 

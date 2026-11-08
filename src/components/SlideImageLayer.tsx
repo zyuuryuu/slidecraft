@@ -14,7 +14,7 @@
 import { useRef, useState } from "react";
 import type { SlideIR, ImageRect, ImageBlock } from "../engine/slide-schema";
 import type { PlaceholderInfo } from "../engine/template-loader";
-import { imagePlaceholder, imageObjectFit, imageEditGeometry } from "../engine/visual-placement";
+import { imageObjectFit, slideImagePlaceholder, slideImageEditGeometry } from "../engine/visual-placement";
 import { imageCaption } from "../engine/image-caption";
 import { startImageGesture, moveImageGesture, endImageGesture, type ImageDragMode, type ImageGesture } from "./image-gesture";
 
@@ -52,10 +52,11 @@ export function useSlideImageLayer({ slide, layoutPhs, scale, isActive, onImageR
   const img = slide.image;
   const behind = !!img?.behind;
   // A body figure is editable only when it resolved to a placeholder; a behind image always has a box.
-  const placed = !!img && (behind || !!imagePlaceholder(layoutPhs, img.placeholderIdx));
+  // #392 段 3: resolved as the export places it (slideImagePlaceholder), not by the stored placeholderIdx.
+  const placed = !!img && (behind || !!slideImagePlaceholder(slide, layoutPhs));
   const imgEditable = !!(isActive && onImageRectChange && img && placed);
   // The SAME edit geometry as the form's numeric X/Y/W/H (aspect locked identically on resize).
-  const aspect = img ? imageEditGeometry(img, layoutPhs).aspect : 1;
+  const aspect = slideImageEditGeometry(slide, layoutPhs)?.aspect ?? 1;
 
   const pct = (box: ImageRect): React.CSSProperties => ({
     left: `${(box.x / slideW) * 100}%`,

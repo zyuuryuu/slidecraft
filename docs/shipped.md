@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **#392（複数ビジュアル）段 3 — GUI・MCP の追随** — ビジュアルの一覧の書き込みを `slide-figure-edit.withFigures` の 1 本に（読みの `slideFigures` の逆・正は単数フィールド）。SlideEditor は 2 つ以上のスライドだけに一覧（順序・削除・2 つ目以降の図の編集）を出し、全ビジュアルの枠に本文欄を出さない（`visualOccupancy`）。MCP `set_slide_diagram` に `figure`（何番目の図か）。テキスト編集の引き継ぎは図ごと（`carryFigures`・MCP と GUI の一致テスト）。画像の編集枠と出典行のキャプション高さも配置に追随。`.scft` は旧形式のまま正しい（migrate 不要） （#392 段 3・2026-11-08）
 - **#392（複数ビジュアル）段 2 — 2 つ目以降のビジュアルも別々の枠に描く** — 1 スライドの図・表・コード・画像を出現順に別々の body 枠へ置く（ordinal 解決は `figure-placement.placedFigures` の 1 経路・SlideIR は不変）。表＋図の重なり（#434）を構造的に解消、図×2 は `Chart.2Chart.Equal`（無ければ 2 カラム）、本文＋ビジュアルは Column.2/3Body へ。PPTX・プレビュー／HTML・診断が同じ配置を読む（R8）。枠が足りないものだけ info `figure-dropped`。単一ビジュアルのスライドは PPTX・HTML とも byte-identical （#392 段 2・2026-11-08）
 - **UX ゲート（ADR-0039・ADR-0031 の G4）** — 「UX が良い」の定義は ISO 9241-11（効果・効率・満足）、原則は ISO 9241-110:2020 の 7 原則に Nielsen／Shneiderman／Norman を対応づけた 1 枚（`docs/design/ux-principles.md`）。法則（Hick・Fitts・Miller–Cowan・段階的開示・認知負荷・WCAG 2.2）から導いた UX 予算を `tests/ux-budget.test.tsx` の ratchet で守り（常設ボタン ≤7・帯 1 本・区画 ≤4・記号 1 対 1・ネスト ≤2・i18n 漏れは現在値凍結）、GUI の PR はヒューリスティック評価（重大度 3 以上はマージ阻害）、PR テンプレに「UX への影響」欄 （ADR-0039・PR #647・#648／PR #651・2026-11-08）
 - **#392（複数ビジュアル）段 1 — SlideIR に `figures[]`** — 1 スライドに同種 2 つ目以降のビジュアル（図・Mermaid・表・コード・画像）を `figures`（全件出現順・2 件以上のときだけ・背面画像は含まない）で保持し、md へ出現順で書き戻す。`slideFigures()` が唯一の列挙経路（R8）。描画は段 2 までされないが `figure-dropped`（info）で告知。テキストだけの編集でも `figures` を引き継ぐ。単一ビジュアルは段 0 の固定テストで byte-identical （#392 段 1・PR #636・2026-11-08）
