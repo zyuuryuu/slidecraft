@@ -19,8 +19,8 @@ import type { ThemeConfig } from "./theme";
 import { parseDiagramYaml } from "./diagram-node-shrink";
 import { chartSpecToNativeChart, nativeChartRect, type NativeChart } from "./pptx-native-chart";
 
-/** slide rels 上の chart の関係 ID。1 slide に図は高々 1 つなので固定でよい（画像 rId2/3・notes rId4・
- *  リンク rId5〜 と衝突しない名前にする）。 */
+/** slide rels 上の chart の関係 ID（画像 rId2/3・notes rId4・リンク rId5〜 と衝突しない名前）。1 枚目の chart は
+ *  これ、#392 段 2 で同じスライドに 2 つ目以降があれば rIdChart2, rIdChart3 …（placeholder-filler が付け替える）。 */
 export const CHART_REL_ID = "rIdChart";
 
 const CHART_REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
@@ -100,13 +100,13 @@ export function maxChartNumber(zip: JSZip): number {
 
 /** パーツを chart{n} としてデッキへ書き込む。返り値は slide rels に足す Relationship と
  *  [Content_Types] に足す Override（xlsx の Default は呼び出し側が XLSX_CT で宣言する）。 */
-export function writeNativeChart(zip: JSZip, parts: NativeChartParts, n: number): { slideRel: string; ctOverride: string } {
+export function writeNativeChart(zip: JSZip, parts: NativeChartParts, n: number, relId = CHART_REL_ID): { slideRel: string; ctOverride: string } {
   const wb = `Microsoft_Excel_Worksheet${n}.xlsx`;
   zip.file(`ppt/charts/chart${n}.xml`, parts.chartXml);
   zip.file(`ppt/charts/_rels/chart${n}.xml.rels`, parts.chartRelsXml.replace(WORKBOOK_TOKEN, wb));
   zip.file(`ppt/embeddings/${wb}`, parts.workbook);
   return {
-    slideRel: `<Relationship Id="${CHART_REL_ID}" Type="${CHART_REL_TYPE}" Target="../charts/chart${n}.xml"/>`,
+    slideRel: `<Relationship Id="${relId}" Type="${CHART_REL_TYPE}" Target="../charts/chart${n}.xml"/>`,
     ctOverride: `<Override PartName="/ppt/charts/chart${n}.xml" ContentType="${CHART_CT}"/>`,
   };
 }
