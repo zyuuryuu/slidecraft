@@ -83,6 +83,8 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
     sharedOnly: aiClient,
     templates,
     onMutated: (entry, _tool, opId, changedIndices) => broadcast("deckChanged", deckChangedPayload(entry, opId, aiClient ? "ai" : "gui", changedIndices)),
+    // #616: deck unchanged, template replaced → the SAME deckChanged with templateChanged:true (案 A: no new notification).
+    onTemplateChanged: (entry) => broadcast("deckChanged", deckChangedPayload(entry, undefined, aiClient ? "ai" : "gui", undefined, { templateName: entry.session.meta.templateName })),
     notifyOpened: (entry) => broadcast("documentOpened", { docId: entry.docId, title: entry.title, slideCount: entry.session.deck?.slides.length ?? 0 }),
     notifyClosed: (docId) => broadcast("documentClosed", { docId }),
   });
