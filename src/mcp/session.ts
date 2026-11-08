@@ -396,12 +396,12 @@ export function validate(s: Session) {
 }
 
 // ── persist / export (caller decides base64-over-stdio vs writing under --root) ──
-export async function saveProjectBytes(s: Session): Promise<Uint8Array> {
+/** #633: markSaved=false is a READ (the collab GUI's pull) — the same bytes, but dirty/savedAt stay untouched. */
+export async function saveProjectBytes(s: Session, markSaved = true): Promise<Uint8Array> {
   const { deck, template } = requireLoaded(s);
   const savedAt = new Date().toISOString();
   const bytes = await bundleProject(deck, template, { templateName: s.meta.templateName, savedAt });
-  s.meta = { ...s.meta, savedAt };
-  s.dirty = false;
+  if (markSaved) { s.meta = { ...s.meta, savedAt }; s.dirty = false; }
   return bytes;
 }
 

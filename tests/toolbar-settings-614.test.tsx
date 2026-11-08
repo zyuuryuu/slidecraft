@@ -3,7 +3,7 @@
  *
  *  1. 上部バーのボタンは ↶ ↷ ｜ ファイル 📝原稿 🎨マスター ｜ ✨AI ⚙ の順。
  *     言語（JA/EN）・テーマ（🌙☀◐）・ヘルプ（?）はバーに直接並べず、⚙ のメニューに入れる。
- *  2. ⚙ のメニューから、言語・テーマ・ヘルプ・AI の接続設定に届く。
+ *  2. ⚙ のメニューから、言語・テーマ・ヘルプ・AI 接続設定に届く。
  *  3. ✨ は AI の機能だけに使う（目次の生成・更新通知には使わない）。
  *  4. ＋ は「追加」だけ：マスターの取り込みは 📥、Re-make は 🔁（取り込み結果の帯と同じアイコン）。
  *     📝 は原稿だけ：ファイル → Markdown の書き出しは 📄。
@@ -86,7 +86,7 @@ describe("#614 上部バー: 文書の操作だけ", () => {
   });
 });
 
-describe("#614 ⚙ のメニュー: 言語・テーマ・ヘルプ・AI の接続設定", () => {
+describe("#614 ⚙ のメニュー: 言語・テーマ・ヘルプ・AI 接続設定", () => {
   const panel = (p: Partial<Parameters<typeof SettingsPanel>[0]> = {}) =>
     renderToStaticMarkup(<SettingsPanel onClose={noop} onHelp={noop} onAiSettings={noop} {...p} />);
 
@@ -100,16 +100,16 @@ describe("#614 ⚙ のメニュー: 言語・テーマ・ヘルプ・AI の接�
     expect(html).toContain("配色");
   });
 
-  it("ヘルプ（ドキュメント）と AI の接続設定への入口がある", () => {
+  it("ヘルプ（ドキュメント）と AI 接続設定への入口がある", () => {
     const b = buttons(panel());
     expect(b).toContain("? ヘルプ（ドキュメント）");
-    expect(b).toContain("✨ AI の接続設定…");
+    expect(b).toContain("✨ AI 接続設定"); // #653: 呼び名は aiSettings.title の 1 キー
   });
 
   it("入口が渡されないときは、その項目を出さない", () => {
     const b = buttons(panel({ onHelp: undefined, onAiSettings: undefined }));
     expect(b.some((x) => x.includes("ヘルプ"))).toBe(false);
-    expect(b.some((x) => x.includes("AI の接続設定"))).toBe(false);
+    expect(b.some((x) => x.includes("AI 接続設定"))).toBe(false);
   });
 });
 
