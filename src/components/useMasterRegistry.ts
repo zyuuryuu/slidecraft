@@ -29,6 +29,8 @@ export const BUILTIN_MASTERS: readonly BuiltinDef[] = [
   { id: "builtin-gijutsu", name: "技術報告 スタンダード水色", url: "/templates/slide/技術報告_スタンダード水色_TemplateOnly.pptx" },
   { id: "builtin-koubunsho", name: "配布資料 公文書高密度", url: "/templates/slide/配布資料_公文書高密度_TemplateOnly.pptx" },
   { id: "builtin-magazine", name: "ビジュアルデッキ マガジン", url: "/templates/slide/ビジュアルデッキ_マガジン_TemplateOnly.pptx" },
+  // #595: writer プリセット PITCH_PRESET の出力（scripts/gen-preset-templates.ts で再生成）。
+  { id: "builtin-pitch", name: "セールスピッチ Pitch", url: "/templates/slide/セールスピッチ_Pitch_TemplateOnly.pptx" },
 ];
 const BUILTIN_URLS: ReadonlyMap<string, string> = new Map(BUILTIN_MASTERS.map((b) => [b.id, b.url]));
 const BUILTIN_ENTRIES: MasterEntry[] = BUILTIN_MASTERS.map((b) => ({ id: b.id, name: b.name, builtin: true }));
