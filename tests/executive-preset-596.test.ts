@@ -5,7 +5,7 @@
  * 10 枚のまま（自動分割ゼロ）・消失系 0・巨大 KPI と Ask 締めが意図のレイアウトに入る・本文 4 行のスライドに
  * 密度 info が 1 件（既定テンプレでは 0 件）。
  * 加えて: 出荷 .pptx と全レイアウト見本 fixture は writePresetTemplate／generatePptx から決定論的に再生成でき、
- * 中身（全パートの名前＋内容）が一致する（golden）。生成手順は scripts/make-executive-template.ts。
+ * 中身（全パートの名前＋内容）が一致する（golden）。生成手順は scripts/gen-preset-templates.ts（PRESET_ARTIFACTS・#672）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -24,11 +24,13 @@ import { generatePptx } from "../src/engine/placeholder-filler";
 import { BUILTIN_MASTERS } from "../src/components/useMasterRegistry";
 import * as S from "../src/mcp/session";
 import type { SlideIR, PlaceholderContent } from "../src/engine/slide-schema";
-import { buildExecutiveFixture, EXECUTIVE_FIXTURE_MD } from "../scripts/make-executive-template";
+import { PRESET_ARTIFACTS, buildShowcase } from "../scripts/gen-preset-templates";
 
 const ROOT = resolve(__dirname, "..");
 const SHIPPED = resolve(ROOT, "public/templates/slide/エグゼクティブ_Executive_TemplateOnly.pptx");
 const FIXTURE = resolve(__dirname, "fixtures/templates/エグゼクティブ_Executive_全レイアウト見本.pptx");
+const ARTIFACT = PRESET_ARTIFACTS.find((a) => a.preset === EXECUTIVE_PRESET)!;
+const EXECUTIVE_FIXTURE_MD = readFileSync(resolve(ROOT, ARTIFACT.showcaseMarkdown), "utf8");
 const SAMPLE = readFileSync(resolve(ROOT, "samples/manuscript-06-executive-brief.md"), "utf8");
 
 /** 中身の指紋: 全パートの名前＋内容（zip のエントリ日時は含めない）。 */
@@ -241,7 +243,7 @@ describe("全レイアウト見本 fixture（golden）", () => {
   });
 
   it("committed fixture は再生成と中身が一致（出力の固定）", async () => {
-    expect(await contentDigest(readFileSync(FIXTURE))).toBe(await contentDigest(await buildExecutiveFixture(tpl)));
+    expect(await contentDigest(readFileSync(FIXTURE))).toBe(await contentDigest(await buildShowcase(ARTIFACT, shipped)));
   });
 
   it("generatePptx は決定論的（2 回生成して中身が一致）", async () => {

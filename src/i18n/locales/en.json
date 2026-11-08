@@ -649,7 +649,12 @@
     "buttonTitle": "Settings (language, theme, help, AI connection)",
     "language": "Language",
     "theme": "Theme",
+    "displaySection": "Display",
+    "aiHelpSection": "AI & help",
     "help": "Help (documentation)"
+  },
+  "menu": {
+    "opensDialog": "{{title}}…"
   },
   "toolbar": {
     "undo": "Undo (⌘/Ctrl+Z)",
@@ -664,6 +669,7 @@
     "draft": "📝 Draft",
     "openProject": "Open Project",
     "saveProject": "Save Project",
+    "projectSection": "Project",
     "exportSection": "Export",
     "transition": "Transition",
     "transitionGroup": "HTML transition",

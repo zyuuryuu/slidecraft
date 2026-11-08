@@ -30,8 +30,8 @@ beforeAll(async () => {
 });
 
 describe("#392 段 3: the old (singular-only) form needs no migration", () => {
-  it("v1 は今も現行版で、migrateProjectDeck は deck をそのまま返す", async () => {
-    expect(PROJECT_VERSION).toBe(1);
+  it("v1 → 現行版（#673 で v2）の移行は恒等で、migrateProjectDeck は deck をそのまま返す", async () => {
+    expect(PROJECT_VERSION).toBe(2); // #673: figures を含むデッキだけ v2（tests/project-scft-v2-673.test.ts）
     const raw = JSON.parse(await (await JSZip.loadAsync(readFileSync(FIXTURE))).file("deck.json")!.async("string"));
     expect(migrateProjectDeck(raw, 1)).toBe(raw);
   });
