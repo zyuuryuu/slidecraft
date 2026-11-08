@@ -6,10 +6,12 @@
  * 落として writeTemplate に渡す。幾何の正本は LayoutDef の 1 経路（R8）で、密度は既存の経路に乗せる:
  *   - bodyPt: #570 の adjustTemplate の本文倍率（bodyPt ÷ MASTER_BODY_PT）。第 2 のサイズ規則を作らない。
  *   - marginIn: LayoutDef の枠を左右方向に縮める純粋変換 withHorizontalMargin（既定 0.8in では恒等）。
- * 具体的なスタイル（Pitch / Executive / Campaign）は #595/#596/#598 で足す。そのスタイル別 LayoutDef は
- * presetToSpec の `library` に BUILTIN_LAYOUTS と並べて渡す。
+ * 具体的なスタイル（Pitch / Executive / Campaign）は #595/#596/#598 で足す。プリセット専用の LayoutDef
+ * （BUILTIN_LAYOUTS に入れると既存出力が変わるもの）は PRESET_LAYOUTS に置き、既定の `library`
+ * （PRESET_LIBRARY）から名前で引く。
  */
 import { BUILTIN_LAYOUTS, type LayoutDef, type PaletteKey } from "./template-layout-library";
+import { PRESET_LAYOUTS } from "./template-layout-library-style";
 import { writeTemplate, MIDNIGHT_PALETTE, MASTER_BODY_PT, SLIDE_W, type TemplateSpec } from "./template-writer";
 import { adjustTemplate, type TemplateAdjustRecipe } from "./template-adjust";
 
@@ -56,8 +58,11 @@ export function withHorizontalMargin(def: LayoutDef, marginIn: number): LayoutDe
   return { ...def, placeholders: def.placeholders.map((p) => ({ ...p, x: c + (p.x - c) * k, w: p.w * k })) };
 }
 
+/** プリセットが名前で引けるレイアウト全体: 内蔵（BUILTIN_LAYOUTS）＋プリセット専用（PRESET_LAYOUTS）。 */
+export const PRESET_LIBRARY: readonly LayoutDef[] = [...BUILTIN_LAYOUTS, ...PRESET_LAYOUTS];
+
 /** プリセット → TemplateSpec（レイアウトは `library` から名前で引き、余白を掛ける）。未知の名前は throw。 */
-export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] = BUILTIN_LAYOUTS): TemplateSpec {
+export function presetToSpec(preset: StylePreset, library: readonly LayoutDef[] = PRESET_LIBRARY): TemplateSpec {
   const byName = new Map(library.map((d) => [d.name, d] as const));
   const layouts = preset.layouts.map((name) => {
     const def = byName.get(name);
@@ -77,3 +82,50 @@ export function presetRecipe(preset: StylePreset): TemplateAdjustRecipe {
 export async function writePresetTemplate(preset: StylePreset, library?: readonly LayoutDef[]): Promise<Uint8Array> {
   return adjustTemplate(await writeTemplate(presetToSpec(preset, library)), presetRecipe(preset));
 }
+
+/**
+ * セールスピッチ「Pitch」（#595・#580 段 2-c）。提案・ピッチ用: 1 枚 1 メッセージ（目安 3 行・60 字以下）。
+ *  - 配色: canvas 白・background 濃紺・accent は高彩度の 1 色（朱）・emphasis＝accent（数値を目立たせる）。
+ *    accent / accent2 は白地で 3:1 以上（大きな太字の数値・ラベルに使う。WCAG の大きい文字の基準）。
+ *  - 書体: 見出しも本文も同じゴシック（太さはレイアウトの bold で分ける）。
+ *  - 密度: 本文 18pt（#570 の本文倍率 18/14）・左右 0.8in（現行どおり）。
+ *  - レイアウト 14: #580 段 1 の構成案 12 から調整（#595「実装時に微調整可」・すべて実測）。
+ *      表紙は Title.1Title.Single（+1Meta は Date の枠が無く `Date:` が消える）。
+ *      Content.1Body.Single を追加（図や画像の無い本文が全幅に入る。無いと図が Media の画像枠に入る）。
+ *      「カード 3（group card）」は Summary.3Block.Equal（新・結論帯つき）。内蔵語彙にカード用が無く、
+ *      Column.3Body.Equal に落ちると `:icon:` が文字のまま残り、`Takeaway:` は本文の先頭へ救済される。
+ *      Column.3Body.Equal は `<!-- col -->` の受け皿として残す（無いと 2〜3 列の本文が消える）。
+ *    ロゴ壁 Gallery.4Image.Grid は #392（1 枚に複数画像）の後。
+ */
+export const PITCH_PRESET: StylePreset = Object.freeze({
+  name: "セールスピッチ Pitch",
+  palette: Object.freeze({
+    background: "14213D",
+    canvas: "FFFFFF",
+    titleText: "FFFFFF",
+    bodyText: "1F2937",
+    subtle: "C7D2E4",
+    muted: "6B7280",
+    accent: "E8501C",
+    accent2: "0284C7",
+    emphasis: "E8501C",
+  }),
+  fonts: Object.freeze({ major: "Yu Gothic", minor: "Yu Gothic" }),
+  layouts: Object.freeze([
+    "Title.1Title.Single",
+    "Statement.1Message.Single",
+    "Content.1Body.Single",
+    "Content.1Body.Single+1Callout",
+    "Column.3Body.Equal",
+    "Summary.3Block.Equal",
+    "KPI.1Value.Single",
+    "KPI.4Value.Grid",
+    "Compare.2Option.Versus",
+    "Process.4Step.Sequential",
+    "Media.1Body+1Image",
+    "Quote.1Message.Single+1Attribution",
+    "Table.1Table.Single+1Source",
+    "Closing.1CTA+1Contact",
+  ]),
+  density: Object.freeze({ ...BASE_DENSITY, bodyPt: 18 }),
+}) as StylePreset;

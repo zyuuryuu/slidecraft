@@ -95,9 +95,14 @@ pub fn selected_tier() -> Tier {
 /// (total RAM in MB, logical cores) for the host.
 fn detect_capability() -> (u64, usize) {
     use sysinfo::System;
-    let mut sys = System::new();
-    sys.refresh_memory();
-    let total_ram_mb = sys.total_memory() / 1024 / 1024; // sysinfo ≥0.30 reports bytes
+    // sysinfo ≥0.40: System::new() is fallible. On failure report 0 MB (→ the smallest tier) rather than panic.
+    let total_ram_mb = System::new()
+        .ok()
+        .map(|mut sys| {
+            sys.refresh_memory();
+            sys.total_memory() / 1024 / 1024 // sysinfo ≥0.30 reports bytes
+        })
+        .unwrap_or(0);
     let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
     (total_ram_mb, cores)
 }
