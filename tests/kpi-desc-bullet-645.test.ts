@@ -5,6 +5,8 @@
  * マスター lvl1 の記号を継いでいた。kpi グループの body 枠へ束縛する段落も箇条を外す（判定は group-layout の
  * role だけ・R8）。説明行そのものの出力は tests/kpi-value-bullet-638.test.ts が固定する。ここでは
  *  - kpi の body 枠の段落が bullet を持たないこと（expandGroups の層）
+ *  - 裁定 A（PR #656）: 説明枠の無い KPI.2／KPI.3Value（値枠＋ラベル枠）と KPI.4Value.Grid（ラベル枠のみ）で
+ *    ラベル枠へ流れる見出しでない段落（説明行・KPI.4 では値も）も buNone。ラベル（`###`）と値枠は従来どおり
  *  - card / step / compare の body 段落は箇条のまま（expandGroups の層）
  *  - kpi 以外のスライドの slide XML が修正前と byte-identical（digest＝XML の sha256 を修正前の main で固定）
  * を確かめる。
@@ -45,8 +47,7 @@ beforeAll(async () => {
 });
 
 describe("#645 kpi グループの body 枠の段落は箇条を外す（expandGroups）", () => {
-  // 対象は kpi グループの body 枠（と値枠）へ束縛された段落。説明枠を持たない KPI.2／KPI.3Value では説明行が
-  // ラベル（heading）枠へ流れるが、それは #645 の範囲外（tests/kpi-value-bullet-638.test.ts の Label1 が固定）。
+  // 対象は kpi グループの body 枠（と値枠）へ束縛された段落。ラベル枠へ流れる説明行は下の「裁定 A」が固定する。
   it("kpi グループの body／value 枠へ束縛された段落はすべて bullet を持たない", () => {
     const deck = parseMd(KPI1);
     const slide = deck.slides[deck.slides.length - 1];
@@ -92,7 +93,60 @@ describe("#645 kpi 以外のグループの body 段落は箇条のまま", () =
   }
 });
 
-/** 修正前（main 2ac4525）の出力で固定した、kpi 以外のスライドの slide XML の sha256。 */
+const BU_NONE = "<a:pPr><a:buNone/></a:pPr>";
+const para = (t: string, rPr = "") => `<a:p>${BU_NONE}<a:r>${rPr}<a:t>${t}</a:t></a:r></a:p>`;
+const KPI_N = (n: number) =>
+  COVER + "# K\n\n" + Array.from({ length: n }, (_, i) => `<!-- kpi -->\n### ラベル${i + 1}\n- **値${i + 1}**\n- 説明${i + 1}`).join("\n\n");
+
+/** Paragraphs of every shape on the LAST slide, keyed by shape name, plus that slide's layout part. */
+async function lastSlide(md: string, tpl: TemplateData): Promise<{ layout: string; at: Map<string, string[]> }> {
+  const deck = parseMd(md);
+  const zip = await JSZip.loadAsync(await generatePptx(deck, tpl));
+  const n = deck.slides.length;
+  const xml = await zip.file(`ppt/slides/slide${n}.xml`)!.async("string");
+  const rels = await zip.file(`ppt/slides/_rels/slide${n}.xml.rels`)!.async("string");
+  const layoutPart = /slideLayouts\/(slideLayout\d+\.xml)/.exec(rels)![1];
+  const layoutXml = await zip.file(`ppt/slideLayouts/${layoutPart}`)!.async("string");
+  const at = new Map<string, string[]>();
+  for (const sp of xml.split("<p:sp>").slice(1)) {
+    const name = /<p:cNvPr id="\d+" name="([^"]*)"/.exec(sp)?.[1];
+    if (name) at.set(name, sp.match(/<a:p>.*?<\/a:p>/g) ?? []);
+  }
+  return { layout: /<p:cSld name="([^"]*)"/.exec(layoutXml)![1], at };
+}
+
+// 裁定 A（PR #656）: kpi グループの見出しでない段落は、どの枠に入っても箇条を外す（判定は kind だけ・R8）。
+describe("#645 裁定 A: ラベル枠へ流れる kpi の説明行も buNone", () => {
+  for (const key of ["writerDefault", "reportPreset"]) {
+    it(`KPI.2Value.Equal（${key}）: ラベル枠の説明行が buNone・値とラベルは従来どおり`, async () => {
+      const { layout, at } = await lastSlide(KPI_N(2), tpls[key]);
+      expect(layout).toBe("KPI.2Value.Equal");
+      expect(at.get("Value1.Left")).toEqual([para("値1", '<a:rPr b="1"/>')]);
+      expect(at.get("ValueLabel1.Left")).toEqual([para("ラベル1"), para("説明1")]);
+      expect(at.get("ValueLabel2.Right")).toEqual([para("ラベル2"), para("説明2")]);
+    });
+    it(`KPI.3Value.Equal（${key}）: ラベル枠の説明行が buNone`, async () => {
+      const { layout, at } = await lastSlide(KPI_N(3), tpls[key]);
+      expect(layout).toBe("KPI.3Value.Equal");
+      expect(at.get("Value3")).toEqual([para("値3", '<a:rPr b="1"/>')]);
+      for (const i of [1, 2, 3]) expect(at.get(`Label${i}`)).toEqual([para(`ラベル${i}`), para(`説明${i}`)]);
+    });
+    it(`KPI.4Value.Grid（${key}）: ラベル枠 1 つに入る値・説明行が buNone`, async () => {
+      const { layout, at } = await lastSlide(KPI_N(4), tpls[key]);
+      expect(layout).toBe("KPI.4Value.Grid");
+      for (const [i, name] of ["Value1.TL", "Value2.TR", "Value3.BL", "Value4.BR"].entries()) {
+        const k = i + 1;
+        expect(at.get(name)).toEqual([para(`ラベル${k}`), para(`値${k}`, '<a:rPr b="1"/>'), para(`説明${k}`)]);
+      }
+    });
+  }
+});
+
+/**
+ * 修正前（main 2ac4525）の出力で固定した、kpi 以外のスライドの slide XML の sha256。
+ * 再固定の手順: kpi 以外の出力を意図して変える PR でだけ、その PR の親（main）で下の describe を走らせ、
+ * 失敗メッセージの Received（新しい sha256）を写す。修正後のブランチの値を写してはならない（検査にならない）。
+ */
 const NON_KPI_DIGEST: Record<string, string> = {
   // writer と REPORT_PRESET は slide XML が同じ（配色・フォントは theme/master 側）なので digest も同じ。
   writerDefault: "1c070b9ff905d628cf2bf35ecebdb65756b1a8660a1369852b8c0e4e9aaac25a",

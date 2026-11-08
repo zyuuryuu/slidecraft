@@ -10,8 +10,8 @@
  *  - 報告書・マガジンの 09_KPIハイライト / 05_ビッグナンバー（ラベルが値の上）: role は body のまま
  *    （tests/group-detect.test.ts が固定）だが、同じ dominantValueSlot が値枠と判定する枠。
  *  - ラベル（見出し）は従来どおり。
- *  - #645: 説明行（値以外の body 枠＝ValueDesc／KPI補足／補足）も箇条を外す（buNone）。KPI タイルの
- *    説明はキャプションであって箇条ではない。判定は group-layout の role（kpi グループの body）のみ（R8）。
+ *  - #645: 説明行（値以外の body 枠＝ValueDesc／KPI補足／補足、説明枠の無いレイアウトではラベル枠へ流れる行）も
+ *    箇条を外す（buNone）。KPI タイルの説明はキャプションであって箇条ではない。判定は group-layout の kind のみ（R8）。
  *  - KPI 以外のグループ（card / step / compare）の段落は変えない（slide XML は byte-identical）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -76,10 +76,11 @@ describe("#638 KPI の値枠の段落に buNone が付く", () => {
     expect(at.get("Value1")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>−18%</a:t></a:r></a:p>`]);
     expect(at.get("Value2")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>40% 減</a:t></a:r></a:p>`]);
     expect(at.get("Value3")).toEqual([`<a:p>${BU_NONE}<a:r><a:t>2 週</a:t></a:r></a:p>`]);
-    // KPI.3 には説明枠が無いので、値より後の行はラベル枠へ（#593 の束縛・従来どおり）。箇条のまま。
+    // KPI.3 には説明枠が無いので、値より後の行はラベル枠へ（#593 の束縛・従来どおり）。
+    // #645 裁定 A（PR #656）: ラベル枠へ流れる説明行も箇条を外す（buNone）。
     expect(at.get("Label1")).toEqual([
       `<a:p>${BU_NONE}<a:r><a:t>コスト</a:t></a:r></a:p>`,
-      "<a:p><a:r><a:t>前年比</a:t></a:r></a:p>",
+      `<a:p>${BU_NONE}<a:r><a:t>前年比</a:t></a:r></a:p>`,
     ]);
   });
 

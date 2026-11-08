@@ -112,11 +112,16 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
     const bodySlots = col.filter((s) => s.role === "body");
     const chromeSlot = col.find((s) => s.role === "chrome");
 
+    // #645: a KPI tile's non-heading lines (ValueDesc / KPI補足 / 補足 — or, on layouts without a description
+    // box, the lines that flow into the label slot below: KPI.2/3Value.Equal, KPI.4Value.Grid) are a caption,
+    // not a list — unbulleted like the value (#638) so they don't inherit the master's lvl1 glyph. Judged only
+    // by the group's kind (group-layout, R8); card / step / compare keep their bullets.
+    const slotParas = shape.kind === "kpi" ? bodyParas.map(unbullet) : bodyParas;
     if (headSlot && bodySlots.length === 0) {
       // Single-slot group (#136: Process.NStep/Summary.NBlock-style layouts — one placeholder per group,
       // no separate body box). heading + body paragraphs share that one slot instead of the body half
       // being silently dropped.
-      const allParas = [...headParas.map((p) => ({ ...p, heading: false })), ...bodyParas];
+      const allParas = [...headParas.map((p) => ({ ...p, heading: false })), ...slotParas];
       if (allParas.length) out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: allParas });
     } else if (headSlot && headParas.length) {
       out.set(headSlot.phIdx, { idx: headSlot.phIdx, paragraphs: headParas.map((p) => ({ ...p, heading: false })) });
@@ -133,10 +138,6 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
       if (colorPh) overlay.frames.push(frameAround(unions, i, colorPh.style.fontColor));
     }
 
-    // #645: a KPI tile's description lines (ValueDesc / KPI補足 / 補足 — the kpi group's body slots) are a
-    // caption, not a list — unbulleted like the value (#638) so they don't inherit the master's lvl1 glyph.
-    // Judged only by the group's kind + slot role (group-layout, R8); card / step / compare keep their bullets.
-    const slotParas = shape.kind === "kpi" ? bodyParas.map(unbullet) : bodyParas;
     if (bodySlots.length === 1) {
       if (slotParas.length) out.set(bodySlots[0].phIdx, { idx: bodySlots[0].phIdx, paragraphs: slotParas });
     } else if (bodySlots.length >= 2) {
@@ -147,6 +148,7 @@ function planGroupCells(slide: SlideIR, layout: LayoutInfo): { content: Map<stri
     }
     // #638: the KPI value box shows a number, not a list item — its `- **4.2 億円**` line arrives as a bullet,
     // which would inherit the master's lvl1 glyph ("•4.2 億円"). Unbulleted → export writes <a:buNone/>.
+    // Idempotent with #645: a value box whose role is body already got slotParas (unbulleted) above.
     const kpiValuePh = kpiValueSlot(shape, col, layout)?.phIdx;
     const kpiValue = kpiValuePh ? out.get(kpiValuePh) : undefined;
     if (kpiValue) out.set(kpiValue.idx, { ...kpiValue, paragraphs: kpiValue.paragraphs.map(unbullet) });
