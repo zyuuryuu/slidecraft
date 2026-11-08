@@ -83,4 +83,57 @@ export const PRESET_LAYOUTS: LayoutDef[] = [
     { name: "Ask.Center", type: "body", idx: 1, x: 1.2, y: 1.9, w: 10.9, h: 2.4, fontSize: 37, font: "major", color: "titleText", bold: true, align: "l" },
     { name: "Decision.Bottom", type: "body", idx: 2, x: 1.2, y: 4.8, w: 10.9, h: 1.6, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l" },
   ]},
+  ...CAMPAIGN_LAYOUTS(),
 ];
+
+/**
+ * マーケ「Campaign」（#598・#580 段 3）の画像構造・色面の章扉・下寄せの締め。picture 枠（#594 の pic 型）の idx は
+ * Media.1Body+1Image と同じ自由枠 20〜（読み順＝左上→右上→左下→右下。画像の ordinal は idx 順の N 番目の
+ * picture 枠に入る＝visual-placement.imagePlaceholder）。Image.* / Gallery.* は役割 "image" / "gallery"
+ * （template-catalog の FAMILY_TO_ROLE）で、画像だけのスライド（slide-role-regions の visual）からしか届かない。
+ * 幾何は基準余白 0.8in で書き、プリセットの余白（withHorizontalMargin）で縮める。全面の枠だけは縮めない。
+ */
+function CAMPAIGN_LAYOUTS(): LayoutDef[] {
+  const header: LayoutPhDef[] = [
+    { name: "SlideTitle.Header", type: "body", idx: 15, x: 0.8, y: 0.1, w: 10, h: 0.52, fontSize: 28, font: "major", color: "titleText", bold: true, align: "l" },
+    { name: "SlideSubtitle.Header", type: "body", idx: 16, x: 0.8, y: 0.72, w: 10, h: 0.3, fontSize: 12, font: "minor", color: "subtle", bold: false, align: "l" },
+  ];
+  const sldNum: LayoutPhDef = { name: "SlideNum.Footer", type: "sldNum", idx: 50, x: 12.0, y: 7.05, w: 1.2, h: 0.3, fontSize: 10, font: "minor", color: "muted", bold: false, align: "r" };
+  const pic = (i: number, x: number, y: number, w: number, h: number): LayoutPhDef =>
+    ({ name: `Image${i + 1}`, type: "pic", idx: 20 + i, x, y, w, h, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" });
+  return [
+    // 全面画像＋左下の小さなキャプション（作品名＝スライドのタイトル）。画像は `{behind=1}` の背景画像で、
+    // 全面の picture 枠の箱に描かれる（imageRect）。キャプションは画像の上に載るので canvas 色。
+    { name: "Image.FullBleed+1Caption", family: "dark", placeholders: [
+      { ...pic(0, 0, 0, 13.333, 7.5), name: "Image.Full" },
+      { name: "Caption.BottomLeft", type: "body", idx: 15, x: 0.8, y: 6.6, w: 7.5, h: 0.45, fontSize: 14, font: "minor", color: "canvas", bold: false, align: "l" },
+    ]},
+    // 左キャプション｜右画像（画像が主役。Media.1Body+1Image より本文を細く・画像を大きく）。
+    { name: "Media.1Caption+1Image", family: "light", placeholders: [
+      ...header,
+      { name: "Caption.Left", type: "body", idx: 1, x: 0.8, y: 1.6, w: 3.3, h: 5.2, fontSize: 13, font: "minor", color: "bodyText", bold: false, align: "l" },
+      { ...pic(0, 4.5, 1.4, 8.033, 5.6), name: "Image.Right" },
+      sldNum,
+    ]},
+    // 並置 2 枚（対作品）と 2×2 グリッド（連作・ロゴ壁）。
+    { name: "Gallery.2Image.Equal", family: "light", placeholders: [
+      ...header, pic(0, 0.8, 1.4, 5.716, 5.4), pic(1, 6.816, 1.4, 5.716, 5.4), sldNum,
+    ]},
+    { name: "Gallery.4Image.Grid", family: "light", placeholders: [
+      ...header,
+      pic(0, 0.8, 1.3, 5.716, 2.65), pic(1, 6.816, 1.3, 5.716, 2.65),
+      pic(2, 0.8, 4.15, 5.716, 2.65), pic(3, 6.816, 4.15, 5.716, 2.65),
+      sldNum,
+    ]},
+    // 色面の章扉: 背景を accent（低彩度の 1 色）で塗り、文字は canvas 色。役割 section（タイトルだけのスライド）。
+    { name: "Section.1Title.ColorField", family: "dark", bg: "accent", placeholders: [
+      { name: "Title.Center", type: "body", idx: 15, x: 1.2, y: 2.6, w: 10.9, h: 1.5, fontSize: 44, font: "major", color: "canvas", bold: false, align: "l" },
+      { name: "Subtitle.Center", type: "body", idx: 16, x: 1.2, y: 4.3, w: 10.9, h: 0.6, fontSize: 18, font: "minor", color: "canvas", bold: false, align: "l" },
+    ]},
+    // 下寄せ小文字の締め（経歴・連絡先）: 見出しも本文も下半分に置き、上を余白にする。
+    { name: "Closing.1Notes.Bottom", family: "dark", placeholders: [
+      { name: "Title.Left", type: "body", idx: 15, x: 1.2, y: 4.1, w: 10.9, h: 0.7, fontSize: 28, font: "major", color: "titleText", bold: false, align: "l" },
+      { name: "Notes.Bottom", type: "body", idx: 1, x: 1.2, y: 4.95, w: 10.9, h: 1.7, fontSize: 13, font: "minor", color: "subtle", bold: false, align: "l" },
+    ]},
+  ];
+}

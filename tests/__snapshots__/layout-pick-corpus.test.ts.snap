@@ -176,6 +176,38 @@ exports[`#589 corpus: マガジン以外の全マスターで自動レイアウ�
 }
 `;
 
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > マーケ_Campaign_TemplateOnly.pptx 1`] = `
+{
+  "closing": "Closing.1Notes.Bottom ×1",
+  "columns": "Column.2Body.Equal ×1",
+  "diagram": "Content.1Body.Single ×1",
+  "fiveBullets": "Content.1Body.Single ×1",
+  "image": "Media.1Caption+1Image ×1",
+  "oneBullet": "Content.1Body.Single ×1",
+  "paragraph": "Content.1Body.Single ×1",
+  "section": "Section.1Title.ColorField ×1",
+  "table": "Content.1Body.Single ×1",
+  "twelveBullets": "Content.1Body.Single ×1",
+  "twoBullets": "Content.1Body.Single ×1",
+}
+`;
+
+exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > マーケ_Campaign_全レイアウト見本.pptx 1`] = `
+{
+  "closing": "Closing.1Notes.Bottom ×1",
+  "columns": "Column.2Body.Equal ×1",
+  "diagram": "Content.1Body.Single ×1",
+  "fiveBullets": "Content.1Body.Single ×1",
+  "image": "Media.1Caption+1Image ×1",
+  "oneBullet": "Content.1Body.Single ×1",
+  "paragraph": "Content.1Body.Single ×1",
+  "section": "Section.1Title.ColorField ×1",
+  "table": "Content.1Body.Single ×1",
+  "twelveBullets": "Content.1Body.Single ×1",
+  "twoBullets": "Content.1Body.Single ×1",
+}
+`;
+
 exports[`#589 corpus: マガジン以外の全マスターで自動レイアウト選択と分割枚数が不変 > 報告書テンプレート_エディトリアル_全レイアウト見本.pptx 1`] = `
 {
   "closing": "06_まとめ ×1",

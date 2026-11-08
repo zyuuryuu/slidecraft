@@ -39,6 +39,10 @@ export type LayoutRole =
   // #593: a quotation + attribution layout (マガジン 07_引用 / Quote.1Message.Single+1Attribution) — kept
   // out of "content" the same way, so an unmarked body slide never lands in it.
   | "quote"
+  // #598: image-structure layouts (Image.FullBleed+1Caption / Gallery.<N>Image.*) — reached only by a slide made
+  // of images alone (slide-role-regions' `visual`), so a text slide never lands in them.
+  | "image"
+  | "gallery"
   | "other";
 
 export type PlaceholderRole =
@@ -109,6 +113,8 @@ const FAMILY_TO_ROLE: Record<string, LayoutRole> = {
   closing: "closing",
   statement: "statement", // #593 (#589 NEXT): Statement.1Message.Single
   quote: "quote", // #593: Quote.1Message.Single+1Attribution
+  image: "image", // #598: Image.FullBleed+1Caption
+  gallery: "gallery", // #598: Gallery.2Image.Equal / Gallery.4Image.Grid
 };
 
 /** Layout role from its name's family (the part before the first "."). */

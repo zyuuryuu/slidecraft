@@ -5351,6 +5351,505 @@ exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) >
 }
 `;
 
+exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/manuscript-07-campaign.md 1`] = `
+{
+  "deck": {
+    "slides": [
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "0",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "光の採集",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2026 夏のキャンペーン",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "10",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "Campaign",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 7,
+        "sourceLineStart": 1,
+      },
+      {
+        "diagram": undefined,
+        "groupKind": "statement",
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "見えているのに、誰も見ていない光を拾う。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 12,
+        "sourceLineStart": 9,
+      },
+      {
+        "diagram": undefined,
+        "image": {
+          "alt": "夕凪",
+          "behind": true,
+          "fit": "cover",
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAASCAIAAAC1qksFAAAAyklEQVR4nLXM22YCAADG8e9xxhiji7FzmrJaOyi1/7Z2UMpO1TSlttWmKcaILkaM0cUYMbqIMXqznuL7PcBPcyvMr7Kwfri4QSDIUojlLdbCbEYIbROJEd0hvsv+HokD0gmOkmRSnKfJQuGYqxNuTymfUbmglqWR4ynPc4H2Jd1r3m6QdX8vIuveKyHr3r9D1v2jgqz74B5Z988qsu5fNWTdh3Vk3b8fkHX/eUTWfdRE1v23haz7+AVZ90kbWfe/V2Td/zvIuk+7zABhf60DfokSjgAAAABJRU5ErkJggg==",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "夕凪 — 青木 葵, 2024",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 18,
+        "sourceLineStart": 14,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "I. 水辺の光",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 22,
+        "sourceLineStart": 20,
+      },
+      {
+        "diagram": undefined,
+        "image": {
+          "alt": "汽水 #3",
+          "fit": "cover",
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "汽水 #3",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "2023 / インクジェットプリント",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "",
+                  },
+                ],
+              },
+              {
+                "segments": [
+                  {
+                    "text": "河口で潮が入れ替わる 3 分間だけ現れる色。",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 32,
+        "sourceLineStart": 24,
+      },
+      {
+        "diagram": undefined,
+        "figures": [
+          {
+            "alt": "澪 1",
+            "fit": "cover",
+            "kind": "image",
+            "placeholderIdx": "1",
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=",
+          },
+          {
+            "alt": "澪 2",
+            "fit": "cover",
+            "kind": "image",
+            "placeholderIdx": "1",
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=",
+          },
+          {
+            "alt": "澪 3",
+            "fit": "cover",
+            "kind": "image",
+            "placeholderIdx": "1",
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=",
+          },
+          {
+            "alt": "澪 4",
+            "fit": "cover",
+            "kind": "image",
+            "placeholderIdx": "1",
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=",
+          },
+        ],
+        "image": {
+          "alt": "澪 1",
+          "fit": "cover",
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "連作「澪」",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 41,
+        "sourceLineStart": 34,
+      },
+      {
+        "diagram": undefined,
+        "figures": [
+          {
+            "alt": "朝",
+            "fit": "cover",
+            "kind": "image",
+            "placeholderIdx": "1",
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=",
+          },
+          {
+            "alt": "夜",
+            "fit": "cover",
+            "kind": "image",
+            "placeholderIdx": "1",
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=",
+          },
+        ],
+        "image": {
+          "alt": "朝",
+          "fit": "cover",
+          "placeholderIdx": "1",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=",
+        },
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "対話 — 朝 / 夜",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 48,
+        "sourceLineStart": 43,
+      },
+      {
+        "groupKind": "kpi",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "キャンペーンの目標",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "来場者（人）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "1.2 万",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "SNS 投稿（件）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "3,000",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "会期（日）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "bold": true,
+                    "text": "30",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 64,
+        "sourceLineStart": 50,
+      },
+      {
+        "groupKind": "step",
+        "layout": "auto",
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "体験の流れ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "見る",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "会場で 30 点を展示",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "撮る",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "同じ光を探して撮影",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "3",
+            "paragraphs": [
+              {
+                "heading": true,
+                "segments": [
+                  {
+                    "text": "共有する",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "#光の採集 で投稿",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 80,
+        "sourceLineStart": 66,
+      },
+      {
+        "diagram": undefined,
+        "layout": "auto",
+        "mermaidBlock": undefined,
+        "placeholders": [
+          {
+            "idx": "15",
+            "paragraphs": [
+              {
+                "segments": [
+                  {
+                    "text": "お問い合わせ",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            "idx": "1",
+            "paragraphs": [
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "会期 2026-07-01〜07-30",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "会場 湾岸ギャラリー（架空）",
+                  },
+                ],
+              },
+              {
+                "bullet": true,
+                "segments": [
+                  {
+                    "text": "hello@example.com",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        "sourceLineEnd": 88,
+        "sourceLineStart": 82,
+      },
+    ],
+    "template": undefined,
+  },
+  "notices": [],
+}
+`;
+
 exports[`#392 段 0: SlideIR snapshot (parseMdReport — deck + parse notices) > samples/sample-deck.md 1`] = `
 {
   "deck": {
@@ -9613,6 +10112,104 @@ A 案（1 拠点への統合）の承認
 
 - 選択肢: A 案を承認／B 案で再検討
 - 期限: 12 月 15 日の経営会議
+"
+`;
+
+exports[`#392 段 0: md round-trip is a fixed point over the whole corpus > samples/manuscript-07-campaign.md 1`] = `
+"# 光の採集
+## 2026 夏のキャンペーン
+
+Category: Campaign
+
+---
+
+<!-- statement -->
+# 見えているのに、誰も見ていない光を拾う。
+
+
+---
+
+# 夕凪 — 青木 葵, 2024
+
+
+![夕凪](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAASCAIAAAC1qksFAAAAyklEQVR4nLXM22YCAADG8e9xxhiji7FzmrJaOyi1/7Z2UMpO1TSlttWmKcaILkaM0cUYMbqIMXqznuL7PcBPcyvMr7Kwfri4QSDIUojlLdbCbEYIbROJEd0hvsv+HokD0gmOkmRSnKfJQuGYqxNuTymfUbmglqWR4ynPc4H2Jd1r3m6QdX8vIuveKyHr3r9D1v2jgqz74B5Z988qsu5fNWTdh3Vk3b8fkHX/eUTWfdRE1v23haz7+AVZ90kbWfe/V2Td/zvIuk+7zABhf60DfokSjgAAAABJRU5ErkJggg==){fit=cover,behind=1}
+
+---
+
+# I. 水辺の光
+
+
+---
+
+# 汽水 #3
+
+2023 / インクジェットプリント
+
+河口で潮が入れ替わる 3 分間だけ現れる色。
+
+![汽水 #3](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=){fit=cover}
+
+---
+
+# 連作「澪」
+
+![澪 1](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=){fit=cover}
+
+![澪 2](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=){fit=cover}
+
+![澪 3](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=){fit=cover}
+
+![澪 4](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAnklEQVR4nGOQiwpQjgvWTArXT482zY63zk9yLElzr8jyrc0LbiyMbC2N76pM7avNntRQOL2lfHYHA0mqaxf0MJCkumlJPwNJqjtWTGYgSXXf2ukMJKmesnE2A0mqZ22dx0CS6gW7FjGQpHrZvmUMJKlec3gVA0mqNx1fy0CS6h2nNzKQpHrfha0MJKk+cmUnA0mqT93Yw0CS6gt3DwAAqSKZuC9mSykAAAAASUVORK5CYII=){fit=cover}
+
+---
+
+# 対話 — 朝 / 夜
+
+![朝](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=){fit=cover}
+
+![夜](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAYCAIAAAB4NzpmAAAA10lEQVR4nGOI0rCJ1bZL0HdIMXZON3fNsnbPs/MqdPIpcfOv8Aqs9guuCwxrCo1ojYzqiI3tSYzvT0malJHCQIaeaTlpDGTomVmQyUCGnjkl2Qxk6FlQkcdAhp7F1QUMZOhZVl/EQIaeVc2lDGToWdtezkCGng3dlQxk6NnSV8NAhp7tk+oYyNCza1ojAxl69s1qZiBDz8F5rQxk6DmysIOBDD0nlnYxkKHn9MoeBjL0nFvbz0CGnksbJzKQoefqlikMZOi5sWMaAxl67uyZwUCGnvsHZgMA1DB//8ohHr8AAAAASUVORK5CYII=){fit=cover}
+
+---
+
+# キャンペーンの目標
+
+<!-- kpi -->
+### 来場者（人）
+- **1.2 万**
+
+<!-- kpi -->
+### SNS 投稿（件）
+- **3,000**
+
+<!-- kpi -->
+### 会期（日）
+- **30**
+
+
+---
+
+# 体験の流れ
+
+<!-- step -->
+### 見る
+- 会場で 30 点を展示
+
+<!-- step -->
+### 撮る
+- 同じ光を探して撮影
+
+<!-- step -->
+### 共有する
+- #光の採集 で投稿
+
+
+---
+
+# お問い合わせ
+
+- 会期 2026-07-01〜07-30
+- 会場 湾岸ギャラリー（架空）
+- hello@example.com
 "
 `;
 
