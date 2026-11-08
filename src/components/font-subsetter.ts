@@ -22,12 +22,15 @@
  * used glyphs, the size difference vs. WOFF2 compression is modest (tens of KB either way).
  */
 
-// hb-subset.wasm ships as a plain binary in the harfbuzzjs package (no JS wrapper needed for
-// subsetting — only the raw C-ABI exports below). Vite's built-in `?init` wasm handling resolves
-// this correctly under the dev server, the production build, AND vitest's Vite-powered SSR
-// transform (which reads the file straight off disk instead of fetching a URL) — so the SAME
-// import works in tests, dev, and the packaged app without an environment branch here.
-import initHbSubsetWasm from "harfbuzzjs/hb-subset.wasm?init";
+// harfbuzz-subset.wasm ships as a plain, import-free binary in the harfbuzzjs package. harfbuzzjs
+// 1.x's JS API has no subsetter, so we drive the raw C-ABI exports below directly — the same usage
+// upstream documents in examples/harfbuzz-subset.example.node.js, and the reason 1.6.1 added the
+// `"./dist/*.wasm"` subpath to the package's `exports` (upstream commit 739196a; #218). Keep the
+// dependency at >=1.6.1 for that export. Vite's built-in `?init` wasm handling resolves this under
+// the dev server, the production build, AND vitest's Vite-powered SSR transform (which reads the
+// file straight off disk instead of fetching a URL) — so the SAME import works in tests, dev, and
+// the packaged app without an environment branch here.
+import initHbSubsetWasm from "harfbuzzjs/dist/harfbuzz-subset.wasm?init";
 
 // HB_MEMORY_MODE_WRITABLE (harfbuzz's hb-blob.h) — the wasm heap copy we hand to hb_blob_create
 // may be mutated/freed by harfbuzz itself.
