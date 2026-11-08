@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **#392（複数ビジュアル）段 2 — 2 つ目以降のビジュアルも別々の枠に描く** — 1 スライドの図・表・コード・画像を出現順に別々の body 枠へ置く（ordinal 解決は `figure-placement.placedFigures` の 1 経路・SlideIR は不変）。表＋図の重なり（#434）を構造的に解消、図×2 は `Chart.2Chart.Equal`（無ければ 2 カラム）、本文＋ビジュアルは Column.2/3Body へ。PPTX・プレビュー／HTML・診断が同じ配置を読む（R8）。枠が足りないものだけ info `figure-dropped`。単一ビジュアルのスライドは PPTX・HTML とも byte-identical （#392 段 2・2026-11-08）
 - **#392（複数ビジュアル）段 0 — 既存動作の固定テスト** — SlideIR の JSON スナップショット（samples 全部＋ビジュアル網羅 fixture）・round-trip 不動点・`visual-placement` の ordinal と `slideRoleRegions`・MCP／GUI の編集経路・`.scft` 後方互換（`visuals-v1.scft`）を、型変更の前に機械検査として固定。src は無変更 （#392 段 0・PR #610・2026-11-08）
 - **`.scft` 開封時の version 互換ゲート** — `meta.json.version` を deck.json の検証より先に読み、現行より新しい版は `PROJECT_VERSION_TOO_NEW`（「アプリを更新してください」）で拒否、古い版は `PROJECT_MIGRATIONS` の表を順に適用し途中の段が欠ければ `PROJECT_VERSION_UNSUPPORTED` で明示。黙ってフォールバックしない。meta 破損は従来どおり既定値で開く。判定は純関数 `migrateProjectDeck` に一本化 （#121・PR #559・2026-11-07）
 - **長タイトルを枠に収まるまで縮小（R7 事前計算）＋下限でも溢れたら warn `title-overflow`** — title-fit.ts の `fitTitle` がテンプレのタイトルサイズから 1pt 刻みで下げ、収まる最大サイズを返す（下限＝元サイズ×0.7・幅見積りは図ラベル縮小と共有の draw-target #228）。export（run に `sz` を焼く）・preview・診断の 3 経路が同じ関数を読む（R8）。収まるタイトルは byte-identical。Issue repro は Midnight 28→22pt で全文表示、全角 36 字以上で warn（#437 案b・PR #552・2026-11-07）

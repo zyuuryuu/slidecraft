@@ -12,7 +12,7 @@
  * GUI only — exportMode / non-active cards get no handlers and no chrome (PPTX/HTML unchanged).
  */
 import { useRef, useState } from "react";
-import type { SlideIR, ImageRect } from "../engine/slide-schema";
+import type { SlideIR, ImageRect, ImageBlock } from "../engine/slide-schema";
 import type { PlaceholderInfo } from "../engine/template-loader";
 import { imagePlaceholder, imageObjectFit, imageEditGeometry } from "../engine/visual-placement";
 import { imageCaption } from "../engine/image-caption";
@@ -151,12 +151,25 @@ export function useSlideImageLayer({ slide, layoutPhs, scale, isActive, onImageR
 
   /** The alt caption under a BODY-FIGURE image (#399) — the SAME imageCaption geometry the PPTX export
    *  uses (R8), following the live drag box so it stays under the image while it moves. */
-  const renderImageCaption = (resolved: ImageRect, textColor: string) => {
-    const cap = imageCaption(img!, dragRect ?? resolved, textColor);
+  const renderImageCaption = (resolved: ImageRect, textColor: string) => captionOf(img!, dragRect ?? resolved, textColor, "image-caption");
+
+  /** #392 段 2: a 2nd+ body image of the slide — drawn exactly like the primary one (object-fit, caption)
+   *  but not draggable: the drag edits `slide.image`, the primary (editing the 2nd+ visual is 段 3). */
+  const renderStaticImage = (image: ImageBlock, resolved: ImageRect, textColor: string, key: string) => [
+    <div key={key} style={{ position: "absolute", ...pct(resolved) }}>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+        <img src={image.src} alt={image.alt} draggable={false} style={{ width: "100%", height: "100%", objectFit: imageObjectFit(image), pointerEvents: "none" }} />
+      </div>
+    </div>,
+    captionOf(image, resolved, textColor, `${key}-caption`),
+  ];
+
+  const captionOf = (image: ImageBlock, box: ImageRect, textColor: string, key: string) => {
+    const cap = imageCaption(image, box, textColor);
     if (!cap) return null;
     return (
       <div
-        key="image-caption"
+        key={key}
         data-image-caption="true"
         style={{
           position: "absolute",
@@ -174,5 +187,5 @@ export function useSlideImageLayer({ slide, layoutPhs, scale, isActive, onImageR
     );
   };
 
-  return { renderImageBox, renderImageChrome, renderImageCaption };
+  return { renderImageBox, renderImageChrome, renderImageCaption, renderStaticImage };
 }

@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`#392 段 2 golden — ビジュアルデッキ_マガジン_TemplateOnly.pptx > HTML (SlideCard SSR = the preview): sha256, and every visual is drawn 1`] = `
+{
+  "1 図が 2 つ": "f5645a9b24a5a3abe79e2502d43bdc4510d9fe4c753ecdf65e3e0d0f8cc902f9",
+  "2 表と図": "1bf46117812c77b35c101e3d605ca7804289296d3867636c23d0a9609e960494",
+  "3 col 本文｜図": "7b617591e643817ed1ffb2a6e9e8a68fc82693c45fcd56f833af32b48fc3db83",
+}
+`;
+
+exports[`#392 段 2 golden — ビジュアルデッキ_マガジン_TemplateOnly.pptx > PPTX: slide XML / rels sha256, and every visual is drawn 1`] = `
+{
+  "slide2.xml 図が 2 つ": "7f9d3cbf88b4826c3072a443d13d02955462a19d1dcaaa8c5b5533732f7a5e17",
+  "slide2.xml.rels 図が 2 つ": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
+  "slide3.xml 表と図": "e67bf9b9decf48f8ae9ad5f48b0882a13cdf73f9539cf250105b39a288d3debb",
+  "slide3.xml.rels 表と図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
+  "slide4.xml col 本文｜図": "67bc0fb196497b972cfcf05d0b3509a6288d29ece628707d0d1fcaa11ce4ac08",
+  "slide4.xml.rels col 本文｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
+}
+`;
+
+exports[`#392 段 2 golden — ビジュアルデッキ_マガジン_TemplateOnly.pptx > painter: each diagram painted into its own region (regions are disjoint), sha256 1`] = `
+{
+  "1 図が 2 つ #1": "301e1a6db2cb672fef07e41dacc42514eee71f04f58a1659488cb4af500966e4",
+  "1 図が 2 つ #2": "0828e22ad1a845e454e5887f95eae32fa575cc5986357a6c31df3ab1d2912b74",
+  "2 表と図 #2": "d6e897e3fce3e12bd66a06d8ae5b1b93cce42fbabfec9962ed5eba6d3c7cc223",
+  "3 col 本文｜図 #1": "29a2e8071cb6afa52bde6217bc8590d6d23bf26a97f78a488d2451831e75fe2e",
+}
+`;
+
+exports[`#392 段 2 golden — 技術報告_スタンダード水色_TemplateOnly.pptx > HTML (SlideCard SSR = the preview): sha256, and every visual is drawn 1`] = `
+{
+  "1 図が 2 つ": "cda06b64fd2d95485958571f6849a11d0c81320c675f5b463f0ee26ad7ac3e03",
+  "2 表と図": "946dba72f94ce63ba343fc9d4babc919a38fa854fa8af52ff84cc75242809b90",
+  "3 col 本文｜図": "b9d9d39228658705442bf5741c323e731eee375f4c03b8b0d8e0028ff9546ea6",
+}
+`;
+
+exports[`#392 段 2 golden — 技術報告_スタンダード水色_TemplateOnly.pptx > PPTX: slide XML / rels sha256, and every visual is drawn 1`] = `
+{
+  "slide2.xml 図が 2 つ": "2fa6cdfd8e157324551c9593418a9e704a9498e60589f9a40a57a4bf0865c759",
+  "slide2.xml.rels 図が 2 つ": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
+  "slide3.xml 表と図": "b91ddee2c773c4f16252619fd6ed21a208873f8bad5483992bc8eeee1c9cdc8e",
+  "slide3.xml.rels 表と図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
+  "slide4.xml col 本文｜図": "2a8859a99ef3725766e51667d92e8e2780cb2b166f070543ff48ebd30483f4eb",
+  "slide4.xml.rels col 本文｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
+}
+`;
+
+exports[`#392 段 2 golden — 技術報告_スタンダード水色_TemplateOnly.pptx > painter: each diagram painted into its own region (regions are disjoint), sha256 1`] = `
+{
+  "1 図が 2 つ #1": "301e1a6db2cb672fef07e41dacc42514eee71f04f58a1659488cb4af500966e4",
+  "1 図が 2 つ #2": "0828e22ad1a845e454e5887f95eae32fa575cc5986357a6c31df3ab1d2912b74",
+  "2 表と図 #2": "d6e897e3fce3e12bd66a06d8ae5b1b93cce42fbabfec9962ed5eba6d3c7cc223",
+  "3 col 本文｜図 #1": "29a2e8071cb6afa52bde6217bc8590d6d23bf26a97f78a488d2451831e75fe2e",
+}
+`;
+
+exports[`#392 段 2 golden — 配布資料_公文書高密度_TemplateOnly.pptx > HTML (SlideCard SSR = the preview): sha256, and every visual is drawn 1`] = `
+{
+  "1 図が 2 つ": "10cf6c0540642ab7b005b21f3d007b841941e6911890c6d041efec83ab8550ba",
+  "2 表と図": "849bf9228eeb7cedc10d32b2ca2fb0f73bf7b33effe39ec1ea146072fc4a0662",
+  "3 col 本文｜図": "e2f898c1acac12ddb5052759b0df78767a3fa49a4549b83329f5546d8dffcbbd",
+}
+`;
+
+exports[`#392 段 2 golden — 配布資料_公文書高密度_TemplateOnly.pptx > PPTX: slide XML / rels sha256, and every visual is drawn 1`] = `
+{
+  "slide2.xml 図が 2 つ": "6eef28fea5f084ff208a7aef00f70458346f772cf6e2a8ea6dd81518ad0d0f0d",
+  "slide2.xml.rels 図が 2 つ": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
+  "slide3.xml 表と図": "1dc084975f3470afc7b18786d50dd2823a6f8b77846ba17ff9fbb6ae0265709e",
+  "slide3.xml.rels 表と図": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
+  "slide4.xml col 本文｜図": "c026e194d2d5bbc4d57bbf16bd4bcb074ab13d6ba317d6415ac7ec0f7cb7c5b3",
+  "slide4.xml.rels col 本文｜図": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
+}
+`;
+
+exports[`#392 段 2 golden — 配布資料_公文書高密度_TemplateOnly.pptx > painter: each diagram painted into its own region (regions are disjoint), sha256 1`] = `
+{
+  "1 図が 2 つ #1": "4297071c35de690998557e9df41b44b908f3c6375741e4797afd60416fe517e0",
+  "1 図が 2 つ #2": "3cca1ec5fbe930247ed4c7cbac00c97c9b9174e2e6fd54292337bc81e7bab241",
+  "2 表と図 #2": "a44823bab117c000d557e3975cf3290d53b2f9c7413b3dff06b8dfb530ff7064",
+  "3 col 本文｜図 #1": "c5b8239a82237c06ce9c3c216128c3b4fa30dc7ab1cef1014c738379659dccc6",
+}
+`;
