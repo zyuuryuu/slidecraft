@@ -93,7 +93,9 @@ claude mcp add slidecraft -- slidecraft-mcp
 
 ### Claude Desktop / Cursor
 
-**Claude Desktop** は、リリースの Assets にある `.mcpb`（macOS: `slidecraft-darwin-arm64.mcpb`、Windows: `slidecraft-win32-x64.mcpb`）をダブルクリックするだけで導入できます（JSON 編集不要・Node 同梱）。GUI の 協働 パネルからもダウンロードできます。`.mcpb` が無い版や Cursor では、次の JSON を登録します。
+**Claude Desktop** は、リリースの Assets にある `.mcpb`（macOS: `slidecraft-darwin-arm64.mcpb`、Windows: `slidecraft-win32-x64.mcpb`）を、Claude Desktop の **設定 → 拡張機能** から入れると導入できます（設定画面へのドラッグでも可・JSON 編集不要・Node 同梱）。GUI の 協働 パネルからもダウンロードできます。`.mcpb` が無い版や Cursor では、次の JSON を登録します。
+
+GUI のテンプレ（技術報告・Pitch など）を Claude Desktop から使うには、**先に GUI の 協働 パネルで「協働を開始」を押してから Claude Desktop を起動**します。Claude Desktop がすでに起動しているなら、完全に終了して起動し直してください（拡張の無効→有効では足りない場合があります）。SlideCraft のサーバが GUI を探すのは起動時の 1 回だけです。
 
 `claude_desktop_config.json`（Cursor は `~/.cursor/mcp.json` またはプロジェクト直下 `.cursor/mcp.json`）の `mcpServers` に登録します。
 
