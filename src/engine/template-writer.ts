@@ -72,7 +72,7 @@ export const MIDNIGHT_PALETTE: Record<PaletteKey, string> = {
 
 // ── 定数（設計パラメータ: スライド 13.33×7.5in / EMU 換算）──
 const EMU = (inches: number) => Math.round(inches * 914400);
-const SLIDE_W = 13.333;
+export const SLIDE_W = 13.333;
 const HEADER_BAR_H = 1.18; // light 系レイアウトのヘッダーバー（idx15/16 ヘッダーを覆う）
 
 // 日本語ファーストの既定: spec が majorEa/minorEa を指定しない時に theme <a:ea> へ焼く CJK フォールバック
@@ -93,7 +93,8 @@ export function titleTextBottomIn(titleY: number, titleFontSizePt: number, lines
 // マスター既定（canonical と同値 — lstStyle は差分のみ出力するのでここが基準）
 type MasterStyle = { sz: number; bold: boolean; font: "major" | "minor"; color: PaletteKey };
 const MASTER_TITLE: MasterStyle = { sz: 4400, bold: true, font: "major", color: "titleText" };
-const MASTER_BODY: MasterStyle = { sz: 1400, bold: false, font: "minor", color: "bodyText" };
+export const MASTER_BODY_PT = 14; // 本文の基準サイズ（プリセットの density.bodyPt はこれとの比で掛ける）
+const MASTER_BODY: MasterStyle = { sz: MASTER_BODY_PT * 100, bold: false, font: "minor", color: "bodyText" };
 
 const escXml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -273,7 +274,7 @@ function layoutXml(def: LayoutDef, spec: TemplateSpec): string {
   // family が装飾を決める: dark=背景塗りのみ / light=canvas 塗り＋ヘッダーバー（白タイトルの可読性）。
   // flatContent（ソースがフラット設計）なら light のヘッダーバーを外し、バー前提の明色を暗色へ寄せる。
   const flat = !!spec.flatContent && def.family === "light";
-  const bg = def.family === "dark" ? spec.palette.background : spec.palette.canvas;
+  const bg = spec.palette[def.bg ?? (def.family === "dark" ? "background" : "canvas")]; // bg: 色面（#594）
   const decos = [
     ...(def.family === "light" && !flat ? [{ x: 0, y: 0, w: SLIDE_W, h: HEADER_BAR_H, color: "background" as PaletteKey }] : []),
     ...(def.decos ?? []),
