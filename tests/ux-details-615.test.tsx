@@ -133,7 +133,7 @@ describe("#615-2 英語のままのラベルを辞書へ（日本語表示）", 
       const html = dialog();
       expect(html).toContain("Import to SlideCraft");
       expect(html).toContain("Slide Deck");
-      expect(html).toContain("Connection settings");
+      expect(html).toContain("AI connection settings"); // #653: aiSettings.title に統一
     } finally {
       await i18n.changeLanguage("ja");
     }

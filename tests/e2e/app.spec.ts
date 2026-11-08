@@ -298,7 +298,7 @@ test.describe("SlideCraft", () => {
     // …they are one click away in ⚙.
     await bar.getByRole("button", { name: "設定", exact: true }).click();
     await expect(page.getByRole("button", { name: /ヘルプ（ドキュメント）/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /AI の接続設定/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /AI 接続設定/ })).toBeVisible();
     await expect(page.getByTitle("Light")).toBeVisible();
   });
 
@@ -313,9 +313,9 @@ test.describe("SlideCraft", () => {
     await expect(bar.getByRole("button", { name: /^ファイル/ })).toBeVisible();
   });
 
-  test("⚙ → AI の接続設定 opens the AI dock with its connection settings (#614)", async ({ page }) => {
+  test("⚙ → AI 接続設定 opens the AI dock with its connection settings (#614)", async ({ page }) => {
     await page.getByTestId("top-bar").getByRole("button", { name: "設定", exact: true }).click();
-    await page.getByRole("button", { name: /AI の接続設定/ }).click();
+    await page.getByRole("button", { name: /AI 接続設定/ }).click();
     await expect(page.getByText(/編集対象:/)).toBeVisible(); // the AI dock is open
     await expect(page.getByTestId("ai-settings-popover")).toBeVisible(); // …with the settings popover
     // The request is consumed: closing the dock and reopening it with ✨ AI does not pop settings again.

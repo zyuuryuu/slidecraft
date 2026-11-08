@@ -42,7 +42,7 @@ interface AiPanelProps {
   batchRunning?: boolean;
   /** Pre-fill the instruction box (ReviewBar "✨直す" handoff). `ts` re-seeds on repeat. */
   seed?: { prompt: string; ts: number };
-  /** ⚙ → 「AI の接続設定」 (#614): a value opens the settings popover on the assist tab; the panel then
+  /** ⚙ → 「AI 接続設定」 (#614): a value opens the settings popover on the assist tab; the panel then
    *  calls onSettingsOpened so the request is consumed (a later plain open of the dock doesn't re-pop it). */
   openSettingsTs?: number;
   onSettingsOpened?: () => void;
@@ -296,7 +296,7 @@ export default function AiPanel({
             onClick={() => setShowSettings((v) => !v)}
             title={t("aiPanel.settingsPillTitle", {
               label: ai.connection.label,
-              hint: ai.connection.hint ? " — " + ai.connection.hint : "",
+              hint: ai.connection.hint ? " — " + ai.connection.hint : "", settings: t("aiSettings.title"),
             })}
             className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
           >
@@ -319,7 +319,7 @@ export default function AiPanel({
 
       {hubTab === "collab" ? collabTab : (
       <>
-      {/* AI settings popover — anchored below the header pill; a transparent backdrop closes it. */}
+      {/* AI connection settings popover — anchored below the header pill; a transparent backdrop closes it. */}
       {showSettings && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />

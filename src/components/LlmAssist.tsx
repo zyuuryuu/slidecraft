@@ -156,7 +156,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
               <span className={toneClass(ai.connection.tone)}>●</span>
               <span className="text-fg2">{ai.connection.label}</span>
               {ai.connection.hint && <span className="text-faint truncate">— {ai.connection.hint}</span>}
-              <span className="ml-auto shrink-0 text-muted">⚙ {t("llmAssist.connectionSettings")} {showSettings ? "▾" : "▸"}</span>
+              <span className="ml-auto shrink-0 text-muted">⚙ {t("aiSettings.title")} {showSettings ? "▾" : "▸"}</span>
             </button>
             {showSettings && (
               <div className="rounded border border-edge bg-panel">
