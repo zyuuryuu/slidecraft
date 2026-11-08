@@ -95,11 +95,13 @@ describe("#615-1 AI の接続設定は 1 か所（AiSettingsPopover）", () => {
   });
 
   it("「AIで生成」ダイアログは入力欄を持たず、AiSettingsPopover を開くボタンと接続状態を出す", () => {
-    const html = dialog();
+    // #653: 接続が使えない（ok=false）と開いた時点で設定を展開するので、ここは接続済みの状態で見る。
+    const ai = fakeAi({ connection: { ok: true, tone: "ok", label: "gpt-4o を使用", hint: "" } });
+    const html = renderToStaticMarkup(<LlmAssist isOpen onClose={noop} onImportResult={noop} ai={ai} />);
     expect(html).not.toContain('type="password"'); // API キー欄
     expect(html).not.toContain('type="checkbox"'); // キーの記憶・ローカルモデル限定
     expect(html).not.toContain("<select"); // プロバイダ・モデル
-    expect(html).toContain("APIキー未設定"); // 現在の接続状態は見える
+    expect(html).toContain("gpt-4o を使用"); // 現在の接続状態は見える
     const btn = html.match(/<button[^>]*data-testid="llm-ai-settings-toggle"[^>]*>([\s\S]*?)<\/button>/);
     expect(btn?.[0]).toContain('aria-expanded="false"');
     expect(btn?.[1].replace(/<[^>]+>/g, "")).toContain("接続設定");

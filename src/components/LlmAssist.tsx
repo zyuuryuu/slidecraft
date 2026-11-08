@@ -41,8 +41,15 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   const [diagramType, setDiagramType] = useState<DiagramTypeChoice>("auto");
   const [userRequest, setUserRequest] = useState("");
 
-  // The AI connection settings fold + manual copy/paste fallback (UI-only state).
-  const [showSettings, setShowSettings] = useState(false);
+  // The AI connection settings fold + manual copy/paste fallback (UI-only state). #653: the fold
+  // starts OPEN whenever the dialog opens with an unusable connection (connection.ok=false), so a
+  // first-time user lands on what to fill in; after that it is the user's to toggle.
+  const [showSettings, setShowSettings] = useState(() => !ai.connection.ok);
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) setShowSettings(!ai.connection.ok);
+  }
   const [showManual, setShowManual] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [copied, setCopied] = useState(false);
@@ -155,7 +162,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
             >
               <span className={toneClass(ai.connection.tone)}>●</span>
               <span className="text-fg2">{ai.connection.label}</span>
-              {ai.connection.hint && <span className="text-faint truncate">— {ai.connection.hint}</span>}
+              {ai.connection.hint && <span className="text-faint min-w-0 truncate">— {ai.connection.hint}</span>}
               <span className="ml-auto shrink-0 text-muted">⚙ {t("aiSettings.title")} {showSettings ? "▾" : "▸"}</span>
             </button>
             {showSettings && (
