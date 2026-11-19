@@ -52,7 +52,7 @@
     "@tauri-apps/plugin-http": "^2.8.3",
     "@tauri-apps/plugin-opener": "^2.7.2",
     "harfbuzzjs": "^1.6.4",
-    "i18next": "^26.7.1",
+    "i18next": "^27.1.2",
     "js-yaml": "^5.5.0",
     "jszip": "^3.10.2",
     "mermaid": "^11.16.1",
