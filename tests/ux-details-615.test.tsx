@@ -57,7 +57,7 @@ function fakeAi(over: Partial<Record<string, unknown>> = {}): AiGeneration {
     refreshModels: noop,
     ollamaModels: null,
     switchToOllama: noop,
-    connection: { ok: false, tone: "warn", label: "APIキー未設定", hint: "" },
+    connection: { ok: false, needsUserAction: true, tone: "warn", label: "APIキー未設定", hint: "" },
     switchToBuiltin: noop,
     stopBuiltin: noop,
     builtinStatus: { kind: "idle" },
@@ -96,7 +96,7 @@ describe("#615-1 AI の接続設定は 1 か所（AiSettingsPopover）", () => {
 
   it("「AIで生成」ダイアログは入力欄を持たず、AiSettingsPopover を開くボタンと接続状態を出す", () => {
     // #653: 接続が使えない（ok=false）と開いた時点で設定を展開するので、ここは接続済みの状態で見る。
-    const ai = fakeAi({ connection: { ok: true, tone: "ok", label: "gpt-4o を使用", hint: "" } });
+    const ai = fakeAi({ connection: { ok: true, needsUserAction: false, tone: "ok", label: "gpt-4o を使用", hint: "" } });
     const html = renderToStaticMarkup(<LlmAssist isOpen onClose={noop} onImportResult={noop} ai={ai} />);
     expect(html).not.toContain('type="password"'); // API キー欄
     expect(html).not.toContain('type="checkbox"'); // キーの記憶・ローカルモデル限定
