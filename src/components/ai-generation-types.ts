@@ -154,7 +154,11 @@ export function postProcessAiResult(mode: AiMode, raw: string, catalog?: LayoutC
   return { result: raw }; // "diagram" → raw passthrough
 }
 
-export interface ConnectionStatus { ok: boolean; tone: "ok" | "warn" | "err" | "checking"; label: string; hint?: string; }
+/** The AI connection as the UI shows it. `ok` = usable right now. `needsUserAction` = only the user can fix
+ *  it (enter a key, pick a model, download, restart…) — as opposed to "wait" (checking / downloading / starting)
+ *  or "it will fix itself" (the builtin runtime auto-starts on generate). The 「AIで生成」 dialog opens its
+ *  settings on this signal (#669); computeConnection is the ONLY place that decides it (R8). */
+export interface ConnectionStatus { ok: boolean; needsUserAction: boolean; tone: "ok" | "warn" | "err" | "checking"; label: string; hint?: string; }
 
 /** The status dot's colour for a connection tone — the ONE mapping shared by the AI dock pill, the
  *  settings popover and the 「AIで生成」 dialog (R8, #653). */
@@ -178,35 +182,36 @@ export function computeConnection(a: {
   const { provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsLoading, modelsError, models } = a;
   const isOllama = provider === "ollama";
   if (preset.native) {
-    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint") };
-    if (!cfg.model.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.modelNotSelected") };
-    return { ok: true, tone: "ok", label: i18n.t("aiStatus.usingModel", { model: cfg.model }) };
+    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint") };
+    if (!cfg.model.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.modelNotSelected") };
+    return { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.usingModel", { model: cfg.model }) };
   }
   if (provider === "builtin") {
-    if (builtinStatus.kind === "downloading") return { ok: false, tone: "checking", label: i18n.t("aiStatus.downloadingModel", { model: builtinModel?.display ?? i18n.t("aiStatus.modelFallback"), pct: builtinStatus.pct ?? 0 }) };
-    if (builtinStatus.kind === "starting") return { ok: false, tone: "checking", label: i18n.t("aiStatus.offlineStarting") };
-    if (builtinStatus.kind === "error") return { ok: false, tone: "err", label: i18n.t("aiStatus.offlineStartFailed"), hint: builtinStatus.message };
+    if (builtinStatus.kind === "downloading") return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.downloadingModel", { model: builtinModel?.display ?? i18n.t("aiStatus.modelFallback"), pct: builtinStatus.pct ?? 0 }) };
+    if (builtinStatus.kind === "starting") return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.offlineStarting") };
+    if (builtinStatus.kind === "error") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.offlineStartFailed"), hint: builtinStatus.message };
     if (!cfg.baseURL.trim()) {
+      // Not started yet is NOT something the user must fix: generate auto-starts the runtime (#669).
       return weightsPresent === false
-        ? { ok: false, tone: "warn", label: i18n.t("aiStatus.modelNotFetched", { model: builtinModel?.display ?? i18n.t("aiStatus.offlineAiFallback") }), hint: i18n.t("aiStatus.downloadFirstHint", { gb: builtinModel ? (builtinModel.sizeMb / 1024).toFixed(1) : "?" }) }
-        : { ok: false, tone: "warn", label: i18n.t("aiStatus.offlineNotStarted"), hint: i18n.t("aiStatus.offlineAutoStartHint") };
+        ? { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.modelNotFetched", { model: builtinModel?.display ?? i18n.t("aiStatus.offlineAiFallback") }), hint: i18n.t("aiStatus.downloadFirstHint", { gb: builtinModel ? (builtinModel.sizeMb / 1024).toFixed(1) : "?" }) }
+        : { ok: false, needsUserAction: false, tone: "warn", label: i18n.t("aiStatus.offlineNotStarted"), hint: i18n.t("aiStatus.offlineAutoStartHint") };
     }
     // baseURL is set but the runtime isn't answering (a stale port from a past session, or it stopped).
     // Give the ACTIONABLE fix instead of the generic "接続できません".
-    if (modelsError) return { ok: false, tone: "err", label: i18n.t("aiStatus.offlineNotResponding"), hint: i18n.t("aiStatus.offlineRestartHint") };
+    if (modelsError) return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.offlineNotResponding"), hint: i18n.t("aiStatus.offlineRestartHint") };
     // baseURL filled + reachable → fall through to the generic model checks below.
   }
-  if (!cfg.baseURL.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.baseUrlMissing") };
-  if (modelsLoading) return { ok: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };
+  if (!cfg.baseURL.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.baseUrlMissing") };
+  if (modelsLoading) return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };
   if (modelsError) {
     return isOllama
-      ? { ok: false, tone: "err", label: i18n.t("aiStatus.ollamaCantConnect"), hint: i18n.t("aiStatus.ollamaServeHint") }
-      : { ok: false, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: i18n.t("aiStatus.checkEndpointHint", { error: modelsError }) };
+      ? { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.ollamaCantConnect"), hint: i18n.t("aiStatus.ollamaServeHint") }
+      : { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: i18n.t("aiStatus.checkEndpointHint", { error: modelsError }) };
   }
   if (models.length === 0) {
-    return { ok: false, tone: "warn", label: i18n.t("aiStatus.noModelsAvailable"), hint: isOllama ? i18n.t("aiStatus.ollamaPullHint") : i18n.t("aiStatus.checkModelNameHint") };
+    return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.noModelsAvailable"), hint: isOllama ? i18n.t("aiStatus.ollamaPullHint") : i18n.t("aiStatus.checkModelNameHint") };
   }
-  if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing") };
-  if (!cfg.model.trim() || !models.includes(cfg.model)) return { ok: false, tone: "warn", label: i18n.t("aiStatus.selectModel"), hint: i18n.t("aiStatus.modelsAvailableHint", { count: models.length }) };
-  return { ok: true, tone: "ok", label: i18n.t("aiStatus.connectedOk", { model: cfg.model, count: models.length }) };
+  if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing") };
+  if (!cfg.model.trim() || !models.includes(cfg.model)) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.selectModel"), hint: i18n.t("aiStatus.modelsAvailableHint", { count: models.length }) };
+  return { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.connectedOk", { model: cfg.model, count: models.length }) };
 }
