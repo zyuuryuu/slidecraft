@@ -36,7 +36,7 @@
     "deckGuidance": "スライドを選ぶと、そのスライドを AI で直せます。デッキを丸ごと作るときは",
     "deckGuidanceTarget": "［{{draft}} → {{generate}}］",
     "deckGuidanceLocked": "協働中は原稿を開けません（協働を停止すると使えます）",
-    "deckGuidanceBusy": "テンプレ調整中は原稿を開けません（調整を適用するか取り消すと使えます）",
+    "deckGuidanceBusy": "テンプレート調整中は原稿を開けません（調整を適用するか取り消すと使えます）",
     "stop": "停止",
     "batchRunning": "一括編集中…",
     "editSlidesButton": "{{count}}枚を編集",
