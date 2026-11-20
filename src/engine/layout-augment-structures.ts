@@ -10,7 +10,9 @@
  * 定義を作らない）。LayoutDef に完全一致の定義が無い 2 構造は、最も近い定義を組み合わせる（Issue/PR に記録）:
  *  - card-3: 横（ガター）は Column.3Body.Equal、縦（見出し高・間隔）と見出し/本文の文字比は
  *    Compare.2Option.Versus（見出し＋本文の組を持つ唯一の LayoutDef）。
- *  - kpi-4: 1 行 ×4 の LayoutDef は無い（KPI.4Value.Grid は 2×2 で 1 枠ずつ）ので KPI.3Value.Equal の比率を使う。
+ *  - kpi-4: 1 行 ×4 の LayoutDef は無いので KPI.3Value.Equal の比率を使う。KPI.4Value.Grid（2×2・#695 で値枠＋
+ *    ラベル枠の対）は 1 セルが幅 4.8in 前後と 1 行 ×4 の列（約 2.6in）より大幅に広く、その pt/in や縦比は
+ *    狭い列に合わない。1 行に並ぶ列の比率を持つ KPI.3 の方が近い。
  *
  * 純粋計算のみ（R2）。
  */
