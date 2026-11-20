@@ -72,6 +72,31 @@ export async function generateWithClaude(opts: GenerateOptions): Promise<string>
   }
 }
 
+/**
+ * List the models this key can use — the Claude connection check (#691). Models API (GET /v1/models)
+ * uses no tokens, so it's a cheap, authenticated "is this key valid?" probe. Failures are thrown as
+ * `HTTP <status>` (same convention as the OpenAI-compatible listing) so computeConnection can tell
+ * 401 / 403 apart; a transport failure carries no status. The key never appears in an error message.
+ */
+export async function listClaudeModels(apiKey: string): Promise<string[]> {
+  if (!apiKey.trim()) throw new Error("API key is required.");
+  const client = new Anthropic({
+    apiKey: apiKey.trim(),
+    dangerouslyAllowBrowser: true,
+    fetch: appFetch,
+    maxRetries: 0, // a check, not a generation: report the first answer, don't hammer
+    timeout: 15_000,
+  });
+  try {
+    const ids: string[] = [];
+    for await (const m of client.models.list({ limit: 1000 })) ids.push(m.id);
+    return [...new Set(ids)];
+  } catch (e) {
+    if (e instanceof Anthropic.APIError && typeof e.status === "number") throw new Error(`HTTP ${e.status}`, { cause: e });
+    throw new Error("Could not reach the Claude API", { cause: e });
+  }
+}
+
 function friendlyError(e: unknown): string {
   if (e instanceof Anthropic.APIUserAbortError) {
     return "Generation cancelled.";

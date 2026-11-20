@@ -66,7 +66,7 @@ Windows の注意点：
 - ユーザ PATH が極端に長い（約 1,000 文字超）場合、NSIS インストーラは **PATH を壊さないために編集を見送り**、追加すべきフォルダをダイアログで案内します。その場合は手で追加してください。
 - ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
 
-**Claude Desktop（`.mcpb`・#517）** — リリースの Assets に Claude Desktop 用バンドル `slidecraft-darwin-arm64.mcpb`（macOS Apple Silicon）/ `slidecraft-win32-x64.mcpb`（Windows x64）が付きます（このファイルが載ったリリース以降）。ダウンロードしてダブルクリック（または Claude Desktop の「設定 → 拡張機能」へドラッグ）すると導入され、JSON の手編集は要りません。中身は MCPB 形式（manifest ＋ `cli.cjs` ＋ **同梱 Node**）で、アプリ本体のインストールとは独立に動きます（Claude Desktop 内蔵の Node には依存しない・ADR-0022）。既定は `--no-fs`（base64）のままです。Linux には Claude Desktop が無いため `.mcpb` はありません。GUI の 協働 パネルにも、この OS 用の `.mcpb` のダウンロードボタンが出ます（最新リリースに無ければその旨を表示）。
+**Claude Desktop（`.mcpb`・#517）** — リリースの Assets に Claude Desktop 用バンドル `slidecraft-darwin-arm64.mcpb`（macOS Apple Silicon）/ `slidecraft-win32-x64.mcpb`（Windows x64）が付きます（このファイルが載ったリリース以降）。ダウンロードして Claude Desktop の「設定 → 拡張機能」から入れる（設定画面へのドラッグでも可）と導入され、JSON の手編集は要りません。GUI のテンプレを使うには、GUI の 協働 パネルで「協働を開始」を押してから Claude Desktop を起動します（起動済みなら完全に終了して起動し直す。GUI を探すのは起動時の 1 回だけ・ADR-0033 D2・#687）。中身は MCPB 形式（manifest ＋ `cli.cjs` ＋ **同梱 Node**）で、アプリ本体のインストールとは独立に動きます（Claude Desktop 内蔵の Node には依存しない・ADR-0022）。既定は `--no-fs`（base64）のままです。Linux には Claude Desktop が無いため `.mcpb` はありません。GUI の 協働 パネルにも、この OS 用の `.mcpb` のダウンロードボタンが出ます（最新リリースに無ければその旨を表示）。
 
 **接続診断（`--doctor`・#517）** — 登録したのにツールが見えないときは、登録したコマンドに `--doctor` を付けて実行します：
 
