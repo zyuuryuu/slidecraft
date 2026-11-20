@@ -10,21 +10,21 @@ This page covers the ways in to templates. There are two intake modes: **faithfu
 4. **Create a template from scratch** — pick colors and fonts and build from zero (with AI suggestions and live preview)
 
 ::: tip Persisted
-On the desktop version, imported and created templates are saved to the app's local data area, and **remain selectable from the master picker after a restart**. The browser version (for development and demos) keeps them only within the session, and they are lost when it is closed.
+On the desktop version, imported and created templates are saved to the app's local data area, and **remain selectable from the 🎨 template menu after a restart**. The browser version (for development and demos) keeps them only within the session, and they are lost when it is closed.
 :::
 
-### The master menu
+### The template menu
 
-Template operations live in the **🎨 master menu** on the top bar.
+Template operations live in the menu of the **🎨 Template: <name>** button on the top bar (the template menu).
 
 | Section | Items |
 |---------|-------|
-| **Select** | the registered masters (✓ marks the current one; 🗑 deletes imported ones only) |
-| **Import** | 📥 Import master (.pptx) / 🔁 Keep the design (Re-make) |
+| **Select** | the registered templates (✓ marks the current one; 🗑 deletes imported ones only) |
+| **Import** | 📥 Import template (.pptx) / 🔁 Keep the design (Re-make) |
 | **Modify** | 🔤 Adjust template (fonts / sizes)… / 🧩 Augment template… / ⓘ Show the latest intake result |
 | **New** | ＋ Create template… |
 
-The master menu in the Draft screen has only Select and Import (the adjust strip, the augment result and the creation dialog appear in the main view, so close Draft first). While live collaboration is connected or a template adjustment is open, the master menu is disabled.
+The template menu in the Write draft screen has only Select and Import (the adjust strip, the augment result and the creation dialog appear in the main view, so close Write draft first). While live collaboration is connected or a template adjustment is open, the template menu is disabled.
 
 ---
 
@@ -48,7 +48,7 @@ When you load a `.pptx` you have on hand (such as a company-standard empty templ
 
 ### Steps
 
-1. In the master menu's Import section, choose **Import master (.pptx)**.
+1. In the template menu's Import section, choose **Import template (.pptx)**.
 2. Select the `.pptx` file.
 3. A health check runs, and if there are no problems it is registered and applied as-is.
 
@@ -70,7 +70,7 @@ Images placed on a layout or master (such as a company logo) are rendered as-is 
 
 ## 1-b. Importing the theme only (Re-make)
 
-Next to "Import a master (.pptx)" there is one more intake point: **"🔁 Import the theme only (Re-make)."** This one **extracts only the fonts, colors, background, and logo** from a company template, transplants them onto SlideCraft's own polished layouts, and creates a new template.
+Next to "Import template (.pptx)" there is one more intake point: **"🔁 Import the theme only (Re-make)."** This one **extracts only the fonts, colors, background, and logo** from a company template, transplants them onto SlideCraft's own polished layouts, and creates a new template.
 
 ### Which should you choose?
 
@@ -97,7 +97,7 @@ Re-make does **not replace** faithful import. Both intake points are in the impo
 
 ## 1-c. Adjusting fonts and text sizes in one go (Adjust template)
 
-**"🔤 Adjust template (fonts / sizes)…"** in the master menu's Modify section makes a **derived template** of the one in use with its fonts and text sizes changed together. A control strip opens under the toolbar: pick the heading / body font (a single shared font when the template uses the same font name for both), where to replace it (**Theme + inline** — the theme plus the same font named directly in layouts, the default — or **Theme only**), and a size factor for title / body / other text (50–150%); the preview follows right away. Sizes are rounded to 0.5pt and kept within 1–400pt, and fonts that are not the theme's (such as Consolas in code frames) stay as they are. **Apply adjustment** adds it to the master list as "original name (adjusted)" — the original template is not changed, and Cancel restores it. Because the sizes change in the template itself, overflow diagnostics and automatic splitting use the new sizes.
+**"🔤 Adjust template (fonts / sizes)…"** in the template menu's Modify section makes a **derived template** of the one in use with its fonts and text sizes changed together. A control strip opens under the toolbar: pick the heading / body font (a single shared font when the template uses the same font name for both), where to replace it (**Theme + inline** — the theme plus the same font named directly in layouts, the default — or **Theme only**), and a size factor for title / body / other text (50–150%); the preview follows right away. Sizes are rounded to 0.5pt and kept within 1–400pt, and fonts that are not the theme's (such as Consolas in code frames) stay as they are. **Apply adjustment** adds it to the template list as "original name (adjusted)" — the original template is not changed, and Cancel restores it. Because the sizes change in the template itself, overflow diagnostics and automatic splitting use the new sizes.
 
 ---
 
@@ -129,7 +129,7 @@ Each placeholder in a PPTX carries a role, such as `<p:ph type="title">`. When t
 
 ## 2-b. Adding missing column layouts (Augment template)
 
-If an imported template has **no 3-column (or 2-column) body layout**, a 3-column slide is placed on the closest 2-box layout and some content may not fit. **"🧩 Augment template (add 3-column)…"** in the master menu's Modify section copies the current template's basic title-plus-one-body layout, splits the body into equal-width columns and **adds only that new layout** (named `<original layout name> +3Body`). Fonts, colors, decorations and the footer are inherited from the master; the body text size steps down the PowerPoint size list by one step for 2 columns and two steps for 3 columns (e.g. 16pt → 12pt in 3 columns). Existing layouts are left untouched; before applying, the result is reloaded and checked that the existing layouts read the same, the new layout reads as N columns, and the editor fields map 1:1 to its boxes. The original `.pptx` is not rewritten — the augmented template is registered as a separate master marked "(augmented)". It works for any template — not only right after an import, but also for the built-in templates and any template re-selected from the list (when there is something to add, the intake bar only shows a hint pointing to the menu item). When the template has no basic layout to build from, or nothing is missing, the menu item is disabled and shows the reason. The review panel's "this template has no 3-column layout" hint (rule `missing-column-layout`) points to the same feature.
+If an imported template has **no 3-column (or 2-column) body layout**, a 3-column slide is placed on the closest 2-box layout and some content may not fit. **"🧩 Augment template (add 3-column)…"** in the template menu's Modify section copies the current template's basic title-plus-one-body layout, splits the body into equal-width columns and **adds only that new layout** (named `<original layout name> +3Body`). Fonts, colors, decorations and the footer are inherited from the master; the body text size steps down the PowerPoint size list by one step for 2 columns and two steps for 3 columns (e.g. 16pt → 12pt in 3 columns). Existing layouts are left untouched; before applying, the result is reloaded and checked that the existing layouts read the same, the new layout reads as N columns, and the editor fields map 1:1 to its boxes. The original `.pptx` is not rewritten — the augmented template is registered as a separate template marked "(augmented)". It works for any template — not only right after an import, but also for the built-in templates and any template re-selected from the list (when there is something to add, the intake bar only shows a hint pointing to the menu item). When the template has no basic layout to build from, or nothing is missing, the menu item is disabled and shows the reason. The review panel's "this template has no 3-column layout" hint (rule `missing-column-layout`) points to the same feature.
 
 **Comparison, card and KPI layouts too.** It adds **every** structure the template lacks: besides 2 and 3 columns, a comparison (2 options, heading + body), 3 cards (heading + body) and a KPI row (value + label ×3 / ×4). They are named `<original layout name> +2Compare` / `+3Card` / `+3KPI` / `+4KPI`, and `<!-- compare -->` / `<!-- card -->` / `<!-- kpi -->` slides are routed to them. The heading/value height, column gap and heading-to-body text ratio come from SlideCraft's built-in layouts, and body text steps down by the same rule as columns (4 KPIs are treated like 3 columns); KPI values are capped to fit the column width. The confirmation lists what will be added (with its sizes) and what is not added because the template already has it.
 
@@ -137,7 +137,7 @@ If an imported template has **no 3-column (or 2-column) body layout**, a 3-colum
 
 ## 3. Creating a template from scratch
 
-Even without a template on hand, you can generate and register a new template `.pptx` from zero **just by picking colors and fonts**. Open the creation modal from **"＋ Create a template…"** in the master picker.
+Even without a template on hand, you can generate and register a new template `.pptx` from zero **just by picking colors and fonts**. Open the creation modal from **"＋ Create a template…"** in the template menu.
 
 There are four things you can do in the creation modal.
 

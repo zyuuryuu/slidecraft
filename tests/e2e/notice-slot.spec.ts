@@ -51,7 +51,7 @@ test("#613: three simultaneous notices → one band, the body drops by one band,
   // 2. + intake result → the intake band replaces it; the update waits (+1)
   await masterButton(page).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: /マスターを取り込む/ }).click();
+  await page.getByRole("button", { name: /テンプレートを取り込む/ }).click();
   await (await chooser).setFiles({
     name: "tech-report.pptx",
     mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -65,8 +65,8 @@ test("#613: three simultaneous notices → one band, the body drops by one band,
 
   // 3. + template adjust → all three at once: only the adjust band shows (+2)
   await masterButton(page).click();
-  await page.getByRole("button", { name: /テンプレ調整/ }).click();
-  const panel = page.getByRole("region", { name: "テンプレ調整" });
+  await page.getByRole("button", { name: /テンプレート調整/ }).click();
+  const panel = page.getByRole("region", { name: "テンプレート調整" });
   await expect(panel).toBeVisible();
   await expect(slot).toHaveAttribute("data-notice", "adjust");
   await expect(page.getByText("取り込み結果")).toHaveCount(0);

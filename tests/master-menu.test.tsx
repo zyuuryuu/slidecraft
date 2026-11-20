@@ -58,7 +58,7 @@ describe("#612 MasterMenu: 4 つの区画", () => {
     expect(html).toContain("加工する");
     expect(html).toContain("新規");
     // 加工する = 調整・強化・取り込み結果（ⓘ は横のボタンでなくこの区画の項目）
-    expect(html).toContain("テンプレ調整（書体・サイズ）…");
+    expect(html).toContain("テンプレート調整（書体・サイズ）…");
     expect(html).toContain('data-testid="master-augment"');
     expect(html).toContain('data-testid="master-show-info"');
     expect(html).toContain("ⓘ");
@@ -70,8 +70,8 @@ describe("#612 MasterMenu: 4 つの区画", () => {
     const html = menu({ onImport: noop, onRemake: noop, onRemove: noop });
     expect(sections(html)).toEqual(["select", "intake"]);
     expect(html).not.toContain('data-testid="master-augment"');
-    expect(html).not.toContain("テンプレ調整");
-    expect(html).not.toContain("テンプレを作成");
+    expect(html).not.toContain("テンプレート調整");
+    expect(html).not.toContain("テンプレートを作成");
   });
 
   it("取り込み結果が無いとき（onShowInfo なし）は ⓘ の項目を出さない", () => {
@@ -87,7 +87,7 @@ describe("#612 MasterMenu: テンプレを強化（取り込み結果が無く�
     const tag = buttonTag(html, "master-augment");
     expect(tag).not.toBe("");
     expect(isDisabled(tag)).toBe(false);
-    expect(html).toContain("テンプレを強化（3 列・KPI 4 個を追加）…");
+    expect(html).toContain("テンプレートを強化（3 列・KPI 4 個を追加）…");
   });
 
   it("元にするレイアウトが無いテンプレ: planAugmentation の reason を添えて無効", () => {
@@ -96,7 +96,7 @@ describe("#612 MasterMenu: テンプレを強化（取り込み結果が無く�
     expect(plan.reason).toBeTruthy();
     const html = menu({ augment: { plan, onAugment: noop } });
     expect(isDisabled(buttonTag(html, "master-augment"))).toBe(true);
-    expect(html).toContain(`テンプレの強化はできません: ${plan.reason}`);
+    expect(html).toContain(`テンプレートの強化はできません: ${plan.reason}`);
   });
 
   it("足すものが残っていない（全部ある）: 無効で、その旨を示す", () => {
@@ -126,7 +126,7 @@ describe("#612 取り込み結果の帯: 強化のボタンを外し、メニュ
     const what = augmentWhat(planTemplateAugmentation(gijutsu));
     expect(what).toBe("3 列・KPI 4 個");
     expect(html).toContain('data-testid="intake-augment-hint"');
-    expect(html).toContain(`🎨 メニューの「テンプレを強化」で ${what} を追加できます`);
+    expect(html).toContain(`🎨 テンプレートのメニューの「テンプレートを強化」で ${what} を追加できます`);
   });
 
   it("協働中・調整中（augmentHint なし）は案内も出さない", () => {

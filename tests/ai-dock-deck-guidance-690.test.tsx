@@ -3,7 +3,7 @@
  * （`ready` は `batch || canSlide` を要求）のに、入力欄が「作りたいデッキを指示…」と案内していた。
  *
  *  1. 未選択（!canSlide かつ一括でない）→ 入力欄と「生成」を出さず、1 行の案内を出す。案内の
- *     ［📝 原稿 → ✨ AIで生成］はボタンで、既存の 📝 原稿ボタンと同じハンドラ（onOpenDraft）を呼ぶ。
+ *     ［📝 原稿入力 → ✨ AIで生成］はボタンで、既存の 📝 原稿ボタンと同じハンドラ（onOpenDraft）を呼ぶ。
  *  2. 選択中 → 今までどおり入力欄と「生成」。一括（複数選択）も今までどおり。
  *  3. 原稿が開けないとき（協働中＝locked・テンプレ調整中＝busy。📝 原稿ボタンの draftGate と同じ）→
  *     リンクを無効にし、理由を同じ 1 行に出す。
@@ -73,12 +73,12 @@ describe("#690-1 スライド未選択: 入力欄の代わりに 1 行の案内"
     expect(html).not.toContain(`>${ja.aiPanel.generate}</button>`);
   });
 
-  it("「スライドを選ぶと…／デッキを丸ごと作るときは［📝 原稿 → ✨ AIで生成］」を出す", () => {
+  it("「スライドを選ぶと…／デッキを丸ごと作るときは［📝 原稿入力 → ✨ AIで生成］」を出す", () => {
     const g = guidance(panel({ currentSlideMd: undefined }));
     expect(g).not.toBeNull();
     const text = g![1].replace(/<[^>]+>/g, "");
     expect(text).toContain("スライドを選ぶと、そのスライドを AI で直せます。デッキを丸ごと作るときは");
-    expect(text).toContain("［📝 原稿 → ✨ AIで生成］");
+    expect(text).toContain("［📝 原稿入力 → ✨ AIで生成］");
   });
 
   it("案内のリンクはボタンで、原稿が開けるときは押せる", () => {
@@ -97,7 +97,7 @@ describe("#690-1 スライド未選択: 入力欄の代わりに 1 行の案内"
     await i18n.changeLanguage("en");
     try {
       const text = guidance(panel({ currentSlideMd: undefined }))![1].replace(/<[^>]+>/g, "");
-      expect(text).toContain("[📝 Draft → ✨ Generate with AI]");
+      expect(text).toContain("[📝 Write draft → ✨ Generate with AI]");
       expect(text).not.toContain("原稿");
     } finally {
       await i18n.changeLanguage("ja");
