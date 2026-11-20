@@ -31,7 +31,7 @@ test.describe("HTML export: real print output", () => {
     await page.waitForTimeout(1500); // let the template + deck settle before export
 
     // Export via the real File menu — clicking 🌐 HTML exports with the default ('slide') transition.
-    await page.getByRole("button", { name: /ファイル/ }).click();
+    await page.getByRole("button", { name: /保存・書き出し/ }).click();
     await expect(page.getByText(/プロジェクトを開く/)).toBeVisible();
     const htmlBtn = page.getByRole("button", { name: /HTML/ });
     await expect(htmlBtn).toBeEnabled({ timeout: 10000 });

@@ -259,6 +259,8 @@ export default function App() {
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
   // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
   const editLocked = collab.status === "connected";
+  // 📝 原稿 gate — shared by the toolbar button and the AI dock's no-slide hint (#690) so they never diverge.
+  const draftGate = editLocked ? "locked" : adjust.session ? "busy" : undefined;
 
   // Switch tabs; if the target tab mirrors a host doc, re-point the collab projection at it so the
   // GUI live-mirrors THAT doc (the seed and each AI-created deck are separate host docs).
@@ -433,7 +435,7 @@ export default function App() {
           onHelp={handleHelp}
           onAiSettings={() => { setShowAiPanel(true); setAiSettingsTs(Date.now()); }}
           onDraft={handleEnterImport}
-          draftGate={editLocked ? "locked" : adjust.session ? "busy" : undefined}
+          draftGate={draftGate}
           master={
             // #612: every template operation lives in this master menu (the Draft modal shows a reduced one).
             <MasterPicker
@@ -583,6 +585,7 @@ export default function App() {
             openSettingsTs={aiSettingsTs} onSettingsOpened={() => setAiSettingsTs(undefined)}
             ai={ai}
             collabConnected={editLocked}
+            onOpenDraft={handleEnterImport} draftGate={draftGate}
             collabTab={
               <CollabPanel
                 embedded

@@ -676,7 +676,7 @@ export function assessTemplateHealth(catalog: LayoutCatalog): TemplateHealth {
   // capacity (usable, just unverifiable). Common + fine; NEVER a block.
   const hasUsableBody = catalog.some((e) => e.placeholders.some((p) => p.role === "body" && p.charsPerLine > 0 && p.maxLines > 0));
   if (hasBody && !hasUsableBody)
-    findings.push({ code: "BODY_CAPACITY_UNKNOWN", level: "warn", message: "本文枠のサイズがマスター継承で、文字容量を判定できません（通常は問題ありません）。" });
+    findings.push({ code: "BODY_CAPACITY_UNKNOWN", level: "warn", message: "本文枠のサイズが枠に直接書かれておらず（テンプレート内の上位の定義から継承）、文字容量を判定できません（通常は問題ありません）。" });
 
   const blocked = findings.some((f) => f.level === "block");
   const status: HealthStatus = blocked ? "rejected" : !hasUsableBody ? "degraded" : "ok";
