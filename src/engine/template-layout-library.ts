@@ -204,10 +204,14 @@ export const BUILTIN_LAYOUTS: LayoutDef[] = [
   { name: "KPI.4Value.Grid", family: "light", placeholders: [
     { name: "SlideTitle.Header", type: "body", idx: 15, x: 0.8, y: 0.1, w: 10, h: 0.52, fontSize: 28, font: "major", color: "titleText", bold: true, align: "l" },
     { name: "SlideSubtitle.Header", type: "body", idx: 16, x: 0.8, y: 0.72, w: 10, h: 0.3, fontSize: 12, font: "minor", color: "subtle", bold: false, align: "l" },
-    { name: "Value1.TL", type: "body", idx: 1, x: 1.0, y: 1.6, w: 4.8, h: 2.0, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
-    { name: "Value2.TR", type: "body", idx: 2, x: 7.2, y: 1.6, w: 5.0, h: 2.0, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
-    { name: "Value3.BL", type: "body", idx: 3, x: 1.0, y: 4.4, w: 4.8, h: 2.0, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
-    { name: "Value4.BR", type: "body", idx: 4, x: 7.2, y: 4.4, w: 5.0, h: 2.0, fontSize: 14, font: "minor", color: "bodyText", bold: false, align: "l" },
+    { name: "Value1.TL", type: "body", idx: 1, x: 1.0, y: 1.6, w: 4.8, h: 0.9, fontSize: 40, font: "major", color: "emphasis", bold: true, align: "ctr" },
+    { name: "Label1.TL", type: "body", idx: 2, x: 1.0, y: 2.6, w: 4.8, h: 1.0, fontSize: 13, font: "minor", color: "bodyText", bold: false, align: "ctr" },
+    { name: "Value2.TR", type: "body", idx: 3, x: 7.2, y: 1.6, w: 5.0, h: 0.9, fontSize: 40, font: "major", color: "emphasis", bold: true, align: "ctr" },
+    { name: "Label2.TR", type: "body", idx: 4, x: 7.2, y: 2.6, w: 5.0, h: 1.0, fontSize: 13, font: "minor", color: "bodyText", bold: false, align: "ctr" },
+    { name: "Value3.BL", type: "body", idx: 5, x: 1.0, y: 4.4, w: 4.8, h: 0.9, fontSize: 40, font: "major", color: "emphasis", bold: true, align: "ctr" },
+    { name: "Label3.BL", type: "body", idx: 6, x: 1.0, y: 5.4, w: 4.8, h: 1.0, fontSize: 13, font: "minor", color: "bodyText", bold: false, align: "ctr" },
+    { name: "Value4.BR", type: "body", idx: 7, x: 7.2, y: 4.4, w: 5.0, h: 0.9, fontSize: 40, font: "major", color: "emphasis", bold: true, align: "ctr" },
+    { name: "Label4.BR", type: "body", idx: 8, x: 7.2, y: 5.4, w: 5.0, h: 1.0, fontSize: 13, font: "minor", color: "bodyText", bold: false, align: "ctr" },
     { name: "SlideNum.Footer", type: "sldNum", idx: 50, x: 12.0, y: 7.05, w: 1.2, h: 0.3, fontSize: 10, font: "minor", color: "muted", bold: false, align: "r" },
   ]},
   // 17-19: Chart layouts
