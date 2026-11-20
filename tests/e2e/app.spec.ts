@@ -14,7 +14,7 @@ test.describe("SlideCraft", () => {
 
   test("shell: title + core toolbar buttons", async ({ page }) => {
     await expect(page.getByText("SlideCraft").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /ファイル/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /保存・書き出し/ })).toBeVisible();
     // The template button is now the master picker, labelled with the current master (🎨 …).
     await expect(page.getByRole("button", { name: /🎨/ })).toBeVisible();
   });
@@ -26,14 +26,14 @@ test.describe("SlideCraft", () => {
   });
 
   test("Draft opens the modal (Markdown editor + split preview)", async ({ page }) => {
-    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
+    await page.getByRole("button", { name: "📝 原稿入力", exact: true }).click();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
     await expect(page.getByText(/Slide Preview/)).toBeVisible();
     await expect(page.getByRole("button", { name: /スライドにする/ })).toBeVisible();
   });
 
   test("Draft: スライドにする commits and returns to Edit", async ({ page }) => {
-    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
+    await page.getByRole("button", { name: "📝 原稿入力", exact: true }).click();
     await expect(page.getByText("Markdown Editor")).toBeVisible();
     await page.getByRole("button", { name: /スライドにする/ }).click();
     await expect(page.getByText("Markdown Editor")).toHaveCount(0);
@@ -41,7 +41,7 @@ test.describe("SlideCraft", () => {
   });
 
   test("preview renders slide cards for the sample deck", async ({ page }) => {
-    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
+    await page.getByRole("button", { name: "📝 原稿入力", exact: true }).click();
     await page.waitForTimeout(1500); // serialize + debounced parse + distill
     const cards = page.locator("[style*='position: relative'][style*='overflow: hidden']");
     await expect(cards.first()).toBeVisible({ timeout: 8000 });
@@ -50,7 +50,7 @@ test.describe("SlideCraft", () => {
 
   test("ファイル → PPTX triggers a .pptx download", async ({ page }) => {
     await page.waitForTimeout(2500); // wait for template + deck so PPTX export works
-    await page.getByRole("button", { name: /ファイル/ }).click();
+    await page.getByRole("button", { name: /保存・書き出し/ }).click();
     await expect(page.getByText(/プロジェクトを開く/)).toBeVisible(); // .slidecraft entry present
     const pptx = page.getByRole("button", { name: /PPTX/ });
     await expect(pptx).toBeEnabled({ timeout: 10000 });
@@ -107,7 +107,7 @@ test.describe("SlideCraft", () => {
   });
 
   test("does not crash on invalid editor input (in the Draft modal)", async ({ page }) => {
-    await page.getByRole("button", { name: "📝 原稿", exact: true }).click();
+    await page.getByRole("button", { name: "📝 原稿入力", exact: true }).click();
     const editor = page.locator(".cm-editor .cm-content");
     await editor.click();
     await page.keyboard.press("Control+a");
@@ -288,7 +288,7 @@ test.describe("SlideCraft", () => {
 
   test("top bar: at most 7 always-visible buttons; settings live in ⚙ (#614)", async ({ page }) => {
     const bar = page.getByTestId("top-bar");
-    await expect(bar.getByRole("button", { name: "📝 原稿", exact: true })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "📝 原稿入力", exact: true })).toBeVisible();
     const visible = await bar.locator("button:visible").count();
     expect(visible).toBeLessThanOrEqual(7);
     // Language / theme / help are no longer on the bar itself…
@@ -306,11 +306,11 @@ test.describe("SlideCraft", () => {
     const bar = page.getByTestId("top-bar");
     await bar.getByRole("button", { name: "設定", exact: true }).click();
     await page.getByRole("button", { name: "EN", exact: true }).click();
-    await expect(bar.getByRole("button", { name: /^File/ })).toBeVisible();
-    await expect(bar.getByRole("button", { name: "📝 Draft", exact: true })).toBeVisible();
+    await expect(bar.getByRole("button", { name: /^Save & Export/ })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "📝 Write draft", exact: true })).toBeVisible();
     await expect(bar.getByRole("button", { name: "Settings", exact: true })).toBeVisible(); // ⚙ is labelled in English too
     await page.getByRole("button", { name: "JA", exact: true }).click(); // the menu stays open while switching
-    await expect(bar.getByRole("button", { name: /^ファイル/ })).toBeVisible();
+    await expect(bar.getByRole("button", { name: /^保存・書き出し/ })).toBeVisible();
   });
 
   test("⚙ → AI 接続設定 opens the AI dock with its connection settings (#614)", async ({ page }) => {

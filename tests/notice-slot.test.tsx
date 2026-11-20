@@ -47,7 +47,7 @@ const render = (s: { adjusting: boolean; intake: boolean; update: boolean }) =>
 // The fixed text each band carries (unchanged band contents).
 const UPDATE_TEXT = "新しいバージョン（v9.9.9）が利用可能です。";
 const INTAKE_TEXT = "取り込み結果";
-const ADJUST_TEXT = 'aria-label="テンプレ調整"';
+const ADJUST_TEXT = 'aria-label="テンプレート調整"';
 const bandsIn = (html: string): NoticeKind[] =>
   [
     html.includes(ADJUST_TEXT) ? "adjust" : null,

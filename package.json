@@ -52,7 +52,7 @@
     "@tauri-apps/plugin-http": "^2.9.0",
     "@tauri-apps/plugin-opener": "^2.7.3",
     "harfbuzzjs": "^1.6.4",
-    "i18next": "^26.7.1",
+    "i18next": "^27.1.2",
     "js-yaml": "^5.5.0",
     "jszip": "^3.10.2",
     "mermaid": "^11.16.1",
@@ -88,6 +88,8 @@
   },
   "overrides": {
     "image-size": "^2.0.4",
-    "hono": "^4.13.13"
+    "hono": "^4.13.13",
+    "minimatch": "^11.0.1",
+    "tmp": "^0.2.6"
   }
 }

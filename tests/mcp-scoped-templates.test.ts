@@ -80,6 +80,17 @@ describe("list_templates discovery (#332)", () => {
     expect(list.note).toContain("--root");
   });
 
+  it("with no --root (solo), the note leads with the GUI route a fixed-args client (.mcpb) can use (#687)", async () => {
+    const client = await connect(null);
+    const note = ((await call(client, "list_templates")).data as ListResult).note ?? "";
+    expect(note.startsWith("SlideCraft の GUI で 協働 パネルの「協働を開始」を押し")).toBe(true);
+    expect(note).toContain("起動し直す");
+    expect(note).toContain("Claude Desktop は完全に終了して起動し直す");
+    // the --root / templatePath route stays, but only for clients that can pass --root
+    expect(note).toContain("--root を付けて起動できるクライアント（Claude Code・Cursor など）");
+    expect(note.indexOf("協働を開始")).toBeLessThan(note.indexOf("--root"));
+  });
+
   it("never lists a symlink placed in templates/ (no traversal vector)", async () => {
     const root = scopeWithTemplates("real.pptx");
     const outside = scratchDir();
