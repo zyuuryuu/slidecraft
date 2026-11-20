@@ -60,7 +60,7 @@
     "pptxgenjs": "^4.0.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-i18next": "^17.1.12",
+    "react-i18next": "^18.0.2",
     "tailwindcss": "^4.2.2",
     "zod": "^4.6.5"
   },
