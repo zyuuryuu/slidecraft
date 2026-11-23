@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import type { Transition } from "../engine/html-shell";
 import SettingsMenu from "./SettingsMenu";
 import HtmlTransitionPicker from "./HtmlTransitionPicker";
+import BarTip from "./BarTip";
+import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { BAR_HOVER } from "./bar-button";
 
 interface ToolbarProps {
   onSave: () => void;
@@ -59,9 +63,13 @@ export default function Toolbar({
   const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
   const [htmlTransition, setHtmlTransition] = useState<Transition>("slide"); // #650: chosen in the File menu itself
-  const btn = "whitespace-nowrap px-3 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors";
+  // #724: the bar's 7 buttons are shadcn/ui Buttons (Base UI); their descriptions are Tooltips (was `title=`).
+  // secondary = bg-edge (the old look); the app's hover (accent/40) is kept. Height = the Button's 32px (as before).
+  const sec = `px-3 font-normal ${BAR_HOVER}`;
+  const icon = `font-normal ${BAR_HOVER} disabled:opacity-30`;
 
   return (
+    <TooltipProvider delay={400}>
     <div data-testid="top-bar" className="flex min-w-0 flex-1 items-center gap-2 px-4 py-2">
       {/* #692: min-w-0 lets the bar be narrower than its content's full width, so the 🎨 template name truncates
           (instead of pushing the AI and ⚙ buttons off a narrow window). */}
@@ -72,12 +80,18 @@ export default function Toolbar({
 
       {onUndo && (
         <div className="flex items-center gap-0.5">
-          <button onClick={onUndo} disabled={!canUndo} title={t("toolbar.undo")} className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
-            ↶
-          </button>
-          <button onClick={onRedo} disabled={!canRedo} title={t("toolbar.redo")} className={`${btn} px-2 disabled:opacity-30 disabled:hover:bg-edge`}>
-            ↷
-          </button>
+          <BarTip label={t("toolbar.undo")} disabled={!canUndo}>
+            <Button variant="secondary" size="icon" onClick={onUndo} disabled={!canUndo} aria-label={t("toolbar.undo")}
+              className={icon}>
+              ↶
+            </Button>
+          </BarTip>
+          <BarTip label={t("toolbar.redo")} disabled={!canRedo}>
+            <Button variant="secondary" size="icon" onClick={onRedo} disabled={!canRedo} aria-label={t("toolbar.redo")}
+              className={icon}>
+              ↷
+            </Button>
+          </BarTip>
         </div>
       )}
 
@@ -87,13 +101,10 @@ export default function Toolbar({
 
       {/* File menu — project save/open (.scft = editable) + export (PPTX / Markdown). */}
       <div className="relative">
-        <button
-          onClick={() => setExportOpen((v) => !v)}
-          className="whitespace-nowrap px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi text-on-accent font-medium rounded transition-colors inline-flex items-center gap-1.5"
-        >
+        <Button onClick={() => setExportOpen((v) => !v)} aria-haspopup="true" aria-expanded={exportOpen} className="px-4 hover:bg-accent-hi">
           {generating ? t("toolbar.exporting") : t("toolbar.file")}
           <span className="text-[10px] opacity-80">▾</span>
-        </button>
+        </Button>
         {exportOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
@@ -161,14 +172,11 @@ export default function Toolbar({
 
       {/* 📝 原稿 (Draft) = secondary action. Gated while collab-locked or while a template adjust is open. */}
       {onDraft && (
-        <button
-          onClick={onDraft}
-          disabled={!!draftGate}
-          title={draftGate === "locked" ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}
-          className={`${btn} disabled:opacity-40 disabled:hover:bg-edge`}
-        >
-          {t("toolbar.draft")}
-        </button>
+        <BarTip label={draftGate === "locked" ? t("app.draftLockedTitle") : t("app.draftButtonTitle")} disabled={!!draftGate}>
+          <Button variant="secondary" onClick={onDraft} disabled={!!draftGate} className={`${sec} disabled:opacity-40`}>
+            {t("toolbar.draft")}
+          </Button>
+        </BarTip>
       )}
 
       {master}
@@ -176,14 +184,16 @@ export default function Toolbar({
       <div className="flex-1" />
 
       {onAiAssist && (
-        <button
-          onClick={onAiAssist}
-          title={
+        <BarTip
+          label={
             aiCollabActive ? t("toolbar.aiCollabTitle")
               : aiRunning > 0 ? t("toolbar.aiRunningTitle", { n: aiRunning })
                 : t("toolbar.aiTitle")
           }
-          className={`whitespace-nowrap px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
+        >
+        <Button
+          onClick={onAiAssist}
+          className={`px-3 font-normal ${
             aiCollabActive
               ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
               : "bg-brand hover:bg-brand text-on-accent"
@@ -196,10 +206,12 @@ export default function Toolbar({
               {aiRunning}
             </span>
           )}
-        </button>
+        </Button>
+        </BarTip>
       )}
 
       <SettingsMenu onHelp={onHelp} onAiSettings={onAiSettings} />
     </div>
+    </TooltipProvider>
   );
 }

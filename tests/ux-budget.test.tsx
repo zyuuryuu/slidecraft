@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * ux-budget.test.tsx — UX 予算（ADR-0039 G4-b・docs/design/ux-principles.md §3／§7）。#648 で 1 ファイルに集約。
  *
@@ -12,8 +13,11 @@
  *  - 改善で値が下がったら、ここを下げ（凍結リストからは消し）、docs/shipped.md に 1 行書く。
  *  - 凍結リスト（FROZEN_*）は予算を超えている既存の箇所。目標は空。新しい違反は凍結リストに足さずに直す。
  *
- * DOM 環境は無いので react-dom/server で描画して数える（先例 tests/master-menu.test.tsx）。開いた状態の
- * メニューを数えるときは、boolean の useState を全部「開」で始める（forceOpen）。
+ * メニューは jsdom に描き、入口を実際に押して開いた状態の document.body で数える（tests/ux-budget-dom.ts・#724）。
+ * shadcn/ui（Base UI）のメニューは開いたときだけ Portal に描くので、全部「開」で描く方式（forceOpen・
+ * react-dom/server）では数えられないため。今の手製メニューで両方式が同じ結果になることを「道具の一致」で
+ * 確かめる（R8）。PR-B でメニューが Portal になったら forceOpen 側は数えられなくなるので、その一致テストは外す。
+ * 開いていない部品（バーのボタン・帯・MasterMenu 単体）は従来どおり react-dom/server で描く。
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
@@ -29,6 +33,7 @@ import type { AdjustSession } from "../src/components/useTemplateAdjust";
 import type { MasterEntry } from "../src/components/useMasterRegistry";
 import { SettingsPanel } from "../src/components/SettingsMenu";
 import { i18nLeaks, menuDepth, groupItems } from "./ux-budget-probes";
+import { openDepth, openedGroups, openPaths } from "./ux-budget-dom";
 import DeepMenu from "./fixtures/ux-budget/DeepMenu";
 
 /** 予算（上限）。§7 の初期値＝現在値。 */
@@ -93,19 +98,17 @@ const masters: MasterEntry[] = [
   { id: "m1", name: "会社", builtin: false },
 ];
 
-// useTheme reads <html data-theme> — give the node environment the one attribute it reads.
+// useTheme reads <html data-theme> (jsdom has the element; main.tsx sets the attribute in the app).
 beforeAll(() => {
-  vi.stubGlobal("document", { documentElement: { getAttribute: () => "dark", setAttribute: noop } });
+  document.documentElement.setAttribute("data-theme", "dark");
 });
 afterAll(() => {
-  vi.unstubAllGlobals();
   void i18n.changeLanguage("ja");
 });
 
 /** The top bar exactly as App wires it (every optional entry present → the worst case).
  *  withMaster=false drops the 🎨 slot so the File and ⚙ menus can be counted on their own. */
-const topBar = (withMaster = true) =>
-  renderToStaticMarkup(
+const topBarEl = (withMaster = true) => (
     <Toolbar
       onSave={noop}
       onGenerate={noop}
@@ -126,8 +129,9 @@ const topBar = (withMaster = true) =>
         <MasterPicker masters={masters} activeId="builtin-gijutsu" onSelect={noop} onImport={noop} onRemake={noop}
           onAdjust={noop} onShowInfo={noop} onCreate={noop} onRemove={noop} />
       )}
-    />,
-  );
+    />
+);
+const topBar = (withMaster = true) => renderToStaticMarkup(topBarEl(withMaster));
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
 
 const walk = (dir: string, ext: RegExp, out: string[] = []): string[] => {
@@ -154,7 +158,11 @@ describe("道具の自己検査（fixture）", () => {
   });
 
   it("menuDepth: バー → メニュー → サブメニュー → 項目 を 3 段と数え、ボタンの無い位置決めの箱は数えない", () => {
-    expect(menuDepth(renderToStaticMarkup(<DeepMenu />))).toEqual({ depth: 3, deepest: ["Deep item"] });
+    expect(menuDepth(withAllOpen(() => renderToStaticMarkup(<DeepMenu />)))).toEqual({ depth: 3, deepest: ["Deep item"] });
+  });
+
+  it("openDepth: 入口を押して開く方式でも 3 段と数える（Portal に描かれても document.body から拾う）", async () => {
+    expect(await openDepth(<DeepMenu />)).toEqual({ depth: 3, deepest: ["Deep item"] });
   });
 
   it("groupItems: 区画ごとに、ボタンを含む直下の要素を数える（見出し・区切り線は数えない・一覧は 1 項目）", () => {
@@ -214,12 +222,12 @@ describe("UX 予算（ADR-0039）", () => {
     for (const g of groups) expect(g.items, g.label).toBeLessThanOrEqual(BUDGET.itemsPerSection);
   });
 
-  it(`Cowan/Miller: ファイルと ⚙ のメニューも ${BUDGET.menuSections} 区画以下・1 区画 ${BUDGET.itemsPerSection} 項目以下（#674）`, () => {
-    // 全部「開」で描いた上部バー（🎨 を除く）＝ファイル ▾ と ⚙ のメニューの中身。セグメント行（HTML の遷移・
+  it(`Cowan/Miller: ファイルと ⚙ のメニューも ${BUDGET.menuSections} 区画以下・1 区画 ${BUDGET.itemsPerSection} 項目以下（#674）`, async () => {
+    // 入口を 1 つずつ開いた上部バー（🎨 を除く）＝ファイル ▾ と ⚙ のメニューの中身。セグメント行（HTML の遷移・
     // 言語・配色）は 1 項目で、区画としては現れない（§3）。区画名の一覧を固定するのは数え漏れの防止。
     const files = [t("toolbar.projectSection"), t("toolbar.exportSection")];
     const settings = [t("settings.displaySection"), t("settings.aiHelpSection")];
-    const groups = groupItems(withAllOpen(() => topBar(false)));
+    const groups = await openedGroups(topBarEl(false));
     expect(groups.map((g) => g.label)).toEqual([...files, ...settings]);
     expect(files.length).toBeLessThanOrEqual(BUDGET.menuSections);
     expect(settings.length).toBeLessThanOrEqual(BUDGET.menuSections);
@@ -229,18 +237,28 @@ describe("UX 予算（ADR-0039）", () => {
       .toEqual(settings);
   });
 
-  it(`段階的開示: メニューのネストは ${BUDGET.menuDepth} 段まで（凍結リストの項目を除く）`, () => {
-    const html = withAllOpen(topBar);
-    // 全部「開」で描いた＝ファイル・🎨・⚙ のメニューが実際に出ている（数え漏れの防止）。
-    expect(html).toContain("📊 PPTX");
-    expect(html).toContain('data-testid="master-section-select"');
-    expect(html).toContain("ヘルプ（ドキュメント）");
-    const tooDeep = (budget: number) => {
-      const r = menuDepth(html);
-      return r.depth > budget ? r.deepest : [];
-    };
+  it(`段階的開示: メニューのネストは ${BUDGET.menuDepth} 段まで（凍結リストの項目を除く）`, async () => {
+    // 入口を押して開いた＝ファイル・🎨・⚙ のメニューが実際に出ている（数え漏れの防止）。
+    const opened = (await openPaths(topBarEl())).filter((p) => p.path.length === 1);
+    expect(opened.map((p) => p.path[0])).toEqual(["保存・書き出し▾", "🎨テンプレート：技術報告 スタンダード水色▾", "⚙"]);
+    expect(opened[0].html).toContain("📊 PPTX");
+    expect(opened[1].html).toContain('data-testid="master-section-select"');
+    expect(opened[2].html).toContain("ヘルプ（ドキュメント）");
+    const r = await openDepth(topBarEl());
+    const tooDeep = (budget: number) => (r.depth > budget ? r.deepest : []);
     expect(tooDeep(BUDGET.menuDepth)).toEqual(FROZEN_DEEP_ITEMS);
     expect(tooDeep(BUDGET.menuDepth + 1)).toEqual([]);
+  });
+
+  describe("道具の一致（R8・#724）: 開いて数える（DOM）＝全部「開」で描いて数える（forceOpen）", () => {
+    // 今の手製メニューは両方式で数えられる。メニューが Portal（Base UI）になる PR-B で forceOpen 側は外す。
+    it("ネストの深さと最深のボタンが同じ", async () => {
+      expect(await openDepth(topBarEl())).toEqual(menuDepth(withAllOpen(topBar)));
+    });
+
+    it("ファイルと ⚙ のメニューの区画・項目数が同じ", async () => {
+      expect(await openedGroups(topBarEl(false))).toEqual(groupItems(withAllOpen(() => topBar(false))));
+    });
   });
 
   describe("シグニファイア: 記号 → 意味の 1 対 1（#614）", () => {

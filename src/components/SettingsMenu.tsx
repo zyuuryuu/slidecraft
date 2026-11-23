@@ -9,6 +9,9 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import LanguageToggle from "./LanguageToggle";
 import ThemeToggle from "./ThemeToggle";
+import BarTip from "./BarTip";
+import { Button } from "@/components/ui/button";
+import { BAR_HOVER } from "./bar-button";
 
 interface SettingsPanelProps {
   /** Close the menu (called after an entry that navigates away — help / AI connection settings). */
@@ -82,18 +85,20 @@ export default function SettingsMenu(props: Omit<SettingsPanelProps, "onClose">)
 
   return (
     <div className="relative inline-flex" ref={ref}>
-      <button
-        type="button"
-        data-testid="settings-button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={t("settings.title")}
-        aria-haspopup="true"
-        aria-expanded={open}
-        title={t("settings.buttonTitle")}
-        className="px-2.5 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors"
-      >
-        ⚙
-      </button>
+      <BarTip label={t("settings.buttonTitle")}>
+        <Button
+          variant="secondary"
+          size="icon"
+          data-testid="settings-button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={t("settings.title")}
+          aria-haspopup="true"
+          aria-expanded={open}
+          className={`font-normal ${BAR_HOVER}`}
+        >
+          ⚙
+        </Button>
+      </BarTip>
       {open && (
         <div className="absolute top-full right-0 mt-1 z-50 min-w-[240px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
           <SettingsPanel {...props} onClose={() => setOpen(false)} />

@@ -12,6 +12,9 @@ import type { TemplateData } from "../engine/template-loader";
 import type { AugmentPlan } from "../engine/layout-augment-plan";
 import { MasterMenu } from "./MasterMenu";
 import { planTemplateAugmentation } from "./augment-offer";
+import BarTip from "./BarTip";
+import { Button } from "@/components/ui/button";
+import { BAR_HOVER } from "./bar-button";
 
 interface MasterPickerProps {
   masters: MasterEntry[];
@@ -65,11 +68,15 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
 
   return (
     <div className="relative inline-flex min-w-0 items-center gap-1" ref={ref}>
-      <button
+      <BarTip label={t("masterPicker.buttonTitle")} disabled={disabled}>
+      <Button
+        variant="secondary"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        title={t("masterPicker.buttonTitle")}
-        className="px-3 py-1.5 text-sm rounded bg-edge hover:bg-accent/40 text-fg transition-colors disabled:opacity-40 disabled:hover:bg-edge inline-flex min-w-0 items-center gap-1.5 max-w-[380px]"
+        aria-haspopup="true"
+        aria-expanded={open}
+        // #692: `shrink` (not the Button's shrink-0) + min-w-0 let the name truncate on a narrow window.
+        className={`px-3 font-normal ${BAR_HOVER} disabled:opacity-40 shrink min-w-0 max-w-[380px] justify-start`}
       >
         <span className="shrink-0">🎨</span>
         {/* #692: say what the button is before the name. When space is short the NAME truncates first (far larger
@@ -77,7 +84,8 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
         <span className="min-w-0 overflow-hidden whitespace-nowrap">{t("masterPicker.buttonPrefix")}</span>
         <span className="min-w-0 truncate shrink-[1000]">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
-      </button>
+      </Button>
+      </BarTip>
       {open && (
         // `top-full` anchors the menu to the BOTTOM of the trigger (opens below it, never over it): the root
         // is inline-flex, so without an explicit top an absolute child would sit at the flex line's TOP.
