@@ -65,7 +65,7 @@ function tagGroupSlots(cells: PlaceholderInfo[], nameChrome = true): { slots: Gr
 // #136: create_template()'s OWN canonical dotted-name convention (Family.NDetail.Modifier — e.g.
 // "Process.3Step.Sequential", "KPI.4Value.Grid") encodes the group kind + count directly in the name.
 // The geometric algorithm below can't always recover that shape (a 2x2 KPI grid reads as 2 columns of
-// 2, not 4 single-value groups; a single-placeholder-per-step layout has no [heading,body] pair to
+// 4 slots, not 4 value+label groups; a single-placeholder-per-step layout has no [heading,body] pair to
 // column-cluster on). Trust the name ONLY for this exact family+count+noun pattern — no third-party
 // master is named like this (see group-detect.test.ts's untouched corpus), so this never fires outside
 // SlideCraft's own generated templates. Overrides the geometric kind/grouping entirely when it matches
@@ -200,7 +200,7 @@ export function detectGroups(layout: LayoutInfo): GroupLayoutShape | null {
 
 /** A KPI value box's font must dominate every other text slot of its group by this ratio. Measured:
  *  canonical KPI.1 72pt vs 18/13, KPI.2 60 vs 14, KPI.3 52 vs 13, report 09_KPI 72 vs 13, マガジン
- *  05_ビッグナンバー 150 vs 15/14 — all ≥ 3.7×; equal-font groups (KPI.4Value.Grid's 14pt cells) are 1×. */
+ *  05_ビッグナンバー 150 vs 15/14, KPI.4Value.Grid 40 vs 13 (#695) — all ≥ 3×; an equal-font group is 1×. */
 const VALUE_FONT_RATIO = 1.5;
 
 /** The group's VALUE box: the text slot whose font dominates every other text slot, else undefined. */
@@ -237,7 +237,7 @@ function markKpiValue(shape: GroupLayoutShape, layout: LayoutInfo): GroupLayoutS
  * #638 — a kpi group's VALUE (big-number) box, by the SAME judgment as markKpiValue (R8): the slot it tagged
  * "value" (value above its label — canonical KPI.*Value), else the dominantValueSlot it left as body (label
  * above value — report/magazine 09_KPIハイライト, 05_ビッグナンバー). Undefined for non-kpi shapes and groups
- * without a dominant font (KPI.4Value.Grid). Binding writes this box's paragraphs without a bullet.
+ * without a dominant font. Binding writes this box's paragraphs without a bullet.
  */
 export function kpiValueSlot(shape: GroupLayoutShape, group: GroupSlot[], layout: LayoutInfo): GroupSlot | undefined {
   if (shape.kind !== "kpi") return undefined;

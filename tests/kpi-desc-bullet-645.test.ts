@@ -5,8 +5,9 @@
  * マスター lvl1 の記号を継いでいた。kpi グループの body 枠へ束縛する段落も箇条を外す（判定は group-layout の
  * role だけ・R8）。説明行そのものの出力は tests/kpi-value-bullet-638.test.ts が固定する。ここでは
  *  - kpi の body 枠の段落が bullet を持たないこと（expandGroups の層）
- *  - 裁定 A（PR #656）: 説明枠の無い KPI.2／KPI.3Value（値枠＋ラベル枠）と KPI.4Value.Grid（ラベル枠のみ）で
- *    ラベル枠へ流れる見出しでない段落（説明行・KPI.4 では値も）も buNone。ラベル（`###`）と値枠は従来どおり
+ *  - 裁定 A（PR #656）: 説明枠の無い KPI.2／KPI.3Value／KPI.4Value.Grid（値枠＋ラベル枠。KPI.4 は #695 で
+ *    ラベル枠のみ→値枠＋ラベル枠の対になった）でラベル枠へ流れる見出しでない段落（説明行）も buNone。
+ *    ラベル（`###`）と値枠は従来どおり
  *  - card / step / compare の body 段落は箇条のまま（expandGroups の層）
  *  - kpi 以外のスライドの slide XML が修正前と byte-identical（digest＝XML の sha256 を修正前の main で固定）
  * を確かめる。
@@ -131,12 +132,14 @@ describe("#645 裁定 A: ラベル枠へ流れる kpi の説明行も buNone", (
       expect(at.get("Value3")).toEqual([para("値3", '<a:rPr b="1"/>')]);
       for (const i of [1, 2, 3]) expect(at.get(`Label${i}`)).toEqual([para(`ラベル${i}`), para(`説明${i}`)]);
     });
-    it(`KPI.4Value.Grid（${key}）: ラベル枠 1 つに入る値・説明行が buNone`, async () => {
+    // #695: KPI.4Value.Grid は値枠＋ラベル枠の対になったので KPI.2／3 と同じ分岐（値は値枠・説明行はラベル枠）。
+    it(`KPI.4Value.Grid（${key}）: ラベル枠の説明行が buNone・値は値枠`, async () => {
       const { layout, at } = await lastSlide(KPI_N(4), tpls[key]);
       expect(layout).toBe("KPI.4Value.Grid");
-      for (const [i, name] of ["Value1.TL", "Value2.TR", "Value3.BL", "Value4.BR"].entries()) {
+      for (const [i, pos] of ["TL", "TR", "BL", "BR"].entries()) {
         const k = i + 1;
-        expect(at.get(name)).toEqual([para(`ラベル${k}`), para(`値${k}`, '<a:rPr b="1"/>'), para(`説明${k}`)]);
+        expect(at.get(`Value${k}.${pos}`)).toEqual([para(`値${k}`, '<a:rPr b="1"/>')]);
+        expect(at.get(`Label${k}.${pos}`)).toEqual([para(`ラベル${k}`), para(`説明${k}`)]);
       }
     });
   }
