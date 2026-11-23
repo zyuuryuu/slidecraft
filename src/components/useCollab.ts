@@ -131,6 +131,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
             // The projection tore itself down → release the approval channel WITH it, so 再開 starts clean
             // (start() checks projRef only; an orphaned channel would keep polling the host).
             void releaseCollab(projRef, chanRef);
+            setApprovals(undefined); // no channel to answer through → no stale dialog / band
+            setAiActive(false);
           }
         },
         onDocs: (docs: DocSummary[]) => {
@@ -191,6 +193,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       setStatus("error");
       setError(e instanceof Error ? e.message : String(e));
       await releaseCollab(projRef, chanRef);
+      setApprovals(undefined);
+      setAiActive(false);
     }
   }, [available]);
 
