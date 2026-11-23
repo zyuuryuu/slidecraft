@@ -4,6 +4,9 @@
 
 ## 基盤・アーキテクチャ
 
+- **`.scft` は figures を含むデッキだけ version 2 で保存** — 複数ビジュアル（`figures[]`）を持つデッキは `meta.version` 2 で保存し、旧アプリは `PROJECT_VERSION_TOO_NEW` で拒否して更新を促す（黙って落とさない）。figures の無いデッキは version 1 のまま byte-identical。version の決定は `projectVersionFor` 1 か所 （#673・PR #680・2026-11-08）
+- **本文倍率の提案（overflow-scale-hint）とプリセットの適用範囲を 1 関数に** — `bodyMaxPtFor` を `adjustTemplate` だけが呼び、hint の試算・MCP `build`・GUI は全部その経由。派生済みテンプレでも試算を「元テンプレ × 絶対レシピ」で作るので、前回倍率 1.2／1.3 でも予告件数＝適用結果（一致テスト）。Executive 由来では本文倍率が KPI 値・Ask の表示用枠に掛からない（#635 裁定 B と整合） （#670・PR #682・2026-11-20）
+- **section 役レイアウトの無いテンプレで章扉の退化を告げる** — Pitch など section 役を持たないテンプレに `<!-- section -->` を置くと、`marker-layout-missing`（info）で「どのレイアウトに置いたか」を 1 件告げる。section 役を持つテンプレ（本文つき章扉・「ご清聴」の章扉を含む）では 0 件、raw／materialized で件数一致 （#662・PR #678・2026-11-20）
 - **#392（複数ビジュアル）段 2・段 3 — 配置と描画・GUI/MCP 追随（完了）** — 段 2: `slideRoleRegions`／`visual-placement` が全ビジュアル（`placedFigures`）の ordinal を見て別々の body 枠に置き、表＋図の重なりを解消、```diagram×2 → `Chart.2Chart.Equal`・本文＋図×2 → `Column.*`、無ければ退化＋`figure-dropped`、chart 役割の候補絞り・col 前の画像順、PPTX/HTML/painter golden（PR #657）。段 3: SlideEditor のビジュアル一覧（↑↓🗑・2 つ目以降のソース欄）は `withFigures` の 1 本（`withFigures ∘ slideFigures = id`）、MCP `set_slide_diagram`／`applyFigureYaml`／`previewFigureEdit` に `figure`（何番目か・省略時は最初の diagram、無ければ最初の Mermaid）、`carryFigures` で図ごとの引き継ぎ、`.scft` は v1 据え置き（`figures` 付きだけ v2 は #673） （#392・PR #657・#667・2026-11-08）
 - **CI: llamafile 取得のリトライ＋キャッシュ** — `scripts/download-retry.mjs`（fetch/sleep 注入の純関数・5xx と接続エラーは 2s/4s/8s で最大 4 試行・4xx は即失敗・SHA256 不一致は再試行しない）を `stage-llamafile.mjs` が呼び、`ci.yml` の `build` は版＋target キーの `actions/cache` でヒット時はネットワークに出ない。pinned 版と SHA256 検証は不変（ADR-0017） （#663・PR #675・2026-11-08）
 - **#392（複数ビジュアル）段 3 — GUI・MCP の追随** — ビジュアルの一覧の書き込みを `slide-figure-edit.withFigures` の 1 本に（読みの `slideFigures` の逆・正は単数フィールド）。SlideEditor は 2 つ以上のスライドだけに一覧（順序・削除・2 つ目以降の図の編集）を出し、全ビジュアルの枠に本文欄を出さない（`visualOccupancy`）。MCP `set_slide_diagram` に `figure`（何番目の図か）。テキスト編集の引き継ぎは図ごと（`carryFigures`・MCP と GUI の一致テスト）。画像の編集枠と出典行のキャプション高さも配置に追随。`.scft` は旧形式のまま正しい（migrate 不要） （#392 段 3・2026-11-08）
@@ -89,6 +92,8 @@
 
 ## テンプレ・マスター
 
+- **Campaign のキャプション可読性・Gallery の候補順位・PRESET_ARTIFACTS の 1 本化** — `Caption.BottomLeft` のレイアウト背景を濃色にしてコントラスト ≈15:1（WCAG 相対輝度式で 3 経路検査）。`suggestLayouts` が `visual` 枠数を見て、画像 2／3／4 枚のスライドで Gallery を上位に（枠不足の Gallery.2 は出さない）。Executive の見本も `PRESET_ARTIFACTS` の同じ経路で生成（`make-executive-template.ts` 廃止・pptx は byte-identical） （#672・PR #683・2026-11-08）
+- **画像面積比を export が描く全画像で計上し、marketing の目標帯を実測で較正** — `scripts/style-metrics.ts` が `planSlideFigures`（export と同じ計画）から behind＋各枠の画像を集め、PPTX の `<p:pic>` 面積和と一致（一致テスト）。先頭画像だけ数えていた 0.185 は再現しない。`marketing.minImageAreaRatio` 0.5 → 0.2（実測 3 デッキ） （#671・PR #679・2026-11-08）
 - **マーケ プリセット「Campaign」＋画像構造** — 全面画像＋キャプション（`Hero.1Image+1Caption`）・テキスト＋画像並置・2×2 グリッド（`Gallery.4Image.Grid`）・色面の章扉など 6 LayoutDef（`PRESET_LAYOUTS`）、`samples/manuscript-07`（10 枚・自動分割 0・消失系 0）、出荷テンプレ（内蔵 6 本目）・見本 golden。画像構造は #392 の `figures[]`＋段 2 の配置（`placedFigures` 1 経路）。画像面積比の計測と目標帯の較正は #671 （#598・PR #668・2026-11-08）
 - **章扉の章一覧固定を `SectionNav.1TitleList.Single` を持つテンプレに限る** — `<!-- section -->` が `SectionNav` を持たないテンプレ（出荷 3 本）で本文レイアウトに落ちていた。pin 受容判定を `layout-pin.ts` の `layoutPinHonored` に一本化し、選択と書き出しの両経路が同関数（23 マスターの一致テスト）。技術報告・公文書・マガジン → `01_章扉`、Executive は byte-identical。section 役レイアウトが無いテンプレ（Pitch）の告知は #662 （#637・PR #658・2026-11-08）
 - **KPI タイルの説明行（kpi グループの body 枠・ラベル枠へ流れる説明行）も `buNone`** — #638 の値枠に続き、kpi グループの見出しでない段落は KPI.2〜4 の単一枠分岐でも箇条記号を消す。判定は `shape.kind === "kpi"` と role のみ（R8）。KPI 以外は 1216 ファイルの slide XML 比較で byte-identical （#645・PR #656・2026-11-08）
@@ -173,6 +178,8 @@
 
 ## 協働・MCP
 
+- **`set_slide_markdown` が ops の JSON 配列を `routeSlideEdit` で受け、経路を metrics に記録** — 本文が JSON 配列（```json フェンス可）なら GUI と同じ `routeSlideEdit`（図 ops → setField → DATA ops）で適用し、Markdown はそのまま。壊れた配列は全文差し替えに退避して notice。`MetricsRecord` に `route`／`skipped` を追加（`METRICS_VERSION` 据え置き・旧行も読める）。説明文の ratchet は +1 文ぴったり （#631・PR #681・2026-11-19）
+- **`.mcpb` の導入手順と単独モードの案内を実機に合わせる** — Windows の Claude Desktop（MSIX 版）は `.mcpb` の関連付けを持たないので、ガイド・協働パネル・コメントの「ダブルクリック」を「設定 → 拡張機能」に。単独モードの `note` は「GUI で協働を開始 → クライアントを起動し直す（Claude Desktop は完全終了）」を先頭に置き、`--root`／`templatePath` は条件付きで残す。組み込みテンプレの拡充は #694 で判断待ち （#686・#687・PR #699・2026-11-19）
 - **`kpi-value-overflow`（warn）: KPI の値が値枠に 1 行で収まらないときに `get_deck_issues` が告げる** — 幅見積りは `title-fit.ts` の `measureLines`（式は不変・R8）、値枠判定は `group-layout.ts` の `kpiValueSlot`。コーパス 27 テンプレ × 13 デッキで誤検知 0・真陽性 3（「4.2 億円」72pt／52pt）。hint との適用範囲の整合は #670 （#643・PR #659・2026-11-08）
 - **collab で `augment_template`／`adjust_template` のテンプレ差し替えを GUI へ同期** — `deckChanged` に ADDITIVE な `templateChanged`/`templateName`、`templateRev` で GUI が `save_project` → `openProject` の既存経路で pull。rev は進めるが undo 履歴に積まない。solo 限定を外し `tool-profiles` を ALL に。stale 拒否後の再 pull を template-only 短絡が潰す欠陥（レビュー D1）を修正 （#616・PR #619・2026-11-08）
 - **Claude Desktop 用 `.mcpb` バンドル＋接続診断 `slidecraft-mcp --doctor`** — release.yml が win32-x64／darwin-arm64 の `.mcpb`（manifest 0.3・同梱 Node・SHA256SUMS 入り）を Release 資産に添付。`--doctor` は MCP server を自己 spawn して `server/discover`→`initialize`→`tools/list` を順に検査し、GUI の「接続テスト」は同じ関数を呼ぶ（判定の重複なし・レポート無しは NG） （#517 子 3・4・PR #617・2026-11-08）
@@ -237,6 +244,11 @@
 
 ## UX・配布
 
+- **上部バーのボタン名を用途が分かる語に・呼び名を「テンプレート」に統一** — 「📝 原稿」→「📝 原稿入力」（比較表で「作成」より採用）、テンプレボタンは「🎨 テンプレート：<名前> ▾」、「ファイル」→「保存・書き出し」＋「開く・保存」「書き出す」の区画見出し。「マスター」「スライドマスター」「テンプレ」を画面・診断文・docs から外し、辞書テストで戻りを防ぐ。e2e は `getByRole` の語だけ置換（統括承認）。ヒューリスティック評価 重大度 1×2 は #713 （#692・PR #701・2026-11-20）
+- **Claude の接続表示を Models API でキー検証してから緑にする** — でたらめなキーでも緑「使用中」になっていたのを、`GET /v1/models`（SDK 1.5・`Authorization: Bearer`）で 1 回確認し、401「API キーが無効です」／403／不通「接続できません」／一覧に無いモデルは warn。600ms デバウンス・同一キーは再確認せず・ローカルのみ設定では通信しない・キーはログに出ない。判定は他プロバイダと同じ `computeConnection` 入力（R8）。重大度 2×2 は #712 （#691・PR #700・2026-11-20）
+- **AI ドックはスライド未選択のとき原稿の AI 生成へ案内** — 「作りたいデッキを指示」の入力欄を出さず、「スライドを選ぶと…／デッキを丸ごと作るときは［📝 原稿入力 → ✨ AIで生成］」の 1 行（リンクは 📝 ボタンと同じハンドラ）。協働中・テンプレート調整中は無効化して理由を同じ行に。`ready` 条件は不変。重大度 1×3 は #713 （#690・PR #698・2026-11-19）
+- **ファイル／⚙ のメニューも UX 予算の区画検査に・セグメント行＝1 項目・選択の寿命の方針** — `groupItems` 1 関数で両メニューの区画（`role="group"`）を数え、区画名を固定。セグメント行（言語・配色・HTML 遷移）は 1 つの値を選ぶ 1 チャンク＝1 項目（Cowan 読み）。「書き出しオプション＝セッション寿命／アプリ設定＝localStorage」を ux-principles §2 規則 8 に。予算値の引き上げなし （#674・PR #685・2026-11-08）
+- **AI 接続設定の残所見（内蔵 AI 未起動で展開しない・「…」・畳んだ記憶）** — 展開条件を `ConnectionStatus.needsUserAction`（`computeConnection` だけが書く）に一本化し、自動起動で足りる状態では展開しない。⚙ の項目に「…」（包みキー `menu.opensDialog`）。畳んだ状態を localStorage 1 キーで記憶（開くと消す）。StatusBar の高さは見送り （#669・PR #684・2026-11-08）
 - **メニューのネストを 2 段以内に（HTML 書き出しの遷移をファイルのメニュー内の 1 行に）** — ファイル ▾ → 🌐 HTML ▸ → 遷移の 3 段を、HTML 行の直下に 4 択のセグメント行（ThemeToggle と同形）として置き、UX 予算のネスト凍結リストを 4 → 0 に（`tooDeep(2)` が実効化＝ratchet 縮小）。遷移 4 値の挙動は e2e で `data-transition` を実証。案 1（並列 4 項目）・2a（保存ダイアログ）・2b（⚙）はヒューリスティック評価で重大度 3 （#650・PR #660・2026-11-08）
 - **AI 接続設定まわりの UX（ヒューリスティック評価 重大度 2 の 4 件）** — 「接続設定」「AI 設定」「AI の接続設定…」の 3 表記を `aiSettings.title` 1 キーに、`modelsEmpty` をプロバイダ別（Ollama／remote）に、「AI で生成」ダイアログ内では候補数を隠す（`surface="dialog"`）、未接続（`checking` を除く）なら初回だけ接続設定を展開、`tone → 色クラス` の写像を `toneClass` 1 関数に。ADR-0039 G4-c の初適用 （#653・PR #664・2026-11-08）
 - **UX 細部の整理** — AI 接続設定の入力欄を `AiSettingsPopover` 1 か所に（「AI で生成」ダイアログはそれを描画）、英語のままのラベル（Markdown／Layout／⟳ Auto／区切り線ツールチップ／StatusBar／図の形式名／LlmAssist）を辞書へ、StatusBar の `spec={null}` 経路を整理、コメントとツールチップ（Ctrl+Y）修正。ヒューリスティック評価の重大度 2 は #653 （#615・PR #652・2026-11-08）
