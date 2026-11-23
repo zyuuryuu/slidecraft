@@ -5,7 +5,7 @@
  */
 export const ONBOARDING_SAMPLE_MD = `# SlideCraft へようこそ
 
-- Markdown を書く → テンプレを選ぶ → .pptx を書き出す
+- Markdown を書く → テンプレートを選ぶ → .pptx を書き出す
 - このスライドはサンプルです。自由に編集して試せます
 
 # 次のステップ

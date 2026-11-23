@@ -33,7 +33,10 @@
     "batchHint": "— Apply one instruction to each slide → review and adopt",
     "promptCollapsedEcho": "— The instruction box is collapsed (▸ to expand)",
     "slidePromptPlaceholder": "Instruction for this slide (e.g. 3 bullet points / more concise / add a diagram / add a DB node / translate to English)",
-    "deckPromptPlaceholder": "Describe the deck you want (e.g. a 5-slide SaaS sales pitch: problem → solution → pricing → case study → next steps)",
+    "deckGuidance": "Select a slide to fix it with AI. To build a whole deck, use ",
+    "deckGuidanceTarget": "[{{draft}} → {{generate}}]",
+    "deckGuidanceLocked": "The draft can't be opened while collaborating (stop collaborating to use it)",
+    "deckGuidanceBusy": "The draft can't be opened while adjusting a template (apply or cancel the adjustment to use it)",
     "stop": "Stop",
     "batchRunning": "Batch editing…",
     "editSlidesButton": "Edit {{count}} slides",
@@ -113,7 +116,13 @@
     "checkModelNameHint": "Check the model name",
     "selectModel": "Select a model",
     "modelsAvailableHint": "{{count}} models available",
-    "connectedOk": "{{model}} (connected · {{count}} models)"
+    "connectedOk": "{{model}} (connected · {{count}} models)",
+    "apiKeyInvalid": "Invalid API key",
+    "apiKeyInvalidHint": "Re-enter a key issued in the Anthropic Console",
+    "apiKeyForbidden": "This key can't use the models",
+    "apiKeyForbiddenHint": "Check the key's permissions (workspace / organization settings)",
+    "checkModelName": "Check the model name",
+    "localOnlyNoCheck": "Local-model-only mode is on, so the cloud connection isn't checked"
   },
   "aiTasks": {
     "taskCount": "{{count}} tasks",
@@ -138,7 +147,7 @@
     "imageInserted": "Image inserted",
     "imageLoadFailed": "Failed to load image",
     "draftLockedTitle": "Editing is locked while collaborating",
-    "draftButtonTitle": "Create or import slides from a draft (text)",
+    "draftButtonTitle": "Write, import or AI-generate the deck's draft text (\"Make slides\" replaces the current deck)",
     "viewForm": "Form",
     "defaultTemplateLoadFailed": "Couldn't load the default template \"{{name}}\": {{detail}}",
     "defaultTemplateRejected": "it can't be used as a template",
@@ -238,7 +247,7 @@
     "doctorSpawnFailed": "Could not start the bundled Node ({{error}}).",
     "doctorIpcError": "Could not start the connection test ({{error}}).",
     "doctorBrowser": "The connection test runs only in the desktop app (the browser build has no bundled server).",
-    "mcpbLabel": "Claude Desktop (double-click the .mcpb to install)",
+    "mcpbLabel": "Claude Desktop (install the .mcpb from Settings → Extensions)",
     "mcpbLoading": "Checking the latest release for a .mcpb…",
     "mcpbBrowser": "In the desktop app you can download this OS's .mcpb here (it is also on GitHub Releases).",
     "mcpbDownload": "Download the .mcpb ({{tag}} · {{name}})",
@@ -302,7 +311,7 @@
     "regenerateConfirmTitle": "Recreate the table of contents"
   },
   "initModal": {
-    "dialogLabel": "Draft — Build slides from your draft",
+    "dialogLabel": "Write draft — Build slides from your draft",
     "importMarkdown": "📄 Import Markdown",
     "importMarkdownTitle": "Import a .md / .yaml file",
     "generateAi": "✨ Generate with AI",
@@ -322,7 +331,7 @@
     "separator": ", ",
     "kind": {
       "adjust": "template adjust",
-      "intake": "master intake",
+      "intake": "template import",
       "update": "update notice"
     }
   },
@@ -378,7 +387,7 @@
     "unboundItem": "Slide {{slide}}: {{message}}",
     "augmentUnavailable": "This template can't be augmented: {{reason}}",
     "augmented": "Added layouts",
-    "augmentHint": "🎨 Use \"Augment template\" in the master menu to add {{what}}"
+    "augmentHint": "🎨 Use \"Augment template\" in the template menu to add {{what}}"
   },
   "lang": {
     "name": "English",
@@ -441,18 +450,19 @@
     "localModelOnly": "Local Models Only"
   },
   "masterPicker": {
-    "buttonTitle": "Slide master used for this deck",
-    "selectMaster": "Select master",
+    "buttonTitle": "Template used for this deck (select, import, adjust, create)",
+    "buttonPrefix": "Template:",
+    "selectMaster": "(none)",
     "builtinSuffix": " (built-in)",
     "importTitle": "Import a .pptx keeping its layouts and placeholders as-is",
-    "importLabel": "Import master (.pptx)",
+    "importLabel": "Import template (.pptx)",
     "remakeTitle": "Import keeping the source's decorations, backgrounds and layouts, normalising only the fonts (ADR-0027)",
     "remakeLabel": "Keep the design (Re-make)",
     "createTitle": "Pick colors and fonts to generate a new template",
     "createLabel": "Create template…",
     "showInfoTitle": "Show the latest intake result",
     "removeTitle": "Delete this template",
-    "adjustTitle": "Make a derived template with the current master's fonts and text sizes adjusted in one go (the original is not changed)",
+    "adjustTitle": "Make a derived template with the current template's fonts and text sizes adjusted in one go (the original is not changed)",
     "adjustLabel": "Adjust template (fonts / sizes)…",
     "section": {
       "select": "Select",
@@ -462,7 +472,7 @@
     },
     "augmentLabel": "Augment template (add {{what}})…",
     "augmentLabelPlain": "Augment template",
-    "augmentTitle": "Make a derived template that adds the layouts the current master lacks (N columns, compare, cards, KPI); the original is not changed",
+    "augmentTitle": "Make a derived template that adds the layouts the current template lacks (N columns, compare, cards, KPI); the original is not changed",
     "augmentNothing": "No missing layouts (N columns, compare, cards and KPI are all present)",
     "showInfoLabel": "Show the latest intake result"
   },
@@ -665,11 +675,11 @@
     "aiCollabLabel": "✨ AI · Co-editing",
     "aiLabel": "✨ AI",
     "exporting": "Exporting…",
-    "file": "File",
-    "draft": "📝 Draft",
+    "file": "Save & Export",
+    "draft": "📝 Write draft",
     "openProject": "Open Project",
     "saveProject": "Save Project",
-    "projectSection": "Project",
+    "projectSection": "Open / Save",
     "exportSection": "Export",
     "transition": "Transition",
     "transitionGroup": "HTML transition",
@@ -691,7 +701,7 @@
     "scopeTheme": "Theme only",
     "scopeThemeTitle": "Replace only the theme's heading / body fonts (fonts named directly in layouts stay)",
     "scopeInline": "Theme + inline",
-    "scopeInlineTitle": "Also replace the same font where the master / layouts name it directly (recommended)",
+    "scopeInlineTitle": "Also replace the same font where the template's layouts name it directly (recommended)",
     "sizeTitle": "Title",
     "sizeBody": "Body",
     "sizeOther": "Other",
@@ -699,7 +709,7 @@
     "updating": "Updating…",
     "reset": "Reset",
     "apply": "Apply adjustment",
-    "applyTitle": "Add as \"{{name}}\" to the master list and apply it to this deck",
+    "applyTitle": "Add as \"{{name}}\" to the template list and apply it to this deck",
     "cancel": "Cancel",
     "failed": "Template adjustment failed: {{error}}"
   },

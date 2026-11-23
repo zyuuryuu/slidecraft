@@ -29,7 +29,7 @@ export function markerLayoutMissingHint(slide: SlideIR, slideIndex: number, tota
     // 解決なので告げない。告知の責務は「テンプレに section 役が無い」場合だけ（PR #678 統括裁定）。
     if (catalog.some((e) => e.role === "section")) return undefined;
     const kind = role === "content" ? "本文レイアウト" : "レイアウト";
-    return `章扉（<!-- section -->）のレイアウト（役割 section）がこのテンプレに無いので、${kind}「${resolved}」に置きました`;
+    return `章扉（<!-- section -->）のレイアウト（役割 section）がこのテンプレートに無いので、${kind}「${resolved}」に置きました`;
   }
-  return `<!-- ${marker} --> に対応するレイアウト（役割 ${marker}）がこのテンプレにありません。「${resolved}」で代替しました`;
+  return `<!-- ${marker} --> に対応するレイアウト（役割 ${marker}）がこのテンプレートにありません。「${resolved}」で代替しました`;
 }

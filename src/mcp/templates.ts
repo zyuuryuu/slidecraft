@@ -118,11 +118,14 @@ export function listTemplates(registry: TemplateStore | undefined, solo: boolean
 }
 
 /** Proposal #2: when a solo client would see only built-ins, tell it HOW to surface its own
- *  templates (the discovery is real but silent otherwise). */
+ *  templates (the discovery is real but silent otherwise). Without --root, lead with the GUI route
+ *  (#687): a fixed-args client such as the .mcpb cannot pass --root, and the GUI host is probed only
+ *  once at startup (ADR-0033 D2), so the client must be restarted after "協働を開始". */
 function soloTemplateNote(scopeRoot: string | null): string {
   return scopeRoot
     ? `カスタムテンプレートは --root 配下の \`${SCOPED_TEMPLATES_SUBDIR}/\` に .pptx/.potx を置くと list_templates に現れます。`
-    : `GUI 未接続のため builtin のみです。--root <dir> 起動＋その配下の \`${SCOPED_TEMPLATES_SUBDIR}/\` に .pptx/.potx を置くと一覧に現れます（または new_project(templatePath) で直接指定）。`;
+    : "SlideCraft の GUI で 協働 パネルの「協働を開始」を押し、MCP クライアントを起動し直す（Claude Desktop は完全に終了して起動し直す）と、GUI のテンプレが一覧に出ます。" +
+      `GUI 未接続のため今は builtin のみです。--root を付けて起動できるクライアント（Claude Code・Cursor など）では、--root <dir> 起動＋その配下の \`${SCOPED_TEMPLATES_SUBDIR}/\` に .pptx/.potx を置くと一覧に現れます（または new_project(templatePath) で直接指定）。`;
 }
 
 /** Resolve a solo (GUI-less) use_template id to template bytes + a display name. A `file:` id names a

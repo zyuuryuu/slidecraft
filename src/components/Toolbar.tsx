@@ -31,7 +31,7 @@ interface ToolbarProps {
   onDraft?: () => void;
   /** Draft is gated (collab-locked → `"locked"`, a template adjust open → `"busy"`). */
   draftGate?: "locked" | "busy";
-  /** The master menu (🎨) — App owns its many handlers, so it is passed in as a slot. */
+  /** The template menu (🎨) — App owns its many handlers, so it is passed in as a slot. */
   master?: ReactNode;
 }
 
@@ -59,10 +59,12 @@ export default function Toolbar({
   const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
   const [htmlTransition, setHtmlTransition] = useState<Transition>("slide"); // #650: chosen in the File menu itself
-  const btn = "px-3 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors";
+  const btn = "whitespace-nowrap px-3 py-1.5 text-sm bg-edge hover:bg-accent/40 text-fg rounded transition-colors";
 
   return (
-    <div data-testid="top-bar" className="flex flex-1 items-center gap-2 px-4 py-2">
+    <div data-testid="top-bar" className="flex min-w-0 flex-1 items-center gap-2 px-4 py-2">
+      {/* #692: min-w-0 lets the bar be narrower than its content's full width, so the 🎨 template name truncates
+          (instead of pushing the AI and ⚙ buttons off a narrow window). */}
       <div className="flex items-center gap-1 mr-4">
         <div className="w-1 h-6 bg-accent rounded-full" />
         <h1 className="text-fg font-semibold text-lg tracking-tight">SlideCraft</h1>
@@ -79,7 +81,7 @@ export default function Toolbar({
         </div>
       )}
 
-      {/* #614: the bar holds only the DOCUMENT's operations — ↶ ↷ ｜ ファイル 📝原稿 🎨マスター ｜ ✨AI ⚙.
+      {/* #614: the bar holds only the DOCUMENT's operations — ↶ ↷ ｜ 保存・書き出し 📝原稿入力 🎨テンプレート ｜ ✨AI ⚙ (#692 wording).
           App settings (language / theme / help / AI connection) live in the ⚙ menu at the right end. */}
       <div className="w-px h-6 bg-edge mx-1" aria-hidden />
 
@@ -87,7 +89,7 @@ export default function Toolbar({
       <div className="relative">
         <button
           onClick={() => setExportOpen((v) => !v)}
-          className="px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi text-on-accent font-medium rounded transition-colors inline-flex items-center gap-1.5"
+          className="whitespace-nowrap px-4 py-1.5 text-sm bg-accent hover:bg-accent-hi text-on-accent font-medium rounded transition-colors inline-flex items-center gap-1.5"
         >
           {generating ? t("toolbar.exporting") : t("toolbar.file")}
           <span className="text-[10px] opacity-80">▾</span>
@@ -97,7 +99,9 @@ export default function Toolbar({
             <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
             <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
               {/* #674: each section is a role="group" (as in the master menu) so the UX budget counts it (≤ 7 items). */}
+              {/* #692: both sections show their heading (開く・保存／書き出す) so the menu's scope is visible. */}
               <div role="group" aria-label={t("toolbar.projectSection")}>
+                <div className="px-3 pt-0.5 pb-0.5 text-[10px] text-faint">{t("toolbar.projectSection")}</div>
                 {onOpenProject && (
                   <button
                     onClick={() => { setExportOpen(false); onOpenProject(); }}
@@ -179,7 +183,7 @@ export default function Toolbar({
               : aiRunning > 0 ? t("toolbar.aiRunningTitle", { n: aiRunning })
                 : t("toolbar.aiTitle")
           }
-          className={`px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
+          className={`whitespace-nowrap px-3 py-1.5 text-sm rounded transition-colors inline-flex items-center gap-1.5 ${
             aiCollabActive
               ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
               : "bg-brand hover:bg-brand text-on-accent"
