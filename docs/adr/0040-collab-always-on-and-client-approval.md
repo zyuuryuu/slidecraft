@@ -153,4 +153,4 @@ ADR-0033 D2 の「起動時に 1 回だけ判断する」を次の状態遷移�
 - 触点:
   - アダプタ: `src/mcp/cli.ts:88`（起動時 1 回の探索）・`src/mcp/host-discovery.ts`（`resolveHostJsonPath`・`discoverLiveHost`・`pingAlive`）・`src/mcp/mcp-relay.ts`（`initialize` をそのまま流す転送）・`src/mcp/tool-profiles.ts:85`（`close_document` は協働の口だけ）
   - ホスト: `src/mcp/host.ts:103-124`（`checkRequest` と自己申告の役割）・`src/mcp/host-security.ts`・`src/mcp/host-core.ts`
-  - GUI・Rust: `src-tauri/src/collab.rs:178`（`start_collab`）・`:282`（`stop_collab`）・`src-tauri/src/secret_store.rs`・`src/ipc/key-store.ts`・`src/components/useCollab.ts:104`（`start`）・`:164-186`（seed）・`src/App.tsx:261`（`editLocked`）・`src/components/CollabPanel.tsx`・`src/components/NoticeSlot.tsx`
+  - GUI・Rust: `src-tauri/src/collab.rs:178`（`start_collab`）・`:282`（`stop_collab`）・`src-tauri/src/secret_store.rs`・`src/ipc/key-store.ts`・`src/components/useCollab.ts:104`（`start`）・`:149-188`（seed）・`src/App.tsx:261`（`editLocked`）・`src/components/CollabPanel.tsx`・`src/components/NoticeSlot.tsx`
