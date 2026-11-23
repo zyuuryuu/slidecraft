@@ -28,7 +28,7 @@ import * as TT from "./template-tools";
 import { setReviewRules } from "./review-rules";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 import { deckTitle } from "../engine/md-serializer";
-import { type HostContext, type DocEntry, type TemplateStore, commitMutation, commitTemplateChange, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext } from "./host-core";
+import { type HostContext, type DocEntry, type TemplateStore, commitMutation, commitTemplateChange, changedIndicesOf, undoDoc, redoDoc, createSoloHostContext, closeDocument } from "./host-core";
 import { GuardError } from "./guard-errors";
 import { getBootstrap } from "./bootstrap";
 import { gatedToolRegistrar } from "./tool-profiles";
@@ -291,13 +291,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
     }),
   );
   tool("close_document", { description: "ドキュメントを閉じる（dirty は force 必須＝never-silent）", inputSchema: { docId: z.string(), force: z.boolean().optional() } }, ({ docId, force }) =>
-    run(() => {
-      const e = host.registry.get(docId);
-      if (e.session.dirty && !force) return { ok: false as const, closed: false as const, dirty: true as const };
-      host.registry.remove(docId);
-      host.notifyClosed?.(docId);
-      return { ok: true as const, closed: true as const };
-    }),
+    run(() => closeDocument(host, docId, force, () => S.createSession(scopeRoot))), // solo: back to one empty doc (#728)
   );
   tool("undo", { description: "サーバ側 Undo：このドキュメントの真実を1手戻す（新しい forward rev を発行）", inputSchema: doc }, (a, extra) =>
     run(() => {

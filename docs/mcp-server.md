@@ -66,7 +66,7 @@ Windows の注意点：
 - ユーザ PATH が極端に長い（約 1,000 文字超）場合、NSIS インストーラは **PATH を壊さないために編集を見送り**、追加すべきフォルダをダイアログで案内します。その場合は手で追加してください。
 - ランチャを使わず直接登録するなら `command` = `<インストール先>\node.exe`、`args` = `["<インストール先>\cli.cjs"]`（両方とも同じフォルダ）。
 
-**Claude Desktop（`.mcpb`・#517）** — リリースの Assets に Claude Desktop 用バンドル `slidecraft-darwin-arm64.mcpb`（macOS Apple Silicon）/ `slidecraft-win32-x64.mcpb`（Windows x64）が付きます（このファイルが載ったリリース以降）。ダウンロードして Claude Desktop の「設定 → 拡張機能」から入れる（設定画面へのドラッグでも可）と導入され、JSON の手編集は要りません。GUI のテンプレを使うには、GUI を起動してから Claude Desktop を起動します（協働のホストは GUI と一緒に自動で起動・ADR-0040 D1。Claude Desktop が起動済みなら完全に終了して起動し直す。GUI を探すのは起動時の 1 回だけ・ADR-0033 D2・#687。再探索は #728）。初めてつなぐときは GUI のダイアログで［許可］します（既定は拒否・ADR-0040 D3）。許可前の呼び出しは `authorization-pending`、拒否は `authorization-denied`、取り消し後は `authorization-revoked`、GUI の deck をホストへ載せている途中は `host-not-ready` が返ります（どれも `{ok:false, code}`）。中身は MCPB 形式（manifest ＋ `cli.cjs` ＋ **同梱 Node**）で、アプリ本体のインストールとは独立に動きます（Claude Desktop 内蔵の Node には依存しない・ADR-0022）。既定は `--no-fs`（base64）のままです。Linux には Claude Desktop が無いため `.mcpb` はありません。GUI の 協働 パネルにも、この OS 用の `.mcpb` のダウンロードボタンが出ます（最新リリースに無ければその旨を表示）。
+**Claude Desktop（`.mcpb`・#517）** — リリースの Assets に Claude Desktop 用バンドル `slidecraft-darwin-arm64.mcpb`（macOS Apple Silicon）/ `slidecraft-win32-x64.mcpb`（Windows x64）が付きます（このファイルが載ったリリース以降）。ダウンロードして Claude Desktop の「設定 → 拡張機能」から入れる（設定画面へのドラッグでも可）と導入され、JSON の手編集は要りません。GUI のテンプレを使うには GUI を起動します。起動の順番は問いません（協働のホストは GUI と一緒に自動で起動・ADR-0040 D1。サーバはツール呼び出しのたびに GUI を探し直す・ADR-0040 D2・#728。Claude Desktop の再起動は要らない）。初めてつなぐときだけ GUI のダイアログで［許可］します（既定は拒否・ADR-0040 D3。許可は資格情報ファイルに覚えるので、起動し直しても再び聞かれない）。許可前の呼び出しは `authorization-pending`、拒否は `authorization-denied`、取り消し後は `authorization-revoked`、GUI の deck をホストへ載せている途中は `host-not-ready` が返ります（どれも `{ok:false, code}`）。中身は MCPB 形式（manifest ＋ `cli.cjs` ＋ **同梱 Node**）で、アプリ本体のインストールとは独立に動きます（Claude Desktop 内蔵の Node には依存しない・ADR-0022）。既定は `--no-fs`（base64）のままです。Linux には Claude Desktop が無いため `.mcpb` はありません。GUI の 協働 パネルにも、この OS 用の `.mcpb` のダウンロードボタンが出ます（最新リリースに無ければその旨を表示）。
 
 **接続診断（`--doctor`・#517）** — 登録したのにツールが見えないときは、登録したコマンドに `--doctor` を付けて実行します：
 
@@ -99,18 +99,26 @@ node dist/mcp/cli.js      # stdio で MCP サーバとして待機（通常は�
 ## 接続モデル — 口は1つ・管制も1つ（アダプティブ・フロント）
 
 エージェント側に登録するコマンドは **`slidecraft serve`（別名 `slidecraft mcp`）の1つだけ**。「1アプリに
-MCP 設定を複数」書く必要はない（ADR-0033 D2）。このコマンドは**起動時に**、デスクトップ GUI が協働ホストを
-稼働中か discover（`host.json` を読む）し、状況で振る舞いを変える：
+MCP 設定を複数」書く必要はない（ADR-0033 D2）。このコマンドは常に solo で起動し、**ツール呼び出しのたびに**、
+デスクトップ GUI が協働ホストを稼働中か discover（`host.json` を読む。ping は中身が変わったときだけ）し、
+状況で振る舞いを変える（ADR-0040 D2・#728。状態遷移は `src/mcp/front-decide.ts`）：
 
-- **GUI 稼働中 → forward**：この stdio セッションを GUI の HTTP ホストへ**状態ゼロで中継**する。deck の真実と
+- **GUI 稼働中・solo に deck なし → forward**：サーバ自身がホストと `initialize`（AI の `clientInfo` を再送）と承認
+  （ADR-0040 D3）を行い、その呼び出しから GUI の HTTP ホストへ**状態ゼロで中継**する。AI には
+  `notifications/tools/list_changed` を送る。deck の真実と
   undo 履歴は GUI 側の管制（`DocRegistry`）にだけ在り、人は編集をライブで見る。doc は `select_document`
   （または sole doc 自動解決）で選ぶ。
+- **GUI 稼働中・solo に deck あり → solo のまま**：結果の `note` で「保存してから `close_document` で閉じる」よう
+  告げる（solo の deck を持ったまま乗り換えない＝黙って捨てない）。`close_document` は solo にもある（未保存は `force`）。
 - **GUI 無し / stale → solo**：同じコマンドが**自前の単一ドキュメント管制**を建てる。著作一式に加えサーバ側
-  `undo`/`redo` も効く（ADR-0033 D1）。
+  `undo`/`redo` も効く（ADR-0033 D1）。forward 中にホストが応答しなくなったら `host.json` を読み直し、新しい
+  ホストがあればつなぎ直し、無ければ solo（deck なし）に戻って `note` で知らせる。
 
-どちらでも**管制（deck 権威＋undo）は常に1つ**で、モードは利用者が選ばない（rendezvous は起動時に1度だけ決まる。
-GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示スコープ）。discovery のための `host.json` 読取は
-`--no-fs` 方針の**狭い意図的例外**（0600 のハンドシェイクファイルを1回読むだけ・deck 内容には触れない）。
+どちらでも**管制（deck 権威＋undo）は常に1つ**で、モードは利用者が選ばない。`--no-fs` 方針の**狭い意図的例外**は
+2 つだけで、どちらも deck 内容には触れない：(1) discovery のための `host.json`（0600）の読取、(2) **資格情報ファイル**
+の読み書き — `host.json` と同じフォルダの `mcp-client-<AI アプリ名>-<hash>.json`（0600・AI アプリ名ごとに 1 つ。
+client ID と、許可後のクライアント別の秘密を持つ。秘密は送らず nonce への HMAC で示す・ADR-0040 D3）。
+許可を一から取り直したいときは、このファイルを消す（次の接続で新しい client ID として申し込む）。
 
 ---
 
