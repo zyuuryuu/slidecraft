@@ -268,7 +268,7 @@ jobs:
         run: npm sbom --sbom-format cyclonedx --omit dev > sbom-npm.cdx.json
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
         with:
           tool: cargo-cyclonedx
       - name: cargo SBOM (CycloneDX)

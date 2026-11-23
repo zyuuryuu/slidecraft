@@ -55,7 +55,7 @@ export const PRESET_ARTIFACTS: readonly PresetArtifact[] = [
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 /** 同じパートを同じ順で、エントリ日時だけ固定して詰め直す。 */
-async function withFixedDates(bytes: Uint8Array, date: Date): Promise<Uint8Array> {
+export async function withFixedDates(bytes: Uint8Array, date: Date): Promise<Uint8Array> {
   const src = await JSZip.loadAsync(bytes);
   const out = new JSZip();
   for (const name of Object.keys(src.files)) {

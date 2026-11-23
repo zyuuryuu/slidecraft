@@ -13,6 +13,7 @@ import { parseTemplateSpecResponse, templateSpecSystemPrompt } from "../engine/t
 import { writeTemplate, MIDNIGHT_PALETTE } from "../engine/template-writer";
 import { loadTemplate } from "../engine/template-loader";
 import { buildCatalog, assessTemplateHealth } from "../engine/template-catalog";
+import { writePresetTemplate, PITCH_PRESET, EXECUTIVE_PRESET, CAMPAIGN_PRESET, type StylePreset } from "../engine/template-presets";
 import { listScopedTemplates, readScopedTemplate, SCOPED_TEMPLATES_SUBDIR } from "./fs-scope";
 import { GuardError } from "./guard-errors";
 import type { TemplateStore, TemplateInfo } from "./host-core";
@@ -47,20 +48,37 @@ export function getTemplateSpecGuide() {
 
 /** #298: the SOLO (no GUI, no `register_templates`) fallback for `list_templates`/`use_template` —
  *  so a bare stdio AI's natural first move ("list → pick → start") closes instead of hitting
- *  `template-registry-unavailable`. Built-in ids mirror the presets `get_template_spec_guide`
- *  already documents (today: MIDNIGHT). Minting reuses `createTemplate` (R8: one generation path,
- *  never a second one for the solo case). */
+ *  `template-registry-unavailable`. `midnight` mirrors the preset `get_template_spec_guide` documents
+ *  and is minted by `createTemplate` (R8: no second generation path for the solo case). */
 export interface BuiltinTemplateInfo {
   id: string;
   name: string;
   builtin: true;
 }
-export const BUILTIN_TEMPLATES: BuiltinTemplateInfo[] = [{ id: "midnight", name: "Midnight", builtin: true }];
 
-/** The built-in template's PPTX bytes (or undefined for an unknown id), built through the exact same
- *  contrast-guard + MIDNIGHT-fallback harness as an explicit `create_template` call. */
+/** #694: the style presets the GUI ships as TemplateOnly .pptx (BUILTIN_MASTERS) are pure engine output
+ *  (`writePresetTemplate`, via scripts/gen-preset-templates.ts), so solo mode mints them from the
+ *  same function instead of bundling the .pptx. id + display name MUST equal the GUI's
+ *  BUILTIN_MASTERS (useMasterRegistry.ts) — same id, same thing; the exported deck is byte-identical
+ *  to the GUI route (agreement test: tests/mcp-solo-builtin-presets-694.test.ts). */
+const SOLO_PRESETS: readonly { id: string; name: string; preset: StylePreset }[] = [
+  { id: "builtin-pitch", name: "セールスピッチ Pitch", preset: PITCH_PRESET },
+  { id: "builtin-executive", name: "エグゼクティブ Executive", preset: EXECUTIVE_PRESET },
+  { id: "builtin-campaign", name: "マーケ Campaign", preset: CAMPAIGN_PRESET },
+];
+
+export const BUILTIN_TEMPLATES: BuiltinTemplateInfo[] = [
+  { id: "midnight", name: "Midnight", builtin: true },
+  ...SOLO_PRESETS.map(({ id, name }) => ({ id, name, builtin: true as const })),
+];
+
+/** The built-in template's PPTX bytes (or undefined for an unknown id). `midnight` goes through the
+ *  exact same contrast-guard + MIDNIGHT-fallback harness as an explicit `create_template` call; a
+ *  style preset through `writePresetTemplate` (the generator of the GUI's shipped file). */
 export async function createBuiltinTemplate(id: string): Promise<Uint8Array | undefined> {
-  if (!BUILTIN_TEMPLATES.some((t) => t.id === id)) return undefined;
+  const preset = SOLO_PRESETS.find((p) => p.id === id);
+  if (preset) return writePresetTemplate(preset.preset);
+  if (id !== "midnight") return undefined;
   const created = await createTemplate(); // no spec → MIDNIGHT preset (never "rejected" with the default 30 layouts)
   if (!created.ok) throw new Error(created.error);
   return new Uint8Array(Buffer.from(created.templateBase64, "base64"));
@@ -125,7 +143,8 @@ function soloTemplateNote(scopeRoot: string | null): string {
   return scopeRoot
     ? `カスタムテンプレートは --root 配下の \`${SCOPED_TEMPLATES_SUBDIR}/\` に .pptx/.potx を置くと list_templates に現れます。`
     : "SlideCraft の GUI で 協働 パネルの「協働を開始」を押し、MCP クライアントを起動し直す（Claude Desktop は完全に終了して起動し直す）と、GUI のテンプレが一覧に出ます。" +
-      `GUI 未接続のため今は builtin のみです。--root を付けて起動できるクライアント（Claude Code・Cursor など）では、--root <dir> 起動＋その配下の \`${SCOPED_TEMPLATES_SUBDIR}/\` に .pptx/.potx を置くと一覧に現れます（または new_project(templatePath) で直接指定）。`;
+      "GUI 未接続のため今は builtin（Midnight と、GUI と同じ Pitch・Executive・Campaign）のみです。" +
+      `--root を付けて起動できるクライアント（Claude Code・Cursor など）では、--root <dir> 起動＋その配下の \`${SCOPED_TEMPLATES_SUBDIR}/\` に .pptx/.potx を置くと一覧に現れます（または new_project(templatePath) で直接指定）。`;
 }
 
 /** Resolve a solo (GUI-less) use_template id to template bytes + a display name. A `file:` id names a
