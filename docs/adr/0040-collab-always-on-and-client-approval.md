@@ -1,6 +1,6 @@
 # ADR-0040: 協働ホストの常時起動・単独サーバの再探索・クライアント承認
 
-- Status: Proposed（ユーザが本文を確認してから Accepted にする）
+- Status: Accepted（2026-11-23・ユーザ合意。ネットワーク越しの制御は過剰として採らない）
 - Date: 2026-11-23
 - 関係: [ADR-0033](0033-mcp-single-control-plane.md) D2 の「起動時に 1 回だけ探す」を**部分的に supersede** する。
   [ADR-0009](0009-p2-collab-host.md)（協働ホスト）・[ADR-0010](0010-security-model.md)（セキュリティモデル）・
