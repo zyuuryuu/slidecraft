@@ -29,6 +29,10 @@ export type ApplyVia =
   | { kind: "session"; sessionId: string };
 
 export type ConnStatus = "approved" | "pending" | "denied" | "revoked";
+/** Why a connection was denied without a dialog. `proof-failed`: its pair is ALREADY allowed but it could not
+ *  prove the pair's secret — asking the human would show a look-alike (same name, version, fingerprint), and
+ *  [許可] would replace the real adapter's secret. Recovery: revoke the pair in the 協働 panel, then apply. */
+export type DenyReason = "proof-failed";
 export type Decision = "allow" | "deny" | "deny-all";
 
 /** A grant as the GUI persists it in the keychain. `secret` never appears in `view()`. */
@@ -102,6 +106,7 @@ interface Conn {
   grantKey?: string;
   /** an adapter proof we could not check yet (grants not loaded) — re-checked by loadGrants */
   proof?: { info: ClientInfo; clientId: string; nonce: string; proof: string };
+  reason?: DenyReason;
 }
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("base64url");
@@ -152,9 +157,9 @@ export class ApprovalBook {
     const conn: Conn = { status: "pending", pairKey };
     this.conns.set(connId, conn);
     let proofOk = false;
+    const grant = via.kind === "adapter" ? this.grantFor(pairKey) : undefined;
     if (via.kind === "adapter" && via.nonce && via.proof) {
       const fresh = this.consumeNonce(via.nonce);
-      const grant = this.grantFor(pairKey);
       if (fresh && grant?.stored) proofOk = safeEqual(via.proof, proofFor(grant.stored.secret, via.nonce, via.clientId, info));
       else if (fresh && !grant) conn.proof = { info, clientId: via.clientId, nonce: via.nonce, proof: via.proof };
       if (proofOk) {
@@ -163,7 +168,9 @@ export class ApprovalBook {
       }
     }
     if (!proofOk) {
-      if (this.denyAll || this.denied.has(pairKey)) conn.status = "denied";
+      // An allowed pair that cannot prove its secret is denied outright (never a dialog; not remembered).
+      if (grant) this.denyProof(conn);
+      else if (this.denyAll || this.denied.has(pairKey)) conn.status = "denied";
       else this.enqueue(connId, pairKey, info, via);
     }
     this.onChange();
@@ -172,6 +179,12 @@ export class ApprovalBook {
 
   status(connId: string): ConnStatus | undefined {
     return this.conns.get(connId)?.status;
+  }
+
+  /** Why a denied connection was refused without a dialog (undefined for an ordinary [拒否]). */
+  deniedReason(connId: string): DenyReason | undefined {
+    const c = this.conns.get(connId);
+    return c?.status === "denied" ? c.reason : undefined;
   }
 
   /** Resolve once the connection is no longer pending, or after `ms` (then it reports "pending"). */
@@ -236,12 +249,13 @@ export class ApprovalBook {
     for (const g of [...this.grants.values()]) if (g.kind === "adapter" && !keep.has(g.pairKey)) this.revokeQuietly(g.key);
     for (const s of list) this.addGrant(pairKeyOf(s, { kind: "adapter", clientId: s.clientId }), { name: s.name, version: s.version }, { kind: "adapter", clientId: s.clientId }, s);
     for (const [connId, c] of this.conns) {
-      if (c.status !== "pending" || !c.proof) continue;
+      if (c.status !== "pending") continue;
       const grant = this.grantFor(c.pairKey);
-      if (grant?.stored && safeEqual(c.proof.proof, proofFor(grant.stored.secret, c.proof.nonce, c.proof.clientId, c.proof.info))) {
-        this.withdraw(connId);
-        this.settle([connId], "approved", grant.key);
-      }
+      if (!grant?.stored) continue;
+      // The pair turned out to be allowed: approve a matching early proof, deny anything else (as in apply()).
+      this.withdraw(connId);
+      if (c.proof && safeEqual(c.proof.proof, proofFor(grant.stored.secret, c.proof.nonce, c.proof.clientId, c.proof.info))) this.settle([connId], "approved", grant.key);
+      else this.denyProof(c, connId);
       c.proof = undefined;
     }
     this.onChange();
@@ -280,6 +294,12 @@ export class ApprovalBook {
       grants: [...this.grants.values()].map((g) => ({ key: g.key, name: g.info.name, version: g.info.version, fingerprint: g.fingerprint, kind: g.kind, ...(g.stored ? { clientId: g.stored.clientId } : {}) })),
       denyAll: this.denyAll,
     };
+  }
+
+  private denyProof(conn: Conn, connId?: string): void {
+    conn.reason = "proof-failed";
+    if (connId) this.settle([connId], "denied");
+    else conn.status = "denied";
   }
 
   private consumeNonce(nonce: string): boolean {

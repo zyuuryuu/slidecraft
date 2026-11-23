@@ -17,6 +17,7 @@ import { CollabApprovals, type ApprovalSnapshot } from "../ipc/collab-approvals"
 import { loadClientGrants, addClientGrant, removeClientGrant } from "../ipc/client-grants-store";
 import type { Decision } from "../mcp/host-approval";
 import { seedHost } from "./collab-seed";
+import { releaseCollab } from "./collab-release";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import type { MasterEntry } from "./useMasterRegistry";
@@ -127,7 +128,9 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
           setStatus(s);
           if (s === "error") {
             setError(detail);
-            projRef.current = null; // the projection tore itself down → 開始 can re-establish
+            // The projection tore itself down → release the approval channel WITH it, so 再開 starts clean
+            // (start() checks projRef only; an orphaned channel would keep polling the host).
+            void releaseCollab(projRef, chanRef);
           }
         },
         onDocs: (docs: DocSummary[]) => {
@@ -150,6 +153,9 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       });
       projRef.current = proj;
       await proj.start();
+      // The initial reconcile can fail WITHOUT throwing (onStatus "error" already released everything) → stop here,
+      // or the channel below would be orphaned (projRef is empty, so nothing would ever stop it).
+      if (projRef.current !== proj) return;
       // #727: the approval channel. Seed on the first ALLOWED AI call (the host holds that call until report_seed).
       const chan = new CollabApprovals({
         url: ci.url,
@@ -173,6 +179,10 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       });
       chanRef.current = chan;
       await chan.start();
+      if (chanRef.current !== chan) {
+        await chan.stop(); // released (error / 停止) while it was connecting
+        return;
+      }
       // "I will seed on demand" FIRST (before any AI can be allowed), then the allowed pairs from the keychain → the
       // host over the GUI port (never argv, D3-8).
       await chan.reportSeed("pending");
@@ -180,28 +190,12 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : String(e));
-      try {
-        await projRef.current?.stop();
-        await chanRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      projRef.current = null;
-      chanRef.current = null;
+      await releaseCollab(projRef, chanRef);
     }
   }, [available]);
 
   const stop = useCallback(async () => {
-    const proj = projRef.current;
-    const chan = chanRef.current;
-    projRef.current = null;
-    chanRef.current = null;
-    try {
-      await proj?.stop();
-      await chan?.stop();
-    } catch {
-      /* ignore */
-    }
+    await releaseCollab(projRef, chanRef);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("stop_collab");
@@ -238,6 +232,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     const grant = await chanRef.current?.decide(requestId, decision).catch(() => undefined);
     if (grant) await addClientGrant(grant).then(() => setGrantsUnsaved(false), () => setGrantsUnsaved(true));
   }, []);
+  const dismissGrantsUnsaved = useCallback(() => setGrantsUnsaved(false), []);
   const revoke = useCallback(async (key: string) => {
     const chan = chanRef.current;
     if (!chan) return;
@@ -257,12 +252,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
 
   // Tear down the projection + approval channel on unmount / Vite HMR so dev reloads don't accumulate zombie
   // pollers. (Production App never unmounts; this is dev-loop hygiene.)
-  useEffect(() => () => {
-    void projRef.current?.stop();
-    void chanRef.current?.stop();
-    projRef.current = null;
-    chanRef.current = null;
-  }, []);
+  useEffect(() => () => void releaseCollab(projRef, chanRef), []);
 
   return {
     available,
@@ -277,6 +267,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     aiActive,
     approvals,
     grantsUnsaved,
+    dismissGrantsUnsaved,
     decide,
     revoke,
     sendSlideMarkdown,

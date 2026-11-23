@@ -19,7 +19,7 @@ import type { AddressInfo } from "net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { ApprovalBook, type ApplyVia, type ApprovalPort, type ClientInfo, type ConnStatus } from "./host-approval";
+import { ApprovalBook, type ApplyVia, type ApprovalPort, type ClientInfo, type ConnStatus, type DenyReason } from "./host-approval";
 import { SeedGate } from "./host-seed";
 import { resolveBindHost } from "./host-options";
 import { GuardError } from "./guard-errors";
@@ -117,7 +117,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
       const sid = sidOf(extra);
       let st: ConnStatus | undefined = sid ? book.status(sid) : undefined;
       if (st === "pending" && sid) st = await book.waitSettled(sid, approvalWaitMs);
-      if (st !== "approved") throw refusal(st);
+      if (st !== "approved") throw refusal(st, sid ? book.deniedReason(sid) : undefined);
     }
     return seed.admit(seedWaitMs);
   };
@@ -248,7 +248,9 @@ function applicationOf(clientInfo: unknown, req: IncomingMessage): { info: Clien
 }
 
 /** The never-silent refusal for an AI call that is not (or no longer) allowed. */
-function refusal(st: ConnStatus | undefined): GuardError {
+function refusal(st: ConnStatus | undefined, reason?: DenyReason): GuardError {
+  if (st === "denied" && reason === "proof-failed")
+    return new GuardError("この AI クライアントは許可済みの組（名前・版・client ID）を名乗りましたが、その許可の証明に失敗したため拒否しました（理由: proof-failed）。正規のクライアントが証明を失った場合は、SlideCraft の 協働 パネルで該当クライアントの許可を取り消してから、つなぎ直してください。", "authorization-denied");
   if (st === "denied") return new GuardError("SlideCraft の GUI でこの接続は拒否されました。GUI の deck には触れられません。", "authorization-denied");
   if (st === "revoked") return new GuardError("SlideCraft の GUI でこの接続の許可が取り消されました。つなぎ直すと、もう一度許可を求めます。", "authorization-revoked");
   return new GuardError("SlideCraft の GUI で、この AI クライアントの接続を許可してください（協働 パネルにダイアログが出ています）。許可した後に同じ呼び出しをやり直してください。", "authorization-pending");

@@ -2,7 +2,8 @@
  * NoticeSlot — #613: the ONE notice place under the toolbar. The update notice, the intake progress/result
  * and the template-adjust band used to stack there (each pushing the body down); now only one shows at a
  * time, chosen by `noticeSlotPlan` (approval > adjust > intake > update), with a badge counting the hidden ones.
- * #727: `approval` = how many AI clients wait for [許可] (the decision itself is the approval dialog).
+ * #727: `approval` = how many AI clients wait for [許可] (the decision itself is the approval dialog), and —
+ * once none wait — whether an allowed client could not be saved to the keychain (never silent; dismissable).
  *
  * The bands themselves are unchanged (same components, same props); only where they go and which one shows
  * changes. It stays a layout-flow strip (not an overlay) so the adjust band never hides the preview (#579).
@@ -19,8 +20,9 @@ import type { TemplateData } from "../engine/template-loader";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 
 export interface NoticeSlotProps {
-  /** #727: AI clients waiting for [許可]; absent / count 0 = none. */
-  approval?: { count: number } | null;
+  /** #727: AI clients waiting for [許可]; absent / count 0 = none. `unsaved`: an allowed client could not be saved
+   *  to the OS credential store (asked again next launch) — shown in the same band when nobody is waiting. */
+  approval?: { count: number; unsaved?: boolean; onDismissUnsaved?: () => void } | null;
   /** "New version available" — null when there is none (or it was dismissed). */
   update: { latestVersion: string; onDismiss: () => void } | null;
   /** Intake progress/result — passed through to IntakeSummaryBar as-is (`result` null when dismissed). */
@@ -45,7 +47,7 @@ export interface NoticeSlotProps {
 export default function NoticeSlot({ approval, update, intake, adjust }: NoticeSlotProps) {
   const { t } = useTranslation();
   const plan = noticeSlotPlan({
-    approval: (approval?.count ?? 0) > 0,
+    approval: (approval?.count ?? 0) > 0 || !!approval?.unsaved,
     adjusting: !!adjust,
     intake: !!intake.busy || !!intake.result, // exactly when IntakeSummaryBar renders something
     update: !!update,
@@ -53,9 +55,16 @@ export default function NoticeSlot({ approval, update, intake, adjust }: NoticeS
   if (!plan.shown) return null;
 
   const band =
-    plan.shown === "approval" && approval ? (
+    plan.shown === "approval" && approval && approval.count > 0 ? (
       <div role="status" className="px-3 py-2 bg-surface border-b border-accent/40 text-xs text-fg">
         {t("collabApproval.bandWaiting", { count: approval.count })}
+      </div>
+    ) : plan.shown === "approval" && approval ? (
+      <div role="status" className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-accent/40 text-xs text-fg">
+        <span className="flex-1 min-w-0">{t("collabApproval.grantsUnsaved")}</span>
+        {approval.onDismissUnsaved && (
+          <button data-testid="grants-unsaved-dismiss" onClick={approval.onDismissUnsaved} title={t("updateBanner.dismiss")} className="text-muted hover:text-fg text-base leading-none px-1">×</button>
+        )}
       </div>
     ) : plan.shown === "adjust" && adjust ? (
       <TemplateAdjustPanel {...adjust} />

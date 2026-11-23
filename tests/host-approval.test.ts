@@ -116,27 +116,28 @@ describe("ApprovalBook: adapter secret, claim and nonce HMAC (D3-4)", () => {
     const nonce = book.issueNonce();
     const proof = proofFor(secret, nonce, CLIENT_ID, CD);
     expect(book.apply("c2", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "x", nonce, proof })).toBe("approved");
-    expect(book.apply("c3", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "y", nonce, proof })).toBe("pending"); // replayed nonce
+    expect(book.apply("c3", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "y", nonce, proof })).toBe("denied"); // replayed nonce on an allowed pair
   });
 
-  it("a wrong HMAC (wrong secret / other pair / unknown nonce) does not pass — it falls back to a dialog", () => {
+  it("a wrong HMAC does not pass: on the allowed pair it is denied (no dialog); another pair falls back to a dialog", () => {
     const book = new ApprovalBook();
     const { secret } = allowAndClaim(book);
     const n1 = book.issueNonce();
-    expect(book.apply("c2", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "a", nonce: n1, proof: proofFor("wrong-secret", n1, CLIENT_ID, CD) })).toBe("pending");
+    expect(book.apply("c2", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "a", nonce: n1, proof: proofFor("wrong-secret", n1, CLIENT_ID, CD) })).toBe("denied");
     const n2 = book.issueNonce();
     const other = { name: "Evil", version: "1" };
     expect(book.apply("c3", other, { kind: "adapter", clientId: CLIENT_ID, claim: "b", nonce: n2, proof: proofFor(secret, n2, CLIENT_ID, other) })).toBe("pending");
-    expect(book.apply("c4", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "c", nonce: "never-issued", proof: proofFor(secret, "never-issued", CLIENT_ID, CD) })).toBe("pending");
+    expect(book.apply("c4", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "c", nonce: "never-issued", proof: proofFor(secret, "never-issued", CLIENT_ID, CD) })).toBe("denied");
   });
 
-  it("an expired nonce does not pass", () => {
+  it("an expired nonce does not pass (allowed pair → denied, proof-failed)", () => {
     let t = 1_000;
     const book = new ApprovalBook({ now: () => t, nonceTtlMs: 100 });
     const { secret } = allowAndClaim(book);
     const nonce = book.issueNonce();
     t += 101;
-    expect(book.apply("c2", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "x", nonce, proof: proofFor(secret, nonce, CLIENT_ID, CD) })).toBe("pending");
+    expect(book.apply("c2", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "x", nonce, proof: proofFor(secret, nonce, CLIENT_ID, CD) })).toBe("denied");
+    expect(book.deniedReason("c2")).toBe("proof-failed");
   });
 
   it("grants loaded from the keychain approve a valid proof; a proof that arrived BEFORE the load is re-checked", () => {
@@ -233,5 +234,57 @@ describe("ApprovalBook: waiting for the human (D3-3)", () => {
     book.decide(book.view().pending[0].requestId, "allow");
     book.revoke(book.view().grants[0].key);
     expect(n).toBe(3);
+  });
+});
+
+describe("ApprovalBook: an allowed pair that fails its proof is denied, not re-asked (#733 review)", () => {
+  // Same name + version + client id → the human cannot tell the impostor from the real adapter, and [許可]
+  // would mint a new secret and void the real adapter's. Recovery: revoke in the 協働 panel, then apply again.
+  const granted = (): { book: ApprovalBook; stored: StoredGrant } => {
+    const stored: StoredGrant = { name: CD.name, version: CD.version, clientId: CLIENT_ID, secret: "real-secret" };
+    const book = new ApprovalBook();
+    book.loadGrants([stored]);
+    return { book, stored };
+  };
+
+  it("wrong HMAC → denied with reason proof-failed, no pending request, the grant is unchanged", () => {
+    const { book } = granted();
+    const before = book.view().grants;
+    const n = book.issueNonce();
+    expect(book.apply("x1", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "c", nonce: n, proof: proofFor("guess", n, CLIENT_ID, CD) })).toBe("denied");
+    expect(book.deniedReason("x1")).toBe("proof-failed");
+    expect(book.view().pending).toHaveLength(0);
+    expect(book.view().grants).toEqual(before);
+  });
+
+  it("an application without any proof (claim only) on an allowed pair is denied too", () => {
+    const { book } = granted();
+    expect(applyAdapter(book, "x1")).toBe("denied");
+    expect(book.deniedReason("x1")).toBe("proof-failed");
+    expect(book.view().pending).toHaveLength(0);
+  });
+
+  it("the failure is not remembered: the real adapter still proves and is approved", () => {
+    const { book, stored } = granted();
+    applyAdapter(book, "x1");
+    const n = book.issueNonce();
+    expect(book.apply("real", CD, { kind: "adapter", clientId: CLIENT_ID, nonce: n, proof: proofFor(stored.secret, n, CLIENT_ID, CD) })).toBe("approved");
+  });
+
+  it("a proof that arrived before loadGrants and does not match is denied on load (its dialog is withdrawn)", () => {
+    const book = new ApprovalBook();
+    const n = book.issueNonce();
+    expect(book.apply("x1", CD, { kind: "adapter", clientId: CLIENT_ID, claim: "c", nonce: n, proof: proofFor("guess", n, CLIENT_ID, CD) })).toBe("pending");
+    book.loadGrants([{ name: CD.name, version: CD.version, clientId: CLIENT_ID, secret: "real-secret" }]);
+    expect(book.status("x1")).toBe("denied");
+    expect(book.deniedReason("x1")).toBe("proof-failed");
+    expect(book.view().pending).toHaveLength(0);
+  });
+
+  it("after [取り消し], the same pair may apply again and gets a dialog", () => {
+    const { book } = granted();
+    book.revoke(book.view().grants[0].key);
+    expect(applyAdapter(book, "x1")).toBe("pending");
+    expect(book.deniedReason("x1")).toBeUndefined();
   });
 });

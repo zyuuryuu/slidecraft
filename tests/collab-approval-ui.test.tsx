@@ -46,6 +46,17 @@ describe("noticeSlotPlan: approval waiting is a notice, shown first", () => {
     expect(html).toContain(ja.collabApproval.bandWaiting.replace("{{count}}", "2"));
     expect(html).toMatch(/data-testid="notice-slot-hidden"[^>]*>\+1</);
   });
+  it("a keychain save failure is told in the approval band (never silent), with a dismiss", () => {
+    const html = renderToStaticMarkup(<NoticeSlot approval={{ count: 0, unsaved: true, onDismissUnsaved: noop }} update={{ latestVersion: "9.9.9", onDismiss: noop }} intake={{ busy: null, result: null, onDismiss: noop }} adjust={null} />);
+    expect(html).toContain('data-notice="approval"');
+    expect(html).toContain(ja.collabApproval.grantsUnsaved);
+    expect(html).toContain('data-testid="grants-unsaved-dismiss"');
+  });
+  it("clients still waiting outrank the save failure (the AI call is blocked on them)", () => {
+    const html = renderToStaticMarkup(<NoticeSlot approval={{ count: 1, unsaved: true, onDismissUnsaved: noop }} update={null} intake={{ busy: null, result: null, onDismiss: noop }} adjust={null} />);
+    expect(html).toContain(ja.collabApproval.bandWaiting.replace("{{count}}", "1"));
+    expect(html).not.toContain(ja.collabApproval.grantsUnsaved);
+  });
   it("count 0 → no approval band", () => {
     const html = renderToStaticMarkup(<NoticeSlot approval={{ count: 0 }} update={null} intake={{ busy: null, result: null, onDismiss: noop }} adjust={null} />);
     expect(html).toBe("");

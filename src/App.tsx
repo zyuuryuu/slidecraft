@@ -453,7 +453,7 @@ export default function App() {
       {/* #613: ONE notice strip under the toolbar (flow, not overlay) — template adjust > intake
           (progress/result) > update notice (ADR-0021); the others wait behind a "+N" badge. */}
       <NoticeSlot
-        approval={{ count: collab.approvals?.pending.length ?? 0 }}
+        approval={{ count: collab.approvals?.pending.length ?? 0, unsaved: collab.grantsUnsaved, onDismissUnsaved: collab.dismissGrantsUnsaved }}
         update={showUpdateBanner && latestVersion ? { latestVersion, onDismiss: dismissUpdateBanner } : null}
         intake={{ busy: intakeBusy, result: intakeDismissed ? null : intakeResult, onDismiss: () => setIntakeDismissed(true),
           template: templateData, unbound: diagnostics.filter((d) => d.id === "unbound-content"), augmentHint: !editLocked && !adjust.session }}

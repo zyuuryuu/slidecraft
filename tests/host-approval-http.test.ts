@@ -132,13 +132,19 @@ describe("stdio adapter: claim once, then prove with an HMAC over a nonce (D3-4)
     expect((await approvals(gui)).pending).toHaveLength(0);
   });
 
-  it("a wrong HMAC is not approved (it becomes a dialog, default deny)", async () => {
+  it("a wrong HMAC for an ALREADY-allowed pair is denied (proof-failed) — no dialog, the grant is untouched", async () => {
     await start();
     const gui = await connect(host!.guiToken);
     await call(gui, "load_client_grants", { grants: [{ ...CD, clientId: CID, secret: "kept-in-keychain" }] });
+    const before = (await approvals(gui)).grants;
     const { nonce } = (await (await post("/auth/nonce", {})).json()) as { nonce: string };
     const ai = await connect(host!.token, CD, { "x-slidecraft-client-id": CID, "x-slidecraft-client-nonce": nonce, "x-slidecraft-client-proof": proofFor("guessed", nonce, CID, CD) });
-    expect(await call(ai, "list_documents")).toMatchObject({ ok: false, code: "authorization-pending" });
+    const res = await call(ai, "list_documents");
+    expect(res).toMatchObject({ ok: false, code: "authorization-denied" });
+    expect(JSON.stringify(res)).toContain("proof-failed");
+    const after = await approvals(gui);
+    expect(after.pending).toHaveLength(0);
+    expect(after.grants).toEqual(before);
   });
 
   it("grants handed over by the GUI (keychain) approve a correct HMAC from a new launch", async () => {
