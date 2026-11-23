@@ -241,7 +241,7 @@ DeckIR には章構造の複製状態を持たず（R8）、シリアライザ�
 | 13 | KPI.1Value.Single | KPI | 15, 16, 1, 2, 3, 50 |
 | 14 | KPI.2Value.Equal | KPI | 15, 16, 1, 2, 3, 4, 50 |
 | 15 | KPI.3Value.Equal | KPI | 15, 16, 1, 2, 3, 4, 5, 6, 50 |
-| 16 | KPI.4Value.Grid | KPI | 15, 16, 1, 2, 3, 4, 50 |
+| 16 | KPI.4Value.Grid | KPI | 15, 16, 1, 2, 3, 4, 5, 6, 7, 8, 50 |
 | 17 | Chart.1Chart.Single | Chart | 15, 16, 1, 50 |
 | 18 | Chart.1Chart.Single+1Analysis | Chart | 15, 16, 1, 2, 50 |
 | 19 | Chart.2Chart.Equal | Chart | 15, 16, 1, 2, 50 |
