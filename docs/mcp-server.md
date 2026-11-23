@@ -128,8 +128,8 @@ GUI が途中で立ち上がっても再アタッチはしない＝D2 の明示�
 | 調達 | `get_template_spec_guide()` | `create_template` 用 spec の書式ガイド＋MIDNIGHT preset 値 |
 | テンプレ派生 | `augment_template(structures?, rule?)` | 開いている doc のテンプレに**無い構造**（`columns-2/3`・`compare-2`・`card-3`・`kpi-3/4`。省略で全部）を、その体裁のまま合成した派生テンプレに差し替える（#568 段 3）。`{changed, added:[{structure,name}], skipped:[{structure,reason}], templateName, overflow:{before,after}}`。元にできない・ゲート不合格は適用せず理由（never-silent）。元テンプレ不変・deck は変えない（undo の外）。**両ツールとも stdio 単独（solo）のみ**：collab の GUI は host からテンプレを引かず表示がずれるため未登録（同期は #616） |
 | テンプレ派生 | `adjust_template(recipe)` | `recipe`（JSON 文字列 `{fonts?,scale?}`・書式は `bootstrap.toolNotes.templateDerive`）で書体置換・文字サイズ倍率を掛けた派生テンプレに差し替える（#570 段 3）。毎回「元テンプレ＋レシピ」から 書体置換→倍率→合成 の固定順で作り直すので倍率は重ならない。不正は `{ok:false, code:"invalid-argument"}`。`get_deck_issues` の `overflow-scale-hint` は渡すべき recipe を hints に載せる。実効レシピが今と同じ（`{}` 等）なら `changed:false`＋reason |
-| 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`、既定 `midnight`）を返す（#298）。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#332）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
-| 調達 | `use_template(id, markdown?)` | テンプレ（`list_templates` の id）から**新規プロジェクトを mint**（bytes 不要・GUI の Draft と同じ整形）。単独の組み込み id は `create_template` と同じハーネスで生成（R8）、**`file:` 始まりの id は `--root` 配下 `templates/` のファイルから起票**（#332）。未知 id は never-silent `{ok:false, code:"unknown-template"}`、`file:` で scope 未設定は `scope-not-configured`・不在は `scope-file-not-found`。既存 doc のテンプレ入替ではない |
+| 調達 | `list_templates()` | テンプレ一覧 `{templates:[{id,name,builtin}], note?}`。host（GUI が `register_templates` で投入した master レジストリ）が接続済みならそれを、**単独（GUI 未接続の stdio）は組み込みプリセット**（`builtin:true`。`midnight`（#298）と、GUI と同じ id・表示名の `builtin-pitch`・`builtin-executive`・`builtin-campaign`（#694）の 4 件）を返す。**`--root` 起動時は `<root>/templates/*.{pptx,potx}` も反映**（`builtin:false`・`id` は `file:` 始まり・`path` にベア名。下記「scope テンプレ discovery」#332）。builtin のみに見える単独では `note` で回避策を案内。id を `use_template` へ |
+| 調達 | `use_template(id, markdown?)` | テンプレ（`list_templates` の id）から**新規プロジェクトを mint**（bytes 不要・GUI の Draft と同じ整形）。単独の組み込み id は、`midnight` が `create_template` と同じハーネス、Pitch・Executive・Campaign が GUI の出荷テンプレと同じ生成関数 `writePresetTemplate` で生成（R8。書き出す PPTX は GUI 経路と byte-identical・#694）、**`file:` 始まりの id は `--root` 配下 `templates/` のファイルから起票**（#332）。未知 id は never-silent `{ok:false, code:"unknown-template"}`、`file:` で scope 未設定は `scope-not-configured`・不在は `scope-file-not-found`。既存 doc のテンプレ入替ではない |
 | 契約 | `get_authoring_guide()` | **著作の入口**：このテンプレのレイアウト名に解決した Markdown 書式・`<!-- col/kpi/step -->`・表/コード・`<!-- note -->` スピーカーノート・本文 budget・`activeReviewRules:[{id,level}]`（`get_deck_issues` と同一レジストリ由来のレビュー規則一覧・#244）＋図/spec ガイドへのポインタ |
 | 契約 | `set_review_rules(rules)` | レビュー規則の on/off（lint トグル・#247）。`rules` は `{規則id: "on"|"off"}`（例 `{"touten-used":"off","kuten-used":"off"}`・書かない id は現状維持）。下記「レビュー規則の on/off」 |
 | 契約 | `get_diagram_types()` | 図の種類メニュー（authorable な12種＝type/label/hint） |
@@ -233,7 +233,7 @@ deck の状態は **MCP resource** としても公開する。tool を連打せ�
 0. テンプレを調達：既存 `.scft` を base64 化して `open_project`、または `.pptx` を `new_project`。bytes が
    無ければ `create_template({preset:"midnight"})` → 返った `templateBase64` を `new_project` に渡す。
    `list_templates` → `use_template(id, markdown?)` で選ぶのが最短（bytes を運ばない）：host（GUI 協働）では
-   登録済みテンプレを、**単独（GUI 未接続）でも組み込みプリセット**（`midnight` 等）を一覧できるので同じ流れで着手できる。
+   登録済みテンプレを、**単独（GUI 未接続）でも組み込みプリセット**（`midnight`・Pitch・Executive・Campaign）を一覧できるので同じ流れで着手できる。
    サーバが `--root <dir>` scope で起動していれば、base64 の代わりに `open_project({path})` /
    `new_project({templatePath})` で scope 配下のファイルを直接開ける（下記「scoped fs 入出力」）。
 1. 開いた戻りの `contract`（レイアウト名・区切り・budget・ポインタ）を読み、`get_authoring_guide` で全書式を、
