@@ -14,6 +14,7 @@ import { randomUUID } from "crypto";
 import type { Session } from "./session";
 import type { DeckIR } from "../engine/slide-schema";
 import { historyReducer, type HState } from "../shared/history-core";
+import type { ApprovalPort } from "./host-approval";
 
 export interface DocEntry {
   docId: string;
@@ -72,6 +73,12 @@ export interface HostContext {
   onTemplateChanged?(entry: DocEntry, tool: string): void;
   notifyOpened?(entry: DocEntry): void;
   notifyClosed?(docId: string): void;
+  /** #727 (ADR-0040 D3): runs before EVERY tool call of this connection (tool-profiles' gate). Throws a
+   *  GuardError (authorization-* / host-not-ready) to refuse; a returned string rides the result as `note`.
+   *  Set only for AI connections of the collab host — the GUI and solo stdio are never gated. */
+  admitCall?(extra: unknown): Promise<string | undefined>;
+  /** #727: the GUI's port onto client approval + the seed handshake (GUI-only tools, approval-tools.ts). */
+  approvals?: ApprovalPort;
 }
 
 /** Metadata for one registered template, mirrored from the GUI's MasterEntry (bytes kept host-side,

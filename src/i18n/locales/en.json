@@ -199,10 +199,10 @@
     "close": "Close",
     "unavailableBefore": "Collaboration works only in the desktop app (",
     "unavailableAfter": " / built version). It starts a local MCP sidecar and connects the upstream AI and the webview to the same deck.",
-    "introBefore": "When you start, a local MCP host (sidecar) launches. Register the stdio command below once, and the AI's edits will ",
+    "introBefore": "SlideCraft starts a local MCP host (sidecar) automatically. Register the stdio command below once; after you allow the connection the first time, the AI's edits ",
     "introHighlight": "appear live on this screen",
-    "introAfter": " while the GUI is running (no port or token to manage).",
-    "startButton": "Start collaboration",
+    "introAfter": " (no port/token management). Use Stop to stop it and Resume to bring it back (for this launch only).",
+    "startButton": "Resume",
     "liveViewing": "Connected — showing the host's deck live",
     "documentCount": "Documents: {{docCount}}",
     "coEditNotice": "Co-editing: your edits are sent to the host (the single source of truth) and shared live with the AI. The AI's edits appear here too. Undo (⌘Z) runs against the host's history (structure changes, templates, and tab switching are locked while connected).",
@@ -254,7 +254,12 @@
     "mcpbMissing": "The latest release {{tag}} has no {{name}}. Register the JSON above in Claude Desktop's settings instead.",
     "mcpbUnsupported": "There is no Claude Desktop for this OS, so there is no .mcpb. Register with the command / JSON above.",
     "mcpbError": "Could not check the latest release ({{error}}). You can register with the JSON above.",
-    "mcpbOpenFailed": "Could not open the browser. Download from: {{url}}"
+    "mcpbOpenFailed": "Could not open the browser. Download from: {{url}}",
+    "waitingForAi": "Host running · waiting for an AI to connect (your editing is not locked)",
+    "grantsSummary": "Allowed clients ({{count}})",
+    "grantsEmpty": "None yet. An AI app asks for permission the first time it connects.",
+    "grantSessionOnly": "this session only",
+    "revoke": "Revoke"
   },
   "controller": {
     "untitledDoc": "Untitled",
@@ -332,7 +337,8 @@
     "kind": {
       "adjust": "template adjust",
       "intake": "template import",
-      "update": "update notice"
+      "update": "update notice",
+      "approval": "connection requests"
     }
   },
   "updateBanner": {
@@ -715,5 +721,20 @@
   },
   "resizableSplit": {
     "dividerTitle": "Drag to resize (double-click to reset)"
+  },
+  "collabApproval": {
+    "title": "AI client connection",
+    "body": "〈{{name}}〉 ({{version}}) wants to connect to SlideCraft. If you allow it, this AI can read and edit the same deck as the GUI.",
+    "fingerprintAdapter": "Client ID fingerprint: {{fp}}",
+    "fingerprintSession": "Session ID fingerprint: {{fp}} (HTTP direct · asked again on every reconnect)",
+    "hint": "Deny it if you do not recognise it. Closing this dialog also denies.",
+    "moreWaiting": "{{count}} more waiting for permission.",
+    "allow": "Allow",
+    "deny": "Deny",
+    "denyAll": "Deny all for this launch",
+    "closeIsDeny": "Close (deny)",
+    "bandWaiting": "AI clients are waiting for permission to connect ({{count}}).",
+    "kindName": "connection requests",
+    "grantsUnsaved": "Could not save the permission in the OS credential store. You will be asked again next launch."
   }
 }

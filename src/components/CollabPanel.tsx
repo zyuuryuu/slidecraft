@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CollabStatus } from "../ipc/collab-projection";
+import type { GrantView } from "../mcp/host-approval";
 import { maskToken, httpSnippet } from "./collab-panel-snippets";
 import CollabRegistration, { CopyButton, Field } from "./CollabRegistration";
 
@@ -25,6 +26,12 @@ interface CollabPanelProps {
   docCount: number;
   onStart: () => void;
   onStop: () => void;
+  /** #727 (ADR-0040 D1): an allowed AI has started calling (= collaborating, edit-locked). The host itself runs
+   *  from app launch, so `connected` without this means "waiting for an AI". */
+  aiActive?: boolean;
+  /** #727 (D3-5): the clients the human allowed, each revocable. Omitted → the list is hidden. */
+  grants?: GrantView[];
+  onRevoke?: (key: string) => void;
   /** #407: whether the view follows (jumps to + flashes) the AI's edits. Omitted → toggle hidden. */
   followAi?: boolean;
   onFollowAiChange?: (v: boolean) => void;
@@ -104,12 +111,41 @@ export function AdvancedHttp({
   );
 }
 
+/** #727 (D3-5): the allowed clients as ONE folded line ("許可したクライアント（N）"); opened, one row per client
+ *  with its own 取り消し (= that pair's secret is void; the shared token is not rotated). */
+export function ClientGrantList({ open, onToggle, grants, onRevoke }: { open: boolean; onToggle: () => void; grants: GrantView[]; onRevoke: (key: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <div>
+      <button onClick={onToggle} className="w-full flex items-center gap-1 text-[11px] text-accent-soft hover:text-fg py-1">
+        <span>{open ? "▾" : "▸"}</span>
+        <span>{t("collabPanel.grantsSummary", { count: grants.length })}</span>
+      </button>
+      {open && (
+        <ul className="space-y-1 pl-3 border-l border-edge">
+          {grants.length === 0 && <li className="text-[11px] text-dim">{t("collabPanel.grantsEmpty")}</li>}
+          {grants.map((g) => (
+            <li key={g.key} className="flex items-center justify-between gap-2 text-[11px] text-fg2">
+              <span className="min-w-0 truncate">
+                {g.name} <span className="text-dim">{g.version}</span> <span className="font-mono text-dim">{g.fingerprint}</span>
+                {g.kind === "session" && <span className="text-dim"> · {t("collabPanel.grantSessionOnly")}</span>}
+              </span>
+              <button onClick={() => onRevoke(g.key)} className="shrink-0 text-rose-300 hover:text-rose-200">{t("collabPanel.revoke")}</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function CollabPanel({
-  embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop, followAi, onFollowAiChange,
+  embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop, aiActive, grants, onRevoke, followAi, onFollowAiChange,
 }: CollabPanelProps) {
   const { t } = useTranslation();
   const connected = status === "connected";
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [grantsOpen, setGrantsOpen] = useState(false);
 
   const dot = connected ? "bg-emerald-400" : status === "connecting" ? "bg-amber-400 animate-pulse" : status === "error" ? "bg-rose-500" : "bg-field";
   const statusLabel = connected ? t("collabPanel.statusConnected") : status === "connecting" ? t("collabPanel.statusConnecting") : status === "error" ? t("collabPanel.statusError") : t("collabPanel.statusDisconnected");
@@ -157,13 +193,16 @@ export default function CollabPanel({
               <>
                 <div className="flex items-center justify-between text-[11px] text-muted">
                   <span>
-                    {t("collabPanel.liveViewing")}
+                    {aiActive ? t("collabPanel.liveViewing") : t("collabPanel.waitingForAi")}
                   </span>
                   <span>{t("collabPanel.documentCount", { docCount })}</span>
                 </div>
-                <p className="text-[10px] text-emerald-300/80 leading-relaxed">
-                  ✍️ {t("collabPanel.coEditNotice")}
-                </p>
+                {aiActive && (
+                  <p className="text-[10px] text-emerald-300/80 leading-relaxed">
+                    ✍️ {t("collabPanel.coEditNotice")}
+                  </p>
+                )}
+                {grants && onRevoke && <ClientGrantList open={grantsOpen} onToggle={() => setGrantsOpen((v) => !v)} grants={grants} onRevoke={onRevoke} />}
                 {onFollowAiChange && (
                   <label className="flex items-center gap-1.5 text-[11px] text-fg2 cursor-pointer select-none">
                     <input type="checkbox" checked={!!followAi} onChange={(e) => onFollowAiChange(e.target.checked)} />

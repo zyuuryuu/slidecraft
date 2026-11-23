@@ -131,6 +131,27 @@
     },
     "$schema": "http://json-schema.org/draft-07/schema#"
   },
+  "decide_client_approval": {
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string"
+      },
+      "decision": {
+        "type": "string",
+        "enum": [
+          "allow",
+          "deny",
+          "deny-all"
+        ]
+      }
+    },
+    "required": [
+      "requestId",
+      "decision"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
   "delete_slide": {
     "type": "object",
     "properties": {
@@ -457,6 +478,10 @@
     ],
     "$schema": "http://json-schema.org/draft-07/schema#"
   },
+  "list_client_approvals": {
+    "type": "object",
+    "properties": {}
+  },
   "list_documents": {
     "type": "object",
     "properties": {}
@@ -464,6 +489,41 @@
   "list_templates": {
     "type": "object",
     "properties": {}
+  },
+  "load_client_grants": {
+    "type": "object",
+    "properties": {
+      "grants": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "clientId": {
+              "type": "string"
+            },
+            "secret": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "version",
+            "clientId",
+            "secret"
+          ]
+        }
+      }
+    },
+    "required": [
+      "grants"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
   },
   "move_slide": {
     "type": "object",
@@ -564,6 +624,38 @@
     },
     "required": [
       "templates"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "report_seed": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "done",
+          "failed"
+        ]
+      },
+      "error": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "state"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "revoke_client_approval": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "key"
     ],
     "$schema": "http://json-schema.org/draft-07/schema#"
   },

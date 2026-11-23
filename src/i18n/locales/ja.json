@@ -199,10 +199,10 @@
     "close": "閉じる",
     "unavailableBefore": "協働機能はデスクトップアプリ（",
     "unavailableAfter": " / ビルド版）でのみ動作します。ローカルの MCP サイドカーを起動して、上流 AI と webview を同じデッキへ接続します。",
-    "introBefore": "開始すると、ローカルに MCP ホスト（サイドカー）を起動します。下の stdio コマンドを一度登録しておけば、AI の編集が ",
+    "introBefore": "SlideCraft を起動すると、ローカルに MCP ホスト（サイドカー）が自動で起動します。下の stdio コマンドを一度登録しておけば、初回だけ接続の許可を求めたうえで、AI の編集が ",
     "introHighlight": "この画面にライブ反映",
-    "introAfter": " されます（port・token の管理は不要）。",
-    "startButton": "協働を開始",
+    "introAfter": " されます（port・token の管理は不要）。止めたいときは「停止」、戻すときは「再開」（この起動中だけ有効）。",
+    "startButton": "再開",
     "liveViewing": "接続中・ホストの deck をライブ表示中",
     "documentCount": "ドキュメント: {{docCount}}",
     "coEditNotice": "協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレート・タブ切替は接続中ロック）。",
@@ -254,7 +254,12 @@
     "mcpbMissing": "最新リリース {{tag}} には {{name}} がありません。上の JSON を Claude Desktop の設定に登録してください。",
     "mcpbUnsupported": "この OS には Claude Desktop が無いため .mcpb はありません。上のコマンド / JSON で登録してください。",
     "mcpbError": "最新リリースを確認できませんでした（{{error}}）。上の JSON で登録できます。",
-    "mcpbOpenFailed": "ブラウザを開けませんでした。次の URL からダウンロードしてください: {{url}}"
+    "mcpbOpenFailed": "ブラウザを開けませんでした。次の URL からダウンロードしてください: {{url}}",
+    "waitingForAi": "ホスト起動中・AI の接続を待っています（あなたの編集は止まりません）",
+    "grantsSummary": "接続を許可したクライアント（{{count}}）",
+    "grantsEmpty": "まだありません。AI アプリが初めてつながるときに許可を求めます。",
+    "grantSessionOnly": "このセッションのみ",
+    "revoke": "取り消し"
   },
   "controller": {
     "untitledDoc": "無題",
@@ -332,7 +337,8 @@
     "kind": {
       "adjust": "テンプレート調整",
       "intake": "取り込み",
-      "update": "更新のお知らせ"
+      "update": "更新のお知らせ",
+      "approval": "接続の許可待ち"
     }
   },
   "updateBanner": {
@@ -715,5 +721,20 @@
   },
   "resizableSplit": {
     "dividerTitle": "ドラッグで幅を変える（ダブルクリックで元に戻す）"
+  },
+  "collabApproval": {
+    "title": "AI クライアントの接続",
+    "body": "〈{{name}}〉（{{version}}）が SlideCraft への接続を求めています。許可すると、この AI は GUI と同じ deck を読み書きできます。",
+    "fingerprintAdapter": "クライアント ID の指紋: {{fp}}",
+    "fingerprintSession": "セッション ID の指紋: {{fp}}（HTTP 直結・つなぎ直すたびに確認します）",
+    "hint": "心当たりが無ければ拒否してください。閉じた場合も拒否になります。",
+    "moreWaiting": "ほかに {{count}} 件が許可を待っています。",
+    "allow": "許可",
+    "deny": "拒否",
+    "denyAll": "この起動中はすべて拒否",
+    "closeIsDeny": "閉じる（拒否）",
+    "bandWaiting": "AI クライアントが接続の許可を待っています（{{count}} 件）。",
+    "kindName": "接続の許可待ち",
+    "grantsUnsaved": "許可を OS の資格情報ストアに保存できませんでした。次回の起動では、もう一度許可を求めます。"
   }
 }

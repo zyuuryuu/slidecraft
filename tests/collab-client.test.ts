@@ -18,7 +18,7 @@ beforeAll(() => {
 let host: CollabHost;
 let client: CollabClient | undefined;
 beforeEach(async () => {
-  host = await createCollabHost({ port: 0, hostJsonPath: null });
+  host = await createCollabHost({ port: 0, hostJsonPath: null, requireClientApproval: false });
 });
 afterEach(async () => {
   try { await client?.close(); } catch { /* ignore */ }

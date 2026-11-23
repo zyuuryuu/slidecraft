@@ -5,12 +5,11 @@
  */
 import { createCollabHost } from "./host";
 import { formatReadyLine } from "./host-handshake";
+import { hostOptionsFromEnv } from "./host-options";
 
 async function main(): Promise<void> {
-  const port = Number(process.env.SLIDECRAFT_PORT ?? 5174);
-  const hostJsonPath = process.env.SLIDECRAFT_HOST_JSON ?? null;
-  // #512: opt-in local JSONL call log (no egress). Unset/empty = OFF.
-  const metricsPath = process.env.SLIDECRAFT_MCP_METRICS || null;
+  // #727: no bind-address input exists — the host is 127.0.0.1 only (host-options.ts).
+  const { port, hostJsonPath, metricsPath } = hostOptionsFromEnv(process.env);
   const host = await createCollabHost({ port, hostJsonPath, metricsPath });
   // Machine-readable handshake on STDOUT for the Tauri supervisor (P2.3) to read {url,token,guiToken}
   // directly off the child's pipe — no race against the host.json write. One tagged line. The GUI

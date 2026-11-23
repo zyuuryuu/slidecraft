@@ -109,7 +109,7 @@ describe("over loopback HTTP: who is the GUI", () => {
   });
 
   it("the GUI token sees a private doc (GUI = all docs); the shared token does not (AI = shared only)", async () => {
-    host = await createCollabHost({ port: 0, hostJsonPath: null });
+    host = await createCollabHost({ port: 0, hostJsonPath: null, requireClientApproval: false });
     host.registry.create(createSession(null), "private", false); // a doc the human has not shared
     const g = await connect({ Authorization: `Bearer ${host.guiToken}` });
     const a = await connect({ Authorization: `Bearer ${host.token}` });
