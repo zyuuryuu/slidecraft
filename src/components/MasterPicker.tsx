@@ -68,7 +68,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
 
   return (
     <div className="relative inline-flex min-w-0 items-center gap-1" ref={ref}>
-      <BarTip label={t("masterPicker.buttonTitle")} disabled={disabled}>
+      <BarTip label={t("masterPicker.buttonTitle")}>
       <Button
         variant="secondary"
         onClick={() => setOpen((v) => !v)}

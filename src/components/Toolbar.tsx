@@ -5,7 +5,6 @@ import SettingsMenu from "./SettingsMenu";
 import HtmlTransitionPicker from "./HtmlTransitionPicker";
 import BarTip from "./BarTip";
 import { Button } from "@/components/ui/button";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { BAR_HOVER } from "./bar-button";
 
 interface ToolbarProps {
@@ -63,13 +62,13 @@ export default function Toolbar({
   const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
   const [htmlTransition, setHtmlTransition] = useState<Transition>("slide"); // #650: chosen in the File menu itself
-  // #724: the bar's 7 buttons are shadcn/ui Buttons (Base UI); their descriptions are Tooltips (was `title=`).
+  // #724: the bar's 7 buttons are shadcn/ui Buttons (Base UI); their descriptions are Tooltips (was `title=`, see BarTip).
+  // The TooltipProvider (delay BAR_TOOLTIP_DELAY) wraps the whole app in main.tsx (the draft dialog's 🎨 shares it).
   // secondary = bg-edge (the old look); the app's hover (accent/40) is kept. Height = the Button's 32px (as before).
   const sec = `px-3 font-normal ${BAR_HOVER}`;
   const icon = `font-normal ${BAR_HOVER} disabled:opacity-30`;
 
   return (
-    <TooltipProvider delay={400}>
     <div data-testid="top-bar" className="flex min-w-0 flex-1 items-center gap-2 px-4 py-2">
       {/* #692: min-w-0 lets the bar be narrower than its content's full width, so the 🎨 template name truncates
           (instead of pushing the AI and ⚙ buttons off a narrow window). */}
@@ -80,13 +79,13 @@ export default function Toolbar({
 
       {onUndo && (
         <div className="flex items-center gap-0.5">
-          <BarTip label={t("toolbar.undo")} disabled={!canUndo}>
+          <BarTip label={t("toolbar.undo")}>
             <Button variant="secondary" size="icon" onClick={onUndo} disabled={!canUndo} aria-label={t("toolbar.undo")}
               className={icon}>
               ↶
             </Button>
           </BarTip>
-          <BarTip label={t("toolbar.redo")} disabled={!canRedo}>
+          <BarTip label={t("toolbar.redo")}>
             <Button variant="secondary" size="icon" onClick={onRedo} disabled={!canRedo} aria-label={t("toolbar.redo")}
               className={icon}>
               ↷
@@ -172,7 +171,7 @@ export default function Toolbar({
 
       {/* 📝 原稿 (Draft) = secondary action. Gated while collab-locked or while a template adjust is open. */}
       {onDraft && (
-        <BarTip label={draftGate === "locked" ? t("app.draftLockedTitle") : t("app.draftButtonTitle")} disabled={!!draftGate}>
+        <BarTip label={draftGate === "locked" ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}>
           <Button variant="secondary" onClick={onDraft} disabled={!!draftGate} className={`${sec} disabled:opacity-40`}>
             {t("toolbar.draft")}
           </Button>
@@ -212,6 +211,5 @@ export default function Toolbar({
 
       <SettingsMenu onHelp={onHelp} onAiSettings={onAiSettings} />
     </div>
-    </TooltipProvider>
   );
 }

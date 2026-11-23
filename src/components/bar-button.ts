@@ -6,3 +6,5 @@
  */
 /** 二次ボタン（bg-edge）のホバー: アプリの他のボタンと同じ accent/40（shadcn の既定は fg を 5% 混ぜる）。 */
 export const BAR_HOVER = "hover:bg-accent/40";
+/** Tooltip が開くまでの遅延（ms）。main.tsx の TooltipProvider 1 つで、上部バーと原稿入力ダイアログの 🎨 に効く。 */
+export const BAR_TOOLTIP_DELAY = 400;

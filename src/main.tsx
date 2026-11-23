@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './i18n' // init react-i18next (ja⇄en) before <App/> mounts
 import App from './App.tsx'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { BAR_TOOLTIP_DELAY } from './components/bar-button'
 
 // Apply the saved theme to <html> BEFORE first paint so light/modern users don't flash the dark palette.
 const savedTheme = (() => { try { return localStorage.getItem('slidecraft_theme') } catch { return null } })()
@@ -10,6 +12,9 @@ document.documentElement.setAttribute('data-theme', savedTheme === 'light' || sa
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {/* #724: one Tooltip provider for the whole app (top bar + the draft dialog's 🎨) → the same delay everywhere. */}
+    <TooltipProvider delay={BAR_TOOLTIP_DELAY}>
+      <App />
+    </TooltipProvider>
   </StrictMode>,
 )

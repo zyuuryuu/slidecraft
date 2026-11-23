@@ -7,7 +7,7 @@ shadcn CLI の既定 preset `base-nova`）。設定は リポジトリ直下の 
 | 部品 | ファイル | 使う場所 |
 | --- | --- | --- |
 | Button | `button.tsx` | 上部バーの 7 ボタン（`Toolbar.tsx`・`SettingsMenu.tsx`・`MasterPicker.tsx`） |
-| Tooltip | `tooltip.tsx` | 上部バーのボタンの説明（以前の `title=`）。`../BarTip.tsx` 経由。`TooltipProvider`（delay 400ms）は `Toolbar.tsx` |
+| Tooltip | `tooltip.tsx` | 上部バーのボタンの説明（以前の `title=`）。`../BarTip.tsx` 経由（説明は `aria-describedby` でも渡す）。`TooltipProvider`（delay 400ms＝`BAR_TOOLTIP_DELAY`）は `src/main.tsx` でアプリ全体に 1 つ |
 
 ## 色の名前（トークン）の写像
 
@@ -27,8 +27,8 @@ shadcn の部品は `bg-primary`・`border-border` などの色名で書かれ�
 | `--accent-foreground` | `--fg` | — |
 | `--destructive` | `--danger` | 削除などの危険操作 |
 | `--border` ／ `--input` | `--edge` ／ `--edge2` | 枠・入力欄の枠 |
-| `--ring` | `--accent` | フォーカスリング |
-| `--radius` | `0.375rem`（6px） | 角丸。既存のタブ・入力欄（4px）との不揃いを小さくする |
+| `--ring` | `--fg` | フォーカスリング（主ボタン＝`--accent` の上でも地と分かれる。対 上部バー 3:1 以上） |
+| `--radius` | `0.375rem`（6px） | 角丸。**このフォルダの部品だけ**が参照する（下の「角丸」）。Tailwind の `rounded-*` スケールは既定のまま |
 
 `dark:` variant は `[data-theme="dark"]` と `[data-theme="modern"]`（どちらも `color-scheme: dark`）に向けてある
 （`src/index.css` の `@custom-variant dark`）。
@@ -47,12 +47,25 @@ shadcn の **`--muted`・`--accent` は「薄い塗り」**、アプリの **`--
 | `bg-accent` | `bg-edge` | ホバー・選択中の薄い塗り＝既存メニューのホバー（`hover:bg-edge`） |
 | `text-accent-foreground` | `text-fg` | その上の文字 |
 
+### 角丸
+
+shadcn init は `@theme inline` に `--radius-sm/md/lg/xl…: calc(var(--radius) * …)` を足すが、**採らない**（アプリ既存の
+`rounded-lg` 等がすべて小さくなる＝8px → 6px）。代わりに部品の中の角丸スケールを `--radius` の直接参照に置き換える。
+
+| shadcn の class | 置き換え先 |
+| --- | --- |
+| `rounded-lg`（前置き `in-data-[…]:` 等が付いても同じ） | `rounded-(--radius)` |
+| `rounded-md` ／ `var(--radius-md)` | `rounded-[calc(var(--radius)*0.8)]` ／ `calc(var(--radius)*0.8)` |
+| `rounded-sm` ／ `var(--radius-sm)` | `rounded-[calc(var(--radius)*0.6)]` ／ `calc(var(--radius)*0.6)` |
+| `rounded-xl` 以上 | `rounded-[calc(var(--radius)*1.4)]`（xl）・`*1.8`（2xl）・`*2.2`（3xl）・`*2.6`（4xl） |
+
 手順（リポジトリ直下で）:
 
 ```bash
 npx shadcn@latest add <名前>
 sed -i -E 's/(^|[^-[:alnum:]_])bg-muted([^-[:alnum:]_]|$)/\1bg-surface\2/g; s/(^|[^-[:alnum:]_])bg-accent([^-[:alnum:]_]|$)/\1bg-edge\2/g; s/(^|[^-[:alnum:]_])text-muted-foreground([^-[:alnum:]_]|$)/\1text-muted\2/g; s/(^|[^-[:alnum:]_])text-accent-foreground([^-[:alnum:]_]|$)/\1text-fg\2/g' src/components/ui/*.tsx
-npx vitest run tests/shadcn-ui-tokens.test.ts   # 置換漏れがあれば赤（同じ class が連続すると sed が 1 つ飛ばすので、赤なら sed をもう一度）
+# 角丸は上の表で手で置き換える（数が少なく、前置きの形がまちまちなので sed にしない）
+npx vitest run tests/shadcn-ui-tokens.test.ts tests/shadcn-ui-tokens-radius.test.ts   # 色・角丸の置換漏れがあれば赤（同じ class が連続すると sed が 1 つ飛ばすので、赤なら sed をもう一度）
 ```
 
 あわせて確認すること:
@@ -60,7 +73,10 @@ npx vitest run tests/shadcn-ui-tokens.test.ts   # 置換漏れがあれば赤（
 - **文言は辞書経由**: 部品に英語の文言（例: dialog の閉じるボタンの "Close"）があれば `useTranslation()` の `t()` に
   置き換える。`tests/ux-budget.test.tsx` の「語の一致」は `ui/` も検査し、新しいファイルは 0 件が原則（凍結リストに足さない）。
 - **記号**: 部品の内部アイコン（✓・×・› など）だけ lucide を使ってよい。上部バー・メニュー項目の記号は絵文字のまま
-  （ADR-0039 の記号の許可リスト）。
+  （ADR-0039 の記号の許可リスト）。`lucide-react` は今は依存に無い（使う部品が無いため）。`add` した部品が import したら
+  そのとき `npm install lucide-react` する。
+- **`cn`**: 部品は `cn` パッケージ（clsx＋tailwind-merge の代わり）を直接 import する。`components.json` の
+  `aliases.utils`（`@/lib/utils`）のファイルは置いていない（使う部品が無い）。CLI が作り直したら、使われていなければ消す。
 - **CLI が `src/index.css` を書き換えたら戻す**: `init`／`add` は `:root`／`.dark` に shadcn の色の値や Geist フォントを
   足すことがある。値の定義は上の写像だけにする（`--muted`・`--accent` を上書きされるとアプリの色が壊れる）。
 - **lint**: このフォルダは `react-refresh/only-export-components` の対象外（`button.tsx` が `buttonVariants` も export する
