@@ -60,7 +60,7 @@ beforeAll(() => {
 let host: CollabHost;
 const clients: Client[] = [];
 beforeEach(async () => {
-  host = await createCollabHost({ port: 0, hostJsonPath: null });
+  host = await createCollabHost({ port: 0, hostJsonPath: null, requireClientApproval: false });
 });
 afterEach(async () => {
   for (const c of clients.splice(0)) {

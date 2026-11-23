@@ -70,8 +70,10 @@ const SHARED_TOOLS = [
 ];
 /** collab 専用（doc 切替系）: solo（常に 1 doc・GUI が一切繋がらない）には見せない。 */
 const COLLAB_ONLY_TOOLS = ["close_document", "list_documents", "select_document"];
-/** GUI 専用: webview が master レジストリを push する口。AI からも solo からも見えない。 */
-const GUI_ONLY_TOOLS = ["register_templates"];
+/** GUI 専用: webview が master レジストリを push する口。AI からも solo からも見えない。
+ *  #727（ADR-0040 D1/D3）: AI クライアントの承認（一覧・回答・keychain の grant の受け渡し・取り消し）と
+ *  deck の seed 状態の口を GUI 専用で追加（AI の tools/list は不変＝AI が自分を承認する経路を作らない）。 */
+const GUI_ONLY_TOOLS = ["register_templates", "list_client_approvals", "decide_client_approval", "load_client_grants", "revoke_client_approval", "report_seed"];
 
 const sorted = (xs: string[]): string[] => [...xs].sort();
 

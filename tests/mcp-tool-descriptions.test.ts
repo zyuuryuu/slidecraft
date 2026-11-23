@@ -65,7 +65,10 @@ const HOT_CHAR_LIMIT = 7999;
 // bootstrap.toolNotes.templateDerive へ置き説明文は 1 行に抑えた — 2 本で +794 字、うち約 200 字/本は SDK の固定部分）で
 // 全体 18,199 → 18,993 字。宣言して上限を更新。
 // #631（同上・set_slide_markdown 説明文 +19 字）で全体 19,049 → 19,068 字。宣言して上限を実測値に更新。
-const ALL_CHAR_LIMIT = 19068;
+// #727（ADR-0040 D1/D3: AI クライアントの承認と seed の受け渡し）で GUI 専用ツール 5 本を追加・意図したツール面の拡張。
+// collab-gui だけに出す（AI・solo の tools/list は不変＝LLM の固定費は増えない）。説明文は 1 句に抑え、
+// 増分 +1,561 字はほぼ SDK の inputSchema 固定部分。全体 19,068 → 20,629 字。宣言して上限を実測値に更新。
+const ALL_CHAR_LIMIT = 20629;
 
 type Tool = { name: string; description?: string; inputSchema: Record<string, unknown> };
 type CallRes = { content: Array<{ text?: string }>; isError?: boolean };

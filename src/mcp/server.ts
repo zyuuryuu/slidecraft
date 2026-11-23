@@ -36,6 +36,7 @@ import type { MetricsRecorder } from "./metrics-sink";
 import { instrumentTool, noteDoc, noteChange } from "./metrics-probe";
 import { registerVisualTools } from "./visual-tools";
 import { persistScopedOrBase64, acquireScopedOrBase64 } from "./fs-scope";
+import { registerApprovalTools } from "./approval-tools";
 // The ONE result envelope (tool-result.ts): ok / fail (GuardError → {ok:false,code}; else isError) / run.
 import { type ToolResult, ok, fail, run } from "./tool-result";
 
@@ -382,6 +383,7 @@ export function buildServer(session: Session, opts: BuildServerOptions = {}): Mc
       }),
   );
 
+  registerApprovalTools(tool, host); // #727: GUI-only client approval + seed handshake (collab-gui profile)
   // ── template derivation (#568 段 3 / #570 段 3) ── the open doc's template → a DERIVED one (source untouched;
   // rebuilt from source + recipe in the fixed order fonts → scale → augment). Logic in template-tools.ts.
   tool("augment_template", { description: "無い構造（列・比較・カード・KPI）を合成した派生テンプレを doc に適用（元は不変・bootstrap）", inputSchema: { structures: z.array(z.enum(["columns-2", "columns-3", "compare-2", "card-3", "kpi-3", "kpi-4"])).optional(), rule: z.enum(["steps", "ratio"]).optional(), ...doc } }, (a, extra) => mutateTemplate(extra, a.docId, "augment_template", (s) => TT.augmentDocTemplate(s, a.structures, a.rule)));

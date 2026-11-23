@@ -53,7 +53,7 @@ describe("host new_project → tab title (real MCP path)", () => {
   });
 
   it("names the minted doc after the markdown's first heading (not 'Untitled')", async () => {
-    host = await createCollabHost({ port: 0, hostJsonPath: null });
+    host = await createCollabHost({ port: 0, hostJsonPath: null, requireClientApproval: false });
     ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# 新製品ローンチ計画\n\n- 市場投入は Q3" });
@@ -63,7 +63,7 @@ describe("host new_project → tab title (real MCP path)", () => {
   });
 
   it("falls back to 'Untitled' when the deck has no heading", async () => {
-    host = await createCollabHost({ port: 0, hostJsonPath: null });
+    host = await createCollabHost({ port: 0, hostJsonPath: null, requireClientApproval: false });
     ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "" });
