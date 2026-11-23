@@ -12,6 +12,7 @@ import { writeHostJson, readHostJson, clearHostJson } from "../src/mcp/host-json
 
 const cfg = (token: string): SecurityConfig => ({
   token,
+  guiToken: mintToken(), // #730: required; these cases exercise the shared token only
   allowedOrigins: new Set(["tauri://localhost", "http://localhost:5173"]),
   allowedHosts: new Set(["127.0.0.1", "localhost"]),
 });

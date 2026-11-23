@@ -47,7 +47,7 @@ export interface HostContext {
   setActive(extra: unknown, docId: string): void;
   /** AI clients see only shared docs (private-by-default); the GUI sees all. */
   sharedOnly: boolean;
-  /** #633: this connection is the collab GUI (x-slidecraft-role: gui). Its save_project is a READ (template
+  /** #633: this connection is the collab GUI (it presented the GUI-only token, #730). Its save_project is a READ (template
    *  pull / opening an AI doc as a tab — the human saves locally), so it never marks the host doc saved. */
   guiClient?: boolean;
   /** Solo (stdio) adapter marker (ADR-0033 D1): exactly ONE doc is ever open. open/new_project
@@ -217,7 +217,7 @@ export function changedIndicesOf(tool: string, index: number | undefined, result
   }
 }
 
-/** Who caused a deck change, from the host's view of the connection role (x-slidecraft-role). */
+/** Who caused a deck change, from the host's view of the connection role (which bearer it presented, #730). */
 export type ChangeOrigin = "ai" | "gui";
 
 /** The deckChanged notification params. ADDITIVE over the original {docId, rev, opId} (#407): `origin`

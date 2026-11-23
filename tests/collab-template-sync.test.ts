@@ -54,7 +54,7 @@ const layoutNamesOfHost = async (c: CollabClient, docId: string): Promise<string
   (await c.callTool<{ entries: Array<{ name: string }> }>("get_template_capabilities", { docId })).entries.map((e) => e.name);
 
 async function aiDoc(): Promise<string> {
-  ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+  ai = new CollabClient({ url: host.url, token: host.token });
   await ai.connect();
   const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# 表紙\n\n---\n\n# 本文\n\n- a" });
   return made.docId;
@@ -65,7 +65,7 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
     const decks: ProjectedDeck[] = [];
     const templates: ProjectedTemplate[] = [];
     // pollMs:0 → push 経路だけで同期できることを確かめる。
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
     await proj.start();
     const docId = await aiDoc();
     await waitFor(() => decks.length >= 1);
@@ -91,7 +91,7 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
 
   it("deckChanged は ADDITIVE に templateChanged:true ＋ templateName を運ぶ（AI 由来・opId/changedIndices なし）", async () => {
     const events: DeckChangedEvent[] = [];
-    gui = new CollabClient({ url: host.url, token: host.token, role: "gui", events: { onDeckChanged: (e) => events.push(e) } });
+    gui = new CollabClient({ url: host.url, token: host.guiToken, events: { onDeckChanged: (e) => events.push(e) } });
     await gui.connect();
     const docId = await aiDoc();
     const r = await ai!.callTool<{ templateName: string }>("adjust_template", { recipe: JSON.stringify({ scale: { body: 0.9 } }), docId });
@@ -112,7 +112,7 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
 
   it("no-op（足すものが無い）は rev も通知も出さない", async () => {
     const events: DeckChangedEvent[] = [];
-    gui = new CollabClient({ url: host.url, token: host.token, role: "gui", events: { onDeckChanged: (e) => events.push(e) } });
+    gui = new CollabClient({ url: host.url, token: host.guiToken, events: { onDeckChanged: (e) => events.push(e) } });
     await gui.connect();
     const docId = await aiDoc();
     await ai!.callTool("augment_template", { structures: ["kpi-4"], docId });
@@ -123,7 +123,7 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
   });
 
   it("テンプレ差し替え後、古い expectedRev の GUI 編集は stale で拒否される（既存の stale 契約）", async () => {
-    gui = new CollabClient({ url: host.url, token: host.token, role: "gui" });
+    gui = new CollabClient({ url: host.url, token: host.guiToken });
     await gui.connect();
     const docId = await aiDoc();
     await ai!.callTool("augment_template", { structures: ["kpi-4"], docId });
@@ -137,7 +137,7 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
     const docId = await aiDoc();
     // 接続前に派生済みの doc を後から採用する＝push を一度も受けていない状態。
     await ai!.callTool("augment_template", { structures: ["kpi-4"], docId });
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
     await proj.start();
     await waitFor(() => templates.length >= 1);
     expect(buildCatalog(templates[0].template).map((e) => e.name)).toEqual(await layoutNamesOfHost(ai!, docId));
@@ -150,7 +150,7 @@ describe("#616 collab: テンプレ差し替えを GUI へ同期する", () => {
   async function staleSendAfter(aiOp: (docId: string) => Promise<unknown>) {
     const decks: ProjectedDeck[] = [];
     const templates: ProjectedTemplate[] = [];
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => decks.push(p), onTemplate: (t) => templates.push(t) });
     await proj.start();
     const docId = await aiDoc();
     await waitFor(() => decks.length >= 1);

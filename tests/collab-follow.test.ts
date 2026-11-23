@@ -45,12 +45,12 @@ async function setup(editorRole: "ai" | "gui", followQuietMs?: number) {
   const events: string[] = [];
   const follows: FollowTarget[] = [];
   proj = new CollabProjection({
-    url: host.url, token: host.token, pollMs: 0, followQuietMs,
+    url: host.url, guiToken: host.guiToken, pollMs: 0, followQuietMs,
     onDeck: (p) => events.push(`deck:${p.rev}`),
     onFollow: (f) => { events.push(`follow:${f.rev}`); follows.push(f); },
   });
   await proj.start();
-  const editor = new CollabClient({ url: host.url, token: host.token, role: editorRole });
+  const editor = new CollabClient({ url: host.url, token: editorRole === "gui" ? host.guiToken : host.token });
   await editor.connect();
   others.push(editor);
   const made = await editor.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: FOUR });
@@ -85,7 +85,7 @@ describe("CollabProjection follow (#407)", () => {
 
   it("the human's own edit never follows, and an AI edit right after it is suppressed (quiet window)", async () => {
     const { docId, events, follows } = await setup("gui"); // the editor only seeds the doc here
-    const ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    const ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     others.push(ai);
     const sent = await proj!.sendSlideMarkdown(0, "# 自分の編集");
@@ -98,7 +98,7 @@ describe("CollabProjection follow (#407)", () => {
 
   it("with followQuietMs:0 the same AI edit after a human edit does follow", async () => {
     const { docId, events, follows } = await setup("gui", 0);
-    const ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    const ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     others.push(ai);
     await proj!.sendSlideMarkdown(0, "# 自分の編集");

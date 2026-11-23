@@ -39,8 +39,12 @@ export const TAURI_WEBVIEW_ORIGINS = ["tauri://localhost", "http://tauri.localho
 export const DEV_BROWSER_ORIGINS = ["http://localhost:5173"] as const;
 
 export interface SecurityConfig {
-  /** the per-launch bearer every request must carry */
+  /** the per-launch SHARED bearer (published in host.json for AI clients) */
   token: string;
+  /** #730 (ADR-0040 D3-6 / ADR-0038 D3): the per-launch GUI-ONLY bearer. Minted next to `token`, handed
+   *  to the webview ONLY via the stdout READY line (never host.json / logs / argv). Holding it is what
+   *  makes a connection the GUI — the self-declared `x-slidecraft-role` header is never a credential. */
+  guiToken: string;
   /** Origin allowlist — a PRESENT Origin must be in here; an ABSENT Origin (non-browser / Rust
    *  plugin-http) passes to the token gate. e.g. {"tauri://localhost", "http://localhost:5173"}. */
   allowedOrigins: Set<string>;
@@ -53,22 +57,43 @@ export interface AdmissionFailure {
   message: string;
 }
 
-/** Admit or reject a request. Returns null to admit, or {status,message} to reject. Order:
+export type ClientRole = "gui" | "ai";
+
+export interface AdmissionHeaders {
+  host?: string;
+  origin?: string;
+  authorization?: string;
+  /** the raw `x-slidecraft-role` header, if any. NOT a credential (#730): only checked so that a
+   *  request NAMING a role without the GUI token is refused rather than silently reinterpreted. */
+  role?: string;
+}
+
+/** Admit or reject a request AND decide its role — the ONE place both are computed (R8). Order:
  *  (1) Host must be loopback (defense in depth — a non-loopback Host means a misrouted/forged req);
  *  (2) a PRESENT Origin must be allowlisted (DNS-rebinding defense: evil.com→127.0.0.1 still sends
  *      Origin: http://evil.com and is refused); an absent Origin passes;
- *  (3) the bearer token must match — THE trust boundary (stops another local process / a tab that
- *      guessed the port, since loopback alone is not a boundary). */
-export function checkRequest(
-  headers: { host?: string; origin?: string; authorization?: string },
-  cfg: SecurityConfig,
-): AdmissionFailure | null {
+ *  (3) the bearer must be the shared token or the GUI token — THE trust boundary (stops another local
+ *      process / a tab that guessed the port, since loopback alone is not a boundary). Both compares
+ *      always run (timing-safe, no short-circuit revealing which one matched);
+ *  (4) #730: a `x-slidecraft-role` header without the GUI token is refused (403) — claiming the role is
+ *      not a way to become the GUI (ADR-0040 D3-6: that would bypass client approval).
+ *  The role is "gui" iff the bearer is the GUI token; otherwise "ai". */
+export function admitRequest(headers: AdmissionHeaders, cfg: SecurityConfig): { role: ClientRole } | AdmissionFailure {
   const host = (headers.host ?? "").split(":")[0];
   if (host && !cfg.allowedHosts.has(host)) return { status: 421, message: "host not allowed" };
   if (headers.origin !== undefined && !cfg.allowedOrigins.has(headers.origin)) {
     return { status: 403, message: "origin not allowed" };
   }
   const token = (headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (!token || !safeEqual(token, cfg.token)) return { status: 401, message: "unauthorized" };
-  return null;
+  const isShared = safeEqual(token, cfg.token);
+  const isGui = safeEqual(token, cfg.guiToken);
+  if (!token || (!isShared && !isGui)) return { status: 401, message: "unauthorized" };
+  if (headers.role !== undefined && !isGui) return { status: 403, message: "role header requires the gui token" };
+  return { role: isGui ? "gui" : "ai" };
+}
+
+/** Admission only (null = admit). A view of admitRequest, kept for callers that need no role. */
+export function checkRequest(headers: AdmissionHeaders, cfg: SecurityConfig): AdmissionFailure | null {
+  const r = admitRequest(headers, cfg);
+  return "status" in r ? r : null;
 }

@@ -3,7 +3,9 @@
  * connect IN as equal MCP clients (Streamable HTTP over loopback). ONE shared DocRegistry is the
  * truth; each connection is its own {McpServer, transport} pair (the SDK binds one server per
  * transport), and a deck mutation FANS OUT deckChanged to every connected client. The bearer token
- * is the trust boundary (host-security); the URL+token are published in host.json for discovery.
+ * is the trust boundary (host-security); the URL+token are published in host.json for discovery. The
+ * GUI holds a SEPARATE per-launch GUI token (#730) that only travels on the READY line — that token,
+ * not a self-declared header, is what makes a connection the GUI.
  *
  * Node-only (http, crypto). NOT used by the stdio baseline (cli.ts), which stays listener-less.
  */
@@ -16,7 +18,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createSession } from "./session";
 import { buildServer } from "./server";
 import { DocRegistry, MemTemplateStore, deckChangedPayload, type HostContext } from "./host-core";
-import { mintToken, checkRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type SecurityConfig } from "./host-security";
+import { mintToken, admitRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type SecurityConfig, type ClientRole } from "./host-security";
 import { writeHostJson, clearHostJson, type HostHandshake } from "./host-json";
 import { createFileMetricsRecorder } from "./metrics-sink";
 
@@ -39,6 +41,8 @@ export interface CollabHost {
   url: string;
   port: number;
   token: string;
+  /** #730: the GUI-only bearer. Goes on the READY line ONLY — never host.json / logs / argv. */
+  guiToken: string;
   registry: DocRegistry;
   close(): Promise<void>;
 }
@@ -46,13 +50,17 @@ export interface CollabHost {
 interface Conn {
   server: McpServer;
   transport: StreamableHTTPServerTransport;
+  /** the role the session was opened with; every later request on it must present the same bearer kind (#730) */
+  role: ClientRole;
 }
 
 export async function createCollabHost(opts: CollabHostOptions = {}): Promise<CollabHost> {
   const bindHost = opts.host ?? "127.0.0.1";
   const token = mintToken();
+  const guiToken = mintToken(); // #730: independent of `token`; never written to host.json
   const sec: SecurityConfig = {
     token,
+    guiToken,
     // ONE source of truth (host-security) shared with the origin-policy test — never hand-patch
     // per-OS origins here again. The token is the boundary; this list is the browser-rebinding belt.
     allowedOrigins: new Set([...TAURI_WEBVIEW_ORIGINS, ...DEV_BROWSER_ORIGINS]),
@@ -74,8 +82,8 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
   const sidOf = (extra: unknown): string | undefined => (extra as { sessionId?: string } | undefined)?.sessionId;
 
   // A HostContext per connection: shared registry/conns/broadcast, but sharedOnly reflects THIS
-  // connection's role (AI = shared docs only; GUI = all). Role is the advisory x-slidecraft-role
-  // header — the token is the real boundary, so an attacker gains nothing by spoofing the role.
+  // connection's role (AI = shared docs only; GUI = all). The role comes from WHICH bearer the
+  // connection presented (admitRequest: GUI token → gui, shared token → ai) — never from a header (#730).
   const makeHostCtx = (aiClient: boolean): HostContext => ({
     registry,
     active: (extra) => { const s = sidOf(extra); return s ? activeByConn.get(s) : undefined; },
@@ -100,23 +108,28 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
 
   const httpServer: Server = createServer(async (req, res) => {
     try {
-      const adm = checkRequest(
-        { host: req.headers.host, origin: req.headers.origin as string | undefined, authorization: req.headers.authorization },
+      const roleHeader = req.headers["x-slidecraft-role"];
+      const adm = admitRequest(
+        { host: req.headers.host, origin: req.headers.origin as string | undefined, authorization: req.headers.authorization, role: Array.isArray(roleHeader) ? roleHeader.join(",") : roleHeader },
         sec,
       );
-      if (adm) { res.writeHead(adm.status, { "content-type": "text/plain" }).end(adm.message); return; }
-      const aiClient = req.headers["x-slidecraft-role"] !== "gui";
+      if ("status" in adm) { res.writeHead(adm.status, { "content-type": "text/plain" }).end(adm.message); return; }
+      const role = adm.role;
+      const aiClient = role === "ai";
       const existing = req.headers["mcp-session-id"] as string | undefined;
+      const conn = existing ? conns.get(existing) : undefined;
+      // A session opened by the GUI stays the GUI's: the shared token cannot ride its session id (#730).
+      if (conn && conn.role !== role) { res.writeHead(403, { "content-type": "text/plain" }).end("session role mismatch"); return; }
 
       if (req.method === "POST") {
         const body = await readBody(req);
-        let transport = existing ? conns.get(existing)?.transport : undefined;
+        let transport = conn?.transport;
         if (!transport) {
           if (!isInitializeRequest(body)) { res.writeHead(400, { "content-type": "text/plain" }).end("no session"); return; }
           const server = buildServer(createSession(null), { host: makeHostCtx(aiClient), registerResources: false, metrics });
           const t = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
-            onsessioninitialized: (id) => { conns.set(id, { server, transport: t }); },
+            onsessioninitialized: (id) => { conns.set(id, { server, transport: t, role }); },
           });
           t.onclose = () => { const id = t.sessionId; if (id) { conns.delete(id); activeByConn.delete(id); } };
           await server.connect(t);
@@ -124,7 +137,7 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
         }
         await transport.handleRequest(req, res, body);
       } else if (req.method === "GET" || req.method === "DELETE") {
-        const transport = existing ? conns.get(existing)?.transport : undefined;
+        const transport = conn?.transport;
         if (!transport) { res.writeHead(400, { "content-type": "text/plain" }).end("no session"); return; }
         await transport.handleRequest(req, res);
       } else {
@@ -152,5 +165,5 @@ export async function createCollabHost(opts: CollabHostOptions = {}): Promise<Co
     if (opts.hostJsonPath) clearHostJson(opts.hostJsonPath);
   };
 
-  return { url, port, token, registry, close };
+  return { url, port, token, guiToken, registry, close };
 }

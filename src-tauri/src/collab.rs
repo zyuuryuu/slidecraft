@@ -1,9 +1,11 @@
 //! collab.rs — P2.3 sidecar lifecycle. The GUI hosts collaboration by spawning the Node collab
 //! listener (dist/mcp/host.cjs) as a CHILD process that Rust OWNS: it captures the child's
-//! `SLIDECRAFT_READY {url,token}` stdout handshake, keeps the handle in managed state, and KILLs it
+//! `SLIDECRAFT_READY {url,token,guiToken}` stdout handshake, keeps the handle in managed state, and KILLs it
 //! on app exit. A `std::process::Child` is NOT auto-reaped (Windows would orphan node otherwise), so
 //! `reap()` is wired to the run-loop. Rust never touches the DeckIR — it only supervises the process
-//! and hands {url,token} to the webview, which connects as an equal MCP client (collab-client.ts).
+//! and hands {url,token,guiToken} to the webview, which connects as an equal MCP client (collab-client.ts).
+//! #730: `guiToken` (the GUI-only bearer) arrives ONLY on that private pipe; Rust passes it to the
+//! webview and never logs it, writes it to host.json, or puts it on a command line.
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
@@ -28,6 +30,9 @@ const READY_TIMEOUT: Duration = Duration::from_secs(15);
 pub struct CollabInfo {
     pub url: String,
     pub token: String,
+    /// #730: the GUI-only bearer (makes the webview's connection the GUI). No `Debug` derive on purpose.
+    #[serde(rename = "guiToken")]
+    pub gui_token: String,
     #[serde(rename = "hostJsonPath")]
     pub host_json_path: String,
 }
@@ -36,6 +41,15 @@ pub struct CollabInfo {
 struct ReadyLine {
     url: String,
     token: String,
+    #[serde(rename = "guiToken")]
+    gui_token: String,
+}
+
+/// Parse the JSON after READY_PREFIX (contract: src/mcp/host-handshake.ts). A line missing any field —
+/// including `guiToken` (#730) — is an error, never a half-built handshake. The error text is serde's
+/// (field names / positions), which does not echo token values.
+fn parse_ready(json: &str) -> Result<ReadyLine, String> {
+    serde_json::from_str(json).map_err(|e| format!("READY の解析に失敗しました: {e}"))
 }
 
 #[derive(Default)]
@@ -259,17 +273,18 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
         }
     };
 
-    let parsed: ReadyLine = match serde_json::from_str(&ready) {
+    let parsed = match parse_ready(&ready) {
         Ok(p) => p,
         Err(e) => {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(format!("READY の解析に失敗しました: {e}"));
+            return Err(e);
         }
     };
     let info = CollabInfo {
         url: parsed.url,
         token: parsed.token,
+        gui_token: parsed.gui_token,
         host_json_path: host_json.to_string_lossy().to_string(),
     };
 
@@ -309,8 +324,23 @@ fn clear_host_json(state: &CollabState) {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_path, launcher_candidates};
+    use super::{display_path, launcher_candidates, parse_ready};
     use std::path::Path;
+
+    // #730 — the READY contract carries the GUI-only token; a line without it is rejected (the webview
+    // would otherwise connect as an AI and silently lose its GUI powers).
+    #[test]
+    fn parse_ready_reads_the_gui_token() {
+        let r = parse_ready(r#"{"url":"http://127.0.0.1:1/mcp","token":"s","guiToken":"g"}"#).unwrap();
+        assert_eq!((r.url.as_str(), r.token.as_str(), r.gui_token.as_str()), ("http://127.0.0.1:1/mcp", "s", "g"));
+    }
+
+    #[test]
+    fn parse_ready_rejects_a_line_without_the_gui_token() {
+        let e = parse_ready(r#"{"url":"u","token":"secret-shared"}"#).err().unwrap();
+        assert!(e.contains("guiToken"), "{e}");
+        assert!(!e.contains("secret-shared"), "the error must not echo a token: {e}");
+    }
 
     // #537 — the Windows probe must accept ONLY the .cmd: an extension-less `slidecraft-mcp` on a Windows
     // PATH dir is the (no longer bundled) sh file, which Windows cannot run.
