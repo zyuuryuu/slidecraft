@@ -201,6 +201,15 @@ describe("seed wait: the GUI's deck is on the host before an allowed AI sees it 
     expect(String(r.note)).toContain("GUI");
   });
 
+  it("a late `pending` after the AI is already active is ignored (the gate never re-closes)", async () => {
+    await start();
+    const gui = await connect(host!.guiToken);
+    const ai = await allowedAi(gui); // seed state "none" → passes and activates
+    expect(await call(ai, "list_documents")).toHaveProperty("documents");
+    await call(gui, "report_seed", { state: "pending" });
+    expect(await call(ai, "list_documents")).toHaveProperty("documents");
+  });
+
   it("aiActive stays false while no allowed AI has called (the GUI keeps editing — editLocked off)", async () => {
     await start();
     const gui = await connect(host!.guiToken);

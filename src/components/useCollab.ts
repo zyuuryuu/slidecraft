@@ -1,9 +1,11 @@
 /**
- * useCollab.ts — the P2.4 React binding for GUI-hosted collaboration. On 開始 it asks Rust to spawn
- * the collab sidecar (start_collab → {url,token,guiToken}), connects a gui-role CollabProjection over the
- * Tauri plugin-http fetch, and mirrors the host's truth into the active deck via setDeck(next,
- * 'commit') on every change. It also SEEDS the current deck (as exact .scft bytes) so a
- * connecting AI has something to edit without a lossy markdown round-trip.
+ * useCollab.ts — the P2.4 React binding for GUI-hosted collaboration. #727 (ADR-0040 D1): the host starts WITH
+ * the app (Rust spawns the sidecar off the core thread → {url,token,guiToken}); 停止 / 再開 stop and bring it
+ * back for this launch. It connects a gui-role CollabProjection over the Tauri plugin-http fetch and mirrors the
+ * host's truth into the active deck via setDeck(next,'commit') on every change, plus an approval channel
+ * (collab-approvals.ts): waiting AI clients → the dialog; allowed pairs → the keychain (client-grants-store.ts).
+ * The GUI's deck + templates are SEEDED (collab-seed.ts) when an ALLOWED AI makes its first call (aiActive) —
+ * that is also when `aiActive` turns on and App locks structural edits (collab-lock.ts).
  *
  * Desktop-only: collaboration needs the spawned sidecar, so `available` is false in a plain browser.
  */
@@ -11,7 +13,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import i18n from "../i18n";
 import { runningInTauri } from "../ipc/commands";
 import { CollabProjection, type CollabStatus, type DocSummary, type FollowTarget } from "../ipc/collab-projection";
-import { bundleProject } from "../engine/project-io";
+import { CollabApprovals, type ApprovalSnapshot } from "../ipc/collab-approvals";
+import { loadClientGrants, addClientGrant, removeClientGrant } from "../ipc/client-grants-store";
+import type { Decision } from "../mcp/host-approval";
+import { seedHost } from "./collab-seed";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
 import type { MasterEntry } from "./useMasterRegistry";
@@ -28,14 +33,6 @@ export interface CollabInfo {
 async function tauriHttpFetch(): Promise<typeof fetch> {
   const mod = await import("@tauri-apps/plugin-http");
   return mod.fetch as unknown as typeof fetch;
-}
-
-/** btoa can't take a huge spread; chunk the bytes so a few-hundred-KB template encodes safely. */
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  return btoa(bin);
 }
 
 export interface UseCollabArgs {
@@ -71,6 +68,10 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   const [info, setInfo] = useState<CollabInfo | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [docCount, setDocCount] = useState(0);
+  // #727: an allowed AI has started calling (= collaborating; App's edit lock) + the approval snapshot.
+  const [aiActive, setAiActive] = useState(false);
+  const [approvals, setApprovals] = useState<ApprovalSnapshot | undefined>(undefined);
+  const chanRef = useRef<CollabApprovals | null>(null);
 
   // Refs so start/stop keep a stable identity yet always read the latest deck / template / apply fn.
   const projRef = useRef<CollabProjection | null>(null);
@@ -149,63 +150,55 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       });
       projRef.current = proj;
       await proj.start();
-      // Best-effort: UPLOAD the master registry so a connecting AI can list_templates / use_template.
-      // The bytes live host-side (Node sidecar has no Tauri fs); the AI selects by id. Full-replace, so
-      // this connect-time push is the truth for the session (re-import while connected = a follow-up).
-      try {
-        const items = (
-          await Promise.all(
-            mastersRef.current.map(async (m) => {
-              // Guard each master's fetch per-item (matches App.tsx handleSelectMaster) so ONE bad
-              // master (e.g. a transient builtin fetch failure) drops only itself, not the whole set —
-              // register_templates is full-replace, so a rejected Promise.all would empty the AI picker.
-              const bytes = await getBytesRef.current(m.id).catch(() => null);
-              return bytes ? { id: m.id, name: m.name, builtin: m.builtin, bytesBase64: bytesToBase64(bytes) } : null;
-            }),
-          )
-        ).filter((x): x is NonNullable<typeof x> => x !== null);
-        if (items.length) await proj.callTool("register_templates", { templates: items });
-      } catch {
-        /* template upload is best-effort — collaboration still works without it */
-      }
-      // Best-effort: SHARE the current deck as exact .scft bytes (no markdown round-trip → no
-      // title-slide mangling) so a connecting AI has something to edit. The projection mirrors it
-      // back as the INITIAL ('silent') apply = no visible change / no undo step. If there's no deck/
-      // template or the seed fails, collaboration still works (the AI can open its own doc).
-      const curDeck = deckRef.current;
-      const curTemplate = templateRef.current;
-      if (curDeck && curTemplate) {
-        try {
-          const bytes = await bundleProject(curDeck, curTemplate, { templateName: nameRef.current, savedAt: new Date().toISOString() });
-          const r = await proj.callTool<{ docId?: string }>("open_project", { dataBase64: bytesToBase64(bytes) });
-          // Link the tab that was active on 開始 to the seed's host doc, so switching back to it
-          // re-targets the projection here (rather than stranding it on an AI doc).
-          if (r?.docId) {
-            seedDocIdRef.current = r.docId;
-            onSeedDocRef.current?.(r.docId);
-          }
-        } catch {
-          /* seed is best-effort */
-        }
-      }
-      seedReadyRef.current = true; // seed resolved (or none) → onDocs may now surface AI docs as tabs
+      // #727: the approval channel. Seed on the first ALLOWED AI call (the host holds that call until report_seed).
+      const chan = new CollabApprovals({
+        url: ci.url,
+        guiToken: ci.guiToken,
+        fetch,
+        onView: setApprovals,
+        onAiActive: () => {
+          setAiActive(true);
+          void (async () => {
+            const r = await seedHost({ callTool: (n, a) => proj.callTool(n, a), masters: mastersRef.current, getMasterBytes: getBytesRef.current, deck: deckRef.current, template: templateRef.current, templateName: nameRef.current });
+            // Link the tab that was active when the AI arrived to the seed's host doc, so switching back to it
+            // re-targets the projection here (rather than stranding it on an AI doc).
+            if (r.docId) {
+              seedDocIdRef.current = r.docId;
+              onSeedDocRef.current?.(r.docId);
+            }
+            seedReadyRef.current = true; // seed resolved (or none) → onDocs may now surface AI docs as tabs
+            await chan.reportSeed(r.error ? "failed" : "done", r.error).catch(() => {});
+          })();
+        },
+      });
+      chanRef.current = chan;
+      await chan.start();
+      // "I will seed on demand" FIRST (before any AI can be allowed), then the allowed pairs from the keychain → the
+      // host over the GUI port (never argv, D3-8).
+      await chan.reportSeed("pending");
+      await chan.loadGrants(await loadClientGrants().catch(() => [])).catch(() => {});
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : String(e));
       try {
         await projRef.current?.stop();
+        await chanRef.current?.stop();
       } catch {
         /* ignore */
       }
       projRef.current = null;
+      chanRef.current = null;
     }
   }, [available]);
 
   const stop = useCallback(async () => {
     const proj = projRef.current;
+    const chan = chanRef.current;
     projRef.current = null;
+    chanRef.current = null;
     try {
       await proj?.stop();
+      await chan?.stop();
     } catch {
       /* ignore */
     }
@@ -218,6 +211,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     setStatus("idle");
     setInfo(undefined);
     setDocCount(0);
+    setAiActive(false);
+    setApprovals(undefined);
     knownDocsRef.current.clear();
     seedDocIdRef.current = undefined;
     seedReadyRef.current = false;
@@ -236,11 +231,37 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   // (never clobbers the local tab). No-op when disconnected (projRef is null).
   const setActiveHostDoc = useCallback((docId: string | null) => projRef.current?.setTargetDoc(docId), []);
 
-  // Tear down the projection (poll interval + MCP client) on unmount / Vite HMR so dev reloads don't
-  // accumulate zombie pollers. (Production App never unmounts; this is dev-loop hygiene.)
+  // #727 (D3): answer a waiting client. An allowed stdio adapter's grant goes to the keychain (a failure is told:
+  // that client is simply asked again next launch). Revoke = the host voids the secret + the keychain forgets it.
+  const [grantsUnsaved, setGrantsUnsaved] = useState(false);
+  const decide = useCallback(async (requestId: string, decision: Decision) => {
+    const grant = await chanRef.current?.decide(requestId, decision).catch(() => undefined);
+    if (grant) await addClientGrant(grant).then(() => setGrantsUnsaved(false), () => setGrantsUnsaved(true));
+  }, []);
+  const revoke = useCallback(async (key: string) => {
+    const chan = chanRef.current;
+    if (!chan) return;
+    const g = (await chan.refresh().catch(() => undefined))?.grants.find((x) => x.key === key);
+    if (g?.clientId) await removeClientGrant({ name: g.name, version: g.version, clientId: g.clientId }).catch(() => {});
+    await chan.revoke(key).catch(() => {});
+  }, []);
+
+  // ADR-0040 D1: the host starts with the app — never blocking it (Rust spawns off the core thread) and never
+  // a modal on failure (the 協働 panel's status line says it). 停止 lasts for this launch only.
+  // Deferred to a timer so it runs after the first paint (the app's start is never held up by the sidecar).
+  useEffect(() => {
+    if (!available) return;
+    const id = setTimeout(() => void start(), 0);
+    return () => clearTimeout(id);
+  }, [available, start]);
+
+  // Tear down the projection + approval channel on unmount / Vite HMR so dev reloads don't accumulate zombie
+  // pollers. (Production App never unmounts; this is dev-loop hygiene.)
   useEffect(() => () => {
     void projRef.current?.stop();
+    void chanRef.current?.stop();
     projRef.current = null;
+    chanRef.current = null;
   }, []);
 
   return {
@@ -253,6 +274,11 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     docCount,
     start,
     stop,
+    aiActive,
+    approvals,
+    grantsUnsaved,
+    decide,
+    revoke,
     sendSlideMarkdown,
     serverUndo,
     serverRedo,

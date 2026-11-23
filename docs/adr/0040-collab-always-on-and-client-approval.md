@@ -146,6 +146,8 @@ ADR-0033 D2 の「起動時に 1 回だけ判断する」を次の状態遷移�
   - ADR-0038 D3 の GUI 専用トークンは、この ADR の前提として先に実装する（#730）。
   - ADR-0038 の stateless 化（`Mcp-Session-Id` の廃止）は、D3-7 の HTTP 直結の承認の結びつけ先を無くす。段 4 の前に置き換えを決める。
 
+- **実装メモ（#727・2026-11-23）**: 入場判定（ADR-0010 の `checkRequest`／`admitRequest`）は今、(1) Host が loopback、(2) Origin 許可リスト、(3) 共有トークンか GUI 専用トークン、(4) GUI 専用トークン無しで `x-slidecraft-role` を名乗る要求は 403、の順で、GUI であることは GUI 専用トークンだけで決まる（#730）。ホストの READY 行は `{url, token, guiToken}` の 3 つを運ぶ（`guiToken` は `host.json` に書かない）。入場の後、AI のツール呼び出しはすべて承認の関門（`HostContext.admitCall`・`tool-profiles.ts` の登録ゲートで 1 か所）を通る。承認待ちは最大 30 秒、seed 待ちは最大 10 秒待ってから `authorization-pending`／`host-not-ready` を返す。待ち受けは 127.0.0.1 に固定し、他のアドレスを求める指定は拒否する（`src/mcp/host-options.ts`）。
+
 ## References
 
 - Issue: #688（この ADR の元）・#727〜#730（実装）・#687（今の手順を案内する文言の修正・closed）・#689（協働パネルの 2 層化と、止まる機能の告知）・#686（`.mcpb` の導入手順）・#694（単独モードの組み込みテンプレ）・#613（`NoticeSlot`）

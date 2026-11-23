@@ -30,6 +30,10 @@ export interface CollabEvents {
   onDeckChanged?(e: DeckChangedEvent): void;
   onDocumentOpened?(e: DocumentOpenedEvent): void;
   onDocumentClosed?(e: DocumentClosedEvent): void;
+  /** #727 (GUI connections only): the approval state changed (an AI applied / was decided / revoked). */
+  onClientApprovalsChanged?(e: { pending: number }): void;
+  /** #727 (GUI connections only): an allowed AI made its first tool call — seed the deck, lock edits. */
+  onAiActive?(e: { seedRequested: boolean }): void;
 }
 
 export interface CollabClientOptions {
@@ -81,5 +85,7 @@ export class CollabClient {
     if (method === `${NOTIFY}deckChanged`) ev.onDeckChanged?.(params as unknown as DeckChangedEvent);
     else if (method === `${NOTIFY}documentOpened`) ev.onDocumentOpened?.(params as unknown as DocumentOpenedEvent);
     else if (method === `${NOTIFY}documentClosed`) ev.onDocumentClosed?.(params as unknown as DocumentClosedEvent);
+    else if (method === `${NOTIFY}clientApprovalsChanged`) ev.onClientApprovalsChanged?.(params as { pending: number });
+    else if (method === `${NOTIFY}aiActive`) ev.onAiActive?.(params as { seedRequested: boolean });
   }
 }

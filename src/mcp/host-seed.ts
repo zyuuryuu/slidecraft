@@ -25,6 +25,9 @@ export class SeedGate {
 
   /** The GUI's report: "pending" (I have a deck to load on demand), then "done" or "failed". */
   report(state: SeedState, error?: string): void {
+    // Once an AI is active, a late "pending" (a GUI that reported out of order) must not re-close the gate — the
+    // GUI only seeds once, on activation, so nothing would ever report "done" again.
+    if (state === "pending" && this.active) return;
     this.state = state;
     this.error = state === "failed" ? error : undefined;
     if (state === "done" || state === "failed") for (const w of this.waiters.splice(0)) w();

@@ -55,6 +55,9 @@ export interface GrantView {
   version: string;
   fingerprint: string;
   kind: ApplyVia["kind"];
+  /** adapter grants: the full client id (not a secret — it travels in a header) so the GUI can drop that pair
+   *  from the keychain on revoke */
+  clientId?: string;
 }
 
 export interface ApprovalView {
@@ -274,7 +277,7 @@ export class ApprovalBook {
   view(): ApprovalView {
     return {
       pending: [...this.requests.values()].map((r) => ({ requestId: r.requestId, name: r.info.name, version: r.info.version, fingerprint: fingerprintOf(r.via), kind: r.via.kind })),
-      grants: [...this.grants.values()].map((g) => ({ key: g.key, name: g.info.name, version: g.info.version, fingerprint: g.fingerprint, kind: g.kind })),
+      grants: [...this.grants.values()].map((g) => ({ key: g.key, name: g.info.name, version: g.info.version, fingerprint: g.fingerprint, kind: g.kind, ...(g.stored ? { clientId: g.stored.clientId } : {}) })),
       denyAll: this.denyAll,
     };
   }

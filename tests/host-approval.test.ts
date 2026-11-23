@@ -169,6 +169,12 @@ describe("ApprovalBook: adapter secret, claim and nonce HMAC (D3-4)", () => {
     expect(book.view().grants).toHaveLength(0);
   });
 
+  it("an adapter grant's view names its client id (so the GUI can drop exactly that pair from the keychain on revoke)", () => {
+    const book = new ApprovalBook();
+    allowAndClaim(book);
+    expect(book.view().grants[0]).toMatchObject({ kind: "adapter", clientId: CLIENT_ID });
+  });
+
   it("the grant list the GUI sees never carries a secret", () => {
     const book = new ApprovalBook();
     const { secret } = allowAndClaim(book);

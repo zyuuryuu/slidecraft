@@ -6,6 +6,9 @@
 //! and hands {url,token,guiToken} to the webview, which connects as an equal MCP client (collab-client.ts).
 //! #730: `guiToken` (the GUI-only bearer) arrives ONLY on that private pipe; Rust passes it to the
 //! webview and never logs it, writes it to host.json, or puts it on a command line.
+//! #727 (ADR-0040 D1): the webview starts the host at app launch, so `start_collab` runs OFF the Tauri core
+//! thread (a blocking worker) and a second concurrent call waits for the first instead of spawning twice. The
+//! sidecar is told only its port + host.json path — never a bind address (it listens on 127.0.0.1 only).
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
@@ -56,6 +59,18 @@ fn parse_ready(json: &str) -> Result<ReadyLine, String> {
 pub struct CollabState {
     child: Mutex<Option<Child>>,
     info: Mutex<Option<CollabInfo>>,
+    /// #727: held for a whole start, so the launch-time auto start and a user's 再開 never spawn two sidecars.
+    starting: Mutex<()>,
+}
+
+/// The sidecar's whole environment contract (#727): an ephemeral port and where to write host.json. There is
+/// deliberately NO bind-address variable — the host is loopback-only (src/mcp/host-options.ts), and nothing
+/// the GUI passes can move it to 0.0.0.0 / a LAN address.
+fn sidecar_env(host_json: &std::path::Path) -> Vec<(&'static str, std::ffi::OsString)> {
+    vec![
+        ("SLIDECRAFT_PORT", "0".into()), // ephemeral → no port conflicts; the real url comes via READY
+        ("SLIDECRAFT_HOST_JSON", host_json.as_os_str().to_owned()),
+    ]
 }
 
 /// Locate a bundled MCP file (`host.cjs` / `cli.cjs`). Dev (`debug_assertions`): the repo build output
@@ -185,11 +200,18 @@ fn resolve_node() -> std::path::PathBuf {
 }
 
 /// Spawn the collab sidecar and return its handshake. Idempotent: a live sidecar returns its
-/// existing {url,token}. Sync command — it blocks the Tauri core thread until READY (~1s normally,
-/// up to READY_TIMEOUT on a hang); the WebView2 webview (separate process) keeps painting, but other
-/// Rust IPC calls briefly queue behind this wait. (Moving it off the core thread is a follow-up.)
+/// existing {url,token}. #727: async — the wait for READY (~1s normally, up to READY_TIMEOUT on a hang) runs
+/// on a blocking worker, so the app's launch and other Rust IPC calls are never held up by it.
 #[tauri::command]
-pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>) -> Result<CollabInfo, String> {
+pub async fn start_collab(app: tauri::AppHandle) -> Result<CollabInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || start_collab_blocking(&app))
+        .await
+        .map_err(|e| format!("collab ホストの起動処理が中断されました: {e}"))?
+}
+
+fn start_collab_blocking(app: &tauri::AppHandle) -> Result<CollabInfo, String> {
+    let state = app.state::<CollabState>();
+    let _one_at_a_time = state.starting.lock().unwrap_or_else(|e| e.into_inner());
     // Already running? hand back the live handshake. Otherwise reap a dead child and respawn.
     {
         let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
@@ -209,7 +231,7 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
         }
     }
 
-    let host_cjs = resolve_host_cjs(&app)?;
+    let host_cjs = resolve_host_cjs(app)?;
     if !host_cjs.exists() {
         return Err(format!(
             "collab サイドカーが見つかりません: {}（先に `npm run build:host` を実行してください）",
@@ -224,8 +246,7 @@ pub fn start_collab(app: tauri::AppHandle, state: tauri::State<'_, CollabState>)
 
     let mut cmd = Command::new(resolve_node());
     cmd.arg(&host_cjs)
-        .env("SLIDECRAFT_PORT", "0") // ephemeral → no port conflicts; the real url comes via READY
-        .env("SLIDECRAFT_HOST_JSON", &host_json)
+        .envs(sidecar_env(&host_json))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit()); // host logs flow to the dev console for debugging
     #[cfg(windows)]
@@ -324,8 +345,18 @@ fn clear_host_json(state: &CollabState) {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_path, launcher_candidates, parse_ready};
+    use super::{display_path, launcher_candidates, parse_ready, sidecar_env};
     use std::path::Path;
+
+    // #727 (統括補記 2026-11-23) — the sidecar is told its port and host.json path ONLY. No variable that could
+    // move its bind address exists in the contract (the host is 127.0.0.1-only; host-options.ts refuses others).
+    #[test]
+    fn sidecar_env_carries_no_bind_address() {
+        let env = sidecar_env(Path::new("/tmp/x/host.json"));
+        let keys: Vec<&str> = env.iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, ["SLIDECRAFT_PORT", "SLIDECRAFT_HOST_JSON"]);
+        assert_eq!(env[0].1, "0");
+    }
 
     // #730 — the READY contract carries the GUI-only token; a line without it is rejected (the webview
     // would otherwise connect as an AI and silently lose its GUI powers).

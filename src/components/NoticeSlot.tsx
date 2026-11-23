@@ -1,7 +1,8 @@
 /**
  * NoticeSlot — #613: the ONE notice place under the toolbar. The update notice, the intake progress/result
  * and the template-adjust band used to stack there (each pushing the body down); now only one shows at a
- * time, chosen by `noticeSlotPlan` (adjust > intake > update), with a badge counting the hidden ones.
+ * time, chosen by `noticeSlotPlan` (approval > adjust > intake > update), with a badge counting the hidden ones.
+ * #727: `approval` = how many AI clients wait for [許可] (the decision itself is the approval dialog).
  *
  * The bands themselves are unchanged (same components, same props); only where they go and which one shows
  * changes. It stays a layout-flow strip (not an overlay) so the adjust band never hides the preview (#579).
@@ -18,6 +19,8 @@ import type { TemplateData } from "../engine/template-loader";
 import type { DeckIssue } from "../engine/deck-diagnostics";
 
 export interface NoticeSlotProps {
+  /** #727: AI clients waiting for [許可]; absent / count 0 = none. */
+  approval?: { count: number } | null;
   /** "New version available" — null when there is none (or it was dismissed). */
   update: { latestVersion: string; onDismiss: () => void } | null;
   /** Intake progress/result — passed through to IntakeSummaryBar as-is (`result` null when dismissed). */
@@ -39,9 +42,10 @@ export interface NoticeSlotProps {
   } | null;
 }
 
-export default function NoticeSlot({ update, intake, adjust }: NoticeSlotProps) {
+export default function NoticeSlot({ approval, update, intake, adjust }: NoticeSlotProps) {
   const { t } = useTranslation();
   const plan = noticeSlotPlan({
+    approval: (approval?.count ?? 0) > 0,
     adjusting: !!adjust,
     intake: !!intake.busy || !!intake.result, // exactly when IntakeSummaryBar renders something
     update: !!update,
@@ -49,7 +53,11 @@ export default function NoticeSlot({ update, intake, adjust }: NoticeSlotProps) 
   if (!plan.shown) return null;
 
   const band =
-    plan.shown === "adjust" && adjust ? (
+    plan.shown === "approval" && approval ? (
+      <div role="status" className="px-3 py-2 bg-surface border-b border-accent/40 text-xs text-fg">
+        {t("collabApproval.bandWaiting", { count: approval.count })}
+      </div>
+    ) : plan.shown === "adjust" && adjust ? (
       <TemplateAdjustPanel {...adjust} />
     ) : plan.shown === "intake" ? (
       <IntakeSummaryBar {...intake} />

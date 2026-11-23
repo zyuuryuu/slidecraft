@@ -11,6 +11,8 @@ import StatusBar from "./components/StatusBar";
 import LlmAssist from "./components/LlmAssist";
 import AiPanel from "./components/AiPanel";
 import CollabPanel from "./components/CollabPanel";
+import CollabApprovalDialog from "./components/CollabApprovalDialog";
+import { collabEditLocked } from "./components/collab-lock";
 import InitializeModal from "./components/InitializeModal";
 import RefineProposal from "./components/RefineProposal";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -234,14 +236,8 @@ export default function App() {
   const collab = useCollab({
     onFollow: follow.onFollow,
     applyDeck: (d, isInitial) => setDeck(d, isInitial ? "silent" : "commit"),
-    deck,
-    templateData,
-    templateName,
-    // Upload the master registry to the host so a connecting AI can list_templates / use_template.
-    masters,
-    getMasterBytes,
-    // Link the tab that was active on 開始 to the seed's host doc (so switching back re-targets here).
-    onSeedDoc: (docId) => linkHostDoc(activeId, docId),
+    deck, templateData, templateName, masters, getMasterBytes, // seeded (deck + master registry) when an allowed AI arrives (#727)
+    onSeedDoc: (docId) => linkHostDoc(activeId, docId), // the tab active at that moment mirrors the seed's host doc
     applyHostTemplate: setHostDocTemplate, // #616: an AI template swap reaches the tab mirroring that host doc
     // Mode (b): an AI-created deck opens as a BACKGROUND tab (no view switch). Unbundle the full
     // .scft (deck + template) so the new tab renders with its OWN master, not the current one.
@@ -258,7 +254,7 @@ export default function App() {
 
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
   // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
-  const editLocked = collab.status === "connected";
+  const editLocked = collabEditLocked(collab); // #727: an allowed AI is calling — not merely "the host runs"
   // 📝 原稿 gate — shared by the toolbar button and the AI dock's no-slide hint (#690) so they never diverge.
   const draftGate = editLocked ? "locked" : adjust.session ? "busy" : undefined;
 
@@ -457,6 +453,7 @@ export default function App() {
       {/* #613: ONE notice strip under the toolbar (flow, not overlay) — template adjust > intake
           (progress/result) > update notice (ADR-0021); the others wait behind a "+N" badge. */}
       <NoticeSlot
+        approval={{ count: collab.approvals?.pending.length ?? 0 }}
         update={showUpdateBanner && latestVersion ? { latestVersion, onDismiss: dismissUpdateBanner } : null}
         intake={{ busy: intakeBusy, result: intakeDismissed ? null : intakeResult, onDismiss: () => setIntakeDismissed(true),
           template: templateData, unbound: diagnostics.filter((d) => d.id === "unbound-content"), augmentHint: !editLocked && !adjust.session }}
@@ -599,6 +596,7 @@ export default function App() {
                 docCount={collab.docCount}
                 onStart={collab.start}
                 onStop={collab.stop}
+                aiActive={collab.aiActive} grants={collab.approvals?.grants} onRevoke={(k) => void collab.revoke(k)}
                 followAi={follow.enabled}
                 onFollowAiChange={follow.setEnabled}
               />
@@ -669,6 +667,7 @@ export default function App() {
         ai={ai}
       />
 
+      <CollabApprovalDialog request={collab.approvals?.pending[0] ?? null} waiting={collab.approvals?.pending.length ?? 0} onDecide={(id, d) => void collab.decide(id, d)} />
       {/* Multi-select batch edit: review the before→after per slide, then 採用 (one undo) */}
       {refine.proposal && (
         <RefineProposal
