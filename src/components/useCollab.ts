@@ -1,6 +1,6 @@
 /**
  * useCollab.ts — the P2.4 React binding for GUI-hosted collaboration. On 開始 it asks Rust to spawn
- * the collab sidecar (start_collab → {url,token}), connects a gui-role CollabProjection over the
+ * the collab sidecar (start_collab → {url,token,guiToken}), connects a gui-role CollabProjection over the
  * Tauri plugin-http fetch, and mirrors the host's truth into the active deck via setDeck(next,
  * 'commit') on every change. It also SEEDS the current deck (as exact .scft bytes) so a
  * connecting AI has something to edit without a lossy markdown round-trip.
@@ -18,7 +18,10 @@ import type { MasterEntry } from "./useMasterRegistry";
 
 export interface CollabInfo {
   url: string;
+  /** the shared token (shown in the 協働 panel / host.json for AI clients) */
   token: string;
+  /** #730: the GUI-only token — this webview's credential; never displayed or persisted */
+  guiToken: string;
   hostJsonPath?: string;
 }
 
@@ -112,7 +115,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       const fetch = await tauriHttpFetch();
       const proj = new CollabProjection({
         url: ci.url,
-        token: ci.token,
+        guiToken: ci.guiToken,
         fetch,
         // pollMs defaults on → the reliable floor if the SSE push stream doesn't deliver over plugin-http.
         onDeck: (p) => applyRef.current(p.deck, p.isInitial),

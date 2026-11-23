@@ -10,6 +10,7 @@ import { checkRequest, TAURI_WEBVIEW_ORIGINS, DEV_BROWSER_ORIGINS, type Security
 
 const cfg = (): SecurityConfig => ({
   token: "tok",
+  guiToken: "gui-tok",
   allowedOrigins: new Set([...TAURI_WEBVIEW_ORIGINS, ...DEV_BROWSER_ORIGINS]),
   allowedHosts: new Set(["127.0.0.1", "localhost"]),
 });

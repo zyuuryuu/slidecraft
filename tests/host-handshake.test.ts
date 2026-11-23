@@ -1,15 +1,15 @@
 /**
  * host-handshake.test.ts — the Rust↔JS string contract for the collab READY line. host-main.ts
  * PRINTS formatReadyLine(...) on stdout; src-tauri/src/collab.rs PARSES it (strip the same prefix,
- * JSON-parse {url,token}). This locks the format so a change on the JS side can't silently break the
+ * JSON-parse {url,token,guiToken}). This locks the format so a change on the JS side can't silently break the
  * Rust supervisor (which has no shared type). The Rust prefix const must equal READY_PREFIX here.
  */
 import { describe, it, expect } from "vitest";
 import { READY_PREFIX, formatReadyLine, parseReadyLine } from "../src/mcp/host-handshake";
 
 describe("collab READY handshake (Rust↔JS string contract)", () => {
-  it("emits one tagged, single line that round-trips back to {url,token}", () => {
-    const h = { url: "http://127.0.0.1:59299/mcp", token: "abc.DEF-123_xyz" };
+  it("emits one tagged, single line that round-trips back to {url,token,guiToken}", () => {
+    const h = { url: "http://127.0.0.1:59299/mcp", token: "abc.DEF-123_xyz", guiToken: "gui.TOKEN-456_qrs" };
     const line = formatReadyLine(h);
     expect(line.startsWith(READY_PREFIX)).toBe(true);
     expect(line).not.toContain("\n"); // must stay a single line (Rust reads it line-by-line)

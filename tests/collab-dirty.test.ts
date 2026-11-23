@@ -55,7 +55,7 @@ const listedDirty = async (docId: string): Promise<boolean> =>
 
 /** AI が doc を作って編集する（dirty=true の前提）。 */
 async function aiEditedDoc(): Promise<string> {
-  ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+  ai = new CollabClient({ url: host.url, token: host.token });
   await ai.connect();
   const { docId } = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# 表紙\n\n---\n\n# 本文\n\n- a" });
   await ai.callTool("set_slide_markdown", { index: 1, markdown: "# 本文\n\n- b", docId });
@@ -66,7 +66,7 @@ async function aiEditedDoc(): Promise<string> {
 describe("#633 collab: GUI の読み取り目的の save_project は dirty を下ろさない", () => {
   it("受け入れ: GUI projection がテンプレを pull した後も get_project_info.dirty=true・close_document(force なし) は拒否", async () => {
     const templates: ProjectedTemplate[] = [];
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: () => {}, onTemplate: (t) => templates.push(t) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: () => {}, onTemplate: (t) => templates.push(t) });
     await proj.start();
     const docId = await aiEditedDoc();
     const savedAtBefore = (await metaOf(docId)).savedAt;
@@ -84,7 +84,7 @@ describe("#633 collab: GUI の読み取り目的の save_project は dirty を�
 
   it("GUI ロールの save_project（AI 製 doc のタブ化・useCollab の onDocs 経路）も dirty を下ろさず、同じ deck の .scft を返す", async () => {
     const docId = await aiEditedDoc();
-    gui = new CollabClient({ url: host.url, token: host.token, role: "gui" });
+    gui = new CollabClient({ url: host.url, token: host.guiToken });
     await gui.connect();
     const r = await gui.callTool<{ dataBase64: string }>("save_project", { docId });
     const { deck } = await openProject(new Uint8Array(Buffer.from(r.dataBase64, "base64")));

@@ -9,6 +9,10 @@
  * `fetch` is injected: the Tauri webview passes the Rust plugin-http fetch (no browser Origin, no
  * CORS, reaches loopback) — the same reason the bearer token, not Origin, is the trust boundary.
  * Tests pass Node's global fetch.
+ *
+ * #730: the ROLE is decided by the host from WHICH token is presented — the GUI-only token (handed to the
+ * webview by Rust from the READY line) makes this a GUI connection; the shared host.json token an AI one.
+ * There is no role header any more (a self-declared role is refused without the GUI token).
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -30,9 +34,8 @@ export interface CollabEvents {
 
 export interface CollabClientOptions {
   url: string;
+  /** the bearer to present: the GUI-only token (→ GUI: sees all docs) or the shared token (→ AI). */
   token: string;
-  /** "gui" (the human's webview — sees all docs) or "ai". Default "gui". */
-  role?: "gui" | "ai";
   /** inject the Tauri plugin-http fetch in the webview; omit in tests (uses global fetch). */
   fetch?: typeof fetch;
   events?: CollabEvents;
@@ -47,7 +50,7 @@ export class CollabClient {
   constructor(opts: CollabClientOptions) {
     this.opts = opts;
     this.transport = new StreamableHTTPClientTransport(new URL(opts.url), {
-      requestInit: { headers: { Authorization: `Bearer ${opts.token}`, "x-slidecraft-role": opts.role ?? "gui" } },
+      requestInit: { headers: { Authorization: `Bearer ${opts.token}` } },
       fetch: opts.fetch,
     });
     this.client = new Client({ name: "slidecraft-gui", version: "0.5.0" });

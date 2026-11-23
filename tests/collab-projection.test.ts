@@ -42,12 +42,12 @@ describe("CollabProjection", () => {
   it("adopts an AI-opened doc, re-pulls the deck on each edit, and applies each rev exactly once", async () => {
     const applied: ProjectedDeck[] = [];
     // pollMs:0 → push-only, so the assertions exercise the deckChanged/documentOpened path directly.
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => applied.push(p) });
     await proj.start();
     expect(applied.length).toBe(0); // nothing open yet → nothing mirrored
 
     // A SEPARATE ai-role connection opens a doc + edits it (exactly what an upstream AI does).
-    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     const made = await ai.callTool<{ docId: string; slideCount: number }>("new_project", {
       templateBase64: templateB64,
@@ -79,7 +79,7 @@ describe("CollabProjection", () => {
 
   it("on host failure, surfaces an error and STOPS polling (no forever-polling zombie)", async () => {
     const statuses: CollabStatus[] = [];
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 40, onDeck: () => {}, onStatus: (s) => statuses.push(s) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 40, onDeck: () => {}, onStatus: (s) => statuses.push(s) });
     await proj.start();
     expect(statuses).toContain("connected");
 
@@ -94,9 +94,9 @@ describe("CollabProjection", () => {
 
   it("suppresses the echo of its OWN edit (no double apply) but applies others' edits (P2.5 round-trip)", async () => {
     const applied: ProjectedDeck[] = [];
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => applied.push(p) });
     await proj.start();
-    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# Hello\n\n- one\n\n---\n\n# Two\n\n- a" });
     await waitFor(() => applied.some((p) => p.rev === 0)); // adopt
@@ -117,9 +117,9 @@ describe("CollabProjection", () => {
 
   it("reroutes Undo to the host and pulls the rolled-back deck (P2.5 server-undo)", async () => {
     const applied: ProjectedDeck[] = [];
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => applied.push(p) });
     await proj.start();
-    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     const made = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# 元のタイトル\n\n- a" });
     await waitFor(() => applied.some((p) => p.rev === 0));
@@ -138,9 +138,9 @@ describe("CollabProjection", () => {
     // The GUI-side of collab mode (b): each tab is a host doc; switching a tab re-targets the mirror,
     // and switching to a LOCAL (no-host) tab pauses it so it isn't clobbered by a host deck.
     const applied: ProjectedDeck[] = [];
-    proj = new CollabProjection({ url: host.url, token: host.token, pollMs: 0, onDeck: (p) => applied.push(p) });
+    proj = new CollabProjection({ url: host.url, guiToken: host.guiToken, pollMs: 0, onDeck: (p) => applied.push(p) });
     await proj.start();
-    ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    ai = new CollabClient({ url: host.url, token: host.token });
     await ai.connect();
     const a = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# Doc A\n\n- a" });
     const b = await ai.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# Doc B\n\n- b" });
@@ -164,14 +164,14 @@ describe("CollabProjection", () => {
   });
 
   it("surfaces an unauthorized connection as an error (bad token never silently no-ops)", async () => {
-    proj = new CollabProjection({ url: host.url, token: "wrong-token", pollMs: 0, onDeck: () => {} });
+    proj = new CollabProjection({ url: host.url, guiToken: "wrong-token", pollMs: 0, onDeck: () => {} });
     await expect(proj.start()).rejects.toThrow();
   });
 
   // S2 増分2: the full cross-process bridge over real HTTP+base64 — the gui-role client uploads its
   // master registry (what useCollab does on 開始), an ai-role client discovers and starts from it.
   it("a GUI client registers templates; an AI client lists and starts a project from one (by id, no bytes)", async () => {
-    const gui = new CollabClient({ url: host.url, token: host.token, role: "gui" });
+    const gui = new CollabClient({ url: host.url, token: host.guiToken });
     await gui.connect();
     try {
       const reg = await gui.callTool<{ ok: boolean; count: number }>("register_templates", {
@@ -179,7 +179,7 @@ describe("CollabProjection", () => {
       });
       expect(reg).toEqual({ ok: true, count: 1 });
 
-      ai = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+      ai = new CollabClient({ url: host.url, token: host.token });
       await ai.connect();
       const list = await ai.callTool<{ templates: { id: string; name: string; builtin: boolean }[] }>("list_templates");
       expect(list.templates).toEqual([{ id: "m1", name: "社内テンプレ", builtin: false }]);

@@ -40,7 +40,7 @@ describe("CollabClient", () => {
     const changed: DeckChangedEvent[] = [];
     client = new CollabClient({
       url: host.url,
-      token: host.token,
+      token: host.guiToken,
       events: { onDocumentOpened: (e) => opened.push(e), onDeckChanged: (e) => changed.push(e) },
     });
     await client.connect();
@@ -62,7 +62,7 @@ describe("CollabClient", () => {
   });
 
   it("callTool returns a modeled {ok:false,code} for an out-of-range slide (guard, never silent)", async () => {
-    client = new CollabClient({ url: host.url, token: host.token });
+    client = new CollabClient({ url: host.url, token: host.guiToken });
     await client.connect();
     await client.callTool("new_project", { templateBase64: templateB64, markdown: "# A\n\n---\n\n# B" });
     // A guard rejection is now a MODELED result (isError reserved for crashes), so the client returns
@@ -74,7 +74,7 @@ describe("CollabClient", () => {
   });
 
   it("set_slide_markdown honours expectedRev (stale → never-silent) and echoes opId (P2.5 round-trip)", async () => {
-    client = new CollabClient({ url: host.url, token: host.token, role: "ai" });
+    client = new CollabClient({ url: host.url, token: host.token });
     await client.connect();
     const made = await client.callTool<{ docId: string }>("new_project", { templateBase64: templateB64, markdown: "# A\n\n- x\n\n---\n\n# B" });
 

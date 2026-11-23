@@ -70,8 +70,7 @@ afterEach(async () => {
 });
 
 async function connect(role?: "gui"): Promise<Client> {
-  const headers: Record<string, string> = { Authorization: `Bearer ${host.token}` };
-  if (role) headers["x-slidecraft-role"] = role;
+  const headers: Record<string, string> = { Authorization: `Bearer ${role === "gui" ? host.guiToken : host.token}` }; // #730: the GUI token IS the role
   const c = new Client({ name: "test", version: "1.0.0" });
   await c.connect(new StreamableHTTPClientTransport(new URL(host.url), { requestInit: { headers } }));
   clients.push(c);

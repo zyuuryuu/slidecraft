@@ -57,7 +57,9 @@ export interface ProjectedDeck {
 
 export interface CollabProjectionOptions {
   url: string;
-  token: string;
+  /** #730: the GUI-only bearer from start_collab (Rust read it off the READY line). The projection IS
+   *  the human's webview, so it always connects as the GUI — the shared host.json token would make it an AI. */
+  guiToken: string;
   /** inject the Tauri plugin-http fetch in the webview; omit in tests (Node global fetch). */
   fetch?: typeof fetch;
   /** poll interval (ms) for the rev fallback; 0 disables it (push-only, used by tests). Default 1200. */
@@ -134,8 +136,7 @@ export class CollabProjection {
     this.opts = opts;
     this.client = new CollabClient({
       url: opts.url,
-      token: opts.token,
-      role: "gui", // the human's webview sees ALL docs (private-by-default applies to AI clients)
+      token: opts.guiToken, // GUI token → the host treats this as the GUI (sees ALL docs; private-by-default is for AI)
       fetch: opts.fetch,
       events: {
         onDeckChanged: (e) => this.onRemoteDeckChanged(e),

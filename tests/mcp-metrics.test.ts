@@ -230,7 +230,7 @@ describe("collab host: metricsPath で全接続が 1 ファイルに profile 付
     const host = await createCollabHost({ port: 0, hostJsonPath: null, metricsPath: path });
     try {
       const open = async (role?: "gui") => {
-        const headers: Record<string, string> = { Authorization: `Bearer ${host.token}`, ...(role ? { "x-slidecraft-role": role } : {}) };
+        const headers: Record<string, string> = { Authorization: `Bearer ${role === "gui" ? host.guiToken : host.token}` }; // #730: the GUI token IS the role
         const c = new Client({ name: role ?? "ai", version: "1" });
         await c.connect(new StreamableHTTPClientTransport(new URL(host.url), { requestInit: { headers } }));
         return c;

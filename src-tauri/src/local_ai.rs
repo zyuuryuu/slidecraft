@@ -169,7 +169,7 @@ pub async fn ensure_model_weights(app: tauri::AppHandle) -> Result<String, Strin
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         done += chunk.len() as u64;
         if last.elapsed() >= Duration::from_millis(250) {
-            let pct = if total > 0 { (done * 100 / total) as u32 } else { 0 };
+            let pct = (done * 100).checked_div(total).map_or(0, |p| p as u32); // total == 0 → 0
             let _ = app.emit("builtin://download", serde_json::json!({ "pct": pct, "done": done, "total": total }));
             last = Instant::now();
         }
