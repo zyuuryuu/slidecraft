@@ -1,6 +1,6 @@
 # ADR-0033: MCP の単一管制（control plane）— 口は薄いアダプタ・管制は1つ
 
-- Status: Accepted
+- Status: Accepted（D2 の「起動時に 1 回だけ探す」は Partially superseded by [ADR-0040](0040-collab-always-on-and-client-approval.md)・ADR-0040 は Proposed で、合意後に有効）
 - Date: 2026-07-19
 
 ## Context
