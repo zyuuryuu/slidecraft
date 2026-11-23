@@ -149,10 +149,12 @@ describe("(b) レイアウト別背景色 bg", () => {
 // #593 で BUILTIN_LAYOUTS に Statement / Quote / Closing(CTA) の 3 LayoutDef が増えたので再固定（PR #607 マージ時）。
 // 差分は slideLayout33〜35（＋その rels）・slideMaster1 の sldLayoutId 3 行・[Content_Types] の Override 3 行だけで、
 // 既存 32 レイアウトの XML は part 単位で byte-identical（統括が main と部分ごとの sha256 を比較して確認）。
+// #695 で KPI.4Value.Grid を「値枠＋ラベル枠」の 8 枠にしたので再固定。差分は 3 本とも slideLayout17.xml
+// （＝KPI.4Value.Grid）の 1 part だけで、その rels を含む他の 81 part は main 6441efb と byte-identical（PR 本文に表）。
 const LEGACY_DIGEST = {
-  midnight: "f8396c5c842bc5a21e9ec224e346855325648c8b0b6f2aaba884fcc526de7974",
-  flat: "f747d53d852251deceef3879271df0145f9a933974894b4421d080de5ce3dab9",
-  remake: "54afa5de7b2e2d60782cb7b54f41f682616f5fd711fa4fbf8a22d478976dc5c7",
+  midnight: "ec7b76a86a834781bb3cafff178749b61cb6867bdece86fa86036be40ed27fd5",
+  flat: "b3da596213e099b0666bbc475c4c6b3b01d00a1ee65a1047f6af15db4a90ff86",
+  remake: "16ac6f28ff8c0ac237b2a72bcea6e079831845295940e0d5a38c00978e794759",
 };
 
 describe("(c) 既存出力の不変とプリセット表", () => {
