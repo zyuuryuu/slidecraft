@@ -95,7 +95,7 @@ claude mcp add slidecraft -- slidecraft-mcp
 
 **Claude Desktop** は、リリースの Assets にある `.mcpb`（macOS: `slidecraft-darwin-arm64.mcpb`、Windows: `slidecraft-win32-x64.mcpb`）を、Claude Desktop の **設定 → 拡張機能** から入れると導入できます（設定画面へのドラッグでも可・JSON 編集不要・Node 同梱）。GUI の 協働 パネルからもダウンロードできます。`.mcpb` が無い版や Cursor では、次の JSON を登録します。
 
-GUI のテンプレ（技術報告・Pitch など）を Claude Desktop から使うには、**先に GUI の 協働 パネルで「協働を開始」を押してから Claude Desktop を起動**します。Claude Desktop がすでに起動しているなら、完全に終了して起動し直してください（拡張の無効→有効では足りない場合があります）。SlideCraft のサーバが GUI を探すのは起動時の 1 回だけです。
+Pitch・Executive・Campaign は GUI につながなくても組み込みテンプレとして使えます（`list_templates` → `use_template`）。それ以外の GUI のテンプレ（技術報告・公文書・マガジンや、取り込んだテンプレ）を Claude Desktop から使うには、**先に GUI の 協働 パネルで「協働を開始」を押してから Claude Desktop を起動**します。Claude Desktop がすでに起動しているなら、完全に終了して起動し直してください（拡張の無効→有効では足りない場合があります）。SlideCraft のサーバが GUI を探すのは起動時の 1 回だけです。
 
 `claude_desktop_config.json`（Cursor は `~/.cursor/mcp.json` またはプロジェクト直下 `.cursor/mcp.json`）の `mcpServers` に登録します。
 
@@ -297,7 +297,7 @@ MCP 接続で渡るのは**ツール**（エンジンの操作）です。加え
   ADR-0033 D1 の成果）。
 - **登録済みテンプレの活用** — GUI が `register_templates` で master レジストリを host に投入すると、
   AI は `list_templates` で一覧を見て `use_template(id, markdown?)` で**新規プロジェクトを mint** できます。
-  bytes を運ばずにテンプレを選べるため、host 経由ではこれが最短です（単独モードはテンプレ bytes か `create_template`）。
+  bytes を運ばずにテンプレを選べるため、host 経由ではこれが最短です（単独モードはテンプレ bytes か `create_template`、または組み込みの Midnight・Pitch・Executive・Campaign を同じ `list_templates` → `use_template` で選べます）。
 
 人が GUI で見ている deck に AI が相乗りして編集し、人が結果を確認する協働が成立します。編集が競合した場合は
 楽観ロックで検出され、クライアントが再取得します。
