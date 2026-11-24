@@ -91,3 +91,5 @@ Option A（単発リテイク）でも弱モデルは複雑な構造編集で取
 - コード：`src/engine/design-intent.ts`（`applyToFigure`・`applyDesignIntentReport`・`SkippedOp`＝雛形）・`src/engine/diagram-edit-ops.ts`（新・`DiagramEditOp`/`applyDiagramEditOps`/`parseDiagramEditOps`）・`src/engine/placeholder-binding.ts`（`applyFieldEdit`）・`src/engine/ai-apply.ts`（`applyFigureYaml`/`previewFigureEdit`・fallback）・`src/engine/diagram-type-prompts.ts`（`diagramEditSystemPrompt`）
 - 関連 ADR：[ADR-0012](0012-ai-edit-structure-preservation.md)・[ADR-0018](0018-validation-at-adoption-gate.md)・[ADR-0011](0011-placeholder-input-bijection.md)・[ADR-0005](0005-harness-over-model.md)（harness-over-model）
 - 開発メモリ：`backlog_ai_edit_efficiency`（部分生成を先に＝drift を源で断つ）・`product_philosophy_harness`・`editing_two_stage`
+
+- **Addendum（#764・2026-11-24）**：全文フォールバック（P2/P3 の不正配列・#631 の MCP 経路）の例外 — 配列として parse でき、かつ op の**系統が混在**する（図／setField／DATA／design intent のうち 2 つ以上）配列は全文に落とさず**拒否**する（route `rejected`・スライド不変・告知に混在した系統名・MCP は `invalid-argument`）。判定は `slide-edit-route.ts` の `mixedOpsNotice` 1 か所（GUI・refine/batch・MCP 共通）。parse できない文字列と 1 系統内の不正配列は従来どおり。

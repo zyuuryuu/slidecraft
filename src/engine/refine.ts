@@ -82,10 +82,12 @@ export interface RefineResult {
 
 /** An AI reply read as a candidate slide. An ops reply (bare JSON array that a route accepts) is merged
  *  into `slide` by routeSlideEdit and serialized; any other reply keeps the Markdown path (parsed later
- *  by the caller, byte-identical to before P4). A malformed ops array is Markdown with the fallback notice. */
+ *  by the caller, byte-identical to before P4). A malformed ops array is Markdown with the fallback notice.
+ *  A mixed-family array (#764, route "rejected") is no candidate: empty `after`, recorded unapplied with its notice. */
 interface ReadReply { after: string; merged?: SlideIR; route: SlideEditRoute; notices: string[]; skipped: number }
 function readReply(deck: DeckIR, idx: number, raw: string, catalog: LayoutCatalog, tpl?: SerializeTemplate, instruction?: string): ReadReply {
   const r: RoutedSlideEdit | null = routeOpsReply(deck.slides[idx], raw, instruction);
+  if (r?.route === "rejected") return { after: "", route: r.route, notices: r.notices, skipped: 0 };
   if (r && r.slide && OPS_ROUTES.has(r.route)) {
     return { after: slideToMd(replaceSlide(deck, idx, r.slide), idx, catalog, tpl), merged: r.slide, route: r.route, notices: r.notices, skipped: r.skipped };
   }

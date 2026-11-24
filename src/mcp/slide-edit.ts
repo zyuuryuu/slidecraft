@@ -6,7 +6,8 @@
  * An ops route commits the routed slide; anything else keeps the pre-#631 Markdown path
  * (session.ts applySlideMarkdown) byte-identical, result included. A malformed ops array falls back to that
  * Markdown path with the router's notice (never silent, ADR-0018/0019); a skipped op is announced in
- * `notices` with its count in `skipped`.
+ * `notices` with its count in `skipped`. An array mixing op families (#764, route "rejected") is a modeled
+ * reject — GuardError "invalid-argument" carrying the router's notice — and the slide is not touched.
  *
  * The route is noted for the call log (metrics-probe noteRoute → MetricsRecord.route/skipped). Pure engine
  * in / out like session.ts; the only non-engine import is the no-op-when-off metrics probe.
@@ -14,6 +15,7 @@
 import { DeckIRSchema } from "../engine/slide-schema";
 import { routeOpsReply, OPS_ROUTES } from "../engine/slide-edit-route";
 import { type Session, requireLoaded, assertIndex, applySlideMarkdown, slideToMarkdown, zodErr, fitTail } from "./session";
+import { GuardError } from "./guard-errors";
 import { noteRoute } from "./metrics-probe";
 
 export function applySlideEdit(s: Session, i: number, text: string) {
@@ -21,6 +23,10 @@ export function applySlideEdit(s: Session, i: number, text: string) {
   assertIndex(deck, i);
   const old = deck.slides[i];
   const r = routeOpsReply(old, text);
+  if (r?.route === "rejected") {
+    noteRoute(r.route, 0);
+    throw new GuardError(r.notices.join(" ｜ "), "invalid-argument");
+  }
   if (!r || !r.slide || !OPS_ROUTES.has(r.route)) {
     const fallback = r?.route === "fallback";
     noteRoute(fallback ? "fallback" : "markdown", 0);

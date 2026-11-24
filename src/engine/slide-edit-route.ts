@@ -10,20 +10,22 @@
  *
  * Contract kept from P1–P3: a skipped op is announced (never silent); a malformed ops array falls back
  * to the Markdown path with a notice ("fallback"); when nothing applied, ops routes return the ORIGINAL
- * slide object. Pure logic (R2): no DOM / Tauri.
+ * slide object. Exception (#764): an array that parses but MIXES op families is "rejected" — no slide,
+ * the notice names the families — instead of becoming the body as the array's text. Pure logic (R2).
  */
 import type { SlideIR } from "./slide-schema";
 import type { LayoutCatalog } from "./template-catalog";
 import { serializeMd, type SerializeTemplate } from "./md-serializer";
 import { autoSelectLayout } from "./template-loader";
-import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction } from "./diagram-edit-ops";
-import { routeFieldEdit, bareArray } from "./field-edit-ops";
-import { routeDataEdit } from "./chart-edit-ops";
-import { parseDesignIntent, applyDesignIntentReport } from "./design-intent";
+import { parseDiagramEditOps, applyDiagramEditOps, checkDeleteIntent, buildOpsRetryInstruction, DiagramEditOpsSchema } from "./diagram-edit-ops";
+import { routeFieldEdit, bareArray, FieldEditOpsSchema } from "./field-edit-ops";
+import { routeDataEdit, DataEditOpsSchema } from "./chart-edit-ops";
+import { parseDesignIntent, applyDesignIntentReport, DesignIntentSchema } from "./design-intent";
 import { applyFigureYaml, figureFence, reconcileSlideEdit, figureFallbackTag, type FigureLayoutCtx } from "./ai-apply";
 
-/** Which route a reply took. "fallback" = a malformed ops array handled as full Markdown (with notice). */
-export type SlideEditRoute = "figure-yaml" | "diagram-ops" | "field-ops" | "data-ops" | "design" | "markdown" | "fallback";
+/** Which route a reply took. "fallback" = a malformed ops array handled as full Markdown (with notice).
+ *  "rejected" (#764) = an ops array mixing op families — not applied at all (slide null, notice). */
+export type SlideEditRoute = "figure-yaml" | "diagram-ops" | "field-ops" | "data-ops" | "design" | "markdown" | "fallback" | "rejected";
 
 /** The routes that merge a partial edit into the existing slide (as opposed to a whole-slide rewrite). */
 export const OPS_ROUTES: ReadonlySet<SlideEditRoute> = new Set<SlideEditRoute>(["diagram-ops", "field-ops", "data-ops", "design"]);
@@ -55,10 +57,46 @@ export interface RouteSlideEditOpts {
 const opsResult = (route: SlideEditRoute, slide: SlideIR, notices: string[], skipped: number): RoutedSlideEdit =>
   ({ route, slide, notices, warnings: notices, skipped });
 
+// ── #764: the op families, read off each route's own schema (R8: no second vocabulary list) ──
+type OpSchema = { element: unknown };
+function opNames(arr: OpSchema): Set<string> {
+  const el = arr.element as { options?: Array<{ shape: { op: { value: unknown } } }>; shape?: { op: { value: unknown } } };
+  const objs = el.options ?? (el.shape ? [el as { shape: { op: { value: unknown } } }] : []);
+  return new Set(objs.map((o) => String(o.shape.op.value)));
+}
+const OP_FAMILIES: ReadonlyArray<readonly [family: string, ops: ReadonlySet<string>]> = [
+  ["diagram", opNames(DiagramEditOpsSchema)], ["field", opNames(FieldEditOpsSchema)],
+  ["data", opNames(DataEditOpsSchema)], ["design", opNames(DesignIntentSchema)],
+];
+
+/**
+ * #764 — the ONE judge of "this ops array mixes op families" (GUI, refine/batch and MCP all reach it
+ * through routeSlideEdit). A whole-reply array (bareArray: optionally ```-fenced) naming ops of 2+
+ * families → the notice, naming each family by its first op; otherwise null (not an array, one family,
+ * or no known op — those keep their pre-#764 routes).
+ */
+export function mixedOpsNotice(raw: string): string | null {
+  const arr = bareArray(raw);
+  if (!arr) return null;
+  const seen = new Map<string, string>(); // family → its first op, in order of appearance
+  for (const o of arr) {
+    const op = typeof o === "object" && o !== null ? (o as { op?: unknown }).op : undefined;
+    if (typeof op !== "string") continue;
+    const family = OP_FAMILIES.find(([, ops]) => ops.has(op))?.[0];
+    if (family && !seen.has(family)) seen.set(family, op);
+  }
+  if (seen.size < 2) return null;
+  const named = [...seen].map(([family, op]) => `${op}（${family}）`).join("と ");
+  return `[ops拒否] op の系統が混在: ${named}。1 回の返答の op は 1 系統だけにしてください（スライドは変更していません）。`;
+}
+
 /** Route one reply for `old` to the slide it becomes. See the module comment for the order. */
 export function routeSlideEdit(old: SlideIR, raw: string, opts: RouteSlideEditOpts = {}): RoutedSlideEdit {
   const fig = applyFigureYaml(old, raw, opts.figureCtx);
   if (fig) return opsResult("figure-yaml", fig, [], 0);
+
+  const mixed = mixedOpsNotice(raw);
+  if (mixed) return { route: "rejected", slide: null, notices: [mixed], warnings: [mixed], skipped: 0 };
 
   const editOps = parseDiagramEditOps(raw);
   if (editOps) {
@@ -114,12 +152,13 @@ export interface SlideEditPreview { afterMd: string; warnings: string[]; beforeM
 /**
  * Figure routes diff the figure SOURCE (YAML-vs-YAML); text/data ops and Markdown diff the slide's
  * Markdown with its resolved layout. Design intent and an unparseable reply → null (the caller shows
- * the raw diff / nothing).
+ * the raw diff / nothing). A rejected reply (#764) → the slide as it is (no change) + the notice.
  */
 export function previewRoutedEdit(
   old: SlideIR, raw: string, r: RoutedSlideEdit,
   ctx: { index: number; total: number; catalog?: LayoutCatalog; tpl?: SerializeTemplate },
 ): SlideEditPreview | null {
+  if (r.route === "rejected") return { afterMd: serializeMd({ slides: [{ ...old, layout: autoSelectLayout(old, ctx.index, ctx.total, ctx.catalog) }] }, ctx.tpl), warnings: r.warnings };
   if (!r.slide || r.route === "design") return null;
   if (r.route === "figure-yaml") return { afterMd: figureFence(r.slide) ?? raw.trim(), warnings: [], beforeMd: figureFence(old) ?? "" };
   if (r.route === "diagram-ops") return { afterMd: figureFence(r.slide) ?? "", warnings: r.warnings, beforeMd: figureFence(old) ?? "" };
