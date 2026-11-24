@@ -111,7 +111,7 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  # ── Linux compile smoke — skipped on docs-only ───────────────────────
+  # ── Linux compile smoke + Rust clippy/unit tests (#732) — skipped on docs-only ───────────────────────
   # Catches Rust / tauri-config breaks on PR without the expensive mac/Windows legs. The real
   # cross-OS installers are built in release.yml on a `v*` tag. (rust-cache is a future speedup —
   # skipped here to keep every Action SHA-pinned per the repo's security posture.)
@@ -127,6 +127,9 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          # The action installs with --profile minimal, which omits clippy (#732).
+          components: clippy
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -134,6 +137,34 @@ jobs:
             libgtk-3-dev libwebkit2gtk-4.1-dev \
             libappindicator3-dev librsvg2-dev \
             libssl-dev patchelf
+      # #732: Rust-side gates. `tauri build` compiles the crate but runs neither clippy nor the
+      # #[cfg(test)] unit tests, so a new stable-toolchain lint (e.g. manual_checked_ops on 1.97) or a
+      # broken Rust test stayed invisible on PRs. They live HERE (non-required `build`, Linux apt deps
+      # already installed, skipped on docs-only via `changes`) — NOT in the required, apt-free `test` job.
+      # Placed before npm ci / tauri build so a Rust failure fails fast; the base tauri.conf.json has no
+      # externalBin and a debug build does not need ../dist, so no staging is required for these two.
+      # Cache only the crate downloads (key = Cargo.lock). target/ is NOT cached: the debug artifacts of
+      # clippy + test alone are ~2 GB (~5.5 GB with debuginfo), which would crowd the repo's 10 GB cache
+      # and evict the llamafile cache (#663).
+      - name: Cache cargo registry
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: cargo-registry-${{ runner.os }}-
+      # Debuginfo off for the dev profile only (clippy/test); the release profile `tauri build` uses is
+      # untouched. Cuts the dev target/ from ~5.5 GB to ~2 GB and ~20% of the compile time.
+      - name: Rust lint (clippy, warnings are errors)
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - name: Rust unit tests
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npm ci
       - run: npm run build
       # Stage the sidecars so the smoke builds with the SAME bundle overlay release.yml uses (externalBin
