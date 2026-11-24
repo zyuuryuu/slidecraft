@@ -12,6 +12,8 @@
 import type { DiagramSpec, ShapeType } from "./schema";
 import { SLIDE_W, SLIDE_H, type ConnectionPoint } from "./layout-engine";
 import { cjkFontFamily } from "./font-stack";
+import { resolveDiagramFace, withFontRefs, type DiagramFonts } from "./diagram-fonts";
+import { DEFAULT_THEME } from "./theme";
 import {
   paintDiagram,
   type DrawTarget,
@@ -56,8 +58,11 @@ class SvgDrawTarget implements DrawTarget {
   // Stack of part-array indices marking where each open group started.
   private groupStarts: number[] = [];
 
-  constructor(transparent = false) {
+  // #605: the template's diagram fonts — resolves the painter's +mj-lt/+mn-lt references (diagram-fonts.ts).
+  private fonts: DiagramFonts | undefined;
+  constructor(transparent = false, fonts?: DiagramFonts) {
     this.drawBg = !transparent;
+    this.fonts = fonts;
   }
 
   background(color: string): void {
@@ -231,7 +236,8 @@ class SvgDrawTarget implements DrawTarget {
       const fs = Math.round(r.fontSize * PT * 10) / 10;
       const weight = r.bold ? "700" : "400";
       const fill = col(r.color);
-      const face = esc(cjkFontFamily(r.fontFace));
+      const { latin, ea } = resolveDiagramFace(r.fontFace, this.fonts);
+      const face = esc(cjkFontFamily(latin, ea));
       const pieces = opts.wrap ? wrapToWidth(r.text, maxW, fs) : [r.text];
       for (const p of pieces) if (p !== "") vlines.push({ text: p, fs, weight, fill, face });
     }
@@ -304,6 +310,9 @@ export interface SvgRenderOptions extends PaintOptions {
    * transparent to match what actually lands in the slide.
    */
   transparent?: boolean;
+  /** The template's diagram typefaces (#605, diagramFontsFor) — the SAME rule the PPTX export uses (R8).
+   *  Omitted → the theme's own names (Midnight's Georgia / Calibri), as before. */
+  fonts?: DiagramFonts;
 }
 
 /** Run ANY draw commands into a transparent full-slide SVG (preview) — the SVG twin of
@@ -316,7 +325,7 @@ export function renderPaintToSvg(paint: (target: DrawTarget) => void): string {
 
 /** Render a DiagramSpec to an SVG string (preview), matching the PPTX export. */
 export function renderDiagramToSvg(spec: DiagramSpec, options: SvgRenderOptions = {}): string {
-  const target = new SvgDrawTarget(options.transparent);
-  paintDiagram(target, spec, options);
+  const target = new SvgDrawTarget(options.transparent, options.fonts);
+  paintDiagram(target, spec, options.fonts ? { ...options, theme: withFontRefs(options.theme ?? DEFAULT_THEME) } : options);
   return target.toSvg();
 }

@@ -166,6 +166,8 @@ export interface ThemeFonts {
   minorLatin?: string;
   majorEa?: string; // East-Asian (CJK) — often the visible font for Japanese text
   minorEa?: string;
+  majorJpan?: string; // <a:font script="Jpan"> — the Japanese font when the <a:ea> slot is empty (#605)
+  minorJpan?: string;
 }
 
 /** Read the theme fontScheme so a master placeholder that fonts via `+mj-lt` (a theme reference, not a
@@ -173,10 +175,12 @@ export interface ThemeFonts {
 function extractThemeFonts(themeXml: string): ThemeFonts {
   const block = (tag: string) => themeXml.match(new RegExp(`<a:${tag}>[\\s\\S]*?</a:${tag}>`))?.[0] ?? "";
   const face = (blk: string, kind: string) => blk.match(new RegExp(`<a:${kind}[^>]*typeface="([^"]*)"`))?.[1] || undefined;
+  const jpan = (blk: string) => blk.match(/<a:font\b(?=[^>]*\bscript="Jpan")[^>]*\btypeface="([^"]*)"/)?.[1] || undefined;
   const major = block("majorFont"), minor = block("minorFont");
   return {
     majorLatin: face(major, "latin"), minorLatin: face(minor, "latin"),
     majorEa: face(major, "ea"), minorEa: face(minor, "ea"),
+    majorJpan: jpan(major), minorJpan: jpan(minor),
   };
 }
 
