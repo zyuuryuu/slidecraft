@@ -96,7 +96,7 @@ export default function Toolbar({
         </div>
       )}
 
-      {/* #614: the bar holds only the DOCUMENT's operations — ↶ ↷ ｜ 保存・書き出し 📝原稿入力 🎨テンプレート ｜ ✨AI ⚙ (#692 wording).
+      {/* #614: the bar holds only the DOCUMENT's operations — ↶ ↷ ｜ 開く・保存・書き出し 📝原稿入力 🎨テンプレート ｜ ✨AI ⚙ (#692 wording).
           App settings (language / theme / help / AI connection) live in the ⚙ menu at the right end. */}
       <div className="w-px h-6 bg-edge mx-1" aria-hidden />
 

@@ -20,7 +20,7 @@ test.describe("#724 overlays (Base UI)", () => {
 
   test("draft dialog: Tab / Shift+Tab stay inside (focus trap)", async ({ page }) => {
     await page.getByRole("button", { name: "📝 原稿入力", exact: true }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /^原稿入力/ })).toBeVisible();
     expect(await focusInDialog(page)).toBe(true);
     for (const key of ["Tab", "Shift+Tab"]) {
       for (let i = 0; i < 12; i++) { // more presses than the dialog has stops → it must wrap
@@ -32,7 +32,7 @@ test.describe("#724 overlays (Base UI)", () => {
 
   test("draft dialog: Esc closes the 🎨 menu first, then the dialog; a backdrop click closes nothing", async ({ page }) => {
     await page.getByRole("button", { name: "📝 原稿入力", exact: true }).click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("dialog", { name: /^原稿入力/ });
     await page.mouse.click(5, 5); // the backdrop
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: /🎨/ }).click();

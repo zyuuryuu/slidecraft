@@ -321,7 +321,6 @@
     "generateAiTitle": "Generate a deck with AI",
     "tidyDraft": "🧹 Tidy draft",
     "tidyDraftTitle": "Split the raw draft into slides by heading, break up overpacked slides, and turn key-value pairs into tables (no AI, undoable)",
-    "close": "Cancel",
     "editorHint": "• You can paste or type directly here",
     "previewHeader": "Slide Preview (split result)",
     "parseError": "Couldn't parse Markdown: {{parseError}}",

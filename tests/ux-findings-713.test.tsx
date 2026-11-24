@@ -143,16 +143,48 @@ describe("#713-4 「…」は包みキー menu.opensDialog だけが付ける", 
 });
 
 describe("#713-5 畳んだ記憶の条件とヒント文", () => {
+  // 接続の 3 状態（computeConnection の出力の形）: 利用者が直す／使える／待ち（確認中・起動中＝どちらでもない）
+  const BROKEN = { ok: false, needsUserAction: true };
+  const OK = { ok: true, needsUserAction: false };
+  const WAITING = { ok: false, needsUserAction: false };
+
   it("記憶するのは needsUserAction のときに畳んだ場合だけ（開く操作・問題なしで畳んだ操作は記憶を消す）", () => {
-    expect(rememberFold(false, { needsUserAction: true })).toBe(true);
-    expect(rememberFold(false, { needsUserAction: false })).toBe(false);
-    expect(rememberFold(true, { needsUserAction: true })).toBe(false);
-    expect(rememberFold(true, { needsUserAction: false })).toBe(false);
+    for (const prev of [false, true]) {
+      expect(rememberFold(prev, false, BROKEN)).toBe(true);
+      expect(rememberFold(prev, false, OK)).toBe(false);
+      expect(rememberFold(prev, false, WAITING)).toBe(false);
+      expect(rememberFold(prev, true, BROKEN)).toBe(false);
+      expect(rememberFold(prev, true, OK)).toBe(false);
+      expect(rememberFold(prev, true, WAITING)).toBe(false);
+    }
+  });
+
+  it("#743: 開閉の操作が無いとき（接続が変わっただけ）は、ok なら消し、それ以外（直す・待ち）は今の記憶のまま", () => {
+    expect(rememberFold(true, null, OK)).toBe(false);
+    expect(rememberFold(false, null, OK)).toBe(false);
+    expect(rememberFold(true, null, BROKEN)).toBe(true);
+    expect(rememberFold(false, null, BROKEN)).toBe(false);
+    expect(rememberFold(true, null, WAITING)).toBe(true); // 起動時の「確認中」で手動コピペ利用者の記憶を消さない
+    expect(rememberFold(false, null, WAITING)).toBe(false);
   });
 
   it("設定を済ませてから畳んだ利用者は、再び壊れたとき開いた時点で展開される", () => {
-    const folded = rememberFold(false, { needsUserAction: false }); // 使える状態で畳む
-    expect(initialSettingsOpen({ needsUserAction: true }, folded)).toBe(true); // 後でキーが失効した
+    const folded = rememberFold(false, false, OK); // 使える状態で畳む
+    expect(initialSettingsOpen(BROKEN, folded)).toBe(true); // 後でキーが失効した
+  });
+
+  it("#743: 壊れた状態で畳む → 別の入口で ok に復旧 → 再び壊れる → 開いた時点で展開される", () => {
+    let folded = rememberFold(false, false, BROKEN); // キー未設定のまま畳む
+    expect(initialSettingsOpen(BROKEN, folded)).toBe(false); // 記憶どおり畳んだまま
+    folded = rememberFold(folded, null, OK); // ⚙ → AI 接続設定… でキーを入れた（ドックのトグルは押さない）
+    folded = rememberFold(folded, null, BROKEN); // 後でキーが失効した
+    expect(initialSettingsOpen(BROKEN, folded)).toBe(true);
+  });
+
+  it("#743: LlmAssist は接続が変わったときも rememberFold で記憶を決める（書き手は rememberFold の呼び出しだけ）", () => {
+    const s = readFileSync(resolve(__dirname, "../src/components/LlmAssist.tsx"), "utf8");
+    expect(s).toMatch(/saveSettingsFolded\(rememberFold\(loadSettingsFolded\(\), null, /); // 接続が変わったとき（操作なし）
+    expect(s.match(/saveSettingsFolded\(/g)?.length).toBe(s.match(/saveSettingsFolded\(rememberFold\(/g)?.length);
   });
 
   it("LlmAssist は畳んだ記憶を rememberFold で決める（自前で条件を書かない・needsUserAction は読むだけ）", () => {
