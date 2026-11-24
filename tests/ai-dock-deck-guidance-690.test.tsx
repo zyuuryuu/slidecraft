@@ -132,7 +132,7 @@ describe("#690-3 原稿が開けないとき（📝 原稿ボタンの draftGate
   it("テンプレ調整中（busy）: リンクは無効で、理由を同じ 1 行に出す", () => {
     const html = panel({ currentSlideMd: undefined, draftGate: "busy" });
     expect(link(html)).toContain(`disabled=""`);
-    expect(guidance(html)![1].replace(/<[^>]+>/g, "")).toContain(ja.aiPanel.deckGuidanceBusy);
+    expect(guidance(html)![1].replace(/<[^>]+>/g, "")).toContain(ja.app.draftGateBusy);
   });
 
   it("開けるときは理由を出さない", () => {

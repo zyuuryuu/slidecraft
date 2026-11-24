@@ -108,13 +108,13 @@ export function MasterMenu({ masters, activeId, onSelect, onImport, onRemake, on
       id: "modify",
       label: t("masterPicker.section.modify"),
       items: [
-        onAdjust && <Item key="adjust" icon="🔤" label={t("masterPicker.adjustLabel")} title={t("masterPicker.adjustTitle")} onClick={onAdjust} />,
+        onAdjust && <Item key="adjust" icon="🔤" label={t("menu.opensDialog", { title: t("masterPicker.adjustLabel") })} title={t("masterPicker.adjustTitle")} onClick={onAdjust} />,
         augment && (
           <Item
             key="augment"
             testId="master-augment"
             icon="🧩"
-            label={canAugment ? t("masterPicker.augmentLabel", { what: augmentWhat(plan!) }) : t("masterPicker.augmentLabelPlain")}
+            label={canAugment ? t("menu.opensDialog", { title: t("masterPicker.augmentLabel", { what: augmentWhat(plan!) }) }) : t("masterPicker.augmentLabelPlain")}
             title={augmentNote ?? t("masterPicker.augmentTitle")}
             note={augmentNote}
             disabled={!canAugment}
@@ -127,7 +127,7 @@ export function MasterMenu({ masters, activeId, onSelect, onImport, onRemake, on
     {
       id: "create",
       label: t("masterPicker.section.create"),
-      items: [onCreate && <Item key="create" icon="＋" label={t("masterPicker.createLabel")} title={t("masterPicker.createTitle")} onClick={onCreate} />].filter(Boolean),
+      items: [onCreate && <Item key="create" icon="＋" label={t("menu.opensDialog", { title: t("masterPicker.createLabel") })} title={t("masterPicker.createTitle")} onClick={onCreate} />].filter(Boolean),
     },
   ].filter((s) => s.items.length > 0);
 

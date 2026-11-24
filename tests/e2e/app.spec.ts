@@ -306,11 +306,11 @@ test.describe("SlideCraft", () => {
     const bar = page.getByTestId("top-bar");
     await bar.getByRole("button", { name: "設定", exact: true }).click();
     await page.getByRole("button", { name: "EN", exact: true }).click();
-    await expect(bar.getByRole("button", { name: /^Save & Export/ })).toBeVisible();
+    await expect(bar.getByRole("button", { name: /^Open · Save · Export/ })).toBeVisible();
     await expect(bar.getByRole("button", { name: "📝 Write draft", exact: true })).toBeVisible();
     await expect(bar.getByRole("button", { name: "Settings", exact: true })).toBeVisible(); // ⚙ is labelled in English too
     await page.getByRole("button", { name: "JA", exact: true }).click(); // the menu stays open while switching
-    await expect(bar.getByRole("button", { name: /^保存・書き出し/ })).toBeVisible();
+    await expect(bar.getByRole("button", { name: /^開く・保存・書き出し/ })).toBeVisible();
   });
 
   test("⚙ → AI 接続設定 opens the AI dock with its connection settings (#614)", async ({ page }) => {

@@ -118,9 +118,10 @@ export default function Toolbar({
         </BarMenuContent>
       </DropdownMenu>
 
-      {/* 📝 原稿 (Draft) = secondary action. Gated while collab-locked or while a template adjust is open. */}
+      {/* 📝 原稿 (Draft) = secondary action. Gated while collab-locked or while a template adjust is open; the tooltip says why
+          with the same words as the AI dock's guidance (#713: one key per reason). */}
       {onDraft && (
-        <BarTip label={draftGate === "locked" ? t("app.draftLockedTitle") : t("app.draftButtonTitle")}>
+        <BarTip label={draftGate === "locked" ? t("app.draftGateLocked") : draftGate === "busy" ? t("app.draftGateBusy") : t("app.draftButtonTitle")}>
           <Button variant="secondary" onClick={onDraft} disabled={!!draftGate} className={`${sec} disabled:opacity-40`}>
             {t("toolbar.draft")}
           </Button>

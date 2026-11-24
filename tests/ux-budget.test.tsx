@@ -249,7 +249,7 @@ describe("UX 予算（ADR-0039）", () => {
   it(`段階的開示: メニューのネストは ${BUDGET.menuDepth} 段まで（凍結リストの項目を除く）`, async () => {
     // 入口を押して開いた＝ファイル・🎨・⚙ のメニューが実際に出ている（数え漏れの防止）。
     const opened = (await openPaths(topBarEl())).filter((p) => p.path.length === 1);
-    expect(opened.map((p) => p.path[0])).toEqual(["保存・書き出し▾", "🎨テンプレート：技術報告 スタンダード水色▾", "⚙"]);
+    expect(opened.map((p) => p.path[0])).toEqual(["開く・保存・書き出し▾", "🎨テンプレート：技術報告 スタンダード水色▾", "⚙"]);
     expect(opened[0].html).toContain("📊 PPTX");
     expect(opened[1].html).toContain('data-testid="master-section-select"');
     expect(opened[2].html).toContain("ヘルプ（ドキュメント）");

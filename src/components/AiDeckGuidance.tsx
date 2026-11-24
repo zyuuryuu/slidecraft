@@ -5,7 +5,8 @@
  * nothing to 生成 — instead of an input that can't be submitted, point to the ONE entry for whole-deck
  * generation: 📝 原稿 → ✨ AIで生成. The link opens the 原稿 screen only (same handler and same gate as the
  * toolbar's 📝 原稿 button — ux-principles.md §2 rule 2: a second entry merely opens the first). When that
- * button is gated, the link is disabled and the reason is said on the same line (never silent).
+ * button is gated, the link is disabled and the reason is said on the same line (never silent) — the same
+ * dictionary key as the 📝 button's tooltip (#713).
  */
 
 import { useTranslation } from "react-i18next";
@@ -38,7 +39,7 @@ export default function AiDeckGuidance({ onOpenDraft, draftGate }: AiDeckGuidanc
       )}
       {draftGate && (
         <span className="ml-1 text-faint">
-          {draftGate === "locked" ? t("aiPanel.deckGuidanceLocked") : t("aiPanel.deckGuidanceBusy")}
+          {draftGate === "locked" ? t("app.draftGateLocked") : t("app.draftGateBusy")}
         </span>
       )}
     </div>

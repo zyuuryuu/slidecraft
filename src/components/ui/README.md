@@ -8,7 +8,7 @@ shadcn CLI の既定 preset `base-nova`）。設定は リポジトリ直下の 
 | --- | --- | --- |
 | Button | `button.tsx` | 上部バーの 7 ボタン（`Toolbar.tsx`・`SettingsMenu.tsx`・`MasterPicker.tsx`） |
 | Tooltip | `tooltip.tsx` | 上部バーのボタンの説明（以前の `title=`）。`../BarTip.tsx` 経由（説明は `aria-describedby` でも渡す）。`TooltipProvider`（delay 400ms＝`BAR_TOOLTIP_DELAY`）は `src/main.tsx` でアプリ全体に 1 つ |
-| DropdownMenu | `dropdown-menu.tsx` | 上部バーのメニュー 3 つ（保存・書き出し／🎨 テンプレート／⚙）。`../BarMenu.tsx`（区画・項目・箱）経由。項目は `nativeButton` で `<button role="menuitem">` |
+| DropdownMenu | `dropdown-menu.tsx` | 上部バーのメニュー 3 つ（開く・保存・書き出し／🎨 テンプレート／⚙）。`../BarMenu.tsx`（区画・項目・箱）経由。項目は `nativeButton` で `<button role="menuitem">` |
 | Popover | `popover.tsx` | AI 接続設定（AI ドックの状態ピル → `AiSettingsPopover`）。`AiPanel.tsx` |
 | Dialog | `dialog.tsx` | 原稿入力（`InitializeModal.tsx`）・テンプレートを作成（`TemplateCreator.tsx`）。どちらも `showCloseButton={false}`（自前の × を `DialogClose` で置く）・`disablePointerDismissal`（背景クリックで閉じない） |
 

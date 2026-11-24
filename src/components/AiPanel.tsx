@@ -143,11 +143,12 @@ export default function AiPanel({
   const batch = selectedCount > 1 && !!onBatchEdit;
   const canSlide = !!currentSlideMd && !!onApplySlide;
   const slideScope = canSlide;
+  const hasTarget = batch || canSlide; // something selected to instruct (else: the deck guidance, #690/#713)
 
   // !generating && !bestOfRunning = single-flight: a run in progress (incl. best-of-N fan-out) must NOT
   // start a second generation (via ⌘/Ctrl+Enter or the button) — that orphaned the first batch and let
   // a stale candidate be adopted (adversarial review). 停止 (cancel) is the only mid-run action.
-  const ready = ai.canGenerate(userRequest) && !batchRunning && !ai.generating && !ai.bestOfRunning && (batch || canSlide);
+  const ready = ai.canGenerate(userRequest) && !batchRunning && !ai.generating && !ai.bestOfRunning && hasTarget;
 
   // Reconcile+validate the AI result the way it WILL be applied, so the review shows the REAL
   // result (not raw output) + any advisory — the reviewer decides 採用/却下 informed, and an
@@ -354,8 +355,9 @@ export default function AiPanel({
           freed space goes to the result/preview below; the box is user-resizable (resize-y) AND
           collapsible (chevron) so reviewing the 変更プレビュー can reclaim the whole area. */}
       <div className="px-3 py-2 flex flex-col gap-2">
-        {/* Scope = the slide-list selection (no toggle). 1 = focused slide, >1 = batch.
-            Leading chevron folds/unfolds the instruction box below. */}
+        {/* Scope = the slide-list selection (1 = focused, >1 = batch); the chevron folds the box below. No selection → the
+            guidance alone (#713: no 2nd "select a slide" line, no fold for a box that isn't there; the fold state is kept). */}
+        {hasTarget ? (
         <div className="flex items-center gap-1.5 text-xs text-muted">
           <button
             type="button"
@@ -369,10 +371,8 @@ export default function AiPanel({
           <span>{t("aiPanel.editTargetLabel")}</span>
           {batch ? (
             <span className="px-2 py-0.5 rounded bg-accent/20 text-accent-soft">{t("aiPanel.batchScope", { count: selectedCount })}</span>
-          ) : canSlide ? (
-            <span className="px-2 py-0.5 rounded bg-field text-accent-soft">{t("aiPanel.slideScope", { num: activeSlideNum })}</span>
           ) : (
-            <span className="text-faint">{t("aiPanel.selectSlidePrompt")}</span>
+            <span className="px-2 py-0.5 rounded bg-field text-accent-soft">{t("aiPanel.slideScope", { num: activeSlideNum })}</span>
           )}
           {batch && !promptCollapsed && <span className="text-faint">{t("aiPanel.batchHint")}</span>}
           {/* Collapsed: echo the current instruction (truncated) so folding doesn't hide what you asked. */}
@@ -382,9 +382,9 @@ export default function AiPanel({
             </span>
           )}
         </div>
+        ) : <AiDeckGuidance onOpenDraft={onOpenDraft} draftGate={draftGate} />}
         {/* Compact by default (~3 rows); resize-y lets you drag it a little taller, clamped so it can't swallow the panel. */}
-        {!promptCollapsed && !batch && !canSlide && <AiDeckGuidance onOpenDraft={onOpenDraft} draftGate={draftGate} />}
-        {!promptCollapsed && (batch || canSlide) && (
+        {!promptCollapsed && hasTarget && (
         <div className="flex gap-2">
           <textarea
             value={userRequest}

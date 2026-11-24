@@ -2,7 +2,7 @@
  * toolbar-wording-692.test.tsx — #692: 上部バーの 3 つのボタン（ファイル・📝 原稿・🎨 <テンプレ名>）を、押す前に
  * 用途が分かる名前にし、テンプレートの呼び名を「テンプレート」1 つに揃える（UX 原則 4「語は利用者の語で」）。
  *
- *  1. 上部バーのボタン名は辞書の新しい値：「保存・書き出し ▾」「📝 原稿入力」「🎨 テンプレート：<名前> ▾」。
+ *  1. 上部バーのボタン名は辞書の新しい値：「開く・保存・書き出し ▾」（#713 で「開く」を追加）「📝 原稿入力」「🎨 テンプレート：<名前> ▾」。
  *  2. 保存・書き出しのメニューは、区画ごとに見える見出し（開く・保存／書き出す）を持ち、見出しは区画の名前と同じ。
  *  3. 辞書（ja）の値に「マスター」「スライドマスター」「テンプレ（テンプレートでない略称）」「Draft」が残っていない。
  *     辞書（en）の値に「master」が残っていない。
@@ -62,18 +62,18 @@ const topBar = () =>
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").trim());
 
 describe("#692 上部バーのボタン名", () => {
-  it("日本語: 保存・書き出し ▾ ／ 📝 原稿入力 ／ 🎨 テンプレート：<名前> ▾", () => {
+  it("日本語: 開く・保存・書き出し ▾ ／ 📝 原稿入力 ／ 🎨 テンプレート：<名前> ▾", () => {
     const b = buttons(topBar());
-    expect(b).toContain("保存・書き出し▾");
+    expect(b).toContain("開く・保存・書き出し▾"); // #713: 「開く」を足した（ユーザ裁定）
     expect(b).toContain("📝 原稿入力");
     expect(b).toContain("🎨テンプレート：技術報告 スタンダード水色▾");
   });
 
-  it("英語: Save & Export ▾ ／ 📝 Write draft ／ 🎨 Template:<name> ▾", async () => {
+  it("英語: Open · Save · Export ▾ ／ 📝 Write draft ／ 🎨 Template:<name> ▾", async () => {
     await i18n.changeLanguage("en");
     try {
       const b = buttons(topBar());
-      expect(b).toContain("Save & Export▾");
+      expect(b).toContain("Open · Save · Export▾"); // #713
       expect(b).toContain("📝 Write draft");
       expect(b).toContain("🎨Template:技術報告 スタンダード水色▾");
     } finally {

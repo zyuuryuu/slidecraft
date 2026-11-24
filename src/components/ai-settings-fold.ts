@@ -15,6 +15,13 @@ export function initialSettingsOpen(conn: Pick<ConnectionStatus, "needsUserActio
   return conn.needsUserAction && !folded;
 }
 
+/** 開閉の操作のあとに「畳んだ」を記憶するか（#713）。記憶するのは、利用者の操作が要る（needsUserAction）状態で
+ *  畳んだときだけ＝接続を設定しない（手動コピペで使う）利用者。使える状態で畳んだ・開いた操作は記憶を消す：
+ *  設定を済ませて畳んだ人の接続が後で壊れたとき、開いた時点で設定が展開されるように。needsUserAction は読むだけ（R8）。 */
+export function rememberFold(nextOpen: boolean, conn: Pick<ConnectionStatus, "needsUserAction">): boolean {
+  return !nextOpen && conn.needsUserAction;
+}
+
 export function loadSettingsFolded(): boolean {
   try {
     return localStorage.getItem(AI_SETTINGS_FOLDED_KEY) === "1";
