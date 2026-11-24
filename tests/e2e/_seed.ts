@@ -53,6 +53,6 @@ export async function seedDeck(page: Page): Promise<void> {
   await page.getByRole("button", { name: /スライドにする/ }).click();
   await expect(page.getByText("スライド", { exact: true })).toBeVisible({ timeout: 8000 }); // back in Edit
   // #724: the Draft dialog (Base UI) fades out (~100 ms) before it leaves the DOM; until then its own 🎨 / ✨ buttons
-  // are still in the accessibility tree and a later `getByRole("button", { name: /🎨/ })` would match twice.
+  // are still in the accessibility tree and a later `getByRole("button", { name: /^テンプレート：/ })` would match twice.
   await expect(page.getByRole("dialog", { name: /^原稿入力/ })).toHaveCount(0);
 }
