@@ -212,10 +212,10 @@ export function diagnoseDeck(deck: DeckIR, catalog?: LayoutCatalog, layouts?: re
       // Every body visual's region on this layout — the SAME placement export/preview draw by (R8).
       const regions = figureRegions(slide, layout.placeholders);
 
-      // #392 段 2 never-silent: on a slide with 2+ visuals, one this layout has no region for is not drawn
-      // (it stays in the Markdown) — unboundVisuals is that ONE judgment (段 3, R8). A lone visual keeps its
-      // historical handling (no diagnostic here).
-      const lostFigs = regions.length >= 2 ? unboundVisuals(slide, layout.placeholders) : [];
+      // #392 段 2 / #666 never-silent: a visual this layout has no region for is not drawn (it stays in the
+      // Markdown) — on a lone-visual slide too (#666). unboundVisuals is that ONE judgment (段 3, R8); it
+      // already leaves out the solo diagram (drawn full-slide) and the behind image (a layer, no region).
+      const lostFigs = unboundVisuals(slide, layout.placeholders);
       if (lostFigs.length > 0) {
         const what = [...new Set(lostFigs.map((r) => FIGURE_KIND_LABEL[r.kind]))].join("・");
         issues.push({ slideIndex: i, title: slideTitle(slide), id: "figure-dropped", level: RULE_LEVEL["figure-dropped"], message: `${what}（${lostFigs.length}個）はこのレイアウト（${layout.name}）に置き場（本文の枠）が無く、出力（PPTX/プレビュー）に描画されません（Markdown には保持されます）。枠の多いレイアウトにするか、スライドを分けてください`, levers: ["split"] });

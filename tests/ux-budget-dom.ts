@@ -10,13 +10,14 @@
  *  - openDepth(node): ボタンに届くまでに押す入口の数＋1 の最大値（上部バーのボタン＝1・⚙ の中＝2）。
  *    probes の menuDepth（入れ子で数える）と同じ量。両者の一致は ux-budget.test.tsx で確かめる（R8）。
  *  - openedGroups(node): 上部バーの入口を 1 つずつ開き、そのときの document.body を probes の groupItems で数える。
+ *  - openedSegments(node): 同じ開いた状態を probes の segmentRows で数える（セグメント行の選択肢数・#716）。
  *
  * 経路ごとに描き直す（開いたメニューを閉じる操作に依らない＝手製でも Base UI でも同じ）。入口を開く操作は
  * `press`（既定はクリック）。Base UI の Menu が pointerdown で開くなら PR-B でここだけ直す。
  */
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { groupItems } from "./ux-budget-probes";
+import { groupItems, segmentRows } from "./ux-budget-probes";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -90,8 +91,18 @@ export async function openDepth(node: ReactNode, press: Press = click): Promise<
   return { depth, deepest };
 }
 
+/** 上部バーの入口を 1 つずつ開いた状態それぞれを probe で数える（openedGroups・openedSegments の共通部）。 */
+async function eachOpenedMenu<T>(node: ReactNode, probe: (html: string) => T[], press: Press): Promise<T[]> {
+  const paths = await openPaths(node, press);
+  return paths.filter((p) => p.path.length === 1).flatMap((p) => probe(p.html));
+}
+
 /** 上部バーの入口を 1 つずつ開いた状態の、メニューの区画（role="group"）。並びは入口の並び順。 */
 export async function openedGroups(node: ReactNode, press: Press = click) {
-  const paths = await openPaths(node, press);
-  return paths.filter((p) => p.path.length === 1).flatMap((p) => groupItems(p.html));
+  return eachOpenedMenu(node, groupItems, press);
+}
+
+/** 上部バーの入口を 1 つずつ開いた状態の、セグメント行ごとの選択肢数。並びは入口の並び順。 */
+export async function openedSegments(node: ReactNode, press: Press = click) {
+  return eachOpenedMenu(node, segmentRows, press);
 }
