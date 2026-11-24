@@ -23,7 +23,7 @@ async function importMaster(page: Page, file: string, asName: string) {
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: /テンプレートを取り込む/ }).click();
   await (await chooser).setFiles({ name: asName, mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", buffer: readFileSync(resolve(FIX, file)) });
-  await expect(page.getByText("取り込み結果")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId("notice-slot").getByText("取り込み結果")).toBeVisible({ timeout: 15000 });
 }
 
 /** Open the master menu and return its 「テンプレを強化」 item. */
@@ -85,7 +85,7 @@ test.describe("テンプレを強化 (#568 / #612 menu entry)", () => {
   });
 
   test("#612: the built-in master (no intake yet) can be augmented from the menu", async ({ page }) => {
-    await expect(page.getByText("取り込み結果")).toHaveCount(0); // nothing imported
+    await expect(page.getByTestId("notice-slot").getByText("取り込み結果")).toHaveCount(0); // nothing imported
     await expect(masterButton(page)).toContainText("技術報告 スタンダード水色");
     const item = await augmentItem(page);
     await expect(item).toHaveText("🧩テンプレートを強化（3 列・KPI 4 個を追加）…");
