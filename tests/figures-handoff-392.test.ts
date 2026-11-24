@@ -5,7 +5,7 @@
  *     **1 枚目の画像**の alt しか見ておらず、2 枚目だけに alt があると出典行がキャプションに重なった。
  *  2. `unboundVisuals`（枠に置けないビジュアル＝描かれないもの）の呼び出し元が段 2 で無くなっていた。
  *     deck-diagnostics の `figure-dropped` がこれを読む（R8: 「描かれない」の判定を 1 つに）。
- *     単一ビジュアルのスライドの診断は従来どおり（ここは変えない・別 Issue）。
+ *     単一ビジュアルのスライドにも #666 で広げた（single-visual-figure-dropped-666.test.ts）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
