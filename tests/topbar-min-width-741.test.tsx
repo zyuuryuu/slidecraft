@@ -30,6 +30,13 @@ describe("#741 🎨 テンプレートのボタンのアクセシブルネーム
     expect(en.masterPicker.buttonLabel).toBe("Template: {{name}}");
   });
 
+  // R8（一致テスト）: 前置きの語は見た目用の buttonPrefix と読み上げ用の buttonLabel の 2 キーにある。片方だけ変えると赤。
+  it("buttonLabel は buttonPrefix（見た目の前置き）と同じ語で始まる（ja／en）", () => {
+    for (const dict of [ja, en]) {
+      expect(dict.masterPicker.buttonLabel.startsWith(dict.masterPicker.buttonPrefix.trim())).toBe(true);
+    }
+  });
+
   for (const lang of ["ja", "en"] as const) {
     it(`${lang}: aria-label ＝ 辞書の buttonLabel にテンプレート名を入れたもの（未選択なら selectMaster）`, async () => {
       await i18n.changeLanguage(lang);

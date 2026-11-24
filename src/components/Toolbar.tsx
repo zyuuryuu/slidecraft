@@ -76,7 +76,7 @@ export default function Toolbar({
           (instead of pushing the AI and ⚙ buttons off a narrow window). */}
       <div className="flex items-center gap-1 mr-4">
         <div className="w-1 h-6 bg-accent rounded-full" />
-        {/* #741: at 760px or less the wordmark makes way (still the page's heading for screen readers): it is not an
+        {/* #741: below 760px the wordmark makes way (still the page's heading for screen readers): it is not an
             operation, and without its room 「🎨 ▾」 does not fit at 640px (measured). Narrowing goes prefix (860px) →
             wordmark (760px) → template name (MasterPicker, container query), so in the default state the name does not come back as it narrows. */}
         <h1 className="text-fg font-semibold text-lg tracking-tight max-[760px]:sr-only">SlideCraft</h1>
