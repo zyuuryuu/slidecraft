@@ -300,7 +300,7 @@ describe("#724 PR-B 4: ダイアログ（原稿入力・テンプレートを作
     await settle();
     await key(document.activeElement ?? dialog()!, "Escape");
     expect(onCancel).toHaveBeenCalledTimes(1);
-    await press(dialog()!.querySelector<HTMLElement>(`[title="${t("initModal.close")}"]`)!);
+    await press(dialog()!.querySelector<HTMLElement>(`[aria-label="${t("dialog.close")}"]`)!); // #739-3: × の名前は dialog.close
     expect(onCancel).toHaveBeenCalledTimes(2);
     await press([...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === t("initModal.cancel"))!);
     expect(onCancel).toHaveBeenCalledTimes(3);

@@ -321,7 +321,6 @@
     "generateAiTitle": "AI でデッキを生成",
     "tidyDraft": "🧹 原稿を整形",
     "tidyDraftTitle": "生原稿を見出しごとにスライド化＋詰め込みすぎを分割＋key-value を表に（AIなし・元に戻せます）",
-    "close": "キャンセル",
     "editorHint": "・ ここに直接貼り付け／入力してもOK",
     "previewHeader": "Slide Preview（分割結果）",
     "parseError": "Markdown を解析できません: {{parseError}}",
