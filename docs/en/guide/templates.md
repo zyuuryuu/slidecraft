@@ -15,7 +15,7 @@ On the desktop version, imported and created templates are saved to the app's lo
 
 ### The template menu
 
-Template operations live in the menu of the **🎨 Template: <name>** button on the top bar (the template menu).
+Template operations live in the menu of the **🎨 Template: &lt;name&gt;** button on the top bar (the template menu).
 
 | Section | Items |
 |---------|-------|
