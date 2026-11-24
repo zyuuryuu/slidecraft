@@ -1,4 +1,12 @@
 @import "tailwindcss";
+/* shadcn/ui（#724）: 部品のアニメーション（tw-animate-css）と data-open 等の variant（shadcn/tailwind.css）。
+   どちらもビルド時に CSS として取り込むだけ（CDN・外部フォントは足さない＝CSP default-src 'self' のまま）。 */
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* shadcn の dark: variant を、アプリの暗い配色（color-scheme: dark の 2 つ）に向ける。
+   既定の `.dark` クラスはこのアプリに無い（テーマは <html data-theme>）。 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="modern"], [data-theme="modern"] *));
 
 /* ── Semantic color tokens (theme system) ───────────────────────────────────────────────────────
    The UI paints with semantic utilities (bg-surface / border-edge / text-muted / bg-accent …) whose
@@ -30,6 +38,28 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-ok: var(--ok);
+
+  /* shadcn/ui の色名（#724）。値は下の「shadcn の別名」で既存トークンに写像する。
+     --color-muted / --color-accent はアプリの意味（文字色／主色）のまま＝shadcn の同名（薄い塗り）は定義しない。
+     コピーした部品の bg-muted 等は src/components/ui/README.md の置換ルールで既存トークンに直す。 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  /* 角丸: shadcn init が足す --radius-sm/md/lg/xl… の上書きは採らない（アプリ既存の rounded-lg 等が 8px → 6px に
+     変わるため）。下の --radius は src/components/ui/*.tsx だけが rounded-(--radius) 等で参照する（README）。 */
 }
 
 /* Dark (default) — two-tone black + grey: near-black CONTENT (canvas), clearly GREY panels/toolbar/
@@ -123,6 +153,33 @@
   --ok: #10b981;
 }
 
+/* shadcn の別名（#724）— 既存トークンへの写像だけ。値を持たないので 3 テーマ（dark / light / modern）の
+   どれでも、そのテーマの既存トークンを指す（data-theme は <html> に付く＝main.tsx・useTheme.ts）。
+   写像表と、部品をコピーするたびに当てる置換は src/components/ui/README.md。 */
+:root,
+[data-theme] {
+  --background: var(--canvas);
+  --foreground: var(--fg);
+  --card: var(--panel);
+  --card-foreground: var(--fg);
+  --popover: var(--canvas);
+  --popover-foreground: var(--fg);
+  --primary: var(--accent);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--edge);
+  --secondary-foreground: var(--fg);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--fg);
+  --destructive: var(--danger);
+  --border: var(--edge);
+  --input: var(--edge2);
+  /* フォーカスリング＝文字色: 主ボタン（bg-primary＝--accent）の上でも地と分かれ、上部バー（--surface）・
+     ダイアログ見出し（--void）に対して 3 テーマとも 3:1 以上（WCAG 2.4.13・tests/toolbar-bartip-724.test.tsx）。 */
+  --ring: var(--fg);
+  /* 6px: shadcn 部品（src/components/ui/*.tsx）の角丸。Tailwind の rounded-* スケールは既定のまま（#724 統括の決定 2）。 */
+  --radius: 0.375rem;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
@@ -160,4 +217,12 @@ body {
 }
 [data-theme="dark"] .cm-placeholder {
   color: var(--dim) !important;
+}
+
+/* shadcn の既定: 色を指定しない `border` は --border（= --edge）で描く（Tailwind v4 の既定は currentColor）。
+   #724: 適用前後で全画面の computed border-color を比べて差分を確認した（PR-A 本文）。 */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
