@@ -19,7 +19,7 @@ import type { Readable, Writable } from "node:stream";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { DISCOVER_METHOD } from "./discover-probe";
 import { parseModeBanner, type ModeBanner } from "./cli-banner";
-import { HostWatch } from "./front-decide";
+import { HostWatch, isHandshake } from "./front-decide";
 import { pingAlive, resolveHostJsonPath } from "./host-discovery";
 import { readHostJson, type HostHandshake } from "./host-json";
 
@@ -172,11 +172,11 @@ export async function checkCollabHost(
   path: string,
   ping: (h: HostHandshake) => Promise<boolean> = (h) => pingAlive(h.url, h.token, 1500),
 ): Promise<HostCheck> {
-  let seen: HostHandshake | null = null;
+  let seen: unknown = null;
   const live = await new HostWatch(() => (seen = readHostJson(path)), ping).live();
-  const hs = seen as HostHandshake | null;
+  const hs: unknown = seen;
   if (!hs) return { path, file: "none" };
-  if (typeof hs.url !== "string" || typeof hs.token !== "string") return { path, file: "invalid" };
+  if (!isHandshake(hs)) return { path, file: "invalid" };
   return { path, file: "present", url: hs.url, startedAt: String(hs.startedAt), alive: live !== null };
 }
 

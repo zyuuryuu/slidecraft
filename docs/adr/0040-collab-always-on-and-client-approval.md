@@ -165,6 +165,6 @@ ADR-0033 D2 の「起動時に 1 回だけ判断する」を次の状態遷移�
 - Issue: #688（この ADR の元）・#727〜#730（実装）・#687（今の手順を案内する文言の修正・closed）・#689（協働パネルの 2 層化と、止まる機能の告知）・#686（`.mcpb` の導入手順）・#694（単独モードの組み込みテンプレ）・#613（`NoticeSlot`）
 - ADR: [0009](0009-p2-collab-host.md)・[0010](0010-security-model.md)・[0016](0016-security-review-theme4.md)（F3 keychain）・[0033](0033-mcp-single-control-plane.md)（D2 を部分的に supersede）・[0037](0037-mcp-surface-realignment.md)・[0038](0038-mcp-stateless-realign.md)・[0039](0039-ux-gates.md)
 - 触点:
-  - アダプタ: `src/mcp/cli.ts:88`（起動時 1 回の探索）・`src/mcp/host-discovery.ts`（`resolveHostJsonPath`・`discoverLiveHost`・`pingAlive`）・`src/mcp/mcp-relay.ts`（`initialize` をそのまま流す転送）・`src/mcp/tool-profiles.ts:85`（`close_document` は協働の口だけ）
+  - アダプタ: `src/mcp/cli.ts:88`（起動時 1 回の探索）・`src/mcp/host-discovery.ts`（`resolveHostJsonPath`・`discoverLiveHost`・`pingAlive`）・`src/mcp/mcp-relay.ts`（`initialize` をそのまま流す転送。#736 で削除・転送は `adaptive-front.ts`）・`src/mcp/tool-profiles.ts:85`（`close_document` は協働の口だけ）
   - ホスト: `src/mcp/host.ts:103-124`（`checkRequest` と自己申告の役割）・`src/mcp/host-security.ts`・`src/mcp/host-core.ts`
   - GUI・Rust: `src-tauri/src/collab.rs:178`（`start_collab`）・`:282`（`stop_collab`）・`src-tauri/src/secret_store.rs`・`src/ipc/key-store.ts`・`src/components/useCollab.ts:104`（`start`）・`:149-188`（seed）・`src/App.tsx:261`（`editLocked`）・`src/components/CollabPanel.tsx`・`src/components/NoticeSlot.tsx`

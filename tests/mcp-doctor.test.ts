@@ -21,6 +21,7 @@ import { buildServer } from "../src/mcp/server";
 import { createSession } from "../src/mcp/session";
 import { createProbeAwareStdio } from "../src/mcp/discover-probe";
 import { createLineChannel, probeServer, doctorChildArgs, formatDoctorReport, checkCollabHost, type DoctorReport } from "../src/mcp/doctor";
+import { HostWatch, isHandshake } from "../src/mcp/front-decide";
 import { soloReadyBanner, forwardBanner, parseModeBanner } from "../src/mcp/cli-banner";
 import { createCollabHost, type CollabHost } from "../src/mcp/host";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -190,6 +191,31 @@ describe("checkCollabHost — what --doctor says about the GUI's collab host", (
     let pinged = 0;
     expect(await checkCollabHost(path, async () => (pinged++, true))).toEqual({ path, file: "invalid" });
     expect(pinged).toBe(0);
+  });
+  it("isHandshake is the ONE validity rule: HostWatch.live() and checkCollabHost agree with it on every shape, and never ping an invalid one (R8)", async () => {
+    const shapes: Record<string, string> = {
+      valid: '{"url":"http://127.0.0.1:9/mcp","token":"t","pid":1,"startedAt":"s"}',
+      noUrl: '{"token":"t","pid":1,"startedAt":"s"}',
+      noToken: '{"url":"http://127.0.0.1:9/mcp","pid":1,"startedAt":"s"}',
+      urlNotString: '{"url":1,"token":"t","startedAt":"s"}',
+      tokenNotString: '{"url":"http://127.0.0.1:9/mcp","token":null,"startedAt":"s"}',
+      number: "42",
+      string: '"http://127.0.0.1:9/mcp"',
+      array: "[]",
+    };
+    for (const [name, text] of Object.entries(shapes)) {
+      const path = join(hostJsonDir, `shape-${name}.json`);
+      writeFileSync(path, text);
+      const valid = isHandshake(JSON.parse(text));
+      expect(valid, name).toBe(name === "valid");
+      let pinged = 0;
+      const ping = async () => (pinged++, true);
+      const live = await new HostWatch(() => JSON.parse(text), ping).live();
+      expect(live !== null, `${name}: HostWatch.live`).toBe(valid);
+      const r = await checkCollabHost(path, ping);
+      expect(r.file, `${name}: checkCollabHost`).toBe(valid ? "present" : "invalid");
+      expect(pinged, `${name}: pings`).toBe(valid ? 2 : 0);
+    }
   });
 });
 
