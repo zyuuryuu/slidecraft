@@ -327,7 +327,7 @@ describe("(d) 選択の規則と退化（既存テンプレの選択は不変）
       "Media.1Body+1Image",
       "Column.3Body.Equal",
       "Column.3Body.Equal",
-      "KPI.4Value.Grid",
+      "KPI.3Value.Equal", // #719: KPI 3 つは 3 列（以前は 4 マスの格子で右下が空いていた）
       "Process.4Step.Sequential",
       "Closing.1CTA+1Contact",
     ]);
