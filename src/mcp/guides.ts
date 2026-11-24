@@ -73,6 +73,8 @@ export const TOOL_NOTES = {
     "read 系の一部は MCP resource のミラー：get_deck=deck://current・get_deck_markdown=deck://markdown・get_slide_markdown=slide://{index}/markdown（ツール版が確実）・get_deck_issues=deck://issues・get_template_capabilities=deck://capabilities・get_project_info=deck://info",
   getSlide:
     "get_slide(i) は 1 回で編集計画に足る：resolvedLayout・hasFigure/figureKind・bulletCount・budget・overBudget・capacity（本文容量の実測 usedLines/maxLines）・predictedSplit（split_overflowing_slides の dry-run）・当該スライドの issues・markdown。素の Markdown だけなら get_slide_markdown（auto レイアウト解決済み）",
+  slideEdit:
+    "set_slide_markdown の markdown を ops の JSON 配列（全体を ```json 等のフェンス 1 つで囲んでもよい）にすると、全文差し替えでなく GUI と同じ差分適用になる。語彙は 1 配列 1 系統：文字 setField{idx,text}（idx は get_deck の slides[i].placeholders[].idx）／表・グラフ・ガント・KPI setCell{row,col,text}（0 始まり・表頭が row 0）・setSeriesValue{series,index,value}・setTask{name,newName?,start?,end?,status?,section?}・setCard{index,value?,label?,delta?,trend?}／図 nodeUpdate{id,label?,…}・addNode{id,label}・removeNode{id}・edgeUpdate{from,to,label?,relation?}・addEdge{from,to,label?}・removeEdge{from,to}・setDirection{direction}／配置 regionSplit・emphasize・relayout（apply_design_intent と同じ）。応答の route は通った経路、skipped は効かなかった op の数（apply_design_intent の skipped は配列）、notices はその理由。系統を混ぜた配列など不正な配列は全文の Markdown として扱われ（配列の文字列が本文になる）notices で告げる",
   fixRequest: "get_slide_fix_request は修正リクエスト packet を返す。agent 自身が LLM として埋め、set_slide_markdown で適用する",
   visual:
     "get_slide_image / get_deck_image は共有 HTML 描画（フォント埋め込み済・preview/HTML 書き出しと同一）をローカルの Chrome/Edge で画面なし・ネット遮断・使い捨てプロファイルで撮影する。ブラウザ未検出時は環境変数 SLIDECRAFT_BROWSER でパス指定。get_slide_html / get_deck_html は同一描画の自己完結 HTML（script ゼロ・CSP・フォント埋め込み済）で、Chrome/Edge が無い環境では呼び出し側がラスタ化する",
@@ -98,7 +100,7 @@ export function contractDigest(s: Session) {
     budget,
     capacity: "容量は get_slide(i) で実測できる（capacity.usedLines/maxLines・overBudget・predictedSplit）",
     separators:
-      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）。2 案の対比は `<!-- compare -->` を 2 つ、変化の前後（As-is→To-be）は `<!-- before -->` → `<!-- after -->` の順に 1 つずつ（比較レイアウト＋矢印＋Before/After ラベル）。スライド全体の形は `<!-- statement -->`（大きな 1 文＝`# 見出し`・本文は補足行）／`<!-- quote -->`（引用文＝本文・`—` で始まる最終行が帰属）を単独行で（該当レイアウトが無いテンプレでは退化し marker-layout-missing）",
+      "多領域レイアウト（columns/kpi/process）は各リージョンの前に `<!-- col -->` / `<!-- kpi -->` / `<!-- step -->` を1つずつ置く（先頭より前の内容は無視される）。2 案の対比は `<!-- compare -->` を 2 つ、変化の前後（As-is→To-be）は `<!-- before -->` → `<!-- after -->` の順に 1 つずつ（比較レイアウト＋矢印＋Before/After ラベル）。スライド全体の形は `<!-- statement -->`（大きな 1 文＝`# 見出し`・本文は補足行）／`<!-- quote -->`（引用文＝本文・`—` で始まる最終行が帰属）を単独行で（statement／quote と章扉の `<!-- section -->` は、該当レイアウトが無いテンプレでは本文レイアウトに退化し marker-layout-missing）",
     notes:
       "スピーカーノートは `<!-- note -->` を単独行で置き、以降スライド末尾（次の `---`）までが素の Markdown のノート本文（#150）。スライドは疎に・詳細はノートへ",
     sections:
