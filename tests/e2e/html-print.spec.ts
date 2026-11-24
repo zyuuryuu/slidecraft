@@ -33,7 +33,7 @@ test.describe("HTML export: real print output", () => {
     // Export via the real File menu — clicking 🌐 HTML exports with the default ('slide') transition.
     await page.getByRole("button", { name: /保存・書き出し/ }).click();
     await expect(page.getByText(/プロジェクトを開く/)).toBeVisible();
-    const htmlBtn = page.getByRole("button", { name: /HTML/ });
+    const htmlBtn = page.getByRole("menuitem", { name: /HTML/ });
     await expect(htmlBtn).toBeEnabled({ timeout: 10000 });
     const download = page.waitForEvent("download", { timeout: 25000 });
     await htmlBtn.click();

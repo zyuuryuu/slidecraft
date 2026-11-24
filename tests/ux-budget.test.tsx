@@ -15,9 +15,10 @@
  *
  * メニューは jsdom に描き、入口を実際に押して開いた状態の document.body で数える（tests/ux-budget-dom.ts・#724）。
  * shadcn/ui（Base UI）のメニューは開いたときだけ Portal に描くので、全部「開」で描く方式（forceOpen・
- * react-dom/server）では数えられないため。今の手製メニューで両方式が同じ結果になることを「道具の一致」で
- * 確かめる（R8）。PR-B でメニューが Portal になったら forceOpen 側は数えられなくなるので、その一致テストは外す。
- * 開いていない部品（バーのボタン・帯・MasterMenu 単体）は従来どおり react-dom/server で描く。
+ * react-dom/server）では数えられないため。PR-A（#734）では手製メニューで両方式の一致（R8）を確かめ、PR-B で
+ * メニューが Portal になったのでその一致テストは外した（forceOpen は道具の自己検査 DeepMenu にだけ残る）。
+ * 開いていない部品（バーのボタン・帯）は従来どおり react-dom/server で描く。メニューの中身を単体で描くとき
+ * （MasterMenu・SettingsPanel）は DropdownMenu（Base UI の Menu.Root）で包む。
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
@@ -32,6 +33,7 @@ import type { IntakeResult } from "../src/components/IntakeSummaryBar";
 import type { AdjustSession } from "../src/components/useTemplateAdjust";
 import type { MasterEntry } from "../src/components/useMasterRegistry";
 import { SettingsPanel } from "../src/components/SettingsMenu";
+import { DropdownMenu } from "../src/components/ui/dropdown-menu";
 import { i18nLeaks, menuDepth, groupItems } from "./ux-budget-probes";
 import { openDepth, openedGroups, openPaths } from "./ux-budget-dom";
 import DeepMenu from "./fixtures/ux-budget/DeepMenu";
@@ -218,8 +220,10 @@ describe("UX 予算（ADR-0039）", () => {
 
   it(`Cowan/Miller: マスターのメニューは ${BUDGET.menuSections} 区画以下・1 区画 ${BUDGET.itemsPerSection} 項目以下`, () => {
     const html = renderToStaticMarkup(
-      <MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onClose={noop} onImport={noop} onRemake={noop}
-        onAdjust={noop} augment={{ plan: null, onAugment: noop }} onShowInfo={noop} onCreate={noop} onRemove={noop} />,
+      <DropdownMenu>
+        <MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onImport={noop} onRemake={noop}
+          onAdjust={noop} augment={{ plan: null, onAugment: noop }} onShowInfo={noop} onCreate={noop} onRemove={noop} />
+      </DropdownMenu>,
     );
     const groups = groupItems(html);
     expect(groups.length).toBeGreaterThan(0); // 数え漏れの防止（区画を 1 つも拾えなければ道具が壊れている）
@@ -238,7 +242,7 @@ describe("UX 予算（ADR-0039）", () => {
     expect(settings.length).toBeLessThanOrEqual(BUDGET.menuSections);
     for (const g of groups) expect(g.items, g.label).toBeLessThanOrEqual(BUDGET.itemsPerSection);
     // ⚙ の中身を単独で描いても同じ区画になる（SettingsMenu の開閉に依らない）。
-    expect(groupItems(renderToStaticMarkup(<SettingsPanel onClose={noop} onHelp={noop} onAiSettings={noop} />)).map((g) => g.label))
+    expect(groupItems(renderToStaticMarkup(<DropdownMenu><SettingsPanel onHelp={noop} onAiSettings={noop} /></DropdownMenu>)).map((g) => g.label))
       .toEqual(settings);
   });
 
@@ -253,17 +257,6 @@ describe("UX 予算（ADR-0039）", () => {
     const tooDeep = (budget: number) => (r.depth > budget ? r.deepest : []);
     expect(tooDeep(BUDGET.menuDepth)).toEqual(FROZEN_DEEP_ITEMS);
     expect(tooDeep(BUDGET.menuDepth + 1)).toEqual([]);
-  });
-
-  describe("道具の一致（R8・#724）: 開いて数える（DOM）＝全部「開」で描いて数える（forceOpen）", () => {
-    // 今の手製メニューは両方式で数えられる。メニューが Portal（Base UI）になる PR-B で forceOpen 側は外す。
-    it("ネストの深さと最深のボタンが同じ", async () => {
-      expect(await openDepth(topBarEl())).toEqual(menuDepth(withAllOpen(topBar)));
-    });
-
-    it("ファイルと ⚙ のメニューの区画・項目数が同じ", async () => {
-      expect(await openedGroups(topBarEl(false))).toEqual(groupItems(withAllOpen(() => topBar(false))));
-    });
   });
 
   describe("シグニファイア: 記号 → 意味の 1 対 1（#614）", () => {
@@ -309,7 +302,9 @@ describe("UX 予算（ADR-0039）", () => {
     it("＋ は追加だけ: マスターのメニューで ＋ が付くのは「テンプレを作成」だけ", () => {
       const b = buttons(
         renderToStaticMarkup(
-          <MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onClose={noop} onImport={noop} onRemake={noop} onCreate={noop} />,
+          <DropdownMenu>
+            <MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onImport={noop} onRemake={noop} onCreate={noop} />
+          </DropdownMenu>,
         ),
       );
       expect(b.filter((x) => x.startsWith("＋")).map((x) => x.includes("テンプレートを作成"))).toEqual([true]);

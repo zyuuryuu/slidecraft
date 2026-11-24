@@ -5,7 +5,7 @@
  * adjust panel, the augment flow's banner and the creator dialog all render behind the Draft modal).
  * Applying is gated by the caller (collab lock / template adjust → `disabled`).
  */
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { MasterEntry } from "./useMasterRegistry";
 import type { TemplateData } from "../engine/template-loader";
@@ -14,6 +14,8 @@ import { MasterMenu } from "./MasterMenu";
 import { planTemplateAugmentation } from "./augment-offer";
 import BarTip from "./BarTip";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BarMenuContent } from "./BarMenu";
 import { BAR_HOVER } from "./bar-button";
 
 interface MasterPickerProps {
@@ -43,40 +45,24 @@ interface MasterPickerProps {
 export default function MasterPicker({ masters, activeId, onSelect, onImport, onRemake, onAdjust, onAugment, template, onCreate, onShowInfo, onRemove, disabled }: MasterPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close on outside click / Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const active = masters.find((m) => m.id === activeId);
   // Planned lazily (only while open) — the plan builds the template's catalog.
   const augmentPlan = useMemo(() => (open && onAugment && template ? planTemplateAugmentation(template) : null), [open, onAugment, template]);
 
   return (
-    <div className="relative inline-flex min-w-0 items-center gap-1" ref={ref}>
+    // #724: the shadcn DropdownMenu (Base UI) — Portal, arrow keys, Esc / outside click, an item closes the menu itself.
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <BarTip label={t("masterPicker.buttonTitle")}>
-      <Button
-        variant="secondary"
-        onClick={() => setOpen((v) => !v)}
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="secondary"
+            // #692: `shrink` (not the Button's shrink-0) + min-w-0 let the name truncate on a narrow window.
+            className={`px-3 font-normal ${BAR_HOVER} disabled:opacity-40 shrink min-w-0 max-w-[380px] justify-start`}
+          />
+        }
         disabled={disabled}
-        aria-haspopup="true"
         aria-expanded={open}
-        // #692: `shrink` (not the Button's shrink-0) + min-w-0 let the name truncate on a narrow window.
-        className={`px-3 font-normal ${BAR_HOVER} disabled:opacity-40 shrink min-w-0 max-w-[380px] justify-start`}
       >
         <span className="shrink-0">🎨</span>
         {/* #692: say what the button is before the name. When space is short the NAME truncates first (far larger
@@ -84,27 +70,23 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
         <span className="min-w-0 overflow-hidden whitespace-nowrap">{t("masterPicker.buttonPrefix")}</span>
         <span className="min-w-0 truncate shrink-[1000]">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
-      </Button>
+      </DropdownMenuTrigger>
       </BarTip>
-      {open && (
-        // `top-full` anchors the menu to the BOTTOM of the trigger (opens below it, never over it): the root
-        // is inline-flex, so without an explicit top an absolute child would sit at the flex line's TOP.
-        <div className="absolute top-full right-0 mt-1 z-50 min-w-[300px] max-w-[360px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
-          <MasterMenu
-            masters={masters}
-            activeId={activeId}
-            onSelect={onSelect}
-            onClose={() => setOpen(false)}
-            onImport={onImport}
-            onRemake={onRemake}
-            onAdjust={onAdjust}
-            augment={onAugment ? { plan: augmentPlan, onAugment } : undefined}
-            onShowInfo={onShowInfo}
-            onCreate={onCreate}
-            onRemove={onRemove}
-          />
-        </div>
-      )}
-    </div>
+      {/* Opens below the trigger, right-aligned (as before). */}
+      <BarMenuContent align="end" className="w-auto min-w-[300px] max-w-[360px]">
+        <MasterMenu
+          masters={masters}
+          activeId={activeId}
+          onSelect={onSelect}
+          onImport={onImport}
+          onRemake={onRemake}
+          onAdjust={onAdjust}
+          augment={onAugment ? { plan: augmentPlan, onAugment } : undefined}
+          onShowInfo={onShowInfo}
+          onCreate={onCreate}
+          onRemove={onRemove}
+        />
+      </BarMenuContent>
+    </DropdownMenu>
   );
 }

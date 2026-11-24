@@ -4,35 +4,35 @@
  * language (JA/EN), color theme (Dark/Light/Modern), help (the docs site) and the AI connection settings
  * (the same popover the AI dock's status pill opens). The toggles are the existing LanguageToggle /
  * ThemeToggle, re-homed unchanged — behaviour and persistence are theirs.
+ * #724: the menu is the shadcn DropdownMenu (Base UI). An item closes the menu itself; the two toggle rows are
+ * not items (arrow keys skip them, Tab reaches them) — choosing a language / theme keeps the menu open.
  */
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import LanguageToggle from "./LanguageToggle";
 import ThemeToggle from "./ThemeToggle";
 import BarTip from "./BarTip";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BarMenuContent, BarMenuItem, BarMenuSection } from "./BarMenu";
 import { BAR_HOVER } from "./bar-button";
 
 interface SettingsPanelProps {
-  /** Close the menu (called after an entry that navigates away — help / AI connection settings). */
-  onClose: () => void;
   /** Help → docs site (issue #114). Omit → no help entry. */
   onHelp?: () => void;
   /** Open the AI dock with its connection settings. Omit → no AI entry. */
   onAiSettings?: () => void;
 }
 
-/** The menu body — stateless (open/close is SettingsMenu's), so it renders on its own for tests. */
-export function SettingsPanel({ onClose, onHelp, onAiSettings }: SettingsPanelProps) {
+/** The menu body (rendered inside the DropdownMenu; on its own it needs a `DropdownMenu` root around it). */
+export function SettingsPanel({ onHelp, onAiSettings }: SettingsPanelProps) {
   const { t } = useTranslation();
-  const row = "flex items-center justify-between gap-3 px-3 py-1.5";
-  const item = "w-full px-3 py-1.5 text-left text-fg hover:bg-edge";
-  const run = (fn: () => void) => () => { onClose(); fn(); };
+  const row = "flex items-center justify-between gap-3 px-2.5 py-1.5";
   return (
-    <div>
+    <>
       {/* #674: each section is a role="group" (as in the master menu) so the UX budget counts it (≤ 7 items).
           A toggle is a segment row (one choice = one item), not a section of its own. */}
-      <div role="group" aria-label={t("settings.displaySection")}>
+      <BarMenuSection label={t("settings.displaySection")} first>
         <div className={row}>
           <span className="text-xs text-muted">{t("settings.language")}</span>
           <LanguageToggle />
@@ -41,69 +41,43 @@ export function SettingsPanel({ onClose, onHelp, onAiSettings }: SettingsPanelPr
           <span className="text-xs text-muted">{t("settings.theme")}</span>
           <ThemeToggle />
         </div>
-      </div>
+      </BarMenuSection>
       {(onHelp || onAiSettings) && (
-        <div role="group" aria-label={t("settings.aiHelpSection")}>
-          <div className="my-1 border-t border-edge" />
+        <BarMenuSection label={t("settings.aiHelpSection")} first={false}>
           {onAiSettings && (
-            <button type="button" onClick={run(onAiSettings)} className={item}>
+            <BarMenuItem onClick={() => onAiSettings()}>
               ✨ {t("menu.opensDialog", { title: t("aiSettings.title") })}
-            </button>
+            </BarMenuItem>
           )}
           {onHelp && (
-            <button type="button" onClick={run(onHelp)} title={t("toolbar.help")} className={item}>
+            <BarMenuItem onClick={() => onHelp()} title={t("toolbar.help")}>
               ? {t("settings.help")}
-            </button>
+            </BarMenuItem>
           )}
-        </div>
+        </BarMenuSection>
       )}
-    </div>
+    </>
   );
 }
 
-export default function SettingsMenu(props: Omit<SettingsPanelProps, "onClose">) {
+export default function SettingsMenu(props: SettingsPanelProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close on outside click / Escape (same as MasterPicker).
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   return (
-    <div className="relative inline-flex" ref={ref}>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <BarTip label={t("settings.buttonTitle")}>
-        <Button
-          variant="secondary"
-          size="icon"
+        <DropdownMenuTrigger
+          render={<Button variant="secondary" size="icon" className={`font-normal ${BAR_HOVER}`} />}
           data-testid="settings-button"
-          onClick={() => setOpen((v) => !v)}
           aria-label={t("settings.title")}
-          aria-haspopup="true"
           aria-expanded={open}
-          className={`font-normal ${BAR_HOVER}`}
         >
           ⚙
-        </Button>
+        </DropdownMenuTrigger>
       </BarTip>
-      {open && (
-        <div className="absolute top-full right-0 mt-1 z-50 min-w-[240px] bg-canvas border border-edge rounded-lg shadow-2xl py-1 text-sm">
-          <SettingsPanel {...props} onClose={() => setOpen(false)} />
-        </div>
-      )}
-    </div>
+      <BarMenuContent align="end" className="w-auto min-w-[240px]">
+        <SettingsPanel {...props} />
+      </BarMenuContent>
+    </DropdownMenu>
   );
 }

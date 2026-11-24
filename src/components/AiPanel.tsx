@@ -9,6 +9,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import AiSettingsPopover from "./AiSettingsPopover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AiGeneration } from "./useAiGeneration";
 import { toneClass } from "./ai-generation-types";
 import DiffView from "./DiffView";
@@ -293,20 +294,24 @@ export default function AiPanel({
         )}
         <div className="flex-1" />
         {hubTab === "assist" && (
-          // One compact status pill = the only always-visible AI control. Shows readiness + model
-          // (or DL%/error) at a glance and opens the settings popover; everything else lives there.
-          <button
-            onClick={() => setShowSettings((v) => !v)}
-            title={t("aiPanel.settingsPillTitle", {
-              label: ai.connection.label,
-              hint: ai.connection.hint ? " — " + ai.connection.hint : "", settings: t("aiSettings.title"),
-            })}
-            className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
-          >
-            <span className={`${toneClass(ai.connection.tone)} leading-none`}>●</span>
-            <span className="truncate">{ai.connection.label}</span>
-            <span className="text-muted leading-none">⚙</span>
-          </button>
+          // One compact status pill = the only always-visible AI control: readiness + model (or DL%/error) at a glance; it
+          // opens the settings popover (#724: shadcn Popover — Portal, Esc / outside click close, focus returns to the pill).
+          <Popover open={showSettings} onOpenChange={setShowSettings}>
+            <PopoverTrigger
+              title={t("aiPanel.settingsPillTitle", {
+                label: ai.connection.label,
+                hint: ai.connection.hint ? " — " + ai.connection.hint : "", settings: t("aiSettings.title"),
+              })}
+              className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-edge hover:bg-edge max-w-[230px] ${showSettings ? "bg-edge text-fg" : "bg-field text-fg2"}`}
+            >
+              <span className={`${toneClass(ai.connection.tone)} leading-none`}>●</span>
+              <span className="truncate">{ai.connection.label}</span>
+              <span className="text-muted leading-none">⚙</span>
+            </PopoverTrigger>
+            <PopoverContent data-testid="ai-settings-popover" align="end" className="w-[min(30rem,92vw)] gap-0 p-0 shadow-xl shadow-black/50">
+              <AiSettingsPopover ai={ai} />
+            </PopoverContent>
+          </Popover>
         )}
         <button onClick={onClose} className="text-muted hover:text-fg text-lg leading-none" title={t("aiPanel.close")}>
           ×
@@ -322,16 +327,6 @@ export default function AiPanel({
 
       {hubTab === "collab" ? collabTab : (
       <>
-      {/* AI connection settings popover — anchored below the header pill; a transparent backdrop closes it. */}
-      {showSettings && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
-          <div data-testid="ai-settings-popover" className="absolute right-2 top-12 z-50 w-[min(30rem,92vw)] rounded-lg border border-edge bg-canvas shadow-xl shadow-black/50">
-            <AiSettingsPopover ai={ai} />
-          </div>
-        </>
-      )}
-
       {/* Tabs: generate/edit vs the AI task list (in-flight + history) */}
       <div className="flex items-center gap-1 px-3 py-1 border-b border-edge">
         <button

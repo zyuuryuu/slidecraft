@@ -6,12 +6,14 @@
  *   加工する — adjust fonts/sizes · augment (add missing layouts) · ⓘ the latest intake result
  *   新規     — create a template
  * A section shows only when it has an item, so the Draft header (select + import only) gets just the
- * first two. Stateless (open/close lives in MasterPicker) — every item calls its handler then `onClose`.
+ * first two. Stateless (open/close lives in MasterPicker). #724: rendered inside the shadcn DropdownMenu (Base UI) —
+ * an item closes the menu itself; on its own (tests) it needs a `DropdownMenu` root around it.
  * 「テンプレを強化」 is offered for ANY active master (not only right after an intake); when the plan adds
  * nothing it is disabled with the reason (`planAugmentation`'s `reason`, or "nothing missing").
  */
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { BarMenuItem, BarMenuSection } from "./BarMenu";
 import type { MasterEntry } from "./useMasterRegistry";
 import type { AugmentPlan } from "../engine/layout-augment-plan";
 import { augmentWhat } from "./augment-offer";
@@ -20,7 +22,6 @@ export interface MasterMenuProps {
   masters: MasterEntry[];
   activeId: string;
   onSelect: (id: string) => void;
-  onClose: () => void;
   onImport?: () => void;
   onRemake?: () => void;
   onAdjust?: () => void;
@@ -31,15 +32,11 @@ export interface MasterMenuProps {
   onRemove?: (id: string) => void;
 }
 
-const ITEM = "w-full text-left px-3 py-1.5 flex items-center gap-2 text-fg2 hover:bg-edge disabled:opacity-50 disabled:hover:bg-transparent";
-
 function Section({ id, label, first, children }: { id: string; label: string; first: boolean; children: ReactNode }) {
   return (
-    <div role="group" aria-label={label}>
-      {!first && <div className="my-1 h-px bg-edge" />}
-      <div data-testid={`master-section-${id}`} className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-muted">{label}</div>
+    <BarMenuSection label={label} first={first} heading headingTestId={`master-section-${id}`} headingClassName="uppercase tracking-wide text-muted">
       {children}
-    </div>
+    </BarMenuSection>
   );
 }
 
@@ -47,19 +44,18 @@ function Item({ icon, label, title, testId, onClick, disabled, note }: {
   icon: string; label: string; title?: string; testId?: string; onClick: () => void; disabled?: boolean; note?: string;
 }) {
   return (
-    <button data-testid={testId} onClick={onClick} title={title} disabled={disabled} className={ITEM}>
+    <BarMenuItem data-testid={testId} onClick={() => onClick()} title={title} disabled={disabled} className="gap-2 text-fg2">
       <span className="w-3 shrink-0 text-center self-start">{icon}</span>
       <span className="min-w-0 flex flex-col">
         <span>{label}</span>
         {note && <span className="text-[11px] text-muted whitespace-normal">{note}</span>}
       </span>
-    </button>
+    </BarMenuItem>
   );
 }
 
-export function MasterMenu({ masters, activeId, onSelect, onClose, onImport, onRemake, onAdjust, augment, onShowInfo, onCreate, onRemove }: MasterMenuProps) {
+export function MasterMenu({ masters, activeId, onSelect, onImport, onRemake, onAdjust, augment, onShowInfo, onCreate, onRemove }: MasterMenuProps) {
   const { t } = useTranslation();
-  const run = (fn: () => void) => () => { fn(); onClose(); };
   const plan = augment?.plan ?? null;
   const canAugment = !!plan && plan.add.length > 0;
   const augmentNote = !plan || canAugment ? undefined
@@ -74,22 +70,25 @@ export function MasterMenu({ masters, activeId, onSelect, onClose, onImport, onR
           {masters.map((m) => {
             const isActive = m.id === activeId;
             return (
-              <div key={m.id} className={`group flex items-center hover:bg-edge ${isActive ? "bg-accent/15" : ""}`}>
-                <button
-                  onClick={run(() => onSelect(m.id))}
-                  className={`flex-1 min-w-0 text-left pl-3 pr-1 py-1.5 flex items-center gap-2 ${isActive ? "text-accent-soft font-medium" : "text-fg2"}`}
+              // #724: the row highlights while either of its items (select / 🗑) has the menu's focus.
+              <div key={m.id} className={`group flex items-center rounded hover:bg-edge has-[:focus]:bg-edge ${isActive ? "bg-accent/15" : ""}`}>
+                <BarMenuItem
+                  onClick={() => onSelect(m.id)}
+                  className={`flex-1 min-w-0 pr-1 gap-2 focus:bg-transparent ${isActive ? "text-accent-soft font-medium" : "text-fg2"}`}
                 >
                   <span className="w-3 shrink-0 text-center">{isActive ? "✓" : ""}</span>
                   <span className="truncate">{m.name}{m.builtin ? t("masterPicker.builtinSuffix") : ""}</span>
-                </button>
+                </BarMenuItem>
                 {onRemove && !m.builtin && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onRemove(m.id); }}
+                  // An item too (arrow keys reach it); deleting keeps the menu open, as before.
+                  <BarMenuItem
+                    closeOnClick={false}
+                    onClick={() => onRemove(m.id)}
                     title={t("masterPicker.removeTitle")}
-                    className="shrink-0 w-7 h-7 mr-1 rounded text-muted hover:text-red-400 hover:bg-void inline-flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    className="shrink-0 w-7 h-7 mr-1 p-0 justify-center text-xs text-muted hover:text-red-400 focus:text-red-400 focus:bg-void opacity-0 group-hover:opacity-100 focus:opacity-100"
                   >
                     🗑
-                  </button>
+                  </BarMenuItem>
                 )}
               </div>
             );
@@ -101,15 +100,15 @@ export function MasterMenu({ masters, activeId, onSelect, onClose, onImport, onR
       id: "intake",
       label: t("masterPicker.section.intake"),
       items: [
-        onImport && <Item key="import" icon="📥" label={t("masterPicker.importLabel")} title={t("masterPicker.importTitle")} onClick={run(onImport)} />,
-        onRemake && <Item key="remake" icon="🔁" label={t("masterPicker.remakeLabel")} title={t("masterPicker.remakeTitle")} onClick={run(onRemake)} />,
+        onImport && <Item key="import" icon="📥" label={t("masterPicker.importLabel")} title={t("masterPicker.importTitle")} onClick={onImport} />,
+        onRemake && <Item key="remake" icon="🔁" label={t("masterPicker.remakeLabel")} title={t("masterPicker.remakeTitle")} onClick={onRemake} />,
       ].filter(Boolean),
     },
     {
       id: "modify",
       label: t("masterPicker.section.modify"),
       items: [
-        onAdjust && <Item key="adjust" icon="🔤" label={t("masterPicker.adjustLabel")} title={t("masterPicker.adjustTitle")} onClick={run(onAdjust)} />,
+        onAdjust && <Item key="adjust" icon="🔤" label={t("masterPicker.adjustLabel")} title={t("masterPicker.adjustTitle")} onClick={onAdjust} />,
         augment && (
           <Item
             key="augment"
@@ -119,16 +118,16 @@ export function MasterMenu({ masters, activeId, onSelect, onClose, onImport, onR
             title={augmentNote ?? t("masterPicker.augmentTitle")}
             note={augmentNote}
             disabled={!canAugment}
-            onClick={run(() => { if (canAugment) augment.onAugment(plan!); })}
+            onClick={() => { if (canAugment) augment.onAugment(plan!); }}
           />
         ),
-        onShowInfo && <Item key="info" testId="master-show-info" icon="ⓘ" label={t("masterPicker.showInfoLabel")} title={t("masterPicker.showInfoTitle")} onClick={run(onShowInfo)} />,
+        onShowInfo && <Item key="info" testId="master-show-info" icon="ⓘ" label={t("masterPicker.showInfoLabel")} title={t("masterPicker.showInfoTitle")} onClick={onShowInfo} />,
       ].filter(Boolean),
     },
     {
       id: "create",
       label: t("masterPicker.section.create"),
-      items: [onCreate && <Item key="create" icon="＋" label={t("masterPicker.createLabel")} title={t("masterPicker.createTitle")} onClick={run(onCreate)} />].filter(Boolean),
+      items: [onCreate && <Item key="create" icon="＋" label={t("masterPicker.createLabel")} title={t("masterPicker.createTitle")} onClick={onCreate} />].filter(Boolean),
     },
   ].filter((s) => s.items.length > 0);
 

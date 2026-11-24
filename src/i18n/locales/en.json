@@ -669,6 +669,9 @@
     "aiHelpSection": "AI & help",
     "help": "Help (documentation)"
   },
+  "dialog": {
+    "close": "Close"
+  },
   "menu": {
     "opensDialog": "{{title}}…"
   },

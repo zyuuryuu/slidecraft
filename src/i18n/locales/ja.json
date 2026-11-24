@@ -669,6 +669,9 @@
     "aiHelpSection": "AI とヘルプ",
     "help": "ヘルプ（ドキュメント）"
   },
+  "dialog": {
+    "close": "閉じる"
+  },
   "menu": {
     "opensDialog": "{{title}}…"
   },

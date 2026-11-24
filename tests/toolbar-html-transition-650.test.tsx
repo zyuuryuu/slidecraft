@@ -7,24 +7,18 @@
  *   1. 4 種類の遷移（スライド・フェード・ズーム・プッシュ）を選べる。既定はスライド（押された状態で描かれる）。
  *   2. 選んだ遷移で書き出す（クリックの経路は e2e: tests/e2e/html-transition.spec.ts）。
  *   3. 遷移の切り替えボタンの名前に「HTML」を含めない（e2e は 🌐 HTML ボタンを /HTML/ で探す＝一意であること）。
- * DOM 環境は無いので、react-dom/server で描画して確かめる（先例 tests/toolbar-settings-614.test.tsx）。
+ * DOM 環境は無いので、react-dom/server で描画して確かめる（先例 tests/toolbar-settings-614.test.tsx）。#724: ファイルの
+ * メニューは shadcn の DropdownMenu（開いたときだけ Portal に描く）なので、中身（FileMenuPanel）を Root で包んで描く。
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import i18n from "../src/i18n";
 import HtmlTransitionPicker from "../src/components/HtmlTransitionPicker";
 import { HTML_TRANSITIONS } from "../src/components/html-transitions";
-import Toolbar from "../src/components/Toolbar";
+import { FileMenuPanel } from "../src/components/Toolbar";
+import { DropdownMenu } from "../src/components/ui/dropdown-menu";
 
 const noop = () => {};
-
-// Toolbar のメニューは閉じた状態で始まるので、useState(false) を「開」で始めて描く（ux-budget と同じ手口）。
-const force = vi.hoisted(() => ({ open: false }));
-vi.mock("react", async (importOriginal) => {
-  const R = await importOriginal<typeof import("react")>();
-  const useState = ((init: unknown) => R.useState(force.open && init === false ? true : init)) as typeof R.useState;
-  return { ...R, default: { ...R, useState }, useState };
-});
 
 beforeAll(() => {
   vi.stubGlobal("document", { documentElement: { getAttribute: () => "dark", setAttribute: noop } });
@@ -83,15 +77,12 @@ describe("#650 HTML の遷移の選択（ファイルのメニューの中の 1 
 
 describe("#650 ファイルのメニューの並び", () => {
   it("🌐 HTML の直後に遷移の 1 行があり、横に開くメニュー（▸）は無い", () => {
-    force.open = true;
-    let html: string;
-    try {
-      html = renderToStaticMarkup(
-        <Toolbar onSave={noop} onGenerate={noop} onExportHtml={noop} onSaveProject={noop} onOpenProject={noop} generating={false} hasSpec />,
-      );
-    } finally {
-      force.open = false;
-    }
+    const html = renderToStaticMarkup(
+      <DropdownMenu>
+        <FileMenuPanel onSave={noop} onGenerate={noop} onExportHtml={noop} onSaveProject={noop} onOpenProject={noop} generating={false} hasSpec
+          htmlTransition="slide" onHtmlTransition={noop} />
+      </DropdownMenu>,
+    );
     const labels = buttons(html).map((x) => x.label);
     const i = labels.findIndex((l) => l.startsWith("🌐 HTML"));
     expect(i).toBeGreaterThanOrEqual(0);

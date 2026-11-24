@@ -8,7 +8,9 @@
  *  3. 取り込み結果の帯からは強化のボタンを外し、メニューへの案内だけにする。案内とメニューは同じ計画
  *     （planTemplateAugmentation）から作る — 一致テスト（R8）。
  * 区画の数・1 区画の項目数の上限は tests/ux-budget.test.tsx に集約（#648）。ここは区画の中身と順を見る。
- * DOM 環境は無いので、状態を持たない MasterMenu を react-dom/server で描画して確かめる。
+ * DOM 環境は無いので、状態を持たない MasterMenu を react-dom/server で描画して確かめる。#724: MasterMenu は
+ * shadcn の DropdownMenu（Base UI の Menu）の中身なので、単体で描くときは DropdownMenu（Root）で包む。押せない項目は
+ * aria-disabled（Base UI のメニュー項目はフォーカスを受けたまま押せなくなる）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
@@ -16,6 +18,7 @@ import { resolve } from "path";
 import { renderToStaticMarkup } from "react-dom/server";
 import "../src/i18n"; // init side-effect → useTranslation interpolates (ja default)
 import { MasterMenu } from "../src/components/MasterMenu";
+import { DropdownMenu } from "../src/components/ui/dropdown-menu";
 import IntakeSummaryBar, { type IntakeResult } from "../src/components/IntakeSummaryBar";
 import { planTemplateAugmentation, augmentWhat } from "../src/components/augment-offer";
 import { loadTemplate, type TemplateData } from "../src/engine/template-loader";
@@ -31,13 +34,13 @@ const masters: MasterEntry[] = [
 ];
 const noop = () => {};
 const menu = (p: Partial<Parameters<typeof MasterMenu>[0]> = {}) =>
-  renderToStaticMarkup(<MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onClose={noop} {...p} />);
+  renderToStaticMarkup(<DropdownMenu><MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} {...p} /></DropdownMenu>);
 /** The section headings, in render order. */
 const sections = (html: string) => [...html.matchAll(/data-testid="master-section-([a-z]+)"/g)].map((m) => m[1]);
 /** The <button …> tag carrying the given test id (to read its attributes). */
 const buttonTag = (html: string, id: string) => html.match(new RegExp(`<button[^>]*data-testid="${id}"[^>]*>`))?.[0] ?? "";
-/** The HTML `disabled` attribute (not the Tailwind `disabled:` class variants). */
-const isDisabled = (tag: string) => /\sdisabled=""/.test(tag);
+/** The menu item's `aria-disabled="true"` (not the Tailwind `data-disabled:` class variants). */
+const isDisabled = (tag: string) => /\saria-disabled="true"/.test(tag);
 
 let gijutsu: TemplateData;
 let allBody: TemplateData;

@@ -21,7 +21,7 @@ const masterButton = (page: Page) => page.getByRole("button", { name: /🎨/ });
 async function importMaster(page: Page, file: string, asName: string) {
   await masterButton(page).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: /テンプレートを取り込む/ }).click();
+  await page.getByRole("menuitem", { name: /テンプレートを取り込む/ }).click();
   await (await chooser).setFiles({ name: asName, mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", buffer: readFileSync(resolve(FIX, file)) });
   await expect(page.getByText("取り込み結果")).toBeVisible({ timeout: 15000 });
 }
@@ -96,7 +96,7 @@ test.describe("テンプレを強化 (#568 / #612 menu entry)", () => {
     await expect(masterButton(page)).toContainText("技術報告 スタンダード水色（強化）");
     // registered: it is in the list and selected (✓)
     await masterButton(page).click();
-    await expect(page.getByRole("button", { name: /✓.*（強化）/ })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /✓.*（強化）/ })).toBeVisible();
   });
 
   test("#612: a template with no title + one-body layout disables the item with the reason", async ({ page }) => {
