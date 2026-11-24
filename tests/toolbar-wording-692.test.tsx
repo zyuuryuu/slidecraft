@@ -13,21 +13,19 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { renderToStaticMarkup } from "react-dom/server";
 import i18n from "../src/i18n";
-import Toolbar from "../src/components/Toolbar";
+import Toolbar, { FileMenuPanel } from "../src/components/Toolbar";
+import { DropdownMenu } from "../src/components/ui/dropdown-menu";
 import MasterPicker from "../src/components/MasterPicker";
 import type { MasterEntry } from "../src/components/useMasterRegistry";
 
-// メニューを「開」で描くための切り替え（ux-budget.test.tsx と同じ手口）。
-const force = vi.hoisted(() => ({ open: false }));
-vi.mock("react", async (importOriginal) => {
-  const R = await importOriginal<typeof import("react")>();
-  const useState = ((init: unknown) => R.useState(force.open && init === false ? true : init)) as typeof R.useState;
-  return { ...R, default: { ...R, useState }, useState };
-});
-const withAllOpen = <T,>(fn: () => T): T => {
-  force.open = true;
-  try { return fn(); } finally { force.open = false; }
-};
+// #724: 保存・書き出しのメニューは shadcn の DropdownMenu（開いたときだけ Portal に描く）。中身を Root で包んで描く。
+const fileMenu = () =>
+  renderToStaticMarkup(
+    <DropdownMenu>
+      <FileMenuPanel onSave={noop} onGenerate={noop} onExportHtml={noop} onSaveProject={noop} onOpenProject={noop} generating={false} hasSpec
+        htmlTransition="slide" onHtmlTransition={noop} />
+    </DropdownMenu>,
+  );
 
 const noop = () => {};
 const masters: MasterEntry[] = [{ id: "builtin-gijutsu", name: "技術報告 スタンダード水色", builtin: true }];
@@ -95,10 +93,10 @@ describe("#692 上部バーのボタン名", () => {
 
 describe("#692 保存・書き出しのメニューの見出し", () => {
   it("区画ごとに見える見出し（開く・保存／書き出す）があり、区画の名前（aria-label）と同じ", () => {
-    const html = withAllOpen(topBar);
+    const html = fileMenu();
     for (const [label, text] of [["toolbar.projectSection", "開く・保存"], ["toolbar.exportSection", "書き出す"]] as const) {
       expect(i18n.t(label)).toBe(text);
-      const group = html.match(new RegExp(`<div role="group" aria-label="${text}">([\\s\\S]*?)<button`))?.[1] ?? "";
+      const group = html.match(new RegExp(`<div role="group"[^>]*aria-label="${text}"[^>]*>([\\s\\S]*?)<button`))?.[1] ?? "";
       expect(group, label).toMatch(new RegExp(`>${text}</div>`));
     }
   });

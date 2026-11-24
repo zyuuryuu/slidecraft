@@ -8,6 +8,9 @@ shadcn CLI の既定 preset `base-nova`）。設定は リポジトリ直下の 
 | --- | --- | --- |
 | Button | `button.tsx` | 上部バーの 7 ボタン（`Toolbar.tsx`・`SettingsMenu.tsx`・`MasterPicker.tsx`） |
 | Tooltip | `tooltip.tsx` | 上部バーのボタンの説明（以前の `title=`）。`../BarTip.tsx` 経由（説明は `aria-describedby` でも渡す）。`TooltipProvider`（delay 400ms＝`BAR_TOOLTIP_DELAY`）は `src/main.tsx` でアプリ全体に 1 つ |
+| DropdownMenu | `dropdown-menu.tsx` | 上部バーのメニュー 3 つ（保存・書き出し／🎨 テンプレート／⚙）。`../BarMenu.tsx`（区画・項目・箱）経由。項目は `nativeButton` で `<button role="menuitem">` |
+| Popover | `popover.tsx` | AI 接続設定（AI ドックの状態ピル → `AiSettingsPopover`）。`AiPanel.tsx` |
+| Dialog | `dialog.tsx` | 原稿入力（`InitializeModal.tsx`）・テンプレートを作成（`TemplateCreator.tsx`）。どちらも `showCloseButton={false}`（自前の × を `DialogClose` で置く）・`disablePointerDismissal`（背景クリックで閉じない） |
 
 ## 色の名前（トークン）の写像
 
@@ -73,11 +76,21 @@ npx vitest run tests/shadcn-ui-tokens.test.ts tests/shadcn-ui-tokens-radius.test
 - **文言は辞書経由**: 部品に英語の文言（例: dialog の閉じるボタンの "Close"）があれば `useTranslation()` の `t()` に
   置き換える。`tests/ux-budget.test.tsx` の「語の一致」は `ui/` も検査し、新しいファイルは 0 件が原則（凍結リストに足さない）。
 - **記号**: 部品の内部アイコン（✓・×・› など）だけ lucide を使ってよい。上部バー・メニュー項目の記号は絵文字のまま
-  （ADR-0039 の記号の許可リスト）。`lucide-react` は今は依存に無い（使う部品が無いため）。`add` した部品が import したら
-  そのとき `npm install lucide-react` する。
+  （ADR-0039 の記号の許可リスト）。`lucide-react` は `dropdown-menu.tsx`（✓・›）と `dialog.tsx`（×）のために依存にある
+  （#724 PR-B）。アプリの画面コードからは import しない。
 - **`cn`**: 部品は `cn` パッケージ（clsx＋tailwind-merge の代わり）を直接 import する。`components.json` の
   `aliases.utils`（`@/lib/utils`）のファイルは置いていない（使う部品が無い）。CLI が作り直したら、使われていなければ消す。
 - **CLI が `src/index.css` を書き換えたら戻す**: `init`／`add` は `:root`／`.dark` に shadcn の色の値や Geist フォントを
   足すことがある。値の定義は上の写像だけにする（`--muted`・`--accent` を上書きされるとアプリの色が壊れる）。
 - **lint**: このフォルダは `react-refresh/only-export-components` の対象外（`button.tsx` が `buttonVariants` も export する
   shadcn の形をそのまま保つため。`eslint.config.js`）。
+
+## このフォルダ独自の変更（`shadcn add --overwrite` したら当て直す）
+
+置換ルール（上）のほかに、コピーした部品を次のように変えている。
+
+| ファイル | 変更 | 理由 |
+| --- | --- | --- |
+| `dialog.tsx` | 背景（`DialogOverlay`）を `bg-black/10 supports-backdrop-filter:backdrop-blur-xs` → `bg-void/60` | 以前の手製モーダルと同じ暗さ（#724 統括の決定）。ぼかしは以前も無かった |
+| `dialog.tsx` | "Close" → `t("dialog.close")`（2 か所） | 文言は辞書経由（ux-budget の「語の一致」） |
+

@@ -15,7 +15,7 @@ test.describe("HTML export: transition picked in the File menu (#650)", () => {
 
     const exportHtml = async () => {
       await page.getByRole("button", { name: /保存・書き出し/ }).click();
-      const htmlBtn = page.getByRole("button", { name: /HTML/ });
+      const htmlBtn = page.getByRole("menuitem", { name: /HTML/ });
       await expect(htmlBtn).toBeEnabled({ timeout: 10000 });
       return htmlBtn;
     };

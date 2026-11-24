@@ -8,7 +8,8 @@
  *  4. ＋ は「追加」だけ：マスターの取り込みは 📥、Re-make は 🔁（取り込み結果の帯と同じアイコン）。
  *     📝 は原稿だけ：ファイル → Markdown の書き出しは 📄。
  * 数の上限（ボタン ≤ 7）と記号の許可リスト（✨・＋）は tests/ux-budget.test.tsx に集約（#648・R8）。
- * DOM 環境は無いので、react-dom/server で描画して確かめる（先例 tests/master-menu.test.tsx）。
+ * DOM 環境は無いので、react-dom/server で描画して確かめる（先例 tests/master-menu.test.tsx）。#724: メニューの中身
+ * （SettingsPanel・MasterMenu）は shadcn の DropdownMenu の中身なので、単体で描くときは DropdownMenu（Root）で包む。
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { readFileSync } from "fs";
@@ -21,6 +22,7 @@ import { SettingsPanel } from "../src/components/SettingsMenu";
 import GenerateSlideMenu from "../src/components/GenerateSlideMenu";
 import UpdateBanner from "../src/components/UpdateBanner";
 import { MasterMenu } from "../src/components/MasterMenu";
+import { DropdownMenu } from "../src/components/ui/dropdown-menu";
 import type { MasterEntry } from "../src/components/useMasterRegistry";
 
 const noop = () => {};
@@ -73,7 +75,7 @@ describe("#614 上部バー: 文書の操作だけ", () => {
   it("⚙ ボタンは名前（aria-label）で見つけられ、メニューを持つことを示す", () => {
     const tag = topBar().match(/<button[^>]*data-testid="settings-button"[^>]*>/)?.[0] ?? "";
     expect(tag).toContain('aria-label="設定"');
-    expect(tag).toContain('aria-haspopup="true"');
+    expect(tag).toContain('aria-haspopup="menu"'); // #724: Base UI の Menu.Trigger はメニューの種類を示す
   });
 
   it("英語表示では原稿ボタンは「📝 Write draft」", async () => {
@@ -88,7 +90,7 @@ describe("#614 上部バー: 文書の操作だけ", () => {
 
 describe("#614 ⚙ のメニュー: 言語・テーマ・ヘルプ・AI 接続設定", () => {
   const panel = (p: Partial<Parameters<typeof SettingsPanel>[0]> = {}) =>
-    renderToStaticMarkup(<SettingsPanel onClose={noop} onHelp={noop} onAiSettings={noop} {...p} />);
+    renderToStaticMarkup(<DropdownMenu><SettingsPanel onHelp={noop} onAiSettings={noop} {...p} /></DropdownMenu>);
 
   it("言語（JA / EN）とテーマ（Dark / Light / Modern）を変えられる", () => {
     const html = panel();
@@ -129,7 +131,7 @@ describe("#614 ✨ は AI の機能だけ", () => {
 
 describe("#614 ＋ は追加だけ・📝 は原稿だけ", () => {
   const html = renderToStaticMarkup(
-    <MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onClose={noop} onImport={noop} onRemake={noop} onCreate={noop} />,
+    <DropdownMenu><MasterMenu masters={masters} activeId="builtin-gijutsu" onSelect={noop} onImport={noop} onRemake={noop} onCreate={noop} /></DropdownMenu>,
   );
   const b = buttons(html);
 

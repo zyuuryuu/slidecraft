@@ -5,6 +5,8 @@
  * template-writer（ゼロから生成）でテンプレ PPTX を作ってレジストリ登録＋適用する。
  * 生成→適用後はメインプレビューが即時反映されるので、モーダル内に埋め込みプレビューは
  * 持たない（作り直しは再オープンで反復）。レイアウトは組み込み 30 種固定（サブセット UI は後続）。
+ * #724: shadcn の Dialog（Base UI）。focus trap・Esc（＝キャンセル）・Portal は部品が担う。背景のクリックでは
+ * 閉じない（以前と同じ。入力中の色・レイアウト選択を誤クリックで畳まない）。
  */
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,6 +16,7 @@ import { assessTemplateHealth, buildCatalog } from "../engine/template-catalog";
 import SlidePreview from "./SlidePreview";
 import LayoutEditor from "./LayoutEditor";
 import { combineLayouts, useTemplatePreview } from "./template-preview";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 
 interface TemplateCreatorProps {
   isOpen: boolean;
@@ -111,19 +114,15 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
   };
 
   return (
-    <div
-      className="fixed inset-0 z-40 bg-void/60 flex items-center justify-center p-4"
-      onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }} disablePointerDismissal>
+      <DialogContent
+        showCloseButton={false}
         aria-label={t("templateCreator.dialogLabel")}
-        className="bg-void border border-accent/40 rounded-lg shadow-2xl w-full max-w-4xl flex flex-col"
+        className="flex flex-col gap-0 p-0 text-base w-[calc(100%-2rem)] max-w-4xl sm:max-w-4xl bg-void ring-0 border border-accent/40 rounded-lg shadow-2xl"
       >
         <div className="px-4 py-2.5 border-b border-edge flex items-center justify-between">
           <span className="text-sm font-medium text-fg">🎨 {t("templateCreator.title")}</span>
-          <button onClick={onCancel} className="text-muted hover:text-fg2 text-sm">✕</button>
+          <DialogClose aria-label={t("dialog.close")} className="text-muted hover:text-fg2 text-sm">✕</DialogClose>
         </div>
 
         <div className="flex min-h-0 divide-x divide-edge">
@@ -239,9 +238,9 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
         </div>
 
         <div className="px-4 py-2.5 border-t border-edge flex justify-end gap-2">
-          <button onClick={onCancel} className="px-3 py-1.5 text-sm rounded text-fg2 hover:bg-edge">
+          <DialogClose className="px-3 py-1.5 text-sm rounded text-fg2 hover:bg-edge">
             {t("templateCreator.cancel")}
-          </button>
+          </DialogClose>
           <button
             onClick={create}
             disabled={!name.trim() || busy || noLayouts || rejected || preview.busy}
@@ -251,7 +250,7 @@ export default function TemplateCreator({ isOpen, onCancel, onCreate, onProposeS
             {busy ? t("templateCreator.creating") : t("templateCreator.createAndApply")}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

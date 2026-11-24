@@ -6,8 +6,13 @@
  * 原稿を整形), see how it splits into slides (live preview + structure review), then
  * "スライドにする" to commit the deck and return to the visual Edit home. Markdown lives
  * ONLY here — after commit the deck is the source of truth ([[primary-surface-deck]]).
+ *
+ * #724: the shadcn Dialog (Base UI) — focus trap, Esc (= cancel) and the Portal are the component's. A click on the
+ * backdrop does NOT close it (as before): cancel restores the pre-open snapshot, so a stray click would drop the draft.
+ * Focus starts on the dialog itself (not its first control = the 🎨 menu, whose tooltip would open and take the first Esc).
  */
 
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Editor from "./Editor";
 import ReviewBar from "./ReviewBar";
@@ -15,6 +20,7 @@ import SlidePreview from "./SlidePreview";
 import ResizableSplit from "./ResizableSplit";
 import MasterPicker from "./MasterPicker";
 import IntakeSummaryBar, { type IntakeBusy, type IntakeResult } from "./IntakeSummaryBar";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import type { MasterEntry } from "./useMasterRegistry";
 import type { DeckIR } from "../engine/slide-schema";
 import type { TemplateData } from "../engine/template-loader";
@@ -60,19 +66,15 @@ export default function InitializeModal({
   onFixDeterministic, onCursorLine, gotoLine,
 }: InitializeModalProps) {
   const { t } = useTranslation();
-  if (!isOpen) return null;
+  const popupRef = useRef<HTMLDivElement>(null);
   return (
-    <div
-      className="fixed inset-0 z-40 bg-void/60 flex items-center justify-center p-4 sm:p-6"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onCancel();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }} disablePointerDismissal>
+      <DialogContent
+        showCloseButton={false}
+        ref={popupRef}
+        initialFocus={popupRef}
         aria-label={t("initModal.dialogLabel")}
-        className="bg-void border border-accent/40 rounded-lg shadow-2xl flex flex-col w-full max-w-6xl"
+        className="flex flex-col gap-0 p-0 text-base w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] max-w-6xl sm:max-w-6xl bg-void ring-0 border border-accent/40 rounded-lg shadow-2xl"
         style={{ height: "86vh" }}
       >
         {/* Header + input methods (one tidy row). #612: the master menu here is select / import / Re-make / delete —
@@ -85,7 +87,7 @@ export default function InitializeModal({
           <button onClick={onGenerateAI} className={action} title={t("initModal.generateAiTitle")}>{t("initModal.generateAi")}</button>
           <button onClick={onStructure} className={action} title={t("initModal.tidyDraftTitle")}>{t("initModal.tidyDraft")}</button>
           <div className="flex-1" />
-          <button onClick={onCancel} title={t("initModal.close")} className="text-muted hover:text-fg text-lg leading-none">×</button>
+          <DialogClose title={t("initModal.close")} className="text-muted hover:text-fg text-lg leading-none">×</DialogClose>
         </div>
 
         {/* Intake progress/result for a Re-make triggered from THIS modal (the main-view banner is behind it). */}
@@ -134,7 +136,7 @@ export default function InitializeModal({
             </span>
           )}
           <div className="flex-1" />
-          <button onClick={onCancel} className="px-3 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">{t("initModal.cancel")}</button>
+          <DialogClose className="px-3 py-1 text-xs bg-field hover:bg-edge text-fg2 rounded">{t("initModal.cancel")}</DialogClose>
           <button
             onClick={onConfirm}
             disabled={!deck}
@@ -143,7 +145,7 @@ export default function InitializeModal({
             {t("initModal.commit")}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
