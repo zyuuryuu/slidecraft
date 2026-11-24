@@ -34,9 +34,11 @@ import type { AdjustSession } from "../src/components/useTemplateAdjust";
 import type { MasterEntry } from "../src/components/useMasterRegistry";
 import { SettingsPanel } from "../src/components/SettingsMenu";
 import { DropdownMenu } from "../src/components/ui/dropdown-menu";
-import { i18nLeaks, menuDepth, groupItems } from "./ux-budget-probes";
-import { openDepth, openedGroups, openPaths } from "./ux-budget-dom";
+import { i18nLeaks, menuDepth, groupItems, segmentRows, removeAt } from "./ux-budget-probes";
+import { openDepth, openedGroups, openedSegments, openPaths } from "./ux-budget-dom";
 import DeepMenu from "./fixtures/ux-budget/DeepMenu";
+import WideSegmentMenu from "./fixtures/ux-budget/WideSegmentMenu";
+import GenerateSlideMenu from "../src/components/GenerateSlideMenu";
 
 /** 予算（上限）。§7 の初期値＝現在値。 */
 const BUDGET = {
@@ -50,7 +52,11 @@ const BUDGET = {
   itemsPerSection: 7,
   /** 段階的開示（Nielsen 2006）: 上部バー → ⚙ → 項目 の 2 段まで。 */
   menuDepth: 2,
+  /** Hick: セグメント行 1 行の選択肢（#716。現在値＝HTML の遷移 4・配色 3・言語 2 の最大）。 */
+  segmentOptions: 4,
 } as const;
+/** 予算を超えたセグメント行（自己検査と本番で同じ判定を使う）。 */
+const overSegments = (rows: Array<{ label: string; options: number }>) => rows.filter((r) => r.options > BUDGET.segmentOptions);
 
 // ── 凍結リスト（予算を超えている既存の箇所。目標は空）──────────────────────────────────
 /** 深さ 3 のメニュー項目。#648 の実測で ファイル ▾ → 🌐 HTML ▸ → 遷移の種類 の 4 項目があった。#650 で空にした
@@ -185,6 +191,28 @@ describe("道具の自己検査（fixture）", () => {
       seg(2);
     expect(groupItems(html)).toEqual([{ label: "A", items: 4 }, { label: "B", items: 2 }]);
   });
+
+  it("segmentRows: セグメント行ごとに選択肢を数え、区画・押し状態の無いボタンが混じる group は数えない（#716）", () => {
+    const seg = (label: string, n: number) =>
+      `<div role="group" aria-label="${label}">${Array.from({ length: n }, (_, i) => `<button aria-pressed="${i === 0}">${i}</button>`).join("")}</div>`;
+    const html =
+      `<div role="group" aria-label="A"><button>1</button><div><span>遷移</span>${seg("s4", 4)}</div>${seg("s3", 3)}</div>` +
+      `<div role="group" aria-label="B"><button aria-pressed="true">x</button><button>y</button></div>` +
+      seg("s2", 2);
+    expect(segmentRows(html)).toEqual([{ label: "s4", options: 4 }, { label: "s3", options: 3 }, { label: "s2", options: 2 }]);
+  });
+
+  it("openedSegments: 選択肢を 1 つ足したセグメント行（5＝予算 4＋1）をメニューを開いて拾い、予算超過と判定する（#716）", async () => {
+    expect(overSegments(await openedSegments(<WideSegmentMenu />))).toEqual([{ label: "wide", options: 5 }]);
+  });
+
+  it("removeAt: 位置が -1（見つからない）なら配列を変えない・0 以上ならその 1 要素だけ除く（#716）", () => {
+    const a = ["x", "y", "z"];
+    removeAt(a, a.indexOf("missing"));
+    expect(a).toEqual(["x", "y", "z"]);
+    removeAt(a, 1);
+    expect(a).toEqual(["x", "z"]);
+  });
 });
 
 // ── 予算 ────────────────────────────────────────────────────────────────────────
@@ -244,6 +272,18 @@ describe("UX 予算（ADR-0039）", () => {
     // ⚙ の中身を単独で描いても同じ区画になる（SettingsMenu の開閉に依らない）。
     expect(groupItems(renderToStaticMarkup(<DropdownMenu><SettingsPanel onHelp={noop} onAiSettings={noop} /></DropdownMenu>)).map((g) => g.label))
       .toEqual(settings);
+  });
+
+  it(`Hick: セグメント行 1 行の選択肢は ${BUDGET.segmentOptions} 個以下（#716）`, async () => {
+    // ファイル ▾（HTML の遷移）・⚙（言語・配色）・📑 便利スライド（モード）を開いた状態で数える。行の一覧を
+    // 固定するのは数え漏れの防止（拾えなければ道具が壊れている）。
+    const rows = [...(await openedSegments(topBarEl(false))), ...(await openedSegments(
+      <GenerateSlideMenu hasActiveSlide onInsert={noop} onRegenerateActive={noop} />,
+    ))];
+    expect(rows.map((r) => r.label)).toEqual([
+      t("toolbar.transitionGroup"), t("lang.aria"), t("themeToggle.groupLabel"), t("generateSlide.modeLabel"),
+    ]);
+    expect(overSegments(rows)).toEqual([]);
   });
 
   it(`段階的開示: メニューのネストは ${BUDGET.menuDepth} 段まで（凍結リストの項目を除く）`, async () => {
