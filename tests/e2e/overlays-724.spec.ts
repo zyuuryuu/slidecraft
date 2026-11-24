@@ -35,7 +35,7 @@ test.describe("#724 overlays (Base UI)", () => {
     const dialog = page.getByRole("dialog", { name: /^原稿入力/ });
     await page.mouse.click(5, 5); // the backdrop
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: /🎨/ }).click();
+    await dialog.getByRole("button", { name: /^テンプレート：/ }).click();
     await expect(page.getByRole("menu")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);

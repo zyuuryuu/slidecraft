@@ -14,7 +14,7 @@ import { seedDeck } from "./_seed";
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures/templates");
 
-const masterButton = (page: Page) => page.getByRole("button", { name: /🎨/ });
+const masterButton = (page: Page) => page.getByRole("button", { name: /^テンプレート：/ });
 
 // Passed as a buffer with an ASCII name: a non-ASCII file PATH never fires the picker's change event in
 // this Playwright/Chromium pair (observed 2026-11-07), while the bytes are what the app reads anyway.

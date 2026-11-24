@@ -455,6 +455,7 @@
   "masterPicker": {
     "buttonTitle": "Template used for this deck (select, import, adjust, create)",
     "buttonPrefix": "Template:",
+    "buttonLabel": "Template: {{name}}",
     "selectMaster": "(none)",
     "builtinSuffix": " (built-in)",
     "importTitle": "Import a .pptx keeping its layouts and placeholders as-is",

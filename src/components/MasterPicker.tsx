@@ -18,6 +18,15 @@ import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu
 import { BarMenuContent } from "./BarMenu";
 import { BAR_HOVER } from "./bar-button";
 
+/**
+ * #741: the top bar wraps the picker in a size container named `master` (Toolbar.tsx) whose width is the room the bar has
+ * left for it. Below 96px the name could show less than one character + an ellipsis, so it is hidden → 「🎨 ▾」.
+ * Measured in Chromium: 1px border × 2 + 12px padding × 2 + 🎨 17.5 + ▾ 6 + 6px gap × 2 + 2em of text-sm (28) = 89.5px;
+ * 96px (6rem) leaves room for a wider emoji glyph on other platforms. Outside such a container (the Draft header) the
+ * query never matches and nothing changes. Sizes are pinned by tests/e2e/topbar-width-713.spec.ts.
+ */
+const COMPACT_HIDE = "@max-[96px]/master:hidden";
+
 interface MasterPickerProps {
   masters: MasterEntry[];
   activeId: string;
@@ -46,6 +55,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const active = masters.find((m) => m.id === activeId);
+  const name = active ? active.name : t("masterPicker.selectMaster");
   // Planned lazily (only while open) — the plan builds the template's catalog.
   const augmentPlan = useMemo(() => (open && onAugment && template ? planTemplateAugmentation(template) : null), [open, onAugment, template]);
 
@@ -63,6 +73,9 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
         }
         disabled={disabled}
         aria-expanded={open}
+        // #741: the name (and below 860px the prefix) can be hidden on a narrow window → the accessible name comes from here,
+        // never from what happens to be visible (also drops the 🎨 / ▾ glyphs from what a screen reader says).
+        aria-label={t("masterPicker.buttonLabel", { name })}
       >
         <span className="shrink-0">🎨</span>
         {/* #692: say what the button is before the name. When space is short the NAME truncates first (far larger
@@ -70,7 +83,8 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
             #713: shrink-[0.01] keeps the prefix whole until the name is gone (a shrink of 1 shaved a sub-pixel off it → a
             stray "…"); below 860px it cannot be shown whole (measured), so it is dropped and the name gets the room. */}
         <span className="min-w-0 truncate shrink-[0.01] max-[860px]:hidden">{t("masterPicker.buttonPrefix")}</span>
-        <span className="min-w-0 truncate shrink-[1000]">{active ? active.name : t("masterPicker.selectMaster")}</span>
+        {/* #741: below one character + an ellipsis of room, hide the name too → just 「🎨 ▾」 (a lone 「技」 does not show it is cut). */}
+        <span className={`min-w-0 truncate shrink-[1000] ${COMPACT_HIDE}`}>{name}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
       </DropdownMenuTrigger>
       </BarTip>

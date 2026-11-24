@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Template creator (作成後続UI)", () => {
   test("live preview + layout subset + custom layout showcase", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: /🎨/ }).click(); // master picker
+    await page.getByRole("button", { name: /^テンプレート：/ }).click(); // master picker
     await page.getByRole("menuitem", { name: /テンプレートを作成/ }).click();
     const dialog = page.getByRole("dialog", { name: "テンプレートを作成" });
     await expect(dialog).toBeVisible();

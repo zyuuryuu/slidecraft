@@ -12,7 +12,7 @@ import { seedDeck } from "./_seed";
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures/templates");
 const UPDATE_TEXT = "新しいバージョン（v99.0.0）が利用可能です。";
-const masterButton = (page: Page) => page.getByRole("button", { name: /🎨/ });
+const masterButton = (page: Page) => page.getByRole("button", { name: /^テンプレート：/ });
 
 /** Top/bottom (px) of the toolbar row, the notice slot and the edit body (the slot's neighbours). */
 async function geometry(page: Page) {

@@ -15,8 +15,8 @@ test.describe("SlideCraft", () => {
   test("shell: title + core toolbar buttons", async ({ page }) => {
     await expect(page.getByText("SlideCraft").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /保存・書き出し/ })).toBeVisible();
-    // The template button is now the master picker, labelled with the current master (🎨 …).
-    await expect(page.getByRole("button", { name: /🎨/ })).toBeVisible();
+    // The template button is the master picker (🎨 …); its accessible name is 「テンプレート：<name>」 (aria-label, #741).
+    await expect(page.getByRole("button", { name: /^テンプレート：/ })).toBeVisible();
   });
 
   test("lands in Edit (the home): slide list + slide editor", async ({ page }) => {

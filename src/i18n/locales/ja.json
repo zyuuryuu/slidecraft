@@ -455,6 +455,7 @@
   "masterPicker": {
     "buttonTitle": "このデッキで使うテンプレート（選ぶ・取り込む・調整する・作る）",
     "buttonPrefix": "テンプレート：",
+    "buttonLabel": "テンプレート：{{name}}",
     "selectMaster": "未選択",
     "builtinSuffix": "（内蔵）",
     "importTitle": ".pptx のレイアウト・プレースホルダをそのまま活かして取り込む",

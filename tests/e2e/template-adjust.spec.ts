@@ -12,7 +12,7 @@ const titlePx = async (page: Page) =>
   Math.max(...(await page.getByText(TITLE, { exact: true }).evaluateAll((els) => els.map((e) => parseFloat(getComputedStyle(e).fontSize)))));
 
 async function openAdjust(page: Page) {
-  await page.getByRole("button", { name: /🎨/ }).click(); // master picker
+  await page.getByRole("button", { name: /^テンプレート：/ }).click(); // master picker
   await page.getByRole("menuitem", { name: /テンプレート調整/ }).click();
   const panel = page.getByRole("region", { name: "テンプレート調整" });
   await expect(panel).toBeVisible();
@@ -25,7 +25,7 @@ test.describe("Template adjust (#570)", () => {
     await seedDeck(page);
     const before = await titlePx(page);
     const panel = await openAdjust(page);
-    await expect(page.getByRole("button", { name: /🎨/ })).toBeDisabled(); // one template change at a time
+    await expect(page.getByRole("button", { name: /^テンプレート：/ })).toBeDisabled(); // one template change at a time
     await expect(panel.getByRole("button", { name: "調整を適用" })).toBeDisabled(); // nothing changed yet
 
     await panel.getByRole("slider", { name: "タイトル" }).fill("150");
@@ -34,7 +34,7 @@ test.describe("Template adjust (#570)", () => {
 
     await panel.getByRole("button", { name: "調整を適用" }).click();
     await expect(panel).toBeHidden();
-    await expect(page.getByRole("button", { name: /🎨/ })).toContainText("（調整）");
+    await expect(page.getByRole("button", { name: /^テンプレート：/ })).toContainText("（調整）");
     expect(await titlePx(page)).toBeGreaterThan(before * 1.2);
   });
 
@@ -42,7 +42,7 @@ test.describe("Template adjust (#570)", () => {
     await page.goto("/");
     await seedDeck(page);
     const before = await titlePx(page);
-    const name = (await page.getByRole("button", { name: /🎨/ }).textContent()) ?? "";
+    const name = (await page.getByRole("button", { name: /^テンプレート：/ }).textContent()) ?? "";
     const panel = await openAdjust(page);
     await panel.getByRole("slider", { name: "タイトル" }).fill("50");
     await expect.poll(() => titlePx(page), { timeout: 10_000 }).toBeLessThan(before * 0.8);
@@ -50,6 +50,6 @@ test.describe("Template adjust (#570)", () => {
     await panel.getByRole("button", { name: "キャンセル" }).click();
     await expect(panel).toBeHidden();
     await expect.poll(() => titlePx(page), { timeout: 10_000 }).toBe(before);
-    await expect(page.getByRole("button", { name: /🎨/ })).toHaveText(name);
+    await expect(page.getByRole("button", { name: /^テンプレート：/ })).toHaveText(name);
   });
 });
