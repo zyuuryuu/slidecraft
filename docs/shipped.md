@@ -4,6 +4,8 @@
 
 ## 基盤・アーキテクチャ
 
+- **docs サイト（VitePress → GitHub Pages）の 4 日間の赤を修復＋PR で `docs:build` を走らせる** — 英語ガイド 2 ページの生の `<name>` を Vue が未閉じタグとして拒否し、#701（11-20）以降の Pages デプロイがすべて失敗していた。`&lt;name&gt;` に直し、`ci.yml` に非必須ジョブ `docs-build`（`changes` が docs/・package.json・lock の変更を検出したときだけ `npm run docs:build`）を足して、Pages を壊す PR をマージ前に捕まえる （PR #740・2026-11-24）
+- **依存の一括更新（dependabot 10 本）** — tauri 2.12.7・tauri-build 2.7.6・tauri-plugin-opener 2.7.3・sysinfo 0.40.4、hono 4.13.19、npm minor/patch 11 件（i18next 27 → react-i18next 18 の順序）、actions/cache 6.1.0、taiki-e/install-action 2.90.6。教訓: tauri の npm plugin と Rust plugin は major/minor を揃えないと `tauri build` が落ちる（Cargo.lock を同じ PR に取り込む） （PR #703・#705・#707・#711・#720〜#723・2026-11-23）
 - **`.scft` は figures を含むデッキだけ version 2 で保存** — 複数ビジュアル（`figures[]`）を持つデッキは `meta.version` 2 で保存し、旧アプリは `PROJECT_VERSION_TOO_NEW` で拒否して更新を促す（黙って落とさない）。figures の無いデッキは version 1 のまま byte-identical。version の決定は `projectVersionFor` 1 か所 （#673・PR #680・2026-11-08）
 - **本文倍率の提案（overflow-scale-hint）とプリセットの適用範囲を 1 関数に** — `bodyMaxPtFor` を `adjustTemplate` だけが呼び、hint の試算・MCP `build`・GUI は全部その経由。派生済みテンプレでも試算を「元テンプレ × 絶対レシピ」で作るので、前回倍率 1.2／1.3 でも予告件数＝適用結果（一致テスト）。Executive 由来では本文倍率が KPI 値・Ask の表示用枠に掛からない（#635 裁定 B と整合） （#670・PR #682・2026-11-20）
 - **section 役レイアウトの無いテンプレで章扉の退化を告げる** — Pitch など section 役を持たないテンプレに `<!-- section -->` を置くと、`marker-layout-missing`（info）で「どのレイアウトに置いたか」を 1 件告げる。section 役を持つテンプレ（本文つき章扉・「ご清聴」の章扉を含む）では 0 件、raw／materialized で件数一致 （#662・PR #678・2026-11-20）
@@ -92,6 +94,8 @@
 
 ## テンプレ・マスター
 
+- **manuscript-05（Pitch）の締めで連絡先を連絡先の枠に** — 「次のステップ」の連絡先が CTA の箇条書き 3 行目に出ていたのを、原稿を `<!-- col -->` で CTA 側と連絡先側に分けて `Closing.1CTA+1Contact` の `Contact.Bottom` に置く。エンジンは無変更・golden の差分は最終スライドだけ。テンプレ無し round-trip で素の col が落ちる別件は #747 （#693・PR #744・2026-11-24）
+- **KPI.4Value.Grid を値枠＋ラベル枠の対にして値を強調** — 4 マスの KPI 格子が値とラベルを 1 枠に流し込んで値が目立たなかったのを、KPI.3 と同じ値枠／ラベル枠の対（idx は交互・`nameHintedGroups` が idx 順に等分）に。LEGACY_DIGEST は midnight／flat／remake の 3 本＋REPORT_PRESET＋Pitch fixture のみ変化 （#695・PR #718・2026-11-23）
 - **Campaign のキャプション可読性・Gallery の候補順位・PRESET_ARTIFACTS の 1 本化** — `Caption.BottomLeft` のレイアウト背景を濃色にしてコントラスト ≈15:1（WCAG 相対輝度式で 3 経路検査）。`suggestLayouts` が `visual` 枠数を見て、画像 2／3／4 枚のスライドで Gallery を上位に（枠不足の Gallery.2 は出さない）。Executive の見本も `PRESET_ARTIFACTS` の同じ経路で生成（`make-executive-template.ts` 廃止・pptx は byte-identical） （#672・PR #683・2026-11-08）
 - **画像面積比を export が描く全画像で計上し、marketing の目標帯を実測で較正** — `scripts/style-metrics.ts` が `planSlideFigures`（export と同じ計画）から behind＋各枠の画像を集め、PPTX の `<p:pic>` 面積和と一致（一致テスト）。先頭画像だけ数えていた 0.185 は再現しない。`marketing.minImageAreaRatio` 0.5 → 0.2（実測 3 デッキ） （#671・PR #679・2026-11-08）
 - **マーケ プリセット「Campaign」＋画像構造** — 全面画像＋キャプション（`Hero.1Image+1Caption`）・テキスト＋画像並置・2×2 グリッド（`Gallery.4Image.Grid`）・色面の章扉など 6 LayoutDef（`PRESET_LAYOUTS`）、`samples/manuscript-07`（10 枚・自動分割 0・消失系 0）、出荷テンプレ（内蔵 6 本目）・見本 golden。画像構造は #392 の `figures[]`＋段 2 の配置（`placedFigures` 1 経路）。画像面積比の計測と目標帯の較正は #671 （#598・PR #668・2026-11-08）
@@ -178,6 +182,8 @@
 
 ## 協働・MCP
 
+- **協働ホストの常時起動・AI クライアントの承認・単独サーバの自動乗り換え（ADR-0040 D1〜D3・#688）** — GUI は起動と同時にホスト（127.0.0.1）を立て、seed 前は `host-not-ready`（D1）。初めて見る AI クライアント（clientInfo＋client ID・指紋）は GUI のダイアログで承認し、既定拒否・「この起動中はすべて拒否」・承認待ち 3 件上限・keychain 保存・一覧／取り消し、stdio は nonce への HMAC・HTTP 直結は `mcp-session-id` に結びつけ（D3）。GUI 判定は自己申告ヘッダから GUI 専用トークンへ（D3-6・#730）。単独の `slidecraft mcp` は `tools/call` の手前でホストを再探索して転送に乗り換え（deck ありは乗り換えず note・D2・#728）、`front-decide.ts` の純粋な状態機械で決める。起動・停止・承認・再接続は `dist/mcp/cli.js` を stdio で駆動する結合テスト 8 本で固定（#729）。`--doctor` は協働ホストの有無（host.json・ping）を 1 行出し、承認の申し込みは送らない。未使用になった `mcp-relay.ts` は削除（#736）。ネットワーク越しの制御は採らない（ホストは 127.0.0.1 のみ） （ADR-0040・PR #731・#733・#735・#737・#745・2026-11-23〜24）
+- **単独モードの組み込みテンプレに Pitch・Executive・Campaign を追加** — GUI の協働ホストが無い単独モード（`.mcpb` で入れた直後は必ずこの状態）の組み込みテンプレが `midnight` だけだったのを、`list_templates` に Pitch・Executive・Campaign を足す。GUI の同梱 `.pptx` と同じ `writePresetTemplate` で生成し、単独経路と GUI 経路の書き出し PPTX が byte-identical であることを一致テストで固定（R8） （#694・PR #725・2026-11-23）
 - **`set_slide_markdown` が ops の JSON 配列を `routeSlideEdit` で受け、経路を metrics に記録** — 本文が JSON 配列（```json フェンス可）なら GUI と同じ `routeSlideEdit`（図 ops → setField → DATA ops）で適用し、Markdown はそのまま。壊れた配列は全文差し替えに退避して notice。`MetricsRecord` に `route`／`skipped` を追加（`METRICS_VERSION` 据え置き・旧行も読める）。説明文の ratchet は +1 文ぴったり （#631・PR #681・2026-11-19）
 - **`.mcpb` の導入手順と単独モードの案内を実機に合わせる** — Windows の Claude Desktop（MSIX 版）は `.mcpb` の関連付けを持たないので、ガイド・協働パネル・コメントの「ダブルクリック」を「設定 → 拡張機能」に。単独モードの `note` は「GUI で協働を開始 → クライアントを起動し直す（Claude Desktop は完全終了）」を先頭に置き、`--root`／`templatePath` は条件付きで残す。組み込みテンプレの拡充は #694 で判断待ち （#686・#687・PR #699・2026-11-19）
 - **`kpi-value-overflow`（warn）: KPI の値が値枠に 1 行で収まらないときに `get_deck_issues` が告げる** — 幅見積りは `title-fit.ts` の `measureLines`（式は不変・R8）、値枠判定は `group-layout.ts` の `kpiValueSlot`。コーパス 27 テンプレ × 13 デッキで誤検知 0・真陽性 3（「4.2 億円」72pt／52pt）。hint との適用範囲の整合は #670 （#643・PR #659・2026-11-08）
@@ -244,6 +250,8 @@
 
 ## UX・配布
 
+- **shadcn/ui 段 1 — 上部バーの部品を shadcn/ui（Base UI）に置き換え** — PR-A: 部品をリポジトリにコピーして使う部品集 shadcn/ui を Base UI 既定で導入し、Button／Tooltip（`BarTip`・aria-describedby・開いたメニューでは抑止）を置き換え。決定 5 点＝Base UI・`--radius` は `src/components/ui/*.tsx` 内のみ参照（0.375rem で現状に寄せる）・トークンは既存トークンへの別名（`--muted`／`--accent` は定義しない・規則は `src/components/ui/README.md`）・絵文字のまま・Geist 不採用。PR-B: 保存・書き出し／🎨 テンプレート／⚙ を DropdownMenu、AI 接続設定を Popover、原稿入力とテンプレート作成を Dialog に。focus trap・矢印キー・Esc・Portal・role／aria を部品に任せ手製の開閉処理を削除。背景クリックでは閉じない（原稿を失わない）、初期フォーカスは Dialog／Popover 自身（select に ↓ で値が変わる誤操作を防ぐ）、メニューが閉じて戻ったフォーカスでは Tooltip を開かない。ux-budget の予算・凍結リスト・区画名は不変、バンドル gzip +28.7 KB。段 2 は #689 の 2 層化と同時。残所見 5 件は #739 （#724・PR #734・#738・2026-11-24）
+- **第 4 バッチのヒューリスティック評価 重大度 1 の所見 7 件** — 協働ロックの理由文を 1 キー（`app.draftGateLocked／Busy`）に・未選択時の案内の重複と無い指示欄の折りたたみ文言を解消・「…」は包みキー `menu.opensDialog` のみ・畳んだ記憶は `needsUserAction` のときだけ（純関数 `rememberFold`）・ヒントは「⚙ AI 接続設定で…」・上部バーのボタン名を「開く・保存・書き出し」（ユーザ裁定）・🎨 の前置きは `truncate`＋860px 未満では出さない。幅確認で見つけた BarTip の包みの重なり（740px）も修正、約 690px 未満は #741 （#713・PR #742・2026-11-24）
 - **上部バーのボタン名を用途が分かる語に・呼び名を「テンプレート」に統一** — 「📝 原稿」→「📝 原稿入力」（比較表で「作成」より採用）、テンプレボタンは「🎨 テンプレート：<名前> ▾」、「ファイル」→「保存・書き出し」＋「開く・保存」「書き出す」の区画見出し。「マスター」「スライドマスター」「テンプレ」を画面・診断文・docs から外し、辞書テストで戻りを防ぐ。e2e は `getByRole` の語だけ置換（統括承認）。ヒューリスティック評価 重大度 1×2 は #713 （#692・PR #701・2026-11-20）
 - **Claude の接続表示を Models API でキー検証してから緑にする** — でたらめなキーでも緑「使用中」になっていたのを、`GET /v1/models`（SDK 1.5・`Authorization: Bearer`）で 1 回確認し、401「API キーが無効です」／403／不通「接続できません」／一覧に無いモデルは warn。600ms デバウンス・同一キーは再確認せず・ローカルのみ設定では通信しない・キーはログに出ない。判定は他プロバイダと同じ `computeConnection` 入力（R8）。重大度 2×2 は #712 （#691・PR #700・2026-11-20）
 - **AI ドックはスライド未選択のとき原稿の AI 生成へ案内** — 「作りたいデッキを指示」の入力欄を出さず、「スライドを選ぶと…／デッキを丸ごと作るときは［📝 原稿入力 → ✨ AIで生成］」の 1 行（リンクは 📝 ボタンと同じハンドラ）。協働中・テンプレート調整中は無効化して理由を同じ行に。`ready` 条件は不変。重大度 1×3 は #713 （#690・PR #698・2026-11-19）
