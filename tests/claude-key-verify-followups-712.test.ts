@@ -67,6 +67,16 @@ describe("#712-2 ローカルモデル限定のときは「確認を省いた」
     expect(`${c.label} ${c.hint ?? ""}`).not.toContain(i18n.t("aiStatus.cantConnect"));
     expect(c.label).toContain("クラウドへの接続確認はしません");
   });
+
+  // 統括レビュー（PR #759）: ローカル限定を OFF にした直後は fetch 中。「確認中」が skipped より勝つ（main と同じ順）。
+  it("modelsLoading のときは skipped より「確認中」が勝つ（トグル OFF 直後に古いラベルを出さない）", () => {
+    const c = computeConnection({
+      provider: "claude", preset: { native: true, keyRequired: true }, cfg: { baseURL: "", model: "claude-opus-4-8", apiKey: "sk-ant-x" },
+      builtinStatus: { kind: "idle" }, weightsPresent: null, builtinModel: null,
+      modelsLoading: true, modelsError: null, models: [], modelsSkipped: "local",
+    });
+    expect(c).toMatchObject({ tone: "checking", label: i18n.t("aiStatus.checkingConnection") });
+  });
 });
 
 describe("#712-3 Claude の枝のヒントは辞書経由", () => {

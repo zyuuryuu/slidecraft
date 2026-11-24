@@ -84,6 +84,7 @@ export function useProviderModels(provider: ProviderId, baseURL: string, apiKey:
     }
     let cancelled = false;
     setModelsLoading(true);
+    setModelsSkipped(null); // the check IS being made now — clear a stale "skipped" (local-only just switched off)
     const run = () => {
       listProviderModels(provider, baseURL, apiKey)
         .then((list) => ({ models: list, error: null, skipped: null }), (e: unknown) => ({ models: [], error: e instanceof Error ? e.message : String(e), skipped: null }))

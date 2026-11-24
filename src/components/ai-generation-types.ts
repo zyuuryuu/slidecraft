@@ -206,6 +206,8 @@ export function computeConnection(a: {
   const { provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsError, models } = a;
   const isOllama = provider === "ollama";
   if (preset.native) {
+    // A check in flight (e.g. right after local-only was switched OFF) wins over a stale skipped mark.
+    if (a.modelsLoading) return CHECKING();
     // Local-model-only: the cloud is deliberately not asked. Say so — not "can't connect" (#712).
     if (a.modelsSkipped === "local") return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.localOnlyNoCheck") };
     if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint", { settings: i18n.t("aiSettings.title") }) };
