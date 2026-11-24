@@ -130,10 +130,17 @@ jobs:
         with:
           # The action installs with --profile minimal, which omits clippy (#732).
           components: clippy
+      # #757: a slow Ubuntu mirror once made this step take 1300 s (normally 18-35 s), pushing the job
+      # to 1761 s of its 30-min budget. Retries/Timeout drop stalled connections and retry; the step's
+      # own timeout turns "apt is slow" into a red step at 10 min instead of a silent job timeout.
+      # With apt capped at 10 min the job stays well under 30 min (normal total ~630 s), so the job
+      # timeout is left unchanged.
       - name: Install Linux dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+          sudo apt-get $APT_OPTS update
+          sudo apt-get $APT_OPTS install -y \
             libgtk-3-dev libwebkit2gtk-4.1-dev \
             libappindicator3-dev librsvg2-dev \
             libssl-dev patchelf
