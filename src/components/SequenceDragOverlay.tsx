@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { loadYaml } from "../engine/yaml-io";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
+import type { DiagramFonts } from "../engine/diagram-fonts";
 import { DiagramSpecSchema } from "../engine/schema";
 import { SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H } from "../engine/layout-engine";
 import { computeSequenceLayout } from "../engine/diagram-sequence";
@@ -28,9 +29,11 @@ type Props = {
   editable?: boolean;
   onChange?: (yaml: string) => void;
   region?: { x: number; y: number; w: number; h: number };
+  /** #605: the template's diagram typefaces (diagramFontsFor) — the same rule as the PPTX export. */
+  fonts?: DiagramFonts;
 };
 
-export default function SequenceDragOverlay({ diagramYaml, editable = false, onChange, region }: Props) {
+export default function SequenceDragOverlay({ diagramYaml, editable = false, onChange, region, fonts }: Props) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string } | null>(null);
@@ -73,9 +76,10 @@ export default function SequenceDragOverlay({ diagramYaml, editable = false, onC
             omitTitle: true,
             transform: region ? baseTf : undefined,
             layoutFit,
+            fonts,
           })
         : "",
-    [draftSpec, region, baseTf, layoutFit],
+    [draftSpec, region, baseTf, layoutFit, fonts],
   );
 
   // Participant layout (in draft order) for hit-testing + the selection box.

@@ -16,6 +16,7 @@ import {
 } from "./template-layout-library";
 import { BUILTIN_ROLE_DESCR_PREFIX } from "./template-catalog";
 import { nestedLevelFontSize, nestedLevelIndentPt } from "./nested-level-font";
+import { DEFAULT_EA_FONT } from "./font-stack";
 
 /** A logo image lifted from a source master (Re-make). Injected onto the dark-family layouts
  *  (cover/section/closing) — where corporate templates show their logo — as a native <p:pic>. */
@@ -76,8 +77,7 @@ export const SLIDE_W = 13.333;
 const HEADER_BAR_H = 1.18; // light 系レイアウトのヘッダーバー（idx15/16 ヘッダーを覆う）
 
 // 日本語ファーストの既定: spec が majorEa/minorEa を指定しない時に theme <a:ea> へ焼く CJK フォールバック
-// フォント（#137）。Windows/Office 標準搭載で追加インストール不要なもの。
-const DEFAULT_EA_FONT = "Yu Gothic";
+// フォント（#137）。Windows/Office 標準搭載で追加インストール不要なもの。図の <a:ea> の既定と同じ 1 名（#605）。
 
 // タイトルがサブタイトル枠と重ならないかの検査に使う行送り近似係数（実測フォントに依らない安全側の目安）。
 export const TITLE_LINE_HEIGHT_FACTOR = 1.2;

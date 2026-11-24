@@ -25,6 +25,11 @@ export function classifyCjkFont(name: string | undefined): CjkClass {
   return name.toLowerCase().includes(MINCHO_HINT) || name.includes(MINCHO_HINT_JA) ? "mincho" : "gothic";
 }
 
+/** The Japanese (East-Asian) typeface used when a template declares none (#137 / #605): Windows/Office
+ *  ship it with no extra install. ONE name for the theme a generated template bakes (template-writer),
+ *  the exported diagram's `<a:ea>` (diagram-fonts) and the head of the gothic fallback chain below. */
+export const DEFAULT_EA_FONT = "Yu Gothic";
+
 // The last REAL (non-generic) entry in each fallback chain — named separately so #194's runtime
 // @font-face embed can target it by name without duplicating the literal string (R8).
 const GOTHIC_EMBED_TARGET = "Noto Sans CJK JP";
@@ -32,7 +37,7 @@ const MINCHO_EMBED_TARGET = "Noto Serif CJK JP";
 
 // Ordered by real-world install base across Windows/macOS/Linux, ending in the CSS generic so an
 // unmatched environment still gets SOME serif/sans-serif rather than an unstyled fallback.
-const GOTHIC_FALLBACK = ["Yu Gothic", "Hiragino Kaku Gothic ProN", GOTHIC_EMBED_TARGET, "Meiryo", "sans-serif"];
+const GOTHIC_FALLBACK = [DEFAULT_EA_FONT, "Hiragino Kaku Gothic ProN", GOTHIC_EMBED_TARGET, "Meiryo", "sans-serif"];
 const MINCHO_FALLBACK = ["Yu Mincho", "Hiragino Mincho ProN", MINCHO_EMBED_TARGET, "MS Mincho", "serif"];
 
 /** The fallback-chain family name a runtime CJK @font-face embed (#193/#194) should declare, so an

@@ -25,6 +25,7 @@ import { isEmptyOverlay, paintGroupOverlay } from "../engine/group-overlay";
 import { renderPaintToSvg } from "../engine/svg-writer";
 import { materializeDerivedSlides, sectionFooterFor } from "../engine/deck-sections";
 import { cjkFontFamily } from "../engine/font-stack";
+import { diagramFontsFor } from "../engine/diagram-fonts";
 import { cjkClassForStyle } from "../engine/cjk-class";
 import { MERMAID_CONFIG } from "./mermaid";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "../engine/mermaid-to-diagram";
@@ -263,6 +264,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
   // uses (placeholder-binding), so the preview matches the output even on an ALIEN master (whose
   // idxs differ). A figure/table rides the Nth BODY placeholder, resolved the same way.
   const layoutPhs = layout?.placeholders ?? [];
+  const diagramFonts = useMemo(() => (themeFonts ? diagramFontsFor(themeFonts) : undefined), [themeFonts]); // #605: export's rule
   // WYSIWYG: share the SAME contentFor as the export — a grouped slide fills via expandGroups.
   const bound = isGroupedSlide(slide) && layout && isGroupedLayout(layout)
     ? expandGroups(slide, layout)
@@ -389,7 +391,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
       {soloDiagram?.figure.kind === "diagram" && (
         <DiagramSvgOverlay
           key="diagram-solo"
-          diagramYaml={soloDiagram.figure.yaml}
+          diagramYaml={soloDiagram.figure.yaml} fonts={diagramFonts}
           editable={!!onDiagramChange}
           onChange={onDiagramChange}
         />
@@ -412,7 +414,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
           return (
             <DiagramSvgOverlay
               key={`diagram-${ph.idx}`}
-              diagramYaml={fig.yaml}
+              diagramYaml={fig.yaml} fonts={diagramFonts}
               region={at!.solo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
               editable={at!.primary && !!onDiagramChange}
               onChange={at!.primary ? onDiagramChange : undefined}
@@ -429,7 +431,7 @@ function SlideCard({ slide, slideIndex, layout, masterBgColor, masterBackgroundI
             return (
               <DiagramSvgOverlay
                 key={`mmd-native-${ph.idx}`}
-                diagramYaml={diagramSpecToYaml(nativeSpec)}
+                diagramYaml={diagramSpecToYaml(nativeSpec)} fonts={diagramFonts}
                 region={at!.solo ? undefined : { x: s.x, y: s.y, w: s.w, h: s.h }}
                 editable={false}
               />

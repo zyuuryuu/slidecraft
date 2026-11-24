@@ -10,11 +10,11 @@ exports[`#392 段 2 golden — ビジュアルデッキ_マガジン_TemplateOnl
 
 exports[`#392 段 2 golden — ビジュアルデッキ_マガジン_TemplateOnly.pptx > PPTX: slide XML / rels sha256, and every visual is drawn 1`] = `
 {
-  "slide2.xml 図が 2 つ": "7f9d3cbf88b4826c3072a443d13d02955462a19d1dcaaa8c5b5533732f7a5e17",
+  "slide2.xml 図が 2 つ": "3f941befc78a85dcae5eae346adad910ffba6ad94b6f5f8831073a7f9f43bc9f",
   "slide2.xml.rels 図が 2 つ": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
-  "slide3.xml 表と図": "e67bf9b9decf48f8ae9ad5f48b0882a13cdf73f9539cf250105b39a288d3debb",
+  "slide3.xml 表と図": "6332a40cf3ef314934008b0e1df45b07eb192a88efbe037e971ab3db44aed096",
   "slide3.xml.rels 表と図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
-  "slide4.xml col 本文｜図": "67bc0fb196497b972cfcf05d0b3509a6288d29ece628707d0d1fcaa11ce4ac08",
+  "slide4.xml col 本文｜図": "4d9320e3d59b246f4b763811a9e3b9f353a82b8f4c645e04b76a3b7fbc423e61",
   "slide4.xml.rels col 本文｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
 }
 `;
@@ -38,11 +38,11 @@ exports[`#392 段 2 golden — 技術報告_スタンダード水色_TemplateOnl
 
 exports[`#392 段 2 golden — 技術報告_スタンダード水色_TemplateOnly.pptx > PPTX: slide XML / rels sha256, and every visual is drawn 1`] = `
 {
-  "slide2.xml 図が 2 つ": "2fa6cdfd8e157324551c9593418a9e704a9498e60589f9a40a57a4bf0865c759",
+  "slide2.xml 図が 2 つ": "4c6b80d2597b5b3af29f06c38f31d2ee72c0d95be96ac998b80191bb548dc4bf",
   "slide2.xml.rels 図が 2 つ": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
-  "slide3.xml 表と図": "b91ddee2c773c4f16252619fd6ed21a208873f8bad5483992bc8eeee1c9cdc8e",
+  "slide3.xml 表と図": "611810e367007c8d1ed14d5c8fe4186fa8373bc044be478aeb26558153d66044",
   "slide3.xml.rels 表と図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
-  "slide4.xml col 本文｜図": "2a8859a99ef3725766e51667d92e8e2780cb2b166f070543ff48ebd30483f4eb",
+  "slide4.xml col 本文｜図": "b4cbbc9b1d3d11abbe72e876f432c69320447e9c033b9a78cda14d4d72b2152c",
   "slide4.xml.rels col 本文｜図": "c5309a50b72c085135f453616dfd3b0926663b8b947ce407f799b2e53e05426b",
 }
 `;
@@ -66,11 +66,11 @@ exports[`#392 段 2 golden — 配布資料_公文書高密度_TemplateOnly.pptx
 
 exports[`#392 段 2 golden — 配布資料_公文書高密度_TemplateOnly.pptx > PPTX: slide XML / rels sha256, and every visual is drawn 1`] = `
 {
-  "slide2.xml 図が 2 つ": "6eef28fea5f084ff208a7aef00f70458346f772cf6e2a8ea6dd81518ad0d0f0d",
+  "slide2.xml 図が 2 つ": "eae662469ed0ea8aee278891663de0aca2917d980b970a19a18ebad541595a71",
   "slide2.xml.rels 図が 2 つ": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
-  "slide3.xml 表と図": "1dc084975f3470afc7b18786d50dd2823a6f8b77846ba17ff9fbb6ae0265709e",
+  "slide3.xml 表と図": "e58cd3335bb6f0f229b3d00872b3d54961aa0b49bcab3021692336515b2a3e62",
   "slide3.xml.rels 表と図": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
-  "slide4.xml col 本文｜図": "c026e194d2d5bbc4d57bbf16bd4bcb074ab13d6ba317d6415ac7ec0f7cb7c5b3",
+  "slide4.xml col 本文｜図": "78dd21c6fed1ea18bf779fd0cb52df3978e245e7ee41847c1da25d0229303b73",
   "slide4.xml.rels col 本文｜図": "f7c86b6c418e8afef3b955a960ff2ab5a00e7fcea1525fe231f8b5550dc913a5",
 }
 `;

@@ -21,16 +21,18 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const text = (zip: JSZip, f: string) => zip.file(f)!.async("string");
 
 // Captured on main a6dd400 BEFORE #554 (the default path must not move by a byte).
+// #605 re-pinned slide1-4.xml: the diagram runs' <a:ea> moved from Calibri/Georgia to the template theme's
+// Jpan font (ＭＳ Ｐゴシック); every other byte — latin/cs typefaces included — is unchanged (part diff in the PR).
 const DEFAULT_GOLDEN: Record<string, string> = {
   "[Content_Types].xml": "dfacf6b5137abeab2d9fbb6a8de0f0a1f41f175e38850fa368c76c28d6af571a",
   "ppt/slides/_rels/slide1.xml.rels": "1ed261ceb1ed216d53f68afef2500f7fab7a1fee7038a260a567c2330ae926bb",
   "ppt/slides/_rels/slide2.xml.rels": "1ed261ceb1ed216d53f68afef2500f7fab7a1fee7038a260a567c2330ae926bb",
   "ppt/slides/_rels/slide3.xml.rels": "1ed261ceb1ed216d53f68afef2500f7fab7a1fee7038a260a567c2330ae926bb",
   "ppt/slides/_rels/slide4.xml.rels": "1ed261ceb1ed216d53f68afef2500f7fab7a1fee7038a260a567c2330ae926bb",
-  "ppt/slides/slide1.xml": "be72714757a698df46ddcb753ab8a80d4258aea6100e9dbf5130aa31eeae0138",
-  "ppt/slides/slide2.xml": "1e55df5d1e2842808547c0dbd402435f3948b4e0c1e6316c51d657b24ec6baa3",
-  "ppt/slides/slide3.xml": "2dad49115fed6df271fc54d5da223adeeb855a56f134e743556477b0c176c255",
-  "ppt/slides/slide4.xml": "178e6228cae455340cc662620666cd6223ddf26cdaf7df12b3addf86a920cbaf",
+  "ppt/slides/slide1.xml": "81c66fd8668b171fadd75c6c6578b2ef294595fd396b91b00ac6aad06521d0b2",
+  "ppt/slides/slide2.xml": "8a70b8a5bbe6b6b6e8877c1970808104afd87d5af08a4d0afc93d837aee45caf",
+  "ppt/slides/slide3.xml": "faaeaf95626f24e2b34eae6e47f6af05a987b6f11b03df81d18ab910215e34dc",
+  "ppt/slides/slide4.xml": "5047c30a431c112d1e3901231265bcc4e97f879d2b185075ffc7c4f52c8fdcf5",
 };
 
 // native chart XML golden (pie / combo bar+line / radar) — pinned after a by-hand read of the XML and a
