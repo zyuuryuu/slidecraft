@@ -182,7 +182,7 @@ export function computeConnection(a: {
   const { provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsLoading, modelsError, models } = a;
   const isOllama = provider === "ollama";
   if (preset.native) {
-    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint") };
+    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint", { settings: i18n.t("aiSettings.title") }) };
     if (!cfg.model.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.modelNotSelected") };
     // Green only on a VERIFIED key: the Models API list fetched with it (#691 — never on the fixed list).
     if (modelsLoading) return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };

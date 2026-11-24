@@ -86,7 +86,7 @@ describe("#724 要修正 2: 説明（以前の title=）が aria-describedby で
 
   it("状態で変わる説明（ロック中の 📝・AI 実行中・協働中・押せない ↶）も届く", async () => {
     await mount(bar({ draftGate: "locked", aiRunning: 2, canUndo: false }));
-    expect(described(btn(t("toolbar.draft")))).toBe(t("app.draftLockedTitle"));
+    expect(described(btn(t("toolbar.draft")))).toBe(t("app.draftGateLocked"));
     expect(described(btn(t("toolbar.aiLabel")))).toBe(t("toolbar.aiRunningTitle", { n: 2 }));
     expect(described(btn("↶"))).toBe(t("toolbar.undo"));
     await rerender(bar({ aiCollabActive: true }));

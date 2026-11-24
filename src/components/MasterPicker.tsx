@@ -52,7 +52,7 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
   return (
     // #724: the shadcn DropdownMenu (Base UI) — Portal, arrow keys, Esc / outside click, an item closes the menu itself.
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <BarTip label={t("masterPicker.buttonTitle")}>
+      <BarTip label={t("masterPicker.buttonTitle")} shrink>
       <DropdownMenuTrigger
         render={
           <Button
@@ -66,8 +66,10 @@ export default function MasterPicker({ masters, activeId, onSelect, onImport, on
       >
         <span className="shrink-0">🎨</span>
         {/* #692: say what the button is before the name. When space is short the NAME truncates first (far larger
-            flex-shrink); the prefix gives way only on a very narrow window, so the AI and ⚙ buttons stay on screen. */}
-        <span className="min-w-0 overflow-hidden whitespace-nowrap">{t("masterPicker.buttonPrefix")}</span>
+            flex-shrink); the prefix gives way only on a very narrow window (with an ellipsis, #713), so the AI and ⚙ buttons stay on screen.
+            #713: shrink-[0.01] keeps the prefix whole until the name is gone (a shrink of 1 shaved a sub-pixel off it → a
+            stray "…"); below 860px it cannot be shown whole (measured), so it is dropped and the name gets the room. */}
+        <span className="min-w-0 truncate shrink-[0.01] max-[860px]:hidden">{t("masterPicker.buttonPrefix")}</span>
         <span className="min-w-0 truncate shrink-[1000]">{active ? active.name : t("masterPicker.selectMaster")}</span>
         <span className="shrink-0 text-muted text-xs">▾</span>
       </DropdownMenuTrigger>

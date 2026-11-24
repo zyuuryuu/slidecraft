@@ -17,7 +17,7 @@ import { generateCombinedPrompt, DIAGRAM_TYPES } from "../engine/llm-prompts";
 import AiSettingsPopover from "./AiSettingsPopover";
 import type { AiGeneration, DiagramTypeChoice } from "./useAiGeneration";
 import { toneClass } from "./ai-generation-types";
-import { initialSettingsOpen, loadSettingsFolded, saveSettingsFolded } from "./ai-settings-fold";
+import { initialSettingsOpen, loadSettingsFolded, rememberFold, saveSettingsFolded } from "./ai-settings-fold";
 import type { LayoutCatalog } from "../engine/template-catalog";
 
 interface LlmAssistProps {
@@ -47,7 +47,8 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   // decided by computeConnection alone, R8). Waiting (checking/starting, PR #664 レビュー B-1) and the
   // builtin runtime that auto-starts on generate stay folded. After that it is the user's to toggle.
   // A user who folded it (e.g. runs on manual copy/paste, never configures a connection) is not made to
-  // fold it again on every open: the fold is remembered (ai-settings-fold, #669-3).
+  // fold it again on every open: the fold is remembered (ai-settings-fold, #669-3) — but only a fold made while the
+  // user must act (#713), so a user who folds a working connection still sees the settings open if it later breaks.
   const [showSettings, setShowSettings] = useState(() => initialSettingsOpen(ai.connection, loadSettingsFolded()));
   const [wasOpen, setWasOpen] = useState(isOpen);
   if (isOpen !== wasOpen) {
@@ -57,7 +58,7 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   const toggleSettings = () => {
     const next = !showSettings;
     setShowSettings(next);
-    saveSettingsFolded(!next);
+    saveSettingsFolded(rememberFold(next, ai.connection));
   };
   const [showManual, setShowManual] = useState(false);
   const [prompt, setPrompt] = useState("");

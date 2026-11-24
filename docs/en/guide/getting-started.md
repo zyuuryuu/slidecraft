@@ -38,7 +38,7 @@ SlideCraft's basic cycle has four steps.
 
 Markdown (the input) and the deck (the source of truth) hold the same content and can be moved back and forth. Day to day, the visual editor is the main surface, and Markdown is always available for input and export.
 
-The top bar holds only the document's operations: **↶ ↷** (undo / redo) | **Save & Export**, **📝 Write draft**, **🎨 Template: <name>** | **✨ AI**, **⚙**. The **Save & Export** menu has two sections: "Open / Save" (open or save a `.scft` project) and "Export" (PPTX / HTML / Markdown). Writing the draft and working with templates live on their own buttons (**📝 Write draft** and **🎨 Template**), not in the Save & Export menu. Language (日本語 / English), theme (Dark / Light / Modern), help (this documentation) and the AI connection settings open from **⚙** at the right end.
+The top bar holds only the document's operations: **↶ ↷** (undo / redo) | **Open · Save · Export**, **📝 Write draft**, **🎨 Template: <name>** | **✨ AI**, **⚙**. The **Open · Save · Export** menu has two sections: "Open / Save" (open or save a `.scft` project) and "Export" (PPTX / HTML / Markdown). Writing the draft and working with templates live on their own buttons (**📝 Write draft** and **🎨 Template**), not in the Open · Save · Export menu. Language (日本語 / English), theme (Dark / Light / Modern), help (this documentation) and the AI connection settings open from **⚙** at the right end.
 
 ## ① Write draft — Write Markdown
 

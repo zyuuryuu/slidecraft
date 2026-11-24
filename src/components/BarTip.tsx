@@ -12,6 +12,9 @@
  *   （#724 PR-B: 開くと次の Esc を Tooltip が取り、原稿入力ダイアログの中では Esc を 3 回押さないと閉じなかった）。
  *   ポインタを乗せる・一度離れて再びフォーカスする、では従来どおり開く。
  * 記号だけのボタン（↶ ↷ ⚙）は aria-label で名前を持つこと（Tooltip・説明は名前にならない）。
+ * - 包みの span はバーの flex の項目なので、既定では縮まない（shrink-0）。縮むのは中のボタン自身が縮めるとき
+ *   （🎨 テンプレート＝名前を省略する）だけで、`shrink` を渡す。以前は全部 min-w-0 で、狭い窓で span だけが縮み、
+ *   縮まないボタンが隣のボタンに重なっていた（#713 の幅確認で発見）。
  */
 import { cloneElement, useId, useState, type ReactElement } from "react";
 import type { TooltipRootChangeEventDetails } from "@base-ui/react/tooltip";
@@ -24,9 +27,11 @@ interface BarTipProps {
   label: string;
   /** 説明を付けるボタン（1 要素）。 */
   children: ReactElement<TipChildProps>;
+  /** 中のボタンが狭い窓で縮む（名前を省略する）とき true。既定は縮まない。 */
+  shrink?: boolean;
 }
 
-export default function BarTip({ label, children }: BarTipProps) {
+export default function BarTip({ label, children, shrink = false }: BarTipProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const expanded = children.props["aria-expanded"];
@@ -46,7 +51,7 @@ export default function BarTip({ label, children }: BarTipProps) {
   };
   return (
     <Tooltip open={open && !menuOpen} onOpenChange={onOpenChange}>
-      <TooltipTrigger render={<span className="inline-flex min-w-0" onBlur={() => setQuiet(false)} />}>
+      <TooltipTrigger render={<span className={`inline-flex ${shrink ? "min-w-0" : "shrink-0"}`} onBlur={() => setQuiet(false)} />}>
         {cloneElement(children, { "aria-describedby": id })}
         <span id={id} hidden>{label}</span>
       </TooltipTrigger>
