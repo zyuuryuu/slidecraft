@@ -10,7 +10,9 @@
  *  - a forward that fails → decideHostLost → re-attach to a new host, or back to solo (deck-less) + `note`;
  *  - each switch tells the AI `notifications/tools/list_changed` (solo and collab lists differ slightly);
  *  - a forwarded result's code: authorization-denied → solo against that launch; -revoked → drop the secret and
- *    apply again; anything admitted → redeem the one-time claim (once).
+ *    apply again; a result that passed the host's call gate → redeem the one-time claim (verdictOf; an SDK-level
+ *    refusal such as an unknown tool proves nothing and never spends it);
+ *  - a host that answered the ping but refused the attach → solo answers with a `note` (never silent).
  * Holds no deck state while forwarding (ADR-0033: the host is the only control plane then).
  *
  * Known limit: a call already delivered to a host that dies before answering is not answered here (the AI's own
@@ -39,16 +41,25 @@ export interface AdaptiveFrontDeps {
 const LIST_CHANGED: JSONRPCMessage = { jsonrpc: "2.0", method: "notifications/tools/list_changed" };
 const isResponse = (m: JSONRPCMessage): m is JSONRPCMessage & { id: RequestId } => !("method" in m) && "id" in m;
 
-/** The guard code of a tool result ({ok:false, code} envelope — tool-result.ts), if any. */
-function codeOf(result: unknown): string | undefined {
-  const first = (result as ToolResult | undefined)?.content?.[0];
-  if (first?.type !== "text") return undefined;
-  try {
-    const v = JSON.parse(first.text) as { ok?: unknown; code?: unknown };
-    return v.ok === false && typeof v.code === "string" ? v.code : undefined;
-  } catch {
-    return undefined;
+/** What a forwarded tools/call reply says about this client's approval.
+ *  - a guard code: the {ok:false, code} envelope (tool-result.ts) — authorization-* are the host's call gate;
+ *  - "admitted": a normal tool result (isError absent/false) whose code, if any, is not authorization-* — only a
+ *    call that passed the gate (tool-profiles.gateCall) can produce one;
+ *  - "unknown": a JSON-RPC error or an isError result. The SDK answers an unknown tool / bad arguments itself,
+ *    BEFORE the handler (so before the gate): such a reply proves nothing about approval (#735 review). */
+export function verdictOf(reply: unknown): { code: string } | "admitted" | "unknown" {
+  const r = (reply as { result?: ToolResult }).result;
+  if (!r || r.isError === true) return "unknown";
+  const first = r.content?.[0];
+  if (first?.type === "text") {
+    try {
+      const v = JSON.parse(first.text) as { ok?: unknown; code?: unknown };
+      if (v && v.ok === false && typeof v.code === "string") return v.code.startsWith("authorization-") ? { code: v.code } : "admitted";
+    } catch {
+      /* plain text from a tool that passed the gate */
+    }
   }
+  return "admitted";
 }
 
 export class AdaptiveFront {
@@ -118,9 +129,16 @@ export class AdaptiveFront {
   private async soloCall(m: JSONRPCMessage & { id: RequestId }): Promise<void> {
     const docId = this.d.soloDeckDocId();
     const step = decideSoloCall({ soloHasDeck: docId !== null, live: await this.d.watch.live(), deniedKey: this.deniedKey });
-    if (step.kind === "attach" && (await this.tryAttach(step.host))) return this.forward(m);
-    const note = step.kind === "solo" ? step.note ?? this.takePendingNote() : this.takePendingNote();
-    if (note) this.soloNotes.set(m.id, frontNoteText(note, { docId: docId ?? undefined }));
+    let attachError: string | undefined;
+    if (step.kind === "attach") {
+      const err = await this.tryAttach(step.host);
+      if (err === undefined) return this.forward(m);
+      attachError = err;
+    }
+    // never silent: a host that answered the ping but refused the attach is told to the AI, not only to stderr
+    const note: FrontNote | undefined = attachError !== undefined ? "attach-failed" : step.kind === "solo" ? step.note ?? this.takePendingNote() : this.takePendingNote();
+    if (attachError !== undefined) this.pendingNote = undefined;
+    if (note) this.soloNotes.set(m.id, frontNoteText(note, { docId: docId ?? undefined, reason: attachError }));
     return this.toSolo(m);
   }
 
@@ -151,14 +169,16 @@ export class AdaptiveFront {
     await this.d.local.send(m).catch((e: unknown) => this.d.log(`slidecraft mcp: local send failed — ${e instanceof Error ? e.message : String(e)}\n`));
   }
 
-  private async tryAttach(host: HostHandshake): Promise<boolean> {
+  /** Attach to `host`; undefined on success, else why not (the router answers solo and says so). */
+  private async tryAttach(host: HostHandshake): Promise<string | undefined> {
     let att: Attachment;
     try {
       att = await this.d.attach(host, this.init);
     } catch (e) {
+      const why = e instanceof Error ? e.message : String(e);
       this.d.watch.markDead(host); // not retried until host.json changes (no timeout on every call)
-      this.d.log(`slidecraft mcp: could not connect to the GUI host at ${host.url} — staying solo (${e instanceof Error ? e.message : String(e)})\n`);
-      return false;
+      this.d.log(`slidecraft mcp: could not connect to the GUI host at ${host.url} — staying solo (${why})\n`);
+      return why;
     }
     att.wire.onmessage = (msg) => void this.fromHost(att, msg);
     att.wire.onerror = (e) => this.d.log(`slidecraft mcp (forward): host error — ${e.message}\n`);
@@ -166,7 +186,7 @@ export class AdaptiveFront {
     this.pendingNote = undefined;
     this.d.log(forwardBanner(host.url)); // the same line --doctor parses (cli-banner.ts, R8)
     await this.send(LIST_CHANGED);
-    return true;
+    return undefined;
   }
 
   /** Leave forward mode (the router never holds two hosts). */
@@ -190,7 +210,7 @@ export class AdaptiveFront {
       await this.detach(att);
       this.d.watch.markDead(att.host);
       const step = decideHostLost(await this.d.watch.live(), att.host);
-      if (!(step.kind === "attach" && (await this.tryAttach(step.host)))) {
+      if (!(step.kind === "attach" && (await this.tryAttach(step.host)) === undefined)) {
         this.pendingNote = "host-lost";
         this.d.log("slidecraft mcp: back to solo (no deck)\n");
         await this.send(LIST_CHANGED);
@@ -209,8 +229,7 @@ export class AdaptiveFront {
     const via = this.forwarded.get(m.id);
     if (via === att) {
       this.forwarded.delete(m.id);
-      const code = codeOf((m as { result?: unknown }).result);
-      const note = await this.afterForwardedCall(att, code);
+      const note = await this.afterForwardedCall(att, verdictOf(m));
       if (note) {
         const r = m as { result?: ToolResult };
         if (r.result?.content) m = { ...m, result: withNote(r.result, frontNoteText(note, {})) } as JSONRPCMessage;
@@ -220,7 +239,13 @@ export class AdaptiveFront {
   }
 
   /** ADR-0040 D3-3/D3-5: what a forwarded call's outcome means for the adapter. */
-  private async afterForwardedCall(att: Attachment, code: string | undefined): Promise<FrontNote | undefined> {
+  private async afterForwardedCall(att: Attachment, verdict: ReturnType<typeof verdictOf>): Promise<FrontNote | undefined> {
+    if (verdict === "admitted") {
+      void att.afterAdmitted(); // keep the secret for the next launch (settled once the host hands it over)
+      return undefined;
+    }
+    if (verdict === "unknown") return undefined; // proves nothing either way — the claim stays for a later call
+    const { code } = verdict;
     if (code === "authorization-pending") return undefined; // the host's text already asks for [許可]
     if (code === "authorization-denied") {
       this.deniedKey = hostKey(att.host);
@@ -236,12 +261,11 @@ export class AdaptiveFront {
       if (this.att === att) {
         await this.detach(att);
         this.serial(async () => {
-          if (!this.att && !(await this.tryAttach(att.host))) await this.send(LIST_CHANGED);
+          if (!this.att && (await this.tryAttach(att.host)) !== undefined) await this.send(LIST_CHANGED);
         });
       }
       return "reapplied";
     }
-    void att.afterAdmitted(); // admitted: keep the secret for the next launch (once)
     return undefined;
   }
 

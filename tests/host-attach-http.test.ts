@@ -105,6 +105,43 @@ describe("attachHost ⇄ the #727 approval API", () => {
     expect(creds.ensure()).toEqual({ clientId });
   });
 
+  it("clientInfo with surrounding spaces / over 100 chars: first launch allowed → the next launch still proves it (R8: one normalization)", async () => {
+    host = await createCollabHost({ port: 0, hostJsonPath: null, approvalWaitMs: 50, seedWaitMs: 50 });
+    const g = await gui();
+    const creds = new CredentialFile(join(dir, "clip.json"));
+    const odd = { ...INIT, clientInfo: { name: "  Claude Desktop  ", version: "9".repeat(101) } };
+
+    const a1 = await attachHost(hs(), odd, creds);
+    closers.push(() => a1.close());
+    expect(await wireCall(a1, "list_documents", 1)).toMatchObject({ code: "authorization-pending" });
+    const [req] = ((await guiCall(g, "list_client_approvals")) as unknown as ApprovalView).pending;
+    await guiCall(g, "decide_client_approval", { requestId: req.requestId, decision: "allow" });
+    expect(await wireCall(a1, "list_documents", 2)).toHaveProperty("documents");
+    await a1.afterAdmitted();
+    expect(creds.ensure().secret).toBeTruthy();
+
+    const a2 = await attachHost(hs(), odd, creds);
+    closers.push(() => a2.close());
+    expect(await wireCall(a2, "list_documents", 1)).toHaveProperty("documents"); // HMAC proof, not proof-failed
+    expect(((await guiCall(g, "list_client_approvals")) as unknown as ApprovalView).pending).toHaveLength(0);
+  });
+
+  it("an early afterAdmitted (before [許可]) does not burn the claim — the later admitted call still saves the secret", async () => {
+    host = await createCollabHost({ port: 0, hostJsonPath: null, approvalWaitMs: 50, seedWaitMs: 50 });
+    const g = await gui();
+    const creds = new CredentialFile(join(dir, "early.json"));
+    const a = await attachHost(hs(), INIT, creds);
+    closers.push(() => a.close());
+    await a.afterAdmitted(); // nothing to claim yet (404) — must stay retryable
+    expect(creds.ensure().secret).toBeUndefined();
+    expect(await wireCall(a, "list_documents", 1)).toMatchObject({ code: "authorization-pending" });
+    const [req] = ((await guiCall(g, "list_client_approvals")) as unknown as ApprovalView).pending;
+    await guiCall(g, "decide_client_approval", { requestId: req.requestId, decision: "allow" });
+    expect(await wireCall(a, "list_documents", 2)).toHaveProperty("documents");
+    await a.afterAdmitted();
+    expect(creds.ensure().secret).toBeTruthy();
+  });
+
   it("a dead host rejects the attach (never hangs)", async () => {
     const t0 = Date.now();
     await expect(attachHost({ url: "http://127.0.0.1:9/mcp", token: "x", pid: 1, startedAt: "y" }, INIT, new CredentialFile(join(dir, "d.json")), { timeoutMs: 1000 })).rejects.toThrow();

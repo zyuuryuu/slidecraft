@@ -158,6 +158,20 @@ describe("solo with a deck + a live host → stays solo, note says how to connec
   });
 });
 
+describe("a live host that cannot be attached (never silent)", () => {
+  it("the ping answered but the attach failed → solo answers this call with a note saying so", async () => {
+    const t = setup();
+    t.hosts[H1.url].state.dead = true; // attach refuses
+    await t.start();
+    t.setLive(H1);
+    const r = await t.call("get_project_info");
+    expect(String(r.note)).toContain("接続できませんでした");
+    expect(String(r.note)).toContain("connection refused");
+    expect(t.watch.markDead).toHaveBeenCalledWith(H1);
+    expect(await t.call("get_project_info")).not.toHaveProperty("note"); // said once, not on every call
+  });
+});
+
 describe("forward + host lost", () => {
   it("no new host → solo without a deck, the call is answered by solo with a note, list_changed again", async () => {
     const t = setup();
@@ -198,6 +212,25 @@ describe("authorization outcomes (ADR-0040 D3-3/D3-5)", () => {
     expect(t.redeemed).toEqual([]); // not admitted → no claim redeemed
     t.hosts[H1.url].state.gate = undefined;
     expect(titles(await t.call("list_documents"))).toEqual(["H1"]); // still forwarding: allowed now
+  });
+
+  it("an SDK-level refusal (unknown tool / bad arguments, answered before the call gate) is not taken as admission", async () => {
+    const t = setup();
+    t.hosts[H1.url].state.gate = "authorization-pending";
+    await t.start();
+    t.setLive(H1);
+    // The SDK answers these itself, before the tool's handler (so before admitCall): an isError result with plain
+    // text, or a JSON-RPC error — neither proves the host admitted this client.
+    const unknown = await t.ai.callTool({ name: "no_such_tool", arguments: {} }).catch((e: unknown) => e);
+    expect(unknown).toMatchObject({ isError: true });
+    const bad = await t.ai.callTool({ name: "open_document", arguments: { docId: 42 } }).catch((e: unknown) => e);
+    expect(bad).not.toHaveProperty("content.0.text", expect.stringContaining("documents"));
+    await flush();
+    expect(t.redeemed).toEqual([]); // the claim is redeemed only after a call the host admitted
+    t.hosts[H1.url].state.gate = undefined;
+    expect(titles(await t.call("list_documents"))).toEqual(["H1"]);
+    await flush();
+    expect(t.redeemed).toEqual([H1.url]);
   });
 
   it("authorization-denied → the adapter keeps working solo and does not ask that host launch again", async () => {

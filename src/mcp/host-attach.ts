@@ -13,7 +13,7 @@
 import { randomBytes } from "crypto";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { LATEST_PROTOCOL_VERSION, type JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
-import { proofFor, type ClientInfo } from "./host-approval";
+import { clientInfoOf, proofFor, type ClientInfo } from "./host-approval";
 import type { CredentialFile } from "./client-credentials";
 import type { HostHandshake } from "./host-json";
 
@@ -29,7 +29,8 @@ export interface FrontWire {
 }
 
 /** What the adapter remembers from the AI's `initialize` — the ONE place clientInfo is taken from (ADR-0038:
- *  when `initialize` goes away, only this extraction changes). Missing → "不明なクライアント" (ADR-0040 D2). */
+ *  when `initialize` goes away, only this extraction changes). Normalized by host-approval.clientInfoOf — the
+ *  host's own rule (R8) — so the pair the adapter proves is the pair the host keyed. Missing → "不明なクライアント". */
 export interface InitParams {
   protocolVersion?: string;
   capabilities?: unknown;
@@ -37,17 +38,16 @@ export interface InitParams {
 }
 
 export function initParamsOf(params: unknown): InitParams {
-  const p = (params ?? {}) as { protocolVersion?: unknown; capabilities?: unknown; clientInfo?: { name?: unknown; version?: unknown } };
-  const name = typeof p.clientInfo?.name === "string" && p.clientInfo.name.trim() ? p.clientInfo.name : "不明なクライアント";
-  const version = typeof p.clientInfo?.version === "string" && p.clientInfo.version.trim() ? p.clientInfo.version : "?";
-  return { protocolVersion: typeof p.protocolVersion === "string" ? p.protocolVersion : undefined, capabilities: p.capabilities, clientInfo: { name, version } };
+  const p = (params ?? {}) as { protocolVersion?: unknown; capabilities?: unknown; clientInfo?: unknown };
+  return { protocolVersion: typeof p.protocolVersion === "string" ? p.protocolVersion : undefined, capabilities: p.capabilities, clientInfo: clientInfoOf(p.clientInfo) };
 }
 
 export interface Attachment {
   host: HostHandshake;
   /** started and initialized; the router sets onmessage */
   wire: FrontWire;
-  /** After a call was admitted: exchange the one-time claim for the secret and keep it (once; no-op after). */
+  /** Call ONLY after a call the host admitted (adaptive-front.admittedBy): exchange the one-time claim for the
+   *  secret and keep it. Done for good once the host hands the secret over (200); a 404 leaves it retryable. */
   afterAdmitted(): Promise<void>;
   /** The grant was revoked (D3-5): drop the kept secret, so the next attach applies afresh. */
   forgetSecret(): void;
@@ -100,7 +100,7 @@ export async function attachHost(host: HostHandshake, init: InitParams, creds: C
     doFetch(new URL(path, host.url), { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
 
   const cred = creds.ensure();
-  const info = init.clientInfo;
+  const info = clientInfoOf(init.clientInfo); // idempotent; guards callers that pass raw clientInfo (R8)
   const claim = randomBytes(24).toString("base64url"); // memory only (D3-4)
   const apply: Record<string, string> = { "x-slidecraft-client-id": cred.clientId, "x-slidecraft-client-claim": claim };
   if (cred.secret && cred.version === info.version) {
@@ -122,27 +122,40 @@ export async function attachHost(host: HostHandshake, init: InitParams, creds: C
   const wire: FrontWire = transport;
   try {
     await wire.start();
-    await handshake(wire, init, timeoutMs);
+    await handshake(wire, { ...init, clientInfo: info }, timeoutMs);
   } catch (e) {
     await transport.close().catch(() => {});
     throw e;
   }
 
+  // Settled for good only when the host handed the secret over (200), or when this attach PROVED a kept secret and
+  // an admitted call then finds nothing to claim (approved by that proof). Any other 404 stays retryable: a claim
+  // must never be written off on a call the host did not admit (#735 review — otherwise the secret is lost and the
+  // next launch is locked out by proof-failed).
+  const proved = "x-slidecraft-client-proof" in apply;
   let redeemed = false;
+  let inFlight: Promise<void> | undefined;
+  const redeem = async (): Promise<void> => {
+    try {
+      const r = await post("/auth/claim", { clientId: cred.clientId, claim });
+      if (!r.ok) {
+        if (proved) redeemed = true;
+        return;
+      }
+      const { secret } = (await r.json()) as { secret?: unknown };
+      if (typeof secret === "string" && secret) creds.saveSecret(info.version, secret);
+      redeemed = true;
+    } catch {
+      /* the host went away; the next attach applies again */
+    }
+  };
   return {
     host,
     wire,
-    afterAdmitted: async () => {
-      if (redeemed) return;
-      redeemed = true;
-      try {
-        const r = await post("/auth/claim", { clientId: cred.clientId, claim });
-        if (!r.ok) return; // approved by proof (nothing to claim), or another applicant's claim — nothing to keep
-        const { secret } = (await r.json()) as { secret?: unknown };
-        if (typeof secret === "string" && secret) creds.saveSecret(info.version, secret);
-      } catch {
-        /* the host went away; the next attach applies again */
-      }
+    afterAdmitted: () => {
+      if (redeemed) return Promise.resolve();
+      inFlight ??= redeem().finally(() => (inFlight = undefined));
+      return inFlight;
     },
     forgetSecret: () => creds.clearSecret(),
     close: () => transport.close(),

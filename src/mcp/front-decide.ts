@@ -16,7 +16,7 @@
  */
 import type { HostHandshake } from "./host-json";
 
-export type FrontNote = "host-found-deck-open" | "host-lost" | "denied-stay-solo" | "reapplied";
+export type FrontNote = "host-found-deck-open" | "host-lost" | "denied-stay-solo" | "reapplied" | "attach-failed";
 
 export type FrontStep = { kind: "solo"; note?: FrontNote } | { kind: "attach"; host: HostHandshake };
 
@@ -81,7 +81,7 @@ export class HostWatch {
 }
 
 /** What the AI reads in the result's `note` (the only UX change of #728 — MCP return text). */
-export function frontNoteText(note: FrontNote, ctx: { docId?: string }): string {
+export function frontNoteText(note: FrontNote, ctx: { docId?: string; reason?: string }): string {
   switch (note) {
     case "host-found-deck-open":
       return `GUI の協働ホストが見つかりました。つなぐには、今の deck を保存してから close_document で閉じてください（docId: ${ctx.docId ?? "?"}。未保存のまま閉じるには force: true）。閉じた後の呼び出しから GUI につながります。`;
@@ -89,6 +89,8 @@ export function frontNoteText(note: FrontNote, ctx: { docId?: string }): string 
       return "GUI の協働ホストとの接続が切れたため、この AI アプリの中の単独モードに戻りました（deck なし）。GUI で開いていた deck はここにはありません。GUI を起動し直すと、次の呼び出しで自動的につながります。";
     case "denied-stay-solo":
       return "この AI アプリの中の単独モードで動き続けます（GUI の deck とはつながっていません）。GUI を起動し直すと、もう一度接続を申し込みます。";
+    case "attach-failed":
+      return `GUI の協働ホストは見つかりましたが、接続できませんでした（理由: ${ctx.reason ?? "不明"}）。この呼び出しは、この AI アプリの中の単独モードで答えています。GUI を起動し直すと、次の呼び出しでもう一度つなぎます。`;
     case "reapplied":
       return "接続の許可を申し込み直しました。SlideCraft の GUI で許可してから、呼び出しをやり直してください。";
   }
