@@ -1,0 +1,29 @@
+{
+  "viewBox": "0 0 138.4 510",
+  "nodes": [
+    {
+      "id": "state-Approved-4",
+      "transform": "translate(71.8, 328)"
+    },
+    {
+      "id": "state-Draft-2",
+      "transform": "translate(71.8, 92)"
+    },
+    {
+      "id": "state-Published-5",
+      "transform": "translate(71.8, 418)"
+    },
+    {
+      "id": "state-Review-3",
+      "transform": "translate(71.8, 210)"
+    },
+    {
+      "id": "state-root_end-5",
+      "transform": "translate(71.8, 495)"
+    },
+    {
+      "id": "state-root_start-0",
+      "transform": "translate(71.8, 15)"
+    }
+  ]
+}

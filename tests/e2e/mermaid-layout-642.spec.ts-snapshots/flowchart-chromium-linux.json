@@ -1,0 +1,29 @@
+{
+  "viewBox": "0 0 330 669.8",
+  "nodes": [
+    {
+      "id": "flowchart-A-0",
+      "transform": "translate(153, 35)"
+    },
+    {
+      "id": "flowchart-B-1",
+      "transform": "translate(153, 218.8)"
+    },
+    {
+      "id": "flowchart-C-3",
+      "transform": "translate(153, 402.6)"
+    },
+    {
+      "id": "flowchart-D-7",
+      "transform": "translate(62, 506.6)"
+    },
+    {
+      "id": "flowchart-E-9",
+      "transform": "translate(153, 622.7)"
+    },
+    {
+      "id": "flowchart-F-11",
+      "transform": "translate(244, 506.6)"
+    }
+  ]
+}
