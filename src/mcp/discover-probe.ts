@@ -22,8 +22,8 @@
  * already emits for a parseable probe — one meaning, one shape (R8).
  *
  * The reply is static and touches no deck state: this is not a second control plane (ADR-0033). In
- * forward mode the same filter sits in front of the relay's local transport, so the probe is answered
- * here and never forwarded to the host.
+ * forward mode the same filter is the adapter's local wire (adaptive-front.ts, #728), so the probe is
+ * answered here and never forwarded to the host.
  */
 import { Transform, type Readable, type Writable } from "node:stream";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -82,7 +82,7 @@ class ProbeLineFilter extends Transform {
 }
 
 /** A `StdioServerTransport` whose input passes through the probe filter. Drop-in for
- *  `new StdioServerTransport()` in cli.ts (solo) and as the relay's local side (forward). The reply is
+ *  `new StdioServerTransport()` — cli.ts hands it to the adaptive front as its local wire (solo and forward). The reply is
  *  sent through the transport itself, so stdout has ONE writer and one serializer. */
 export function createProbeAwareStdio(stdin: Readable = process.stdin, stdout: Writable = process.stdout): StdioServerTransport {
   const filter = new ProbeLineFilter();

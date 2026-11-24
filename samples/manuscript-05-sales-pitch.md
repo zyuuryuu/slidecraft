@@ -173,6 +173,9 @@ Source: 価格は仮置き
 
 # 次のステップ
 
+<!-- col -->
 - 11 月中: パイロット部門の選定
 - 12 月: 試験運用キックオフ
-- 連絡先: hubble-pj@example.com
+
+<!-- col -->
+連絡先: hubble-pj@example.com

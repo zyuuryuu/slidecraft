@@ -7,7 +7,7 @@
  * Layers: probeServer over an in-process server (fast, exact), the banner format↔parse agreement (R8: the
  * mode line cli.ts prints is the one doctor reads), and the real CLI end to end.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { PassThrough } from "node:stream";
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -20,8 +20,11 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { buildServer } from "../src/mcp/server";
 import { createSession } from "../src/mcp/session";
 import { createProbeAwareStdio } from "../src/mcp/discover-probe";
-import { createLineChannel, probeServer, doctorChildArgs, formatDoctorReport, type DoctorReport } from "../src/mcp/doctor";
+import { createLineChannel, probeServer, doctorChildArgs, formatDoctorReport, checkCollabHost, type DoctorReport } from "../src/mcp/doctor";
+import { HostWatch, isHandshake } from "../src/mcp/front-decide";
 import { soloReadyBanner, forwardBanner, parseModeBanner } from "../src/mcp/cli-banner";
+import { createCollabHost, type CollabHost } from "../src/mcp/host";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 /** client→server and server→client pipes, as a spawned child's stdin/stdout would be. */
 function pipes() {
@@ -103,6 +106,7 @@ describe("formatDoctorReport — one screen, verdict last", () => {
     discover: { ok: true, ms: 3, value: { kind: "legacy-only" } },
     initialize: { ok: true, ms: 40, value: { name: "slidecraft", version: "0.5.0", protocolVersion: "2025-06-18" } },
     tools: { ok: true, ms: 5, value: { count: 35 } },
+    host: { path: "/d/host.json", file: "none" },
     exit: null,
     stderr: "",
     ok: true,
@@ -134,6 +138,85 @@ describe("formatDoctorReport — one screen, verdict last", () => {
     expect(t).toMatch(/forward.*http:\/\/127\.0\.0\.1:9\/mcp/);
     expect(t).toMatch(/--metrics m/);
   });
+  it("the collab host line: live / stale / none / unreadable, each with what it saw (#736)", () => {
+    const live = formatDoctorReport({ ...base, host: { path: "/d/host.json", file: "present", url: "http://127.0.0.1:9/mcp", startedAt: "2026-11-24T00:00:00.000Z", alive: true } });
+    expect(live).toMatch(/協働ホスト.*host\.json あり・ping 応答あり（http:\/\/127\.0\.0\.1:9\/mcp・startedAt 2026-11-24T00:00:00\.000Z）/);
+    const stale = formatDoctorReport({ ...base, host: { path: "/d/host.json", file: "present", url: "http://127.0.0.1:9/mcp", startedAt: "s", alive: false } });
+    expect(stale).toMatch(/協働ホスト.*host\.json あり・ping 応答なし（http:\/\/127\.0\.0\.1:9\/mcp・startedAt s）/);
+    expect(formatDoctorReport(base)).toMatch(/協働ホスト.*なし（host\.json なし — \/d\/host\.json）/);
+    expect(formatDoctorReport({ ...base, host: { path: "/d/host.json", file: "invalid" } })).toMatch(/協働ホスト.*なし（host\.json を読めません — \/d\/host\.json）/);
+    expect(live.trimEnd().split("\n").at(-1)).toMatch(/^結果: OK/); // informational: the verdict is unchanged
+    expect(live.split("\n").length).toBeLessThanOrEqual(20);
+  });
+});
+
+// ── the collab host check (#736): HostWatch once, never an approval application ────────────────────────
+const hostJsonDir = mkdtempSync(join(tmpdir(), "slidecraft-doctor-host-"));
+let collab: CollabHost | undefined;
+afterEach(async () => {
+  await collab?.close();
+  collab = undefined;
+});
+afterAll(() => rmSync(hostJsonDir, { recursive: true, force: true }));
+
+/** How many AI applications wait for [許可] on the host — read through the GUI's own tool. */
+async function pendingApprovals(h: CollabHost): Promise<number> {
+  const gui = new Client({ name: "gui", version: "1" });
+  await gui.connect(new StreamableHTTPClientTransport(new URL(h.url), { requestInit: { headers: { Authorization: `Bearer ${h.guiToken}` } } }));
+  const r = (await gui.callTool({ name: "list_client_approvals", arguments: {} })) as { content: { text: string }[] };
+  await gui.close();
+  return (JSON.parse(r.content[0].text) as { pending: unknown[] }).pending.length;
+}
+
+describe("checkCollabHost — what --doctor says about the GUI's collab host", () => {
+  it("host.json + a live host → ping answered, url and startedAt reported, NO approval application on the host", async () => {
+    const path = join(hostJsonDir, "live.json");
+    collab = await createCollabHost({ port: 0, hostJsonPath: path });
+    const r = await checkCollabHost(path);
+    expect(r).toEqual({ path, file: "present", url: collab.url, startedAt: expect.any(String), alive: true });
+    expect(await pendingApprovals(collab)).toBe(0);
+  });
+  it("no host.json → none", async () => {
+    const path = join(hostJsonDir, "absent.json");
+    expect(await checkCollabHost(path)).toEqual({ path, file: "none" });
+  });
+  it("host.json left by a host that is gone → present, ping not answered", async () => {
+    const path = join(hostJsonDir, "stale.json");
+    writeFileSync(path, JSON.stringify({ url: "http://127.0.0.1:9/mcp", token: "t", pid: 1, startedAt: "s" }));
+    expect(await checkCollabHost(path, async () => false)).toEqual({ path, file: "present", url: "http://127.0.0.1:9/mcp", startedAt: "s", alive: false });
+  });
+  it("host.json that is not a handshake (no url/token) → invalid, never pinged", async () => {
+    const path = join(hostJsonDir, "bad.json");
+    writeFileSync(path, "{\"pid\":1}");
+    let pinged = 0;
+    expect(await checkCollabHost(path, async () => (pinged++, true))).toEqual({ path, file: "invalid" });
+    expect(pinged).toBe(0);
+  });
+  it("isHandshake is the ONE validity rule: HostWatch.live() and checkCollabHost agree with it on every shape, and never ping an invalid one (R8)", async () => {
+    const shapes: Record<string, string> = {
+      valid: '{"url":"http://127.0.0.1:9/mcp","token":"t","pid":1,"startedAt":"s"}',
+      noUrl: '{"token":"t","pid":1,"startedAt":"s"}',
+      noToken: '{"url":"http://127.0.0.1:9/mcp","pid":1,"startedAt":"s"}',
+      urlNotString: '{"url":1,"token":"t","startedAt":"s"}',
+      tokenNotString: '{"url":"http://127.0.0.1:9/mcp","token":null,"startedAt":"s"}',
+      number: "42",
+      string: '"http://127.0.0.1:9/mcp"',
+      array: "[]",
+    };
+    for (const [name, text] of Object.entries(shapes)) {
+      const path = join(hostJsonDir, `shape-${name}.json`);
+      writeFileSync(path, text);
+      const valid = isHandshake(JSON.parse(text));
+      expect(valid, name).toBe(name === "valid");
+      let pinged = 0;
+      const ping = async () => (pinged++, true);
+      const live = await new HostWatch(() => JSON.parse(text), ping).live();
+      expect(live !== null, `${name}: HostWatch.live`).toBe(valid);
+      const r = await checkCollabHost(path, ping);
+      expect(r.file, `${name}: checkCollabHost`).toBe(valid ? "present" : "invalid");
+      expect(pinged, `${name}: pings`).toBe(valid ? 2 : 0);
+    }
+  });
 });
 
 // ── the real CLI, end to end ────────────────────────────────────────────────────────────────────────
@@ -145,9 +228,9 @@ beforeAll(() => {
   expect(existsSync(cliJs)).toBe(true);
 }, 60_000);
 
-function runDoctorCli(args: string[]): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  // A fresh host.json location: no live GUI host can be discovered, so the child runs solo.
-  const env = { ...process.env, SLIDECRAFT_HOST_JSON: join(tmpdir(), `slidecraft-doctor-none-${process.pid}.json`) };
+function runDoctorCli(args: string[], hostJson = join(tmpdir(), `slidecraft-doctor-none-${process.pid}.json`)): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  // By default a fresh host.json location: no live GUI host can be discovered, so the child runs solo.
+  const env = { ...process.env, SLIDECRAFT_HOST_JSON: hostJson };
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [cliJs, "--doctor", ...args], { env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
@@ -201,5 +284,25 @@ describe("slidecraft-mcp --doctor (real CLI)", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("slidecraft-mcp --doctor (real CLI) — the collab host line (#736)", () => {
+  const IT = { timeout: 30_000, retry: 1 } as const;
+
+  it("no GUI host: the line says none, the verdict is still OK", IT, async () => {
+    const { code, stdout } = await runDoctorCli([]);
+    expect(stdout).toMatch(/協働ホスト.*なし（host\.json なし/);
+    expect(code).toBe(0);
+  });
+
+  it("a live GUI host with host.json: ping answered with its URL — and no approval dialog was asked for", IT, async () => {
+    const path = join(hostJsonDir, "cli-live.json");
+    collab = await createCollabHost({ port: 0, hostJsonPath: path });
+    const { code, stdout } = await runDoctorCli([], path);
+    expect(stdout).toMatch(/協働ホスト.*host\.json あり・ping 応答あり/);
+    expect(stdout).toContain(collab.url);
+    expect(await pendingApprovals(collab)).toBe(0);
+    expect(code).toBe(0);
   });
 });

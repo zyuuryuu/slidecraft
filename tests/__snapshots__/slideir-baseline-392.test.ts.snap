@@ -4656,9 +4656,7 @@ edges:
         "sourceLineStart": 153,
       },
       {
-        "diagram": undefined,
         "layout": "auto",
-        "mermaidBlock": undefined,
         "placeholders": [
           {
             "idx": "15",
@@ -4691,8 +4689,12 @@ edges:
                   },
                 ],
               },
+            ],
+          },
+          {
+            "idx": "2",
+            "paragraphs": [
               {
-                "bullet": true,
                 "segments": [
                   {
                     "text": "連絡先: hubble-pj@example.com",
@@ -4702,7 +4704,7 @@ edges:
             ],
           },
         ],
-        "sourceLineEnd": 179,
+        "sourceLineEnd": 182,
         "sourceLineStart": 173,
       },
     ],
@@ -9992,7 +9994,8 @@ Source: 価格は仮置き
 
 - 11 月中: パイロット部門の選定
 - 12 月: 試験運用キックオフ
-- 連絡先: hubble-pj@example.com
+
+連絡先: hubble-pj@example.com
 "
 `;
 
