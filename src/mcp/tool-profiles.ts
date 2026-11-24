@@ -23,6 +23,7 @@
  *    solo undo→redo round-trip が実測）。Issue #465 の基準「迷ったら見せる側へ倒す」。
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { fail, withNote, type ToolResult } from "./tool-result";
 
 export type McpProfile = "solo" | "collab-gui" | "collab-ai";
 
@@ -91,6 +92,12 @@ export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
   use_template: ALL,
   // GUI 専用（webview → host の push 口）
   register_templates: GUI,
+  // GUI 専用: AI クライアントの承認と seed の受け渡し（#727・ADR-0040 D1/D3。approval-tools.ts）
+  list_client_approvals: GUI,
+  decide_client_approval: GUI,
+  load_client_grants: GUI,
+  revoke_client_approval: GUI,
+  report_seed: GUI,
   // テンプレ派生（#568 段 3 / #570 段 3）— doc のテンプレを派生に差し替える。collab では GUI へ同期する（#616）。
   augment_template: ALL,
   adjust_template: ALL,
@@ -106,12 +113,38 @@ export function isToolVisible(name: string, profile: McpProfile): boolean {
 /** 登録される handler を包む任意のフック（#512 計測）。全ツールが通るこのゲートが唯一の差し込み点。 */
 export type HandlerWrap = (name: string, profile: McpProfile, cfg: { inputSchema?: unknown }, cb: never) => unknown;
 
+type Handler = (...a: unknown[]) => Promise<ToolResult> | ToolResult;
+
+/** #727 (ADR-0040 D3): the ONE call gate — every tool of a connection whose host sets `admitCall` (collab AI)
+ *  passes it before running. A refusal (authorization-* / host-not-ready) is the normal {ok:false,code}
+ *  envelope; a returned note rides the result. The handler's last argument is the SDK's `extra`. */
+function gateCall(admitCall: (extra: unknown) => Promise<string | undefined>, cb: Handler): Handler {
+  return async (...a: unknown[]) => {
+    let note: string | undefined;
+    try {
+      note = await admitCall(a[a.length - 1]);
+    } catch (e) {
+      return fail(e);
+    }
+    const r = await cb(...a);
+    return note ? withNote(r, note) : r;
+  };
+}
+
 /** server.registerTool と同型のゲート: 表でこのプロファイルに出すと決めたツールだけ登録する。
  *  server.ts は全登録をこれ経由にする（call site に per-tool の if を書かない — R8）。
- *  `wrap` 省略時（計測 OFF）は handler をそのまま登録する。 */
-export function gatedToolRegistrar(server: McpServer, host: { solo?: boolean; sharedOnly: boolean }, wrap?: HandlerWrap): McpServer["registerTool"] {
+ *  `wrap` 省略時（計測 OFF）は handler をそのまま登録する。`host.admitCall` があれば（協働 AI・#727）呼び出しの
+ *  承認ゲートを一番外側に巻く（承認の判定はこの 1 か所 — R8）。 */
+export function gatedToolRegistrar(
+  server: McpServer,
+  host: { solo?: boolean; sharedOnly: boolean; admitCall?: (extra: unknown) => Promise<string | undefined> },
+  wrap?: HandlerWrap,
+): McpServer["registerTool"] {
   const profile = profileOf(host);
   const register = server.registerTool.bind(server) as (name: string, cfg: unknown, cb: unknown) => unknown;
-  return ((name: string, cfg: { inputSchema?: unknown }, cb: never) =>
-    isToolVisible(name, profile) ? register(name, cfg, wrap ? wrap(name, profile, cfg, cb) : cb) : undefined) as McpServer["registerTool"];
+  return ((name: string, cfg: { inputSchema?: unknown }, cb: never) => {
+    if (!isToolVisible(name, profile)) return undefined;
+    const inner = (wrap ? wrap(name, profile, cfg, cb) : cb) as Handler;
+    return register(name, cfg, host.admitCall ? gateCall(host.admitCall, inner) : inner);
+  }) as McpServer["registerTool"];
 }

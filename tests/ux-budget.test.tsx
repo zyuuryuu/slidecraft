@@ -197,9 +197,12 @@ describe("UX 予算（ADR-0039）", () => {
       sourceName: "会社",
       slots: { major: { latin: "Arial", ea: "", jpan: "" }, minor: { latin: "Arial", ea: "", jpan: "" } },
     } as unknown as AdjustSession;
-    for (const adjusting of [false, true]) for (const intake of [false, true]) for (const update of [false, true]) {
+    // #727: 接続の許可待ち（件数）と、許可の保存失敗（同じ approval の帯）も、帯 1 本の予算に入る。
+    const approvals = [null, { count: 2 }, { count: 0, unsaved: true, onDismissUnsaved: noop }] as const;
+    for (const approval of approvals) for (const adjusting of [false, true]) for (const intake of [false, true]) for (const update of [false, true]) {
       const html = renderToStaticMarkup(
         <NoticeSlot
+          approval={approval}
           update={update ? { latestVersion: "9.9.9", onDismiss: noop } : null}
           intake={{ busy: null, result: intake ? result : null, onDismiss: noop }}
           adjust={adjusting ? { session, busy: false, onPreview: noop, onApply: noop, onCancel: noop } : null}
@@ -207,7 +210,9 @@ describe("UX 予算（ADR-0039）", () => {
       );
       // 帯の根は role="status"（更新通知・取り込み結果）か role="region"（テンプレ調整）。
       const bands = (html.match(/role="(status|region)"/g) ?? []).length;
-      expect(bands, `adjusting=${adjusting} intake=${intake} update=${update}`).toBeLessThanOrEqual(BUDGET.noticeBands);
+      const axes = `approval=${JSON.stringify(approval)} adjusting=${adjusting} intake=${intake} update=${update}`;
+      expect(bands, axes).toBeLessThanOrEqual(BUDGET.noticeBands);
+      if (approval) expect(html, axes).toContain('data-notice="approval"'); // the axis is really drawn, not skipped
     }
   });
 

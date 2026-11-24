@@ -26,7 +26,7 @@ let proj: CollabProjection | undefined;
 let ai: CollabClient | undefined;
 let gui: CollabClient | undefined;
 beforeEach(async () => {
-  host = await createCollabHost({ port: 0, hostJsonPath: null });
+  host = await createCollabHost({ port: 0, hostJsonPath: null, requireClientApproval: false });
 });
 afterEach(async () => {
   for (const c of [proj, ai, gui]) {

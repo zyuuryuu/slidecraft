@@ -227,7 +227,7 @@ describe("collab host: metricsPath で全接続が 1 ファイルに profile 付
     const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
     const dir = mkdtempSync(join(tmpdir(), "slidecraft-metrics-host-"));
     const path = join(dir, "host.jsonl");
-    const host = await createCollabHost({ port: 0, hostJsonPath: null, metricsPath: path });
+    const host = await createCollabHost({ port: 0, hostJsonPath: null, metricsPath: path, requireClientApproval: false });
     try {
       const open = async (role?: "gui") => {
         const headers: Record<string, string> = { Authorization: `Bearer ${role === "gui" ? host.guiToken : host.token}` }; // #730: the GUI token IS the role

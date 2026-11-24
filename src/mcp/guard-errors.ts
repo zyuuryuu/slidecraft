@@ -25,7 +25,12 @@ export type GuardCode =
   // ADR-0035 stage 3 (scoped fs input, #299) — open_project / new_project:
   | "scope-file-not-found" // path names no file under the --root scope
   | "ambiguous-input" // both dataBase64/templateBase64 AND path/templatePath were supplied
-  | "missing-input"; // neither dataBase64/templateBase64 NOR path/templatePath was supplied
+  | "missing-input" // neither dataBase64/templateBase64 NOR path/templatePath was supplied
+  // ADR-0040 (#727) — the always-on collab host: client approval + the GUI deck's seed wait:
+  | "authorization-pending" // this AI client is waiting for [許可] in the SlideCraft GUI (retry after allowing)
+  | "authorization-denied" // the human denied it (or deny-all / too many waiting) — keep working solo
+  | "authorization-revoked" // the human revoked it in the 協働 panel — apply again
+  | "host-not-ready"; // the GUI's deck is still being loaded onto the host — retry shortly
 
 /** The single GuardError → { ok:false, error, code } mapping (R8: one envelope shape — server.ts's
  *  fail() and the bootstrap sections share it instead of re-typing the object in two places). */
