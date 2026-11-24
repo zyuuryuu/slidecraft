@@ -17,7 +17,7 @@ import { clientInfoOf, proofFor, type ClientInfo } from "./host-approval";
 import type { CredentialFile } from "./client-credentials";
 import type { HostHandshake } from "./host-json";
 
-/** Structural subset of the SDK's Transport (same shape as mcp-relay's RelayTransport). */
+/** Structural subset of the SDK's Transport (every SDK transport we use — stdio, Streamable HTTP, in-memory — fits it). */
 export interface FrontWire {
   start(): Promise<void>;
   send(message: JSONRPCMessage): Promise<void>;

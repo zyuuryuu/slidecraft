@@ -52,11 +52,13 @@ function setup(opts: { hosts?: Record<string, ReturnType<typeof fakeHost>> } = {
   const redeemed: string[] = [];
   const forgot: string[] = [];
   const attachInits: InitParams[] = [];
+  const hostServers: ReturnType<typeof buildServer>[] = [];
   const attach = vi.fn(async (h: HostHandshake, init: InitParams): Promise<Attachment> => {
     attachInits.push(init);
     const fh = hosts[h.url];
     if (!fh || fh.state.dead) throw new Error("connection refused");
     const server = buildServer(createSession(null), { host: fh.ctx, registerResources: false });
+    hostServers.push(server);
     const [c, s] = InMemoryTransport.createLinkedPair();
     await server.connect(s);
     const wire: FrontWire = {
@@ -93,7 +95,7 @@ function setup(opts: { hosts?: Record<string, ReturnType<typeof fakeHost>> } = {
     await ai.connect(aiEnd);
   };
   return {
-    start, call, ai, front, attach, watch, attachInits, redeemed, forgot, hosts,
+    start, call, ai, front, attach, watch, attachInits, redeemed, forgot, hosts, hostServers,
     setLive: (h: HostHandshake | null) => void (live = h),
     listChanged: () => listChanged,
     soloCtx,
@@ -137,6 +139,28 @@ describe("solo without a deck + a live host → that very call is forwarded", ()
     await t.call("list_documents");
     await flush();
     expect(t.redeemed).toEqual([H1.url]);
+  });
+});
+
+describe("while forwarding, the host's own messages reach the AI (the pass-through the old runRelay pinned — #736)", () => {
+  it("a host notification (deckChanged) is delivered to the AI as is", async () => {
+    const t = setup();
+    const seen: { method: string; params?: unknown }[] = [];
+    t.ai.fallbackNotificationHandler = async (n) => void seen.push(n);
+    await t.start();
+    t.setLive(H1);
+    await t.call("list_documents"); // attached
+    await t.hostServers[0].server.notification({ method: "notifications/slidecraft/deckChanged", params: { docId: "d1", rev: 2 } });
+    for (let i = 0; i < 100 && !seen.some((n) => n.method.endsWith("deckChanged")); i++) await flush();
+    expect(seen).toContainEqual({ jsonrpc: "2.0", method: "notifications/slidecraft/deckChanged", params: { docId: "d1", rev: 2 } });
+  });
+
+  it("the forwarding modules hold no deck state: adaptive-front.ts / host-attach.ts never import host-core or session (ADR-0033)", () => {
+    for (const f of ["adaptive-front.ts", "host-attach.ts"]) {
+      const src = readFileSync(resolve(__dirname, "../src/mcp", f), "utf8");
+      expect(src).not.toMatch(/from ["']\.\/host-core["']/);
+      expect(src).not.toMatch(/from ["']\.\/session["']/);
+    }
   });
 });
 
