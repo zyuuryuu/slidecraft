@@ -60,6 +60,9 @@ async function mount(node: ReactElement) {
   await act(async () => root!.render(node));
 }
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+/** Base UI schedules the initial focus with requestAnimationFrame (floating-ui-react/utils/enqueueFocus.js), which
+ *  settle()'s setTimeout(0) does not wait for — under load the check then runs before the focus lands (flake). Poll. */
+const focusLands = (check: () => void) => act(async () => { await vi.waitFor(check); });
 
 const bar = (p: Partial<Parameters<typeof Toolbar>[0]> = {}) => (
   <Toolbar
@@ -247,6 +250,18 @@ describe("#724 PR-B 3: AI 接続設定（状態ピル → Popover）", () => {
     expect(popover()).toBeNull();
   });
 
+  // In Chromium a focused, closed <select> changes its value on ↓ (→ ai.setProvider): opening the settings must not
+  // put the focus on the provider select, so a keyboard user's first arrow press cannot switch the provider.
+  it("開いた直後のフォーカスは Popover 自体（role=dialog）にあり、プロバイダの <select> ではない", async () => {
+    await mount(<AiPanel onClose={noop} ai={fakeAi()} onApplySlide={noop} onOpenDraft={noop} />);
+    await press(pill());
+    await settle();
+    const p = popover() as HTMLElement;
+    expect(p.getAttribute("role")).toBe("dialog");
+    await focusLands(() => expect(document.activeElement).toBe(p));
+    expect(document.activeElement!.tagName).not.toBe("SELECT");
+  });
+
   it("⚙ →「AI 接続設定…」の要求（openSettingsTs）で開く", async () => {
     await mount(<AiPanel onClose={noop} ai={fakeAi()} onApplySlide={noop} onOpenDraft={noop} openSettingsTs={1} />);
     await settle();
@@ -275,7 +290,7 @@ describe("#724 PR-B 4: ダイアログ（原稿入力・テンプレートを作
     expect(host.contains(d)).toBe(false); // Portal
     expect(host.getAttribute("aria-hidden")).toBe("true"); // the app behind is hidden from assistive tech while open
     expect(d.getAttribute("aria-label")).toBe(t("initModal.dialogLabel"));
-    expect(document.activeElement).toBe(d);
+    await focusLands(() => expect(document.activeElement).toBe(d));
     expect(backdrop()).not.toBeNull();
   });
 
@@ -305,7 +320,7 @@ describe("#724 PR-B 4: ダイアログ（原稿入力・テンプレートを作
     await settle();
     const d = dialog()!;
     expect(d.getAttribute("aria-label")).toBe(t("templateCreator.dialogLabel"));
-    expect(d.contains(document.activeElement)).toBe(true);
+    await focusLands(() => expect(d.contains(document.activeElement)).toBe(true));
     expect(d.querySelector(`[aria-label="${t("dialog.close")}"]`)).not.toBeNull();
     await key(document.activeElement ?? d, "Escape");
     expect(onCancel).toHaveBeenCalledTimes(1);

@@ -82,6 +82,7 @@ export default function AiPanel({
   // Collapse the instruction box (keep scope + a truncated echo) so the 変更プレビュー below gets the room.
   const [promptCollapsed, setPromptCollapsed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null); // initial focus = the popover itself, not the provider <select> (↓ would switch it)
   const [tab, setTab] = useState<"gen" | "tasks">("gen");
   // Hub-level tab: this dock now houses both the AI assistant and the 協働 (live-collab) surface.
   const [hubTab, setHubTab] = useState<"assist" | "collab">(collabConnected ? "collab" : "assist");
@@ -308,7 +309,7 @@ export default function AiPanel({
               <span className="truncate">{ai.connection.label}</span>
               <span className="text-muted leading-none">⚙</span>
             </PopoverTrigger>
-            <PopoverContent data-testid="ai-settings-popover" align="end" className="w-[min(30rem,92vw)] gap-0 p-0 shadow-xl shadow-black/50">
+            <PopoverContent ref={settingsRef} initialFocus={settingsRef} data-testid="ai-settings-popover" align="end" className="w-[min(30rem,92vw)] gap-0 p-0 shadow-xl shadow-black/50">
               <AiSettingsPopover ai={ai} />
             </PopoverContent>
           </Popover>
