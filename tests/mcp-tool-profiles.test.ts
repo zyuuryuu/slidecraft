@@ -21,16 +21,19 @@ import { buildServer } from "../src/mcp/server";
 import { DocRegistry, MemTemplateStore, type HostContext } from "../src/mcp/host-core";
 import { TOOL_PROFILES, isToolVisible, profileOf } from "../src/mcp/tool-profiles";
 
-/** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 40 本。
+/** 全プロファイル共通の deck ツール（著作・read・レバー・出口・入口・undo/redo）— 41 本。
  *  #522 で get_deck_image / get_deck_html（deck 全枚のコンタクトシート＝ホット往復 29→1・ADR-0037 D3）を
  *  全プロファイルに追加（35→37）。#247 で set_review_rules（レビュー規則の on/off・診断の見え方の設定）を
  *  全プロファイルに追加（37→38）。#568 段 3 / #570 段 3 の augment_template / adjust_template は PR #606 D3 で
- *  一時 solo 専用だったが、#616 でテンプレ差し替えを GUI へ同期する経路ができたので全プロファイルへ（38→40）。 */
+ *  一時 solo 専用だったが、#616 でテンプレ差し替えを GUI へ同期する経路ができたので全プロファイルへ（38→40）。
+ *  #728（ADR-0040 D2）で close_document を solo にも出す（40→41）: 単独の deck を閉じてから GUI の協働ホストへ
+ *  乗り換えられるように。新ツールは作らず、未保存なら force が要るという既存の規則をそのまま使う。 */
 const SHARED_TOOLS = [
   "adjust_template",
   "apply_design_intent",
   "augment_template",
   "bootstrap",
+  "close_document",
   "convert_bullets_to_table",
   "create_template",
   "delete_slide",
@@ -68,8 +71,9 @@ const SHARED_TOOLS = [
   "use_template",
   "validate_deck",
 ];
-/** collab 専用（doc 切替系）: solo（常に 1 doc・GUI が一切繋がらない）には見せない。 */
-const COLLAB_ONLY_TOOLS = ["close_document", "list_documents", "select_document"];
+/** collab 専用（doc 切替系）: solo（常に 1 doc・GUI が一切繋がらない）には見せない。
+ *  close_document は #728 で全プロファイルへ移った（SHARED_TOOLS の注記を参照）。 */
+const COLLAB_ONLY_TOOLS = ["list_documents", "select_document"];
 /** GUI 専用: webview が master レジストリを push する口。AI からも solo からも見えない。
  *  #727（ADR-0040 D1/D3）: AI クライアントの承認（一覧・回答・keychain の grant の受け渡し・取り消し）と
  *  deck の seed 状態の口を GUI 専用で追加（AI の tools/list は不変＝AI が自分を承認する経路を作らない）。 */
@@ -103,7 +107,7 @@ async function listToolNames(host?: HostContext): Promise<string[]> {
 }
 
 describe("プロファイル別登録のスナップショット（ADR-0037 D2 / #465 受け入れ基準）", () => {
-  it("solo（stdio 単独）: collab 専用 4 本（doc 切替 3 本＋register_templates）が隠れ、残り全部が出る", async () => {
+  it("solo（stdio 単独）: collab 専用（doc 切替 2 本＋GUI 専用）が隠れ、残り全部が出る（close_document は #728 で solo にも出る）", async () => {
     expect(await listToolNames()).toEqual(EXPECTED.solo);
   });
 

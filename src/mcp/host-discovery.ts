@@ -46,10 +46,11 @@ export interface DiscoverOptions {
 
 /** A live host answers ANY HTTP response (even 400/401 — the token isn't even checked here) within
  *  the timeout; that alone proves the process is up and listening on that port. The actual protocol
- *  handshake (`initialize`) happens later, over the real relay — this is only a liveness probe, not
- *  a second implementation of the MCP handshake. A dead/stale entry times out or the connection is
+ *  handshake (`initialize`) happens later (host-attach.ts) — this is only a liveness probe, not
+ *  a second implementation of the MCP handshake. #728: the adapter's HostWatch (front-decide.ts) calls this
+ *  only when host.json's content changed. A dead/stale entry times out or the connection is
  *  refused, never hangs past `timeoutMs` — never-silent fallback to solo. */
-async function pingAlive(url: string, token: string, timeoutMs: number, fetchImpl: typeof fetch): Promise<boolean> {
+export async function pingAlive(url: string, token: string, timeoutMs: number, fetchImpl: typeof fetch = fetch): Promise<boolean> {
   try {
     const res = await fetchImpl(url, {
       method: "GET",

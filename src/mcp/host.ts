@@ -19,7 +19,7 @@ import type { AddressInfo } from "net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { ApprovalBook, type ApplyVia, type ApprovalPort, type ClientInfo, type ConnStatus, type DenyReason } from "./host-approval";
+import { ApprovalBook, clientInfoOf, type ApplyVia, type ApprovalPort, type ClientInfo, type ConnStatus, type DenyReason } from "./host-approval";
 import { SeedGate } from "./host-seed";
 import { resolveBindHost } from "./host-options";
 import { GuardError } from "./guard-errors";
@@ -233,14 +233,12 @@ const header = (req: IncomingMessage, name: string): string | undefined => {
   const v = req.headers[name];
   return Array.isArray(v) ? v[0] : v;
 };
-const clip = (v: unknown, fallback: string): string => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : fallback);
 
 /** #727: what an AI's `initialize` applies as. An adapter (stdio, #728) names its client id + one-time claim, or a
  *  nonce + HMAC proof; anything else is HTTP direct (bound to the session id the transport mints — `via`
  *  undefined here). null = a malformed client id (refused 400). clientInfo is display text, clipped. */
 function applicationOf(clientInfo: unknown, req: IncomingMessage): { info: ClientInfo; via?: ApplyVia } | null {
-  const ci = (clientInfo ?? {}) as { name?: unknown; version?: unknown };
-  const info: ClientInfo = { name: clip(ci.name, "不明なクライアント"), version: clip(ci.version, "?") };
+  const info: ClientInfo = clientInfoOf(clientInfo); // the SAME normalization the adapter proves with (R8)
   const clientId = header(req, "x-slidecraft-client-id");
   if (clientId === undefined) return { info };
   if (!CLIENT_ID.test(clientId)) return null;
