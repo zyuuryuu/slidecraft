@@ -5,6 +5,7 @@
  *  - i18nLeaks(file): TSX の画面に直書きされた文言（i18n の辞書を通らない文言）を列挙する。
  *  - menuDepth(html): 描画した HTML で、メニュー項目に届くまでの段数を数える。
  *  - groupItems(html) / isSegmentRow: メニューの区画ごとの項目数（セグメント行＝1 項目）。
+ *  - segmentRows(html): セグメント行ごとの選択肢数（Hick・#716）。groupItems と同じ走査（scanGroups）の別の出力。
  */
 import ts from "typescript";
 
@@ -112,10 +113,13 @@ export function isSegmentRow(children: ReadonlyArray<{ button: boolean; pressed:
   return children.length > 0 && children.every((c) => c.button && c.pressed);
 }
 
-/** 描画した HTML の `role="group"`（メニューの区画）ごとに、ボタンを含む直下の要素（＝項目）を数える。
- *  見出し・区切り線はボタンを含まないので数えない。スクロールする一覧（マスターの一覧）は 1 項目。
- *  セグメント行（isSegmentRow）は区画として返さず、それを含む区画の 1 項目になる。 */
-export function groupItems(html: string): Array<{ label: string; items: number }> {
+/** 配列から idx の 1 要素を除く。idx < 0（indexOf の見つからない）では何もしない（#716: splice(-1) は末尾を消す）。 */
+export function removeAt<T>(arr: T[], idx: number): void {
+  if (idx >= 0) arr.splice(idx, 1);
+}
+
+/** 描画した HTML の `role="group"` を 1 回走査し、区画とセグメント行に分ける（groupItems・segmentRows の共通部＝R8）。 */
+function scanGroups(html: string): { groups: Array<{ label: string; items: number }>; segments: Array<{ label: string; options: number }> } {
   type Group = { label: string; items: number };
   type Frame = {
     tag: string;
@@ -125,7 +129,8 @@ export function groupItems(html: string): Array<{ label: string; items: number }
     child?: { hasButton: boolean };
   };
   const stack: Frame[] = [];
-  const out: Group[] = [];
+  const groups: Group[] = [];
+  const segments: Array<{ label: string; options: number }> = [];
   const tagRe = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g;
   for (let m = tagRe.exec(html); m; m = tagRe.exec(html)) {
     const [, close, rawTag, attrs, selfClose] = m;
@@ -137,7 +142,11 @@ export function groupItems(html: string): Array<{ label: string; items: number }
         const f = stack[j];
         const parent = stack[j - 1];
         if (f.child?.hasButton && parent?.group) parent.group.items++;
-        if (f.group && f.kids && isSegmentRow(f.kids)) out.splice(out.indexOf(f.group), 1);
+        if (f.group && f.kids && isSegmentRow(f.kids)) {
+          removeAt(groups, groups.indexOf(f.group));
+          // セグメント行の直下はすべて押し状態のボタン（isSegmentRow）＝直下の数が選択肢の数。
+          segments.push({ label: f.group.label, options: f.kids.length });
+        }
       }
       stack.length = i;
       continue;
@@ -150,10 +159,22 @@ export function groupItems(html: string): Array<{ label: string; items: number }
     if (/\srole="group"/.test(attrs)) {
       frame.group = { label: attrs.match(/\saria-label="([^"]*)"/)?.[1] ?? "", items: 0 };
       frame.kids = [];
-      out.push(frame.group);
+      groups.push(frame.group);
     }
     if (parent?.group) frame.child = { hasButton: tag === "button" };
     stack.push(frame);
   }
-  return out;
+  return { groups, segments };
+}
+
+/** 描画した HTML の `role="group"`（メニューの区画）ごとに、ボタンを含む直下の要素（＝項目）を数える。
+ *  見出し・区切り線はボタンを含まないので数えない。スクロールする一覧（マスターの一覧）は 1 項目。
+ *  セグメント行（isSegmentRow）は区画として返さず、それを含む区画の 1 項目になる。 */
+export function groupItems(html: string): Array<{ label: string; items: number }> {
+  return scanGroups(html).groups;
+}
+
+/** 描画した HTML のセグメント行（isSegmentRow）ごとの選択肢の数（Hick・#716）。並びは閉じた順。 */
+export function segmentRows(html: string): Array<{ label: string; options: number }> {
+  return scanGroups(html).segments;
 }
