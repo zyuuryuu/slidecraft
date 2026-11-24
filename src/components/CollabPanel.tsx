@@ -1,17 +1,23 @@
 /**
- * CollabPanel.tsx — the P2.4 "Connect" surface. Starts/stops GUI-hosted collaboration and shows the
- * ready-to-paste stdio registration (CollabRegistration: `claude mcp add slidecraft -- …`, generated from
- * this install's real paths, #520) so an upstream AI can connect — stdio auto-discovers and forwards to this host while the GUI runs (ADR-0033), so no
- * url/token management is needed. The loopback URL + per-launch token direct-HTTP path stays available
- * as a folded "advanced" fallback for clients that can't spawn stdio (#283 anti-pattern, #297). The
- * deck mirrors the host's truth live while connected.
+ * CollabPanel.tsx — the 協働 surface, in two layers (#689):
+ *  - top: ONE status line (協働中 / AI 待ち / 停止中 …, the allowed clients, 承認待ち N 件) + 停止 / 再開.
+ *  - bottom: 「接続の設定（初回だけ）」 (CollabSetup) — the stdio registration (#520/#530), .mcpb, 接続テスト, the folded
+ *    HTTP-direct fallback (#283/#297), the allowed-clients list and the follow toggle. Open until the user has ever
+ *    connected (collab-panel-view.ts), folded after; the fold is remembered by the same rule as ai-settings-fold.ts (#669/#743).
+ * What is locked while collaborating, and why, is said ONCE in the notice slot (NoticeSlot, #689) — not here.
+ * 「協働中か」 comes from collabEditLocked only (collab-lock.ts, R8).
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CollabStatus } from "../ipc/collab-projection";
 import type { GrantView } from "../mcp/host-approval";
-import { maskToken, httpSnippet } from "./collab-panel-snippets";
-import CollabRegistration, { CopyButton, Field } from "./CollabRegistration";
+import { collabEditLocked } from "./collab-lock";
+import {
+  collabEverConnected, collabStatusView, initialSetupOpen, loadSetupFolded, rememberSetupFold, saveSetupFolded,
+} from "./collab-panel-view";
+import CollabSetup from "./CollabSetup";
+
+export { AdvancedHttp, ClientGrantList } from "./CollabSetup";
 
 interface CollabPanelProps {
   /** When embedded in the AI hub's 協働 tab: render body-only (no floating card, no own header/close). */
@@ -23,7 +29,6 @@ interface CollabPanelProps {
   token?: string;
   hostJsonPath?: string;
   error?: string;
-  docCount: number;
   onStart: () => void;
   onStop: () => void;
   /** #727 (ADR-0040 D1): an allowed AI has started calling (= collaborating, edit-locked). The host itself runs
@@ -32,132 +37,53 @@ interface CollabPanelProps {
   /** #727 (D3-5): the clients the human allowed, each revocable. Omitted → the list is hidden. */
   grants?: GrantView[];
   onRevoke?: (key: string) => void;
+  /** #689: AI clients waiting for [許可] (the decision is the approval dialog) — shown in the status line. */
+  pendingCount?: number;
   /** #407: whether the view follows (jumps to + flashes) the AI's edits. Omitted → toggle hidden. */
   followAi?: boolean;
   onFollowAiChange?: (v: boolean) => void;
 }
 
-/**
- * The HTTP-direct registration path — folded away by default (ADR-0033 / #283: registering the collab
- * host's URL+token directly is an anti-pattern, since the port is ephemeral and the token rotates every
- * GUI launch). Kept as a fallback for clients that can't spawn a stdio process. The token stays masked
- * even once this block is opened; only the explicit reveal toggle shows it.
- */
-export function AdvancedHttp({
-  open, onToggle, url, token, hostJsonPath,
-}: { open: boolean; onToggle: () => void; url?: string; token?: string; hostJsonPath?: string }) {
-  const { t } = useTranslation();
-  const [revealed, setRevealed] = useState(false);
-  const snippetFull = url && token ? httpSnippet(url, token) : "";
-  const snippetDisplay = url && token ? httpSnippet(url, revealed ? token : maskToken(token)) : "";
-
-  return (
-    <div className="pt-1 border-t border-edge/60">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-1 text-[11px] text-accent-soft hover:text-fg py-1"
-      >
-        <span>{open ? "▾" : "▸"}</span>
-        <span>{t("collabPanel.advancedHttpSummary")}</span>
-      </button>
-      {open && (
-        <div className="space-y-2 pl-3 border-l border-edge">
-          <p className="text-[10px] text-amber-300/80 leading-relaxed">{t("collabPanel.httpAntipatternNotice")}</p>
-
-          {url && <Field label={t("collabPanel.endpointLabel")} value={url} />}
-
-          {token && (
-            <div>
-              <div className="text-[10px] text-faint mb-0.5 flex items-center justify-between">
-                <span>{t("collabPanel.tokenLabel")}</span>
-                <button onClick={() => setRevealed((v) => !v)} className="text-accent-soft hover:text-fg text-[10px]">
-                  {revealed ? t("collabPanel.hideToken") : t("collabPanel.revealToken")}
-                </button>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input
-                  readOnly
-                  value={revealed ? token : maskToken(token)}
-                  onFocus={(e) => { if (revealed) e.currentTarget.select(); }}
-                  className="flex-1 min-w-0 px-2 py-1 rounded bg-void border border-edge text-fg2 text-[11px] font-mono"
-                />
-                <CopyButton value={token} />
-              </div>
-            </div>
-          )}
-
-          {snippetDisplay && (
-            <div>
-              <div className="text-[10px] text-faint mb-0.5">{t("collabPanel.httpSnippetLabel")}</div>
-              <div className="flex items-start gap-1.5">
-                <textarea
-                  readOnly
-                  value={snippetDisplay}
-                  onFocus={(e) => { if (revealed) e.currentTarget.select(); }}
-                  rows={3}
-                  className="flex-1 min-w-0 px-2 py-1 rounded bg-void border border-edge text-fg2 text-[11px] font-mono resize-none"
-                />
-                <CopyButton value={snippetFull} />
-              </div>
-            </div>
-          )}
-
-          {hostJsonPath && (
-            <div className="text-[10px] text-dim break-all">handshake: {hostJsonPath}</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** #727 (D3-5): the allowed clients as ONE folded line ("許可したクライアント（N）"); opened, one row per client
- *  with its own 取り消し (= that pair's secret is void; the shared token is not rotated). */
-export function ClientGrantList({ open, onToggle, grants, onRevoke }: { open: boolean; onToggle: () => void; grants: GrantView[]; onRevoke: (key: string) => void }) {
-  const { t } = useTranslation();
-  return (
-    <div>
-      <button onClick={onToggle} className="w-full flex items-center gap-1 text-[11px] text-accent-soft hover:text-fg py-1">
-        <span>{open ? "▾" : "▸"}</span>
-        <span>{t("collabPanel.grantsSummary", { count: grants.length })}</span>
-      </button>
-      {open && (
-        <ul className="space-y-1 pl-3 border-l border-edge">
-          {grants.length === 0 && <li className="text-[11px] text-dim">{t("collabPanel.grantsEmpty")}</li>}
-          {grants.map((g) => (
-            <li key={g.key} className="flex items-center justify-between gap-2 text-[11px] text-fg2">
-              <span className="min-w-0 truncate">
-                {g.name} <span className="text-dim">{g.version}</span> <span className="font-mono text-dim">{g.fingerprint}</span>
-                {g.kind === "session" && <span className="text-dim"> · {t("collabPanel.grantSessionOnly")}</span>}
-              </span>
-              <button onClick={() => onRevoke(g.key)} className="shrink-0 text-rose-300 hover:text-rose-200">{t("collabPanel.revoke")}</button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+/** The setup fold: open until the user has ever connected; a fold made before that is remembered. */
+function useSetupFold(everConnected: boolean) {
+  const [open, setOpen] = useState(() => initialSetupOpen(everConnected, loadSetupFolded()));
+  const toggle = (next: boolean) => {
+    setOpen(next);
+    saveSetupFolded(rememberSetupFold(loadSetupFolded(), next, everConnected));
+  };
+  // Connected for the first time while the panel is open → fold the setup away (and forget an old fold).
+  const prev = useRef(everConnected);
+  useEffect(() => {
+    if (everConnected === prev.current) return;
+    prev.current = everConnected;
+    saveSetupFolded(rememberSetupFold(loadSetupFolded(), null, everConnected));
+    setOpen(initialSetupOpen(everConnected, loadSetupFolded()));
+  }, [everConnected]);
+  return [open, toggle] as const;
 }
 
 export default function CollabPanel({
-  embedded, onClose, available, status, url, token, hostJsonPath, error, docCount, onStart, onStop, aiActive, grants, onRevoke, followAi, onFollowAiChange,
+  embedded, onClose, available, status, url, token, hostJsonPath, error, onStart, onStop, aiActive, grants, onRevoke,
+  pendingCount = 0, followAi, onFollowAiChange,
 }: CollabPanelProps) {
   const { t } = useTranslation();
   const connected = status === "connected";
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [grantsOpen, setGrantsOpen] = useState(false);
-
-  const dot = connected ? "bg-emerald-400" : status === "connecting" ? "bg-amber-400 animate-pulse" : status === "error" ? "bg-rose-500" : "bg-field";
-  const statusLabel = connected ? t("collabPanel.statusConnected") : status === "connecting" ? t("collabPanel.statusConnecting") : status === "error" ? t("collabPanel.statusError") : t("collabPanel.statusDisconnected");
+  const locked = collabEditLocked({ status, aiActive: !!aiActive });
+  const [setupOpen, setSetupOpen] = useSetupFold(collabEverConnected({ locked, grants }));
+  const view = collabStatusView(status, locked);
+  const statusLabel = t(`collabPanel.${view.key}`);
+  const clients = [...new Set((grants ?? []).map((g) => g.name))].join(t("collabPanel.clientSeparator"));
+  const parts = [
+    statusLabel,
+    connected && clients ? t("collabPanel.allowedClients", { names: clients }) : null,
+    pendingCount > 0 ? t("collabPanel.pendingCount", { count: pendingCount }) : null,
+  ].filter((p): p is string => !!p);
 
   return (
     <div className={embedded ? "flex-1 min-h-0 overflow-auto text-sm" : "fixed bottom-2 right-2 z-50 w-[420px] max-w-[calc(100vw-1rem)] bg-canvas border border-edge rounded-lg shadow-2xl text-sm"}>
       {!embedded && (
         <div className="flex items-center justify-between px-3 py-2 border-b border-edge">
-          <div className="flex items-center gap-2">
-            <span role="img" aria-label={statusLabel} className={`w-2 h-2 rounded-full ${dot}`} />
-            <span className="text-fg font-medium">🔗 {t("collabPanel.headerTitle")}</span>
-          </div>
+          <span className="text-fg font-medium">🔗 {t("collabPanel.headerTitle")}</span>
           <button onClick={onClose} className="text-muted hover:text-fg px-1" title={t("collabPanel.close")}>
             ✕
           </button>
@@ -170,72 +96,33 @@ export default function CollabPanel({
             {t("collabPanel.unavailableBefore")}<span className="font-mono">npm run tauri dev</span>{t("collabPanel.unavailableAfter")}
           </p>
         ) : (
-          <>
-            <p className="text-muted text-xs leading-relaxed">
-              {t("collabPanel.introBefore")}<span className="text-emerald-300">{t("collabPanel.introHighlight")}</span>{t("collabPanel.introAfter")}
-            </p>
-
-            {error && (
-              <div role="alert" className="text-[11px] text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded px-2 py-1.5 break-words">
-                {error}
-              </div>
-            )}
-
-            {!connected ? (
-              <button
-                onClick={onStart}
-                disabled={status === "connecting"}
-                className="w-full py-2 rounded bg-accent hover:bg-accent-hi disabled:opacity-50 text-on-accent font-medium"
-              >
-                {status === "connecting" ? t("collabPanel.statusConnecting") : t("collabPanel.startButton")}
-              </button>
-            ) : (
-              <>
-                <div className="flex items-center justify-between text-[11px] text-muted">
-                  <span>
-                    {aiActive ? t("collabPanel.liveViewing") : t("collabPanel.waitingForAi")}
-                  </span>
-                  <span>{t("collabPanel.documentCount", { docCount })}</span>
-                </div>
-                {aiActive && (
-                  <p className="text-[10px] text-emerald-300/80 leading-relaxed">
-                    ✍️ {t("collabPanel.coEditNotice")}
-                  </p>
-                )}
-                {grants && onRevoke && <ClientGrantList open={grantsOpen} onToggle={() => setGrantsOpen((v) => !v)} grants={grants} onRevoke={onRevoke} />}
-                {onFollowAiChange && (
-                  <label className="flex items-center gap-1.5 text-[11px] text-fg2 cursor-pointer select-none">
-                    <input type="checkbox" checked={!!followAi} onChange={(e) => onFollowAiChange(e.target.checked)} />
-                    {t("collabPanel.followAi")}
-                  </label>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {/* Registration is independent of the connection (register once; stdio auto-discovers the host —
-            ADR-0033), so it shows in EVERY state, browser demo included (#520: real install paths on
-            desktop, the generic launcher form elsewhere). */}
-        <CollabRegistration />
-
-        {available && connected && (
-          <>
-            <AdvancedHttp
-              open={advancedOpen}
-              onToggle={() => setAdvancedOpen((v) => !v)}
-              url={url}
-              token={token}
-              hostJsonPath={hostJsonPath}
-            />
-
-            <div className="flex items-center justify-end pt-1">
-              <button onClick={onStop} className="px-4 py-1.5 rounded bg-edge hover:bg-surface text-fg text-xs">
+          <div data-testid="collab-status" className="flex items-center gap-2">
+            <span role="img" aria-label={statusLabel} className={`shrink-0 w-2 h-2 rounded-full ${view.dot}`} />
+            <span className="flex-1 min-w-0 text-xs text-fg2 leading-relaxed">{parts.join(t("collabPanel.statusSeparator"))}</span>
+            {view.action === "stop" && (
+              <button onClick={onStop} className="shrink-0 px-3 py-1 rounded bg-edge hover:bg-surface text-fg text-xs">
                 {t("collabPanel.stopButton")}
               </button>
-            </div>
-          </>
+            )}
+            {view.action === "start" && (
+              <button onClick={onStart} className="shrink-0 px-3 py-1 rounded bg-accent hover:bg-accent-hi text-on-accent text-xs font-medium">
+                {t("collabPanel.startButton")}
+              </button>
+            )}
+          </div>
         )}
+
+        {available && error && (
+          <div role="alert" className="text-[11px] text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded px-2 py-1.5 break-words">
+            {error}
+          </div>
+        )}
+
+        <CollabSetup
+          open={setupOpen} onOpenChange={setSetupOpen} connected={available && connected} locked={locked}
+          url={url} token={token} hostJsonPath={hostJsonPath} grants={grants} onRevoke={onRevoke}
+          followAi={followAi} onFollowAiChange={onFollowAiChange}
+        />
       </div>
     </div>
   );

@@ -69,7 +69,7 @@ const FROZEN_I18N_LEAKS: Record<string, number> = {
   "components/AiSettingsPopover.tsx": 3,
   "components/ClaudeRegisterFlow.tsx": 2,
   "components/CollabDiagnostics.tsx": 1,
-  "components/CollabPanel.tsx": 2,
+  "components/CollabPanel.tsx": 1, // #689: "handshake:" を辞書へ（2 → 1）
   "components/DiagramEditor.tsx": 6,
   "components/DiagramSvgOverlay.tsx": 1,
   "components/DocTabs.tsx": 1,

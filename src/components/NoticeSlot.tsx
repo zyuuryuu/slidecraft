@@ -4,6 +4,8 @@
  * time, chosen by `noticeSlotPlan` (approval > adjust > intake > update), with a badge counting the hidden ones.
  * #727: `approval` = how many AI clients wait for [許可] (the decision itself is the approval dialog), and —
  * once none wait — whether an allowed client could not be saved to the keychain (never silent; dismissable).
+ * #689: `collabLock` = collaborating (App's editLocked): ONE line saying what is paused, why, that it lasts until 停止
+ * (ADR-0040), with the 停止 button itself — instead of only greyed-out buttons with a tooltip.
  *
  * The bands themselves are unchanged (same components, same props); only where they go and which one shows
  * changes. It stays a layout-flow strip (not an overlay) so the adjust band never hides the preview (#579).
@@ -23,6 +25,8 @@ export interface NoticeSlotProps {
   /** #727: AI clients waiting for [許可]; absent / count 0 = none. `unsaved`: an allowed client could not be saved
    *  to the OS credential store (asked again next launch) — shown in the same band when nobody is waiting. */
   approval?: { count: number; unsaved?: boolean; onDismissUnsaved?: () => void } | null;
+  /** #689: present while collaborating (edit-locked — App passes it from editLocked only); onStop = the 協働 停止. */
+  collabLock?: { onStop: () => void } | null;
   /** "New version available" — null when there is none (or it was dismissed). */
   update: { latestVersion: string; onDismiss: () => void } | null;
   /** Intake progress/result — passed through to IntakeSummaryBar as-is (`result` null when dismissed). */
@@ -44,10 +48,11 @@ export interface NoticeSlotProps {
   } | null;
 }
 
-export default function NoticeSlot({ approval, update, intake, adjust }: NoticeSlotProps) {
+export default function NoticeSlot({ approval, collabLock, update, intake, adjust }: NoticeSlotProps) {
   const { t } = useTranslation();
   const plan = noticeSlotPlan({
     approval: (approval?.count ?? 0) > 0 || !!approval?.unsaved,
+    collab: !!collabLock,
     adjusting: !!adjust,
     intake: !!intake.busy || !!intake.result, // exactly when IntakeSummaryBar renders something
     update: !!update,
@@ -65,6 +70,13 @@ export default function NoticeSlot({ approval, update, intake, adjust }: NoticeS
         {approval.onDismissUnsaved && (
           <button data-testid="grants-unsaved-dismiss" onClick={approval.onDismissUnsaved} title={t("updateBanner.dismiss")} className="text-muted hover:text-fg text-base leading-none px-1">×</button>
         )}
+      </div>
+    ) : plan.shown === "collab" && collabLock ? (
+      <div role="status" className="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-accent/40 text-xs text-fg">
+        <span className="flex-1 min-w-0">{t("collabPanel.lockedNotice")}</span>
+        <button onClick={collabLock.onStop} className="shrink-0 px-3 py-1 rounded bg-edge hover:bg-accent/50 text-fg">
+          {t("collabPanel.stopButton")}
+        </button>
       </div>
     ) : plan.shown === "adjust" && adjust ? (
       <TemplateAdjustPanel {...adjust} />
