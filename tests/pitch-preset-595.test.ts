@@ -213,6 +213,22 @@ describe("(c) 受け入れ: 提案書 14 枚を Pitch で取り込む", () => {
     }
   });
 
+  it("#693 締め: 連絡先は CTA の箸書きでなく連絡先の枠（Contact.Bottom）に入る", async () => {
+    const s = S.createSession(null);
+    await S.newProject(s, generated, md());
+    const slides = s.deck!.slides;
+    const last = slides.length - 1;
+    const layout = tpl.layouts.find((l) => l.name === autoSelectLayout(slides[last], last, slides.length, buildCatalog(tpl)))!;
+    expect(layout.name).toBe("Closing.1CTA+1Contact");
+    const plan = slideBindingPlan(slides[last], layout);
+    const at = (phName: string) => {
+      const idx = layout.placeholders.find((p) => p.name === phName)!.idx;
+      return text(plan.assignments.find((a) => a.placeholder.idx === idx)?.content.content);
+    };
+    expect(at("CTA.Center")).toBe("11 月中: パイロット部門の選定\n12 月: 試験運用キックオフ");
+    expect(at("Contact.Bottom")).toBe("連絡先: hubble-pj@example.com");
+  });
+
   it("書き出した PPTX に `:icon:` の記法が文字で残らない（カードのアイコンは描かれる）", async () => {
     const s = S.createSession(null);
     await S.newProject(s, generated, md());
