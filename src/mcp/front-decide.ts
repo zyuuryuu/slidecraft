@@ -45,6 +45,14 @@ export function decideHostLost(live: HostHandshake | null, lost: HostHandshake):
   return { kind: "solo", note: "host-lost" };
 }
 
+/** THE validity rule for a host.json's content: it names an endpoint (url) and a bearer (token). HostWatch.live()
+ *  and `--doctor` (checkCollabHost) both ask this — one rule, not two copies (R8). */
+export function isHandshake(h: unknown): h is HostHandshake {
+  if (typeof h !== "object" || h === null) return false;
+  const o = h as Record<string, unknown>;
+  return typeof o.url === "string" && typeof o.token === "string";
+}
+
 /** Reads host.json on every call, but pings only when its content (url + startedAt) differs from the last read —
  *  a stale file whose content never changes must not cost a ping timeout on every call (ADR-0040 D2). */
 export class HostWatch {
@@ -61,7 +69,7 @@ export class HostWatch {
 
   async live(): Promise<HostHandshake | null> {
     const hs = this.read();
-    if (!hs || typeof hs.url !== "string" || typeof hs.token !== "string") {
+    if (!isHandshake(hs)) {
       this.lastKey = undefined;
       return null;
     }
