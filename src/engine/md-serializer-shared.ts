@@ -12,6 +12,7 @@ import { orderedNumbers, listItemLine } from "./list-markers";
 import { FIELD_ROWS } from "./field-rows";
 import { beforeAfterRole } from "./md-separators";
 import { opensComment } from "./md-comments";
+import { slideMarker } from "./slide-markers";
 
 // ── Separator-layout detection (serializer-local; distinct from the title-namespace convention) ──
 
@@ -33,6 +34,29 @@ export function getSeparatorType(layout: string): "col" | "kpi" | "step" | null 
   if (isKpiLayout(layout)) return "kpi";
   if (isProcessLayout(layout)) return "step";
   return null;
+}
+
+/** Separator form of a slide: the ONE mapping (slide → separator kind) both readouts use (R8, #747).
+ *  Order: a statement/quote marker slide (#593) is never split (the parser reads it single-body) → the
+ *  slide's own group kind → the canonical layout-name family → the Columns fallback: a title + ≥2
+ *  positional body regions (idx 1 and 2) is `col`, so a plain `<!-- col -->` slide (no groupKind) keeps
+ *  its markers even when its layout resolves to a non-column name (e.g. Closing.* on the last slide, or
+ *  a third-party template's multi-region layout). `isBody(idx)` is the caller's notion of a non-blank
+ *  body region (the plan's role / the legacy content-namespace text); diagram/mermaid figures count too
+ *  (#392: every one of them, from slideFigures). Tables don't: columnFigures / singleBodyFigure decide
+ *  their column-scoping. */
+export function slideSeparatorType(
+  slide: SlideIR,
+  layout: string,
+  hasTitle: boolean,
+  isBody: (idx: string) => boolean,
+): NonNullable<SlideIR["groupKind"]> | "col" | null {
+  if (slideMarker(slide)) return null;
+  const known = slide.groupKind ?? getSeparatorType(layout);
+  if (known) return known;
+  const figIdxs = slideFigures(slide).filter((f) => f.kind === "diagram" || f.kind === "mermaid").map((f) => f.placeholderIdx);
+  const bodyIsh = (idx: string) => isBody(idx) || figIdxs.includes(idx);
+  return hasTitle && bodyIsh("1") && bodyIsh("2") ? "col" : null;
 }
 
 /** The separator line opening region `col` (1-based) — the ONE marker writer for both readouts (R8):
