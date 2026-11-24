@@ -13,8 +13,9 @@
  *  - collab-ai  … 協働ホストへの AI クライアント接続（sharedOnly:true）。
  *
  * solo から隠すもの（collab 専用）とその理由:
- *  - list/select/close_document … 多 doc 切替系。solo は soleDocId() で常に一意解決され、
- *    close は唯一 doc を壊すだけ。
+ *  - list/select_document … 多 doc 切替系。solo は soleDocId() で常に一意解決される。
+ *    close_document は #728（ADR-0040 D2）で solo にも出す: solo の deck を閉じる（空の doc 1 つに戻る）と、
+ *    アダプタが GUI の協働ホストへ乗り換えられる。
  *  - register_templates … GUI webview が master レジストリを push する口。solo には GUI が
  *    存在せず host.templates も配線されない＝常に template-registry-unavailable で死にツール。
  * augment_template / adjust_template は PR #606 D3 で一時 solo 限定だったが、#616 でテンプレ差し替えを
@@ -83,7 +84,8 @@ export const TOOL_PROFILES: Record<string, readonly McpProfile[]> = {
   // 多 doc ライフサイクル（collab 専用 — solo は常に 1 doc）
   list_documents: COLLAB,
   select_document: COLLAB,
-  close_document: COLLAB,
+  // #728（ADR-0040 D2）: solo でも deck を閉じられる — 閉じれば GUI の協働ホストへ乗り換えられる（未保存は force）
+  close_document: ALL,
   // サーバ側 undo/redo（solo でも実動 — ヘッダ注記の実測参照）
   undo: ALL,
   redo: ALL,

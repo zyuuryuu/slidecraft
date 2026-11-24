@@ -70,6 +70,15 @@ export interface ApprovalView {
   denyAll: boolean;
 }
 
+/** THE normalization of an AI's self-reported clientInfo (display text: trimmed, ≤100 chars, never empty). The
+ *  host keys the pair with it and the adapter proves with it — both sides MUST call this one function (R8): an
+ *  adapter that proved over the raw text would fail every launch after the first (proof-failed lockout). */
+export function clientInfoOf(raw: unknown): ClientInfo {
+  const ci = (raw ?? {}) as { name?: unknown; version?: unknown };
+  const clip = (v: unknown, fallback: string): string => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : fallback);
+  return { name: clip(ci.name, "不明なクライアント"), version: clip(ci.version, "?") };
+}
+
 /** The HMAC an adapter sends to prove it holds the pair's secret. Bound to the nonce AND the pair, so a proof
  *  can be neither replayed (single-use nonce) nor moved to another name/version/client id. */
 export function proofFor(secret: string, nonce: string, clientId: string, info: ClientInfo): string {

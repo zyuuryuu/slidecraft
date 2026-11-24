@@ -138,6 +138,25 @@ export function createSoloHostContext(initialSession: Session): HostContext {
   };
 }
 
+/** #728 (ADR-0040 D2): the doc that holds a deck, or null. The adapter reads THIS (not its own copy of the rule)
+ *  to decide whether it may switch to a GUI host — it never switches while a solo deck is open (never-silent). */
+export function openDeckDocId(registry: DocRegistry): string | null {
+  for (const d of registry.list()) if (registry.get(d.docId).session.deck) return d.docId;
+  return null;
+}
+
+/** close_document's rule, for every profile: an unsaved (dirty) doc needs `force` (never-silent). In SOLO the
+ *  registry must keep exactly one doc (sole-doc resolution, resources), so a fresh empty one takes the closed
+ *  doc's place — solo is back in its startup state (no deck), which lets the adapter switch (#728). */
+export function closeDocument(host: HostContext, docId: string, force: boolean | undefined, freshSession: () => Session) {
+  const e = host.registry.get(docId);
+  if (e.session.dirty && !force) return { ok: false as const, closed: false as const, dirty: true as const };
+  host.registry.remove(docId);
+  if (host.solo) host.registry.create(freshSession(), "Untitled", true);
+  host.notifyClosed?.(docId);
+  return { ok: true as const, closed: true as const };
+}
+
 /** One list_documents row. `templateRev` (#616) is ADDITIVE. */
 export interface DocListing {
   docId: string;
