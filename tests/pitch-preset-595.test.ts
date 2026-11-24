@@ -46,6 +46,7 @@ const PITCH_LAYOUTS = [
   "Column.3Body.Equal",
   "Summary.3Block.Equal",
   "KPI.1Value.Single",
+  "KPI.3Value.Equal", // #719
   "KPI.4Value.Grid",
   "Compare.2Option.Versus",
   "Process.4Step.Sequential",

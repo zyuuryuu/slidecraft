@@ -141,12 +141,13 @@ export async function writePresetTemplate(preset: StylePreset, library?: readonl
  *    accent / accent2 は白地で 3:1 以上（大きな太字の数値・ラベルに使う。WCAG の大きい文字の基準）。
  *  - 書体: 見出しも本文も同じゴシック（太さはレイアウトの bold で分ける）。
  *  - 密度: 本文 18pt（#570 の本文倍率 18/14）・左右 0.8in（現行どおり）。
- *  - レイアウト 14: #580 段 1 の構成案 12 から調整（#595「実装時に微調整可」・すべて実測）。
+ *  - レイアウト 15: #580 段 1 の構成案 12 から調整（#595「実装時に微調整可」・すべて実測）。
  *      表紙は Title.1Title.Single（+1Meta は Date の枠が無く `Date:` が消える）。
  *      Content.1Body.Single を追加（図や画像の無い本文が全幅に入る。無いと図が Media の画像枠に入る）。
  *      「カード 3（group card）」は Summary.3Block.Equal（新・結論帯つき）。内蔵語彙にカード用が無く、
  *      Column.3Body.Equal に落ちると `:icon:` が文字のまま残り、`Takeaway:` は本文の先頭へ救済される。
  *      Column.3Body.Equal は `<!-- col -->` の受け皿として残す（無いと 2〜3 列の本文が消える）。
+ *      KPI.3Value.Equal を追加（#719。KPI 3 つが KPI.4Value.Grid に入り 1 マス空いていた）。
  *    ロゴ壁 Gallery.4Image.Grid は #392（1 枚に複数画像）の後。
  */
 export const PITCH_PRESET: StylePreset = Object.freeze({
@@ -171,6 +172,7 @@ export const PITCH_PRESET: StylePreset = Object.freeze({
     "Column.3Body.Equal",
     "Summary.3Block.Equal",
     "KPI.1Value.Single",
+    "KPI.3Value.Equal", // KPI 3 つ（無いと 4 マスの格子に入り右下が空く・#719）
     "KPI.4Value.Grid",
     "Compare.2Option.Versus",
     "Process.4Step.Sequential",
