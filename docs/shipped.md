@@ -4,6 +4,7 @@
 
 ## 基盤・アーキテクチャ
 
+- **CI の `build` ジョブで `cargo clippy -- -D warnings` と `cargo test` を回す** — `tauri build` は Rust をコンパイルするが clippy も `#[cfg(test)]` も走らせず、新しい stable の lint（Rust 1.97 の `manual_checked_ops` で main が実は赤だった #731）や Rust テストの退行が PR で見えなかった。Linux の `build` ジョブ（非必須・docs-only は skip）の apt 直後・`npm ci` より前に 2 ステップを置き、必須の `test` は TS 専用のまま。`dtolnay/rust-toolchain` に `components: clippy`、clippy／test だけ `CARGO_PROFILE_DEV_DEBUG=0`（dev の `target/` 5.5 → 2 GB）、crate の registry だけ `Cargo.lock` キーでキャッシュ（`target/` は 10 GB 上限で llamafile cache を追い出すので乗せない）。一時的に clippy 警告を入れたコミットで `build` が赤になることを実証してから戻した。追加コスト 110〜160 秒。apt ミラー遅延の timeout は #757 （#732・PR #754・2026-11-24）
 - **テンプレ無し md round-trip で 2 列スライドの `<!-- col -->` が落ちるのを直す（区切り種別の判定を 1 本に・R8）** — AI 生成結果の保存など、テンプレートを渡さずに `serializeMd` を通す経路（4 経路・製品から到達可能）で、文字だけの 2 列スライド（締めの CTA＋連絡先）の区切りが消え、再パースで 2 列目が本文側に戻っていた。テンプレ付き経路だけが持っていた「title ＋ 本文領域 2 つ → col」のフォールバックを `md-serializer-shared.ts` の `slideSeparatorType` に移し、legacy／plan の両経路が同じ関数を使う（経路差は `isBody` 述語の引数）。legacy と plan の一致テスト（byte-identical）を追加。golden の差分は manuscript-05／06 の締めに元原稿どおりの `<!-- col -->` が戻る 4 行だけ、テンプレ付き 34 出力は byte-identical （#747・PR #749・2026-11-24）
 - **docs サイト（VitePress → GitHub Pages）の 4 日間の赤を修復＋PR で `docs:build` を走らせる** — 英語ガイド 2 ページの生の `<name>` を Vue が未閉じタグとして拒否し、#701（11-20）以降の Pages デプロイがすべて失敗していた。`&lt;name&gt;` に直し、`ci.yml` に非必須ジョブ `docs-build`（`changes` が docs/・package.json・lock の変更を検出したときだけ `npm run docs:build`）を足して、Pages を壊す PR をマージ前に捕まえる （PR #740・2026-11-24）
 - **依存の一括更新（dependabot 10 本）** — tauri 2.12.7・tauri-build 2.7.6・tauri-plugin-opener 2.7.3・sysinfo 0.40.4、hono 4.13.19、npm minor/patch 11 件（i18next 27 → react-i18next 18 の順序）、actions/cache 6.1.0、taiki-e/install-action 2.90.6。教訓: tauri の npm plugin と Rust plugin は major/minor を揃えないと `tauri build` が落ちる（Cargo.lock を同じ PR に取り込む） （PR #703・#705・#707・#711・#720〜#723・2026-11-23）
@@ -95,6 +96,7 @@
 
 ## テンプレ・マスター
 
+- **Pitch に `KPI.3Value.Equal` を採用し、KPI 3 つを 2×2 格子でなく 3 列に置く** — Pitch × manuscript-07 の KPI 3 つが `KPI.4Value.Grid` に置かれ右下が空いていた。原因は採用一覧の欠落（選択経路は枠数一致を既に最優先）。採用一覧に 1 行足して出荷テンプレと全レイアウト見本を再生成（旧レイアウトは番号がずれるだけで byte-identical、Executive／Campaign・内蔵 3 本は不変）。manuscript-06 の 5 枚目（KPI 3 つ）も同じく 3 列に。KPI 4 つ・5 つの選択は不変 （#719・PR #755・2026-11-24）
 - **manuscript-05（Pitch）の締めで連絡先を連絡先の枠に** — 「次のステップ」の連絡先が CTA の箇条書き 3 行目に出ていたのを、原稿を `<!-- col -->` で CTA 側と連絡先側に分けて `Closing.1CTA+1Contact` の `Contact.Bottom` に置く。エンジンは無変更・golden の差分は最終スライドだけ。テンプレ無し round-trip で素の col が落ちる別件は #747 （#693・PR #744・2026-11-24）
 - **KPI.4Value.Grid を値枠＋ラベル枠の対にして値を強調** — 4 マスの KPI 格子が値とラベルを 1 枠に流し込んで値が目立たなかったのを、KPI.3 と同じ値枠／ラベル枠の対（idx は交互・`nameHintedGroups` が idx 順に等分）に。LEGACY_DIGEST は midnight／flat／remake の 3 本＋REPORT_PRESET＋Pitch fixture のみ変化 （#695・PR #718・2026-11-23）
 - **Campaign のキャプション可読性・Gallery の候補順位・PRESET_ARTIFACTS の 1 本化** — `Caption.BottomLeft` のレイアウト背景を濃色にしてコントラスト ≈15:1（WCAG 相対輝度式で 3 経路検査）。`suggestLayouts` が `visual` 枠数を見て、画像 2／3／4 枚のスライドで Gallery を上位に（枠不足の Gallery.2 は出さない）。Executive の見本も `PRESET_ARTIFACTS` の同じ経路で生成（`make-executive-template.ts` 廃止・pptx は byte-identical） （#672・PR #683・2026-11-08）
@@ -169,6 +171,7 @@
 
 ## スライド編集・画像
 
+- **テキストだけの編集で画像（1 枚）が告知なしに消えるのを直す（省略＝引き継ぎに画像を加える）** — MCP `set_slide_markdown`／GUI `reconcileSlideEdit` は図・表・コードを「編集側に無ければ旧スライドから引き継ぐ」（#220 B3）が画像だけ対象外で、AI 編集の出力が data URI を省くと画像が黙って消えていた。引き継ぐ種類の一覧を `CARRIED_KINDS`（`slide-figure-edit.ts`）の 1 か所にし（R8。以前は `carryOmittedBlocks` の列挙と `CARRIED` の 2 か所）、`carryOmittedVisuals` がビジュアル 1 つ以下なら単数フィールド、2 つ以上なら `carryFigures` で引き継ぐ。編集側の画像が正・背面画像も同じ規則（編集側の背面画像があれば旧の本文画像は引き継がない）。MCP ≡ GUI の一致テスト 13 件。テキスト編集で画像を消すことはできなくなる（消す経路は GUI の画像削除・図一覧の削除） （#665・PR #753・2026-11-24）
 - **最背面（`behind=1`）画像もプレビュー上で直接ドラッグ／リサイズ** — 編集 chrome（枠線＋角ハンドル）だけを最前面 overlay に描き、画像本体は最背面のまま。枠線の帯で移動・角で拡縮し、前面画像と同じジェスチャ経路（`image-gesture.ts`）と同じ編集幾何（`imageEditGeometry`・フォームの数値入力と一致テスト）を使う（R8）。前面画像の markup は byte-identical。e2e 1 本追加 （#122・PR #571・2026-11-07）
 - **便利スライド生成メニュー＝目次 live/static（ADR-0034）** — GUI から「既存コンテンツから便利スライドを生成」する枠を新設。目次を **live**（`derived:"toc"`・章に自動追随・直接編集不可）か **static**（章から1回焼いた普通の編集可能スライド・「作り直す」で明示再生成）で選んで挿入。導出は `tocPlaceholders`（scanSections/tocParagraphs）の単一経路を両モードが再利用（R8）。schema 非変更（live=既存 derived・static=通常スライド）。ADR-0032 D2 の「生成却下」をモード選択で解消（ADR-0034） （#277・PR #280・2026-07-20）
 - **目次タイトルの言語自動切替（目次／Table of Contents）** — `<!-- toc -->` 導出スライドの見出しが `目次` 固定だったのを、章タイトル群の文字種で切替（CJK を含めば「目次」・英語のみなら "Table of Contents"・章なしは既定「目次」）。判定は既存の `deckHasCjkText` を再利用し重複を作らない（R8）。engine 純関数で react-i18next を持ち込まず（R2）、派生タイトルは md へ書き戻さない（round-trip 不変） （#184・PR #234・2026-07-20）
