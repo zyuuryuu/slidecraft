@@ -74,7 +74,7 @@ Windows の注意点：
 slidecraft-mcp --doctor              # --root <dir> を付ければその scope で起動して確認
 ```
 
-サーバが**自分自身を stdio で起動**し、クライアントと同じ手順（`server/discover` → `initialize` → `tools/list`）で話しかけて、応答・版・tools の本数・モード（solo / 起動中の GUI への forward）・`--root` の設定を 1 画面に出します。最終行が `結果: OK` なら終了コード 0、どこかで失敗すれば理由（子プロセスの stderr を含む）を出して終了コード 1 です。`--metrics` は診断では無効化されます（診断の呼び出しを記録しないため）。GUI の 協働 パネルの「接続テスト」ボタンは、同梱 node ＋ `cli.cjs` でこの `--doctor` を実行して結果をそのまま表示します。
+サーバが**自分自身を stdio で起動**し、クライアントと同じ手順（`server/discover` → `initialize` → `tools/list`）で話しかけて、応答・版・tools の本数・モード（solo / 起動中の GUI への forward）・`--root` の設定・協働ホスト（GUI の `host.json` の有無と ping 応答・URL・startedAt。ping だけなので GUI に承認ダイアログは出ません。#736）を 1 画面に出します。GUI が起動中でもモードは solo と出ます（GUI へは最初のツール呼び出しで乗り換えるため・#728）。最終行が `結果: OK` なら終了コード 0、どこかで失敗すれば理由（子プロセスの stderr を含む）を出して終了コード 1 です。`--metrics` は診断では無効化されます（診断の呼び出しを記録しないため）。GUI の 協働 パネルの「接続テスト」ボタンは、同梱 node ＋ `cli.cjs` でこの `--doctor` を実行して結果をそのまま表示します。
 
 > **v0.5.0 以前**のインストーラにはランチャが入っていません（`.deb` に `/usr/bin/slidecraft-mcp` は無い）。その場合は上の直接パス指定（Linux: `/usr/bin/node` ＋ `/usr/lib/SlideCraft/cli.cjs`）か、**ソースからの起動（B）**を使ってください。
 >

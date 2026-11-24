@@ -21,7 +21,9 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { buildServer } from "../src/mcp/server";
 import { createSession } from "../src/mcp/session";
-import { runRelay } from "../src/mcp/mcp-relay";
+import { createSoloHostContext } from "../src/mcp/host-core";
+import { AdaptiveFront, type Attachment, type FrontWire } from "../src/mcp/adaptive-front";
+import { handshake, type InitParams } from "../src/mcp/host-attach";
 import type { HostHandshake } from "../src/mcp/host-json";
 import { createProbeAwareStdio, parseDiscoverProbe } from "../src/mcp/discover-probe";
 
@@ -171,40 +173,65 @@ describe("solo stdio front — server/discover as the very first message (#518)"
   });
 });
 
-describe("forward (relay) front — the probe is answered locally and never reaches the host (#518)", () => {
-  it("relay: -32601 within 100ms on the local side; host sees no server/discover; initialize still forwards", async () => {
-    // Remote side: a real host-mode server behind an InMemoryTransport pair, as in mcp-relay.test.ts.
-    const remoteServer = buildServer(createSession(null), { registerResources: false });
-    const [remoteClientSide, remoteServerSide] = InMemoryTransport.createLinkedPair();
-    await remoteServer.connect(remoteServerSide);
+describe("forward front — the probe is answered locally and never reaches the host (#518)", () => {
+  // Since #728 forwarding is the adaptive front's (adaptive-front.ts; the old runRelay is gone). Wired as cli.ts
+  // wires it: the probe-aware stdio is the local wire, a real solo server answers `initialize`, and the first
+  // tool call attaches to the host (the adapter's own `initialize`, host-attach.handshake) and is forwarded.
+  it("forward: -32601 within 100ms locally (before and after the switch); the host never sees server/discover", async () => {
+    const H: HostHandshake = { url: "http://127.0.0.1:5999/mcp", token: "t", pid: process.pid, startedAt: new Date().toISOString() };
     const forwarded: string[] = [];
-    const remote = {
-      start: () => remoteClientSide.start(),
-      close: () => remoteClientSide.close(),
-      send: (m: JSONRPCMessage) => {
-        forwarded.push((m as { method?: string }).method ?? "<response>");
-        return remoteClientSide.send(m);
-      },
-      set onmessage(h: ((m: JSONRPCMessage) => void) | undefined) { remoteClientSide.onmessage = h; },
-      set onclose(h: (() => void) | undefined) { remoteClientSide.onclose = h; },
-      set onerror(h: ((e: Error) => void) | undefined) { remoteClientSide.onerror = h; },
+    const remoteServer = buildServer(createSession(null), { registerResources: false });
+    const attach = async (host: HostHandshake, init: InitParams): Promise<Attachment> => {
+      const [c, srv] = InMemoryTransport.createLinkedPair();
+      await remoteServer.connect(srv);
+      const wire: FrontWire = {
+        start: () => c.start(),
+        close: () => c.close(),
+        send: (m: JSONRPCMessage) => {
+          forwarded.push((m as { method?: string }).method ?? "<response>");
+          return c.send(m);
+        },
+        set onmessage(h: ((m: JSONRPCMessage) => void) | undefined) { c.onmessage = h; },
+        get onmessage() { return c.onmessage; },
+      };
+      await wire.start();
+      await handshake(wire, init, 2000);
+      return { host, wire, afterAdmitted: async () => {}, forgetSecret: () => {}, close: () => wire.close() };
     };
-
+    const session = createSession(null);
+    const soloServer = buildServer(session, { host: createSoloHostContext(session), registerResources: true });
+    const [soloFront, soloEnd] = InMemoryTransport.createLinkedPair();
+    await soloServer.connect(soloEnd);
     const io = makeStdio();
-    const handshake: HostHandshake = { url: "unused://", token: "unused", pid: process.pid, startedAt: new Date().toISOString() };
-    const relayDone = runRelay(handshake, createProbeAwareStdio(io.stdin, io.stdout), remote);
+    const front = new AdaptiveFront({
+      local: createProbeAwareStdio(io.stdin, io.stdout),
+      solo: soloFront,
+      soloDeckDocId: () => null,
+      watch: { live: async () => H, markDead: () => {} },
+      attach,
+      log: () => {},
+    });
+    await front.start();
 
     io.stdin.write(line(PROBE_TOP_META));
     expect(await io.waitFor(1, 100)).toEqual(METHOD_NOT_FOUND(1));
-    expect(forwarded).not.toContain("server/discover");
 
     io.stdin.write(line(INITIALIZE));
     const init = (await io.waitFor(10, 2000)) as { result: { serverInfo: { name: string } } };
     expect(init.result.serverInfo.name).toBe("slidecraft");
-    expect(forwarded).toContain("initialize");
+    io.stdin.write(line(INITIALIZED));
+
+    io.stdin.write(line({ jsonrpc: "2.0", id: 12, method: "tools/call", params: { name: "get_project_info", arguments: {} } }));
+    await io.waitFor(12, 2000);
+    expect(front.mode).toBe("forward");
+    expect(forwarded).toEqual(expect.arrayContaining(["initialize", "tools/call"]));
+
+    io.stdin.write(line({ ...PROBE_TOP_META, id: 2 }));
+    expect(await io.waitFor(2, 100)).toEqual(METHOD_NOT_FOUND(2));
     expect(forwarded).not.toContain("server/discover");
 
+    await front.close();
     await remoteServer.close();
-    await relayDone;
+    await soloServer.close();
   });
 });

@@ -5,7 +5,10 @@
  *    probe filter (#518 / PR #525, discover-probe.ts) — silence here is the bug that filter fixed;
  *  - the legacy `initialize`: server name + version + negotiated protocol;
  *  - `tools/list`: how many tools a client gets (all pages);
- *  - the mode and `--root` scope the child ANNOUNCED on stderr (cli-banner.ts — format and parse in one place).
+ *  - the mode and `--root` scope the child ANNOUNCED on stderr (cli-banner.ts — format and parse in one place);
+ *  - #736: whether a GUI collab host is up (host.json + ping, through the adapter's own HostWatch — R8). Since #728
+ *    the adapter switches to a host only in front of a tool call, so the child's mode reads "solo" even while
+ *    a host is up; this line says so. It only pings: no `initialize`, so no approval dialog on the host.
  *
  * The GUI's 接続テスト button runs this same entry (Rust `mcp_doctor` spawns the bundled node + cli.cjs with
  * `--doctor`), so the diagnosis exists once (R8). It reads no deck state and is not a control plane: the child
@@ -16,10 +19,18 @@ import type { Readable, Writable } from "node:stream";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { DISCOVER_METHOD } from "./discover-probe";
 import { parseModeBanner, type ModeBanner } from "./cli-banner";
+import { HostWatch, isHandshake } from "./front-decide";
+import { pingAlive, resolveHostJsonPath } from "./host-discovery";
+import { readHostJson, type HostHandshake } from "./host-json";
 
 export type Step<T> = { ok: true; ms: number; value: T } | { ok: false; ms: number; error: string };
 
 export type DiscoverOutcome = { kind: "legacy-only" } | { kind: "modern" };
+
+/** What host.json says and whether its host answers the ping (#736). */
+export type HostCheck =
+  | { path: string; file: "none" | "invalid" }
+  | { path: string; file: "present"; url: string; startedAt: string; alive: boolean };
 
 export interface DoctorReport {
   launch: { node: string; nodeVersion: string; script: string; args: string[]; dropped: string[] };
@@ -27,6 +38,7 @@ export interface DoctorReport {
   discover: Step<DiscoverOutcome>;
   initialize: Step<{ name: string; version: string; protocolVersion: string }>;
   tools: Step<{ count: number }>;
+  host: HostCheck;
   /** Set when the server exited WHILE being probed (a normal close after the probe is not reported). */
   exit: { code: number | null; signal: string | null } | null;
   stderr: string;
@@ -154,6 +166,20 @@ export async function probeServer(ch: LineChannel, opts: { timeoutMs: number }):
   return { discover, initialize, tools };
 }
 
+/** Ask the adapter's own HostWatch once (the same validity rule and ping as a real tool call — R8). Only a GET
+ *  ping reaches the host: no `initialize`, hence no approval application (the host applies at `initialize`). */
+export async function checkCollabHost(
+  path: string,
+  ping: (h: HostHandshake) => Promise<boolean> = (h) => pingAlive(h.url, h.token, 1500),
+): Promise<HostCheck> {
+  let seen: unknown = null;
+  const live = await new HostWatch(() => (seen = readHostJson(path)), ping).live();
+  const hs: unknown = seen;
+  if (!hs) return { path, file: "none" };
+  if (!isHandshake(hs)) return { path, file: "invalid" };
+  return { path, file: "present", url: hs.url, startedAt: String(hs.startedAt), alive: live !== null };
+}
+
 /** Arguments for the self-spawned server: everything but --doctor, minus --metrics <path> (the probe must not
  *  be written into the user's call log). Dropped flags are returned so the report can say so. */
 export function doctorChildArgs(argv: string[]): { args: string[]; dropped: string[] } {
@@ -185,6 +211,14 @@ function rootLine(r: DoctorReport): string {
   return asked ? `${asked}（指定あり・起動を確認できず）` : "未指定";
 }
 
+function hostLine(h: HostCheck): string {
+  if (h.file !== "present") return h.file === "none" ? `なし（host.json なし — ${h.path}）` : `なし（host.json を読めません — ${h.path}）`;
+  const seen = `（${h.url}・startedAt ${h.startedAt}）`;
+  return h.alive
+    ? `host.json あり・ping 応答あり${seen} — 最初のツール呼び出しから GUI へ転送`
+    : `なし — host.json あり・ping 応答なし${seen}`;
+}
+
 const stepLine = <T>(label: string, s: Step<T>, describe: (v: T) => string, msNote = "") =>
   `  ${label.padEnd(16)}: ${s.ok ? `OK  ${describe(s.value)}  ${s.ms}ms${msNote}` : `NG  ${s.error}`}`;
 
@@ -196,6 +230,7 @@ export function formatDoctorReport(r: DoctorReport): string {
     `  起動            : ${l.node}（${l.nodeVersion}） ${l.script}${l.args.length ? ` ${l.args.join(" ")}` : ""}`,
     `  モード          : ${modeLine(r.mode)}`,
     `  --root          : ${rootLine(r)}`,
+    `  協働ホスト      : ${hostLine(r.host)}`,
   ];
   if (l.dropped.length) lines.push(`  診断では無効    : ${l.dropped.join(", ")}（診断の呼び出しを記録しないため）`);
   lines.push(
@@ -224,6 +259,8 @@ export async function runDoctor(argv: string[], opts: { timeoutMs?: number } = {
   const script = process.argv[1] ?? "";
   const child = spawn(process.execPath, [...process.execArgv, script, ...args], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
   const ch = createLineChannel(child.stdin, child.stdout);
+  // The child inherits this env, so it resolves the same host.json (SLIDECRAFT_HOST_JSON included).
+  const hostCheck = checkCollabHost(resolveHostJsonPath());
   let stderr = "";
   let probing = true;
   let exit: DoctorReport["exit"] = null;
@@ -247,6 +284,7 @@ export async function runDoctor(argv: string[], opts: { timeoutMs?: number } = {
     launch: { node: process.execPath, nodeVersion: process.version, script, args, dropped },
     mode: parseModeBanner(stderr),
     ...steps,
+    host: await hostCheck,
     exit,
     stderr,
     ok: steps.discover.ok && steps.initialize.ok && steps.tools.ok && steps.tools.value.count > 0,
