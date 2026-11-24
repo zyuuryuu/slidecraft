@@ -75,8 +75,11 @@ const SINGULAR_FIELD = { diagram: "diagram", mermaid: "mermaidBlock", table: "ta
  * The carry of an edit (MCP set_slide_markdown ⇄ GUI reconcile, via apply-slide-edit.carryOmittedBlocks):
  * a visual of a CARRIED kind the edit omits is kept from the old slide; one the edit carries wins.
  * ≤1 old body visual → the per-kind carry of the singular fields (single-visual decks byte-identical);
- * ≥2 → the per-visual carry (carryFigures). A behind image follows the same rule (#665): kept when the
- * edit has no image of its own (an edit's image — body or behind — wins, since both share `image`).
+ * ≥2 → the per-visual carry (carryFigures). An image the edit has wins: on the ≤1 path the edit's
+ * `image` (body or behind) replaces the old one; on the ≥2 path the edit's body images replace the old
+ * ones per kind, and an edit's behind image stops every old body image from being carried (both share
+ * the singular `image`). An old behind image follows the same rule (#665): kept only when the result
+ * has no image of its own.
  */
 export function carryOmittedVisuals(old: SlideIR, edited: SlideIR): SlideIR {
   if (slideFigures(old).length >= 2) return carryBehind(old, carryFigures(old, edited));
@@ -98,13 +101,18 @@ function carryBehind(old: SlideIR, result: SlideIR): SlideIR {
  * visual of that kind replaces the old i-th; the old ones the edit leaves out stay in their place (a
  * text-only edit keeps every visual); visuals the edit adds beyond the old count follow in the edit's
  * order. An edit that carries every old visual is taken as is — its order included. Body visuals only
- * (the behind image is carryOmittedVisuals' concern).
+ * (an old behind image is carryOmittedVisuals' concern); an edit's behind image means no old body image
+ * is carried.
  */
 export function carryFigures(old: SlideIR, edited: SlideIR): SlideIR {
   const before = slideFigures(old);
   const after = slideFigures(edited);
   const byKind = (list: readonly FigureBlock[], kind: FigureKind) => list.filter((f) => f.kind === kind);
-  const omits = before.some((f) => CARRIED_KINDS.has(f.kind) && byKind(after, f.kind).length < byKind(before, f.kind).length);
+  // An edit's behind image is its image (it shares the singular `image` with body images, so no old
+  // body image can stay beside it): image is not carried then. An edit's BODY images are in `after`
+  // and already win per kind below, so they need no exception.
+  const carried = (kind: FigureKind) => CARRIED_KINDS.has(kind) && !(kind === "image" && edited.image?.behind);
+  const omits = before.some((f) => carried(f.kind) && byKind(after, f.kind).length < byKind(before, f.kind).length);
   if (!omits) return edited;
   const seen = new Map<FigureKind, number>();
   const merged: FigureBlock[] = [];
@@ -113,7 +121,7 @@ export function carryFigures(old: SlideIR, edited: SlideIR): SlideIR {
     seen.set(f.kind, i + 1);
     const repl = byKind(after, f.kind)[i];
     if (repl) merged.push(repl);
-    else if (CARRIED_KINDS.has(f.kind)) merged.push(f);
+    else if (carried(f.kind)) merged.push(f);
   }
   const extra = after.filter((f) => byKind(after, f.kind).indexOf(f) >= (seen.get(f.kind) ?? 0));
   return withFigures(edited, [...merged, ...extra]);

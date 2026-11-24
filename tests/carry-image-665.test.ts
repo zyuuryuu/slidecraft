@@ -68,6 +68,20 @@ describe("#665: a text-only edit keeps the slide's image on both doors", () => {
     expect(slideFigures(mcp)).toEqual(slideFigures(old));
     expect(mcp).toEqual(gui);
   });
+  it("≥2 visuals (diagram + body image), the edit brings a behind image: no throw, behind image + old diagram (MCP ≡ GUI)", async () => {
+    const { old, mcp, gui } = await bothDoors(`# 中身\n\n${DIAG("a")}\n\n![写真](${PNG})`, `# 中身\n\n- b\n\n![bg](${PNG2}){behind=1}`);
+    expect(slideFigures(old).map((f) => f.kind)).toEqual(["diagram", "image"]);
+    expect(mcp.image).toMatchObject({ src: PNG2, behind: true });
+    expect(slideFigures(mcp)).toEqual(slideFigures(old).filter((f) => f.kind === "diagram"));
+    expect(mcp.figures).toBeUndefined();
+    expect(mcp).toEqual(gui);
+  });
+  it("two body images, the edit brings one body image: it replaces the 1st and the 2nd stays (MCP ≡ GUI)", async () => {
+    const { old, mcp, gui } = await bothDoors(`# 中身\n\n![一](${PNG})\n\n![二](${PNG})`, `# 中身\n\n- b\n\n![別](${PNG2})`);
+    expect(slideFigures(old).map((f) => f.kind)).toEqual(["image", "image"]);
+    expect(slideFigures(mcp).map((f) => (f.kind === "image" ? f.src : f.kind))).toEqual([PNG2, PNG]);
+    expect(mcp).toEqual(gui);
+  });
 });
 
 describe("#665 / R8: the carried kinds are decided in ONE place (CARRIED_KINDS) and both carry paths follow it", () => {
