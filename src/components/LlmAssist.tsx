@@ -11,7 +11,7 @@
  * the two surfaces never diverge.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { generateCombinedPrompt, DIAGRAM_TYPES } from "../engine/llm-prompts";
 import AiSettingsPopover from "./AiSettingsPopover";
@@ -58,8 +58,14 @@ export default function LlmAssist({ isOpen, onClose, onImportResult, templateHin
   const toggleSettings = () => {
     const next = !showSettings;
     setShowSettings(next);
-    saveSettingsFolded(rememberFold(next, ai.connection));
+    saveSettingsFolded(rememberFold(loadSettingsFolded(), next, ai.connection));
   };
+  // #743: the connection changed without the toggle (fixed via ⚙ → AI 接続設定… or the status pill) — rememberFold
+  // decides (an ok connection clears the remembered fold), so a later breakage opens the settings again.
+  const { ok, needsUserAction } = ai.connection; // read as primitives: ai.connection is a fresh object each render
+  useEffect(() => {
+    saveSettingsFolded(rememberFold(loadSettingsFolded(), null, { ok, needsUserAction }));
+  }, [ok, needsUserAction]);
   const [showManual, setShowManual] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [copied, setCopied] = useState(false);

@@ -30,7 +30,7 @@ afterAll(() => {
 });
 
 const OK = { ok: true, needsUserAction: false, tone: "ok", label: "gpt-4o を使用", hint: "" };
-const WARN = { ok: false, needsUserAction: true, tone: "warn", label: "APIキー未設定", hint: "下の設定に API キーを入力" };
+const WARN = { ok: false, needsUserAction: true, tone: "warn", label: "APIキー未設定", hint: "⚙ AI 接続設定で Anthropic の API キーを入力" };
 
 /** OpenAI-compatible cloud provider, no models fetched (same shape as tests/ux-details-615.test.tsx). */
 function fakeAi(over: Partial<Record<string, unknown>> = {}): AiGeneration {

@@ -11,6 +11,10 @@
  * - メニューが閉じてフォーカスが入口に戻ったとき（Esc・項目を押したあと）も、その「戻ってきたフォーカス」では開かない
  *   （#724 PR-B: 開くと次の Esc を Tooltip が取り、原稿入力ダイアログの中では Esc を 3 回押さないと閉じなかった）。
  *   ポインタを乗せる・一度離れて再びフォーカスする、では従来どおり開く。
+ *   抑止するのは「メニューから戻ってきた」フォーカスだけ（#739-1）: フォーカスの移動元（relatedTarget）がメニュー
+ *   （role="menu"）の外の要素なら開く。Tab でメニューの外へ出て（フォーカスは入口の次へ進み、入口の blur は起きない）
+ *   Shift+Tab で戻ったとき、以前は抑止が残って最初の 1 回だけ Tooltip が出なかった。移動元が無い（null）のは
+ *   メニューが消えながら戻した場合などで、抑止する側に倒す。
  * 記号だけのボタン（↶ ↷ ⚙）は aria-label で名前を持つこと（Tooltip・説明は名前にならない）。
  * - 包みの span はバーの flex の項目なので、既定では縮まない（shrink-0）。縮むのは中のボタン自身が縮めるとき
  *   （🎨 テンプレート＝名前を省略する）だけで、`shrink` を渡す。以前は全部 min-w-0 で、狭い窓で span だけが縮み、
@@ -31,6 +35,12 @@ interface BarTipProps {
   shrink?: boolean;
 }
 
+/** フォーカスの移動元が、メニュー（role="menu"）の外にある要素か。 */
+function cameFromOutsideMenu(event: Event | undefined): boolean {
+  const from = (event as FocusEvent | undefined)?.relatedTarget;
+  return from instanceof Element && !from.closest("[role=menu]");
+}
+
 export default function BarTip({ label, children, shrink = false }: BarTipProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -45,7 +55,7 @@ export default function BarTip({ label, children, shrink = false }: BarTipProps)
     if (!menuOpen) setOpen(false); // a focus-open requested while the menu was still closing does not surface either
   }
   const onOpenChange = (next: boolean, details: TooltipRootChangeEventDetails) => {
-    if (next && quiet && details.reason === "trigger-focus") return;
+    if (next && quiet && details.reason === "trigger-focus" && !cameFromOutsideMenu(details.event)) return;
     if (next) setQuiet(false);
     setOpen(next);
   };

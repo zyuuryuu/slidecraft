@@ -7,6 +7,8 @@
  *   DropdownMenuLabel、2 つ目以降の区画の前に DropdownMenuSeparator。
  * - 項目（BarMenuItem）: Base UI の Menu.Item を **ネイティブの `<button>`** で描く（`nativeButton`）。role は menuitem。
  *   押せない項目は `aria-disabled`（WAI-ARIA の推奨どおりフォーカスは受ける＝矢印キーで理由を読める）。
+ *   押せない項目は `title` を持たない（#739-2）: 部品が押せない項目を pointer-events-none にするのでホバーで読めない。
+ *   押せない理由は項目の中に見える文字（MasterMenu の note 等）で出す。
  * - 項目でない行（言語・配色の切り替え、HTML の遷移の切り替え）はそのまま置く。矢印キーの移動は項目だけを渡るので
  *   それらを飛ばす（Tab では届く）。
  */
@@ -49,13 +51,15 @@ export function BarMenuSection({ label, first, heading, headingClassName, headin
   );
 }
 
-/** 1 つの項目（`<button role="menuitem">`）。押すとメニューは閉じる（closeOnClick={false} で閉じない）。 */
-export function BarMenuItem({ className, ...props }: Omit<ComponentProps<typeof DropdownMenuItem>, "nativeButton" | "render">) {
+/** 1 つの項目（`<button role="menuitem">`）。押すとメニューは閉じる（closeOnClick={false} で閉じない）。
+ *  押せないとき（disabled）は title を描かない（ホバーで読めない説明を残さない・#739-2）。 */
+export function BarMenuItem({ className, title, ...props }: Omit<ComponentProps<typeof DropdownMenuItem>, "nativeButton" | "render">) {
   return (
     <DropdownMenuItem
       nativeButton
       render={<button type="button" />}
       className={cn("w-full px-2.5 py-1.5 text-left text-fg", className)}
+      title={props.disabled ? undefined : title}
       {...props}
     />
   );

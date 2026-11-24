@@ -87,7 +87,7 @@ export default function InitializeModal({
           <button onClick={onGenerateAI} className={action} title={t("initModal.generateAiTitle")}>{t("initModal.generateAi")}</button>
           <button onClick={onStructure} className={action} title={t("initModal.tidyDraftTitle")}>{t("initModal.tidyDraft")}</button>
           <div className="flex-1" />
-          <DialogClose title={t("initModal.close")} className="text-muted hover:text-fg text-lg leading-none">×</DialogClose>
+          <DialogClose aria-label={t("dialog.close")} className="text-muted hover:text-fg text-lg leading-none">×</DialogClose>
         </div>
 
         {/* Intake progress/result for a Re-make triggered from THIS modal (the main-view banner is behind it). */}

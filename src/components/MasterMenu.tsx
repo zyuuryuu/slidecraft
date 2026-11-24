@@ -115,7 +115,7 @@ export function MasterMenu({ masters, activeId, onSelect, onImport, onRemake, on
             testId="master-augment"
             icon="🧩"
             label={canAugment ? t("menu.opensDialog", { title: t("masterPicker.augmentLabel", { what: augmentWhat(plan!) }) }) : t("masterPicker.augmentLabelPlain")}
-            title={augmentNote ?? t("masterPicker.augmentTitle")}
+            title={t("masterPicker.augmentTitle")}
             note={augmentNote}
             disabled={!canAugment}
             onClick={() => { if (canAugment) augment.onAugment(plan!); }}
