@@ -7,8 +7,9 @@
  *  (a) markKpiValue が KPI.4Value.Grid の 4 グループすべてに `role: "value"` を付ける（束縛・溢れ検出・
  *      プレビューは group-layout の判定 1 つを読む＝KPI.4 専用の分岐は無い・R8）。
  *  (b) Pitch × samples/manuscript-05-sales-pitch.md の 9 枚目（KPI 4 つ）で、値の段落はラベルと別の枠に 1 段落で
- *      入り、その枠は 40pt 以上・太字・emphasis 色。この格子を実際に使う他のケース（Pitch × manuscript-07 の
- *      KPI 3 つ＝campaign-preset-598 が測るスライド・全レイアウトを持つ技術報告プリセットの KPI 4 つ）も同じ。
+ *      入り、その枠は 40pt 以上・太字・emphasis 色。全レイアウトを持つ技術報告プリセットの KPI 4 つも同じ。
+ *      Pitch × manuscript-07 の KPI 3 つ（campaign-preset-598 が測るスライド）は #719 以降 KPI.3Value.Equal に
+ *      入る（格子ではない）ので、その枠で同じ強調を確かめる。
  *      Executive／Campaign プリセットは KPI.4Value.Grid を採用していない（template-presets.ts の layouts）。
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -42,16 +43,16 @@ async function slideShapes(md: string, tpl: TemplateData, n?: number) {
 }
 
 /** 値の段落が、それだけで入っている枠の書式（レイアウト側の継承値）が強調になっていること。 */
-async function expectEmphasizedValues(md: string, preset: StylePreset, values: string[], n?: number) {
+async function expectEmphasizedValues(md: string, preset: StylePreset, values: string[], n?: number, layoutName = "KPI.4Value.Grid") {
   const tpl = await loadTemplate(await writePresetTemplate(preset));
   const shapes = await slideShapes(md, tpl, n);
-  const layout = tpl.layouts.find((l) => l.name === "KPI.4Value.Grid")!;
+  const layout = tpl.layouts.find((l) => l.name === layoutName)!;
   for (const v of values) {
     const sh = shapes.find((s) => s.paras.includes(v));
     expect(sh, v).toBeDefined();
     expect(sh!.paras, `${v} は値枠に 1 段落だけ`).toEqual([v]);
     const ph = layout.placeholders.find((p) => p.idx === sh!.idx)!;
-    expect(ph, `${v} の枠は KPI.4Value.Grid の枠`).toBeDefined();
+    expect(ph, `${v} の枠は ${layoutName} の枠`).toBeDefined();
     expect(ph.style.fontSize).toBeGreaterThanOrEqual(40);
     expect(ph.style.bold).toBe(true);
     expect(ph.style.fontColor.toUpperCase()).toBe(preset.palette.emphasis.toUpperCase());
@@ -99,8 +100,8 @@ describe("#695 (b) KPI 4 つのスライドで値が 40pt 以上・太字・emph
   it("Pitch × manuscript-05 の 9 枚目", async () => {
     await expectEmphasizedValues(readFileSync(DECK, "utf8"), PITCH_PRESET, ["15 分 → 2 分", "月 40% 減", "3 週 → 2 週", "12 カ月"], 9);
   });
-  it("Pitch × manuscript-07 の 8 枚目（KPI 3 つが格子に入る）", async () => {
-    await expectEmphasizedValues(readFileSync(CAMPAIGN_DECK, "utf8"), PITCH_PRESET, ["1.2 万", "3,000", "30"], 8);
+  it("Pitch × manuscript-07 の 8 枚目（KPI 3 つ・#719 以降は KPI.3Value.Equal）", async () => {
+    await expectEmphasizedValues(readFileSync(CAMPAIGN_DECK, "utf8"), PITCH_PRESET, ["1.2 万", "3,000", "30"], 8, "KPI.3Value.Equal");
   });
   it("技術報告プリセット（全レイアウト）の KPI 4 つ", async () => {
     await expectEmphasizedValues(KPI4, REPORT_PRESET, ["4.2 億円", "−18%", "3 週 → 2 週", "12 カ月"]);
