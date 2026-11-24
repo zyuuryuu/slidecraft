@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.f.outputs.code }}
+      docs: ${{ steps.f.outputs.docs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,10 +39,21 @@ jobs:
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
             echo "code=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$base" HEAD | grep -qvE '(\.md$|^docs/|^LICENSE$|^NOTICE$)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
           else
-            echo "code=false" >> "$GITHUB_OUTPUT"
+            if git diff --name-only "$base" HEAD | grep -qvE '(\.md$|^docs/|^LICENSE$|^NOTICE$)'; then
+              echo "code=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "code=false" >> "$GITHUB_OUTPUT"
+            fi
+            # docs=true when the VitePress site's inputs changed (same globs as docs.yml's push trigger), so a
+            # PR learns BEFORE merge that the Pages deploy would break (e.g. a raw `<name>` in a .md that Vue
+            # parses as an unclosed tag — main's docs deploy was red for 4 days over exactly that).
+            if git diff --name-only "$base" HEAD | grep -qE '(^docs/|^package\.json$|^package-lock\.json$)'; then
+              echo "docs=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "docs=false" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   # ── Unit tests + type gates + lint (fast, Linux) — the REQUIRED check; runs on every push/PR ──
@@ -60,6 +72,22 @@ jobs:
       # MCP-layer type error passes `npm test` AND `npm run build` (see feedback_build_typechecks_tests_dont).
       - run: npm run typecheck:mcp
       - run: npm run lint
+
+  # ── Docs site build (VitePress) — NON-REQUIRED, runs only when docs/ or deps changed ────────────
+  # Mirrors the build half of docs.yml so a docs PR fails here instead of breaking the Pages deploy on main.
+  docs-build:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run docs:build
 
   # ── E2E tests (Playwright, Linux) — skipped on docs-only ─────────────
   e2e:
