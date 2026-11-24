@@ -150,7 +150,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
 
   // `models` = the list the provider actually returned (the connection check, #691); `modelChoices` = what
   // the model dropdown offers (exposed to the UI as `models`). They differ only for an unverified Claude key.
-  const { models, modelsError, modelsLoading, refreshModels, modelChoices } = useProviderModels(provider, cfg.baseURL, cfg.apiKey, localModelOnly);
+  const { models, modelsError, modelsLoading, modelsSkipped, refreshModels, modelChoices } = useProviderModels(provider, cfg.baseURL, cfg.apiKey, localModelOnly);
 
   const canGenerate = useCallback(
     (userRequest: string) =>
@@ -386,7 +386,7 @@ export function useAiGeneration(catalog?: LayoutCatalog) {
 
   // A human-readable connection status for the CURRENT provider + an actionable hint when it isn't
   // ready — derived by the pure computeConnection (ai-generation-types) from the resolved state.
-  const connection = computeConnection({ provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsLoading, modelsError, models });
+  const connection = computeConnection({ provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsLoading, modelsError, models, modelsSkipped });
 
   // Only the active document's tasks are surfaced (history is partitioned per project).
   const docTasks = tasks.filter((t) => t.docId === activeDocId);

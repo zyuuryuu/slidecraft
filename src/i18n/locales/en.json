@@ -118,7 +118,6 @@
     "apiKeyInvalidHint": "Re-enter a key issued in the Anthropic Console",
     "apiKeyForbidden": "This key can't use the models",
     "apiKeyForbiddenHint": "Check the key's permissions (workspace / organization settings)",
-    "checkModelName": "Check the model name",
     "localOnlyNoCheck": "Local-model-only mode is on, so the cloud connection isn't checked"
   },
   "aiTasks": {

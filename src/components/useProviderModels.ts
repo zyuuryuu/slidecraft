@@ -5,14 +5,16 @@
  * by (modelsLoading / modelsError / models) for EVERY provider, Claude included (#691: Claude used to show
  * green without ever asking the API, so a bogus key looked fine). When to ask is decided by the pure
  * planModelsQuery below:
- *  - Claude: after the key stops changing (debounce), once per key + endpoint, never under local-only
- *    (no cloud egress even for a check — ADR-0016 F3), never without a key.
+ *  - Claude: after the key stops changing (debounce), never under local-only (no cloud egress even for a
+ *    check — ADR-0016 F3 — reported as `modelsSkipped: "local"`, not as an error, #712), never without a
+ *    key. A DEFINITE answer (success / 401 / 403) is reused for the same key + endpoint; an inconclusive
+ *    one (unreachable / 5xx / 429) is not, so the next switch or redisplay asks again (#712).
  *  - Other providers: immediately on every change, as before.
  * The key itself never leaves this module except in the request (no logs, no UI, no error text).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CLAUDE_MODEL_CANDIDATES, listProviderModels, type ProviderId } from "../ipc/ai";
-import i18n from "../i18n";
+import { verificationFailure } from "./ai-generation-types";
 
 /** Wait this long after the last key edit before verifying a Claude key (typing a key = many edits). */
 export const CLAUDE_VERIFY_DEBOUNCE_MS = 600;
@@ -40,12 +42,26 @@ export function planModelsQuery(a: {
   return { kind: "fetch", delayMs: CLAUDE_VERIFY_DEBOUNCE_MS, cacheKey };
 }
 
-interface ModelsState { models: string[]; error: string | null }
+interface ModelsState { models: string[]; error: string | null; skipped: "local" | null }
+
+/** After a fetch: the key to remember the result under, or null when it must not be reused (another
+ *  provider, or an inconclusive failure — the key may well be fine once the network is back). Pure. */
+export function cacheKeyAfter(plan: ModelsQueryPlan, error: string | null): string | null {
+  if (plan.kind !== "fetch" || !plan.cacheKey) return null;
+  return error === null || verificationFailure(error) !== "inconclusive" ? plan.cacheKey : null;
+}
+
+/** The state to show when the plan does not fetch. Pure. */
+export function settledModelsState(plan: Exclude<ModelsQueryPlan, { kind: "fetch" }>, cached: ModelsState | null): ModelsState {
+  if (plan.kind === "cached" && cached) return cached;
+  return { models: [], error: null, skipped: plan.kind === "skip-local" ? "local" : null };
+}
 
 export function useProviderModels(provider: ProviderId, baseURL: string, apiKey: string, localOnly: boolean) {
   const [models, setModels] = useState<string[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsSkipped, setModelsSkipped] = useState<"local" | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const refreshModels = useCallback(() => setRefreshTick((t) => t + 1), []);
   // Last Claude verification (in memory only): same key + endpoint → reuse, don't ask again.
@@ -59,22 +75,22 @@ export function useProviderModels(provider: ProviderId, baseURL: string, apiKey:
     const apply = (s: ModelsState) => {
       setModels(s.models);
       setModelsError(s.error);
+      setModelsSkipped(s.skipped);
       setModelsLoading(false);
     };
     if (plan.kind !== "fetch") {
-      apply(plan.kind === "cached" && claudeCache.current
-        ? claudeCache.current.result
-        : { models: [], error: plan.kind === "skip-local" ? i18n.t("aiStatus.localOnlyNoCheck") : null });
+      apply(settledModelsState(plan, claudeCache.current?.result ?? null));
       return;
     }
     let cancelled = false;
     setModelsLoading(true);
     const run = () => {
       listProviderModels(provider, baseURL, apiKey)
-        .then((list) => ({ models: list, error: null }), (e: unknown) => ({ models: [], error: e instanceof Error ? e.message : String(e) }))
+        .then((list) => ({ models: list, error: null, skipped: null }), (e: unknown) => ({ models: [], error: e instanceof Error ? e.message : String(e), skipped: null }))
         .then((result: ModelsState) => {
           if (cancelled) return;
-          if (plan.cacheKey) claudeCache.current = { key: plan.cacheKey, result };
+          const key = cacheKeyAfter(plan, result.error);
+          if (plan.cacheKey) claudeCache.current = key ? { key, result } : null;
           apply(result);
         });
     };
@@ -89,5 +105,5 @@ export function useProviderModels(provider: ProviderId, baseURL: string, apiKey:
   // What the model dropdown offers: the verified list, or — for Claude before / without a successful
   // check — the known candidates. Display only: the connection is judged on `models`, never on these.
   const modelChoices = models.length === 0 && provider === "claude" ? CLAUDE_MODEL_CANDIDATES : models;
-  return { models, modelsError, modelsLoading, refreshModels, modelChoices };
+  return { models, modelsError, modelsLoading, modelsSkipped, refreshModels, modelChoices };
 }

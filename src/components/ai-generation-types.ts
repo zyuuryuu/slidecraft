@@ -166,8 +166,31 @@ export function toneClass(tone: ConnectionStatus["tone"]): string {
   return tone === "ok" ? "text-green-400" : tone === "err" ? "text-red-400" : tone === "checking" ? "text-muted" : "text-amber-400";
 }
 
+/** What a failed model-list check says about the key: a definite answer (401 / 403) or "couldn't tell"
+ *  (unreachable, 5xx, 429…). The ONE reading of the error text, shared by the connection label below and
+ *  by useProviderModels' cache (only definite answers are cached, #712) — R8. */
+export function verificationFailure(error: string): "key-invalid" | "key-forbidden" | "inconclusive" {
+  const status = /\bHTTP (\d{3})\b/.exec(error)?.[1];
+  return status === "401" ? "key-invalid" : status === "403" ? "key-forbidden" : "inconclusive";
+}
+
+/** The shared tail of every list-verified branch: checking → error → (the branch's own list verdict). */
+const CHECKING = (): ConnectionStatus => ({ ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") });
+const cantConnect = (error: string): ConnectionStatus => ({ ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: i18n.t("aiStatus.checkEndpointHint", { error }) });
+const notInList = (labelKey: "aiStatus.checkModelNameHint" | "aiStatus.selectModel", count: number): ConnectionStatus => ({ ok: false, needsUserAction: true, tone: "warn", label: i18n.t(labelKey), hint: count ? i18n.t("aiStatus.modelsAvailableHint", { count }) : undefined });
+function byModelList(
+  a: { modelsLoading: boolean; modelsError: string | null },
+  onError: (error: string) => ConnectionStatus,
+  onList: () => ConnectionStatus,
+): ConnectionStatus {
+  if (a.modelsLoading) return CHECKING();
+  return a.modelsError ? onError(a.modelsError) : onList();
+}
+
 /** Derive a human-readable connection status for the CURRENT provider + an actionable hint when it
- *  isn't ready. Pure function of the resolved config/runtime state, so the hook just feeds it values. */
+ *  isn't ready. Pure function of the resolved config/runtime state, so the hook just feeds it values.
+ *  `modelsSkipped: "local"` = the check was deliberately not made (local-model-only, no cloud egress) —
+ *  an explicit state, not an error (#712). */
 export function computeConnection(a: {
   provider: ProviderId;
   preset: { native: boolean; keyRequired: boolean };
@@ -178,22 +201,24 @@ export function computeConnection(a: {
   modelsLoading: boolean;
   modelsError: string | null;
   models: string[];
+  modelsSkipped?: "local" | null;
 }): ConnectionStatus {
-  const { provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsLoading, modelsError, models } = a;
+  const { provider, preset, cfg, builtinStatus, weightsPresent, builtinModel, modelsError, models } = a;
   const isOllama = provider === "ollama";
   if (preset.native) {
+    // Local-model-only: the cloud is deliberately not asked. Say so — not "can't connect" (#712).
+    if (a.modelsSkipped === "local") return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.localOnlyNoCheck") };
     if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing"), hint: i18n.t("aiStatus.apiKeyMissingHint", { settings: i18n.t("aiSettings.title") }) };
     if (!cfg.model.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.modelNotSelected") };
     // Green only on a VERIFIED key: the Models API list fetched with it (#691 — never on the fixed list).
-    if (modelsLoading) return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };
-    if (modelsError) {
-      const status = /\bHTTP (\d{3})\b/.exec(modelsError)?.[1];
-      if (status === "401") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.apiKeyInvalid"), hint: i18n.t("aiStatus.apiKeyInvalidHint") };
-      if (status === "403") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.apiKeyForbidden"), hint: i18n.t("aiStatus.apiKeyForbiddenHint") };
-      return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: modelsError };
-    }
-    if (!models.includes(cfg.model)) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.checkModelName"), hint: models.length ? i18n.t("aiStatus.modelsAvailableHint", { count: models.length }) : undefined };
-    return { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.usingModel", { model: cfg.model }) };
+    return byModelList(a, (error) => {
+      const why = verificationFailure(error);
+      if (why === "key-invalid") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.apiKeyInvalid"), hint: i18n.t("aiStatus.apiKeyInvalidHint") };
+      if (why === "key-forbidden") return { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.apiKeyForbidden"), hint: i18n.t("aiStatus.apiKeyForbiddenHint") };
+      return cantConnect(error);
+    }, () => models.includes(cfg.model)
+      ? { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.usingModel", { model: cfg.model }) }
+      : notInList("aiStatus.checkModelNameHint", models.length));
   }
   if (provider === "builtin") {
     if (builtinStatus.kind === "downloading") return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.downloadingModel", { model: builtinModel?.display ?? i18n.t("aiStatus.modelFallback"), pct: builtinStatus.pct ?? 0 }) };
@@ -211,16 +236,14 @@ export function computeConnection(a: {
     // baseURL filled + reachable → fall through to the generic model checks below.
   }
   if (!cfg.baseURL.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.baseUrlMissing") };
-  if (modelsLoading) return { ok: false, needsUserAction: false, tone: "checking", label: i18n.t("aiStatus.checkingConnection") };
-  if (modelsError) {
-    return isOllama
-      ? { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.ollamaCantConnect"), hint: i18n.t("aiStatus.ollamaServeHint") }
-      : { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.cantConnect"), hint: i18n.t("aiStatus.checkEndpointHint", { error: modelsError }) };
-  }
-  if (models.length === 0) {
-    return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.noModelsAvailable"), hint: isOllama ? i18n.t("aiStatus.ollamaPullHint") : i18n.t("aiStatus.checkModelNameHint") };
-  }
-  if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing") };
-  if (!cfg.model.trim() || !models.includes(cfg.model)) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.selectModel"), hint: i18n.t("aiStatus.modelsAvailableHint", { count: models.length }) };
-  return { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.connectedOk", { model: cfg.model, count: models.length }) };
+  return byModelList(a, (error) => isOllama
+    ? { ok: false, needsUserAction: true, tone: "err", label: i18n.t("aiStatus.ollamaCantConnect"), hint: i18n.t("aiStatus.ollamaServeHint") }
+    : cantConnect(error), () => {
+    if (models.length === 0) {
+      return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.noModelsAvailable"), hint: isOllama ? i18n.t("aiStatus.ollamaPullHint") : i18n.t("aiStatus.checkModelNameHint") };
+    }
+    if (preset.keyRequired && !cfg.apiKey.trim()) return { ok: false, needsUserAction: true, tone: "warn", label: i18n.t("aiStatus.apiKeyMissing") };
+    if (!cfg.model.trim() || !models.includes(cfg.model)) return notInList("aiStatus.selectModel", models.length);
+    return { ok: true, needsUserAction: false, tone: "ok", label: i18n.t("aiStatus.connectedOk", { model: cfg.model, count: models.length }) };
+  });
 }
