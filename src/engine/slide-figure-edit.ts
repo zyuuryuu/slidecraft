@@ -5,7 +5,7 @@
  * `code` / `image`) is authoritative for the FIRST visual of its kind, `figures` gives the order and the
  * 2nd+ ones, and is present only when there are ≥2. Every editor that changes WHICH visuals a slide has
  * — the GUI figure list (edit / delete / reorder), MCP set_slide_diagram's `figure`, the edit carry
- * (apply-slide-edit.carryOmittedBlocks) — writes through `withFigures`, so the singular fields and the
+ * (carryOmittedVisuals, behind apply-slide-edit.carryOmittedBlocks) — writes through `withFigures`, so the singular fields and the
  * `figures` copies are re-derived together from one list and cannot drift. withFigures is the inverse
  * of slideFigures (pinned by tests/figures-edit-392.test.ts); a slide left with ≤1 visual gets no
  * `figures` (single-visual decks stay byte-identical in content).
@@ -13,7 +13,7 @@
  * A behind image is a backmost layer, not a body visual: it is never in the list and is kept as is.
  * Pure logic (R2).
  */
-import type { SlideIR, FigureBlock } from "./slide-schema";
+import type { SlideIR, FigureBlock, FigureKind } from "./slide-schema";
 import { slideFigures, figureFields } from "./slide-figures";
 
 /** The SlideIR fields that hold body visuals (all re-derived by withFigures). */
@@ -64,30 +64,56 @@ export function diagramFigureNumbers(slide: SlideIR): number[] {
   return slideFigures(slide).flatMap((f, k) => (f.kind === "diagram" || f.kind === "mermaid" ? [k + 1] : []));
 }
 
-/** Kinds an edit that omits them carries from the old slide (#220 B3 — an image is not carried). */
-const CARRIED = new Set<FigureBlock["kind"]>(["diagram", "mermaid", "table", "code"]);
+/** Kinds an edit that omits them carries from the old slide (#220 B3; #665 added image) — the ONE list
+ *  both carry paths below read (R8). */
+export const CARRIED_KINDS: ReadonlySet<FigureKind> = new Set<FigureKind>(["diagram", "mermaid", "table", "code", "image"]);
+
+/** The singular SlideIR field of each kind (slide-figures.singular reads the same mapping). */
+const SINGULAR_FIELD = { diagram: "diagram", mermaid: "mermaidBlock", table: "table", code: "code", image: "image" } as const satisfies Record<FigureKind, keyof SlideIR>;
 
 /**
- * #392 段 3: the per-visual carry of an edit (MCP set_slide_markdown ⇄ GUI reconcile) on a slide that
- * HAS ≥2 visuals. Per kind, the edit's i-th visual of that kind replaces the old i-th; the old ones the
- * edit leaves out stay in their place (a text-only edit keeps every visual); visuals the edit adds
- * beyond the old count follow in the edit's order. An edit that carries every old visual is taken as
- * is — its order included. Omitted images are not carried (as for a single image, #220 B3).
+ * The carry of an edit (MCP set_slide_markdown ⇄ GUI reconcile, via apply-slide-edit.carryOmittedBlocks):
+ * a visual of a CARRIED kind the edit omits is kept from the old slide; one the edit carries wins.
+ * ≤1 old body visual → the per-kind carry of the singular fields (single-visual decks byte-identical);
+ * ≥2 → the per-visual carry (carryFigures). A behind image follows the same rule (#665): kept when the
+ * edit has no image of its own (an edit's image — body or behind — wins, since both share `image`).
+ */
+export function carryOmittedVisuals(old: SlideIR, edited: SlideIR): SlideIR {
+  if (slideFigures(old).length >= 2) return carryBehind(old, carryFigures(old, edited));
+  const out: SlideIR = { ...edited };
+  for (const kind of CARRIED_KINDS) {
+    const field = SINGULAR_FIELD[kind];
+    Object.assign(out, { [field]: edited[field] ?? old[field] });
+  }
+  return out;
+}
+
+/** `result` with the old slide's behind image when the result has no image of its own. */
+function carryBehind(old: SlideIR, result: SlideIR): SlideIR {
+  return old.image?.behind && !result.image ? { ...result, image: old.image } : result;
+}
+
+/**
+ * #392 段 3: the per-visual carry of an edit on a slide that HAS ≥2 visuals. Per kind, the edit's i-th
+ * visual of that kind replaces the old i-th; the old ones the edit leaves out stay in their place (a
+ * text-only edit keeps every visual); visuals the edit adds beyond the old count follow in the edit's
+ * order. An edit that carries every old visual is taken as is — its order included. Body visuals only
+ * (the behind image is carryOmittedVisuals' concern).
  */
 export function carryFigures(old: SlideIR, edited: SlideIR): SlideIR {
   const before = slideFigures(old);
   const after = slideFigures(edited);
-  const byKind = (list: readonly FigureBlock[], kind: FigureBlock["kind"]) => list.filter((f) => f.kind === kind);
-  const omits = before.some((f) => CARRIED.has(f.kind) && byKind(after, f.kind).length < byKind(before, f.kind).length);
+  const byKind = (list: readonly FigureBlock[], kind: FigureKind) => list.filter((f) => f.kind === kind);
+  const omits = before.some((f) => CARRIED_KINDS.has(f.kind) && byKind(after, f.kind).length < byKind(before, f.kind).length);
   if (!omits) return edited;
-  const seen = new Map<FigureBlock["kind"], number>();
+  const seen = new Map<FigureKind, number>();
   const merged: FigureBlock[] = [];
   for (const f of before) {
     const i = seen.get(f.kind) ?? 0;
     seen.set(f.kind, i + 1);
     const repl = byKind(after, f.kind)[i];
     if (repl) merged.push(repl);
-    else if (CARRIED.has(f.kind)) merged.push(f);
+    else if (CARRIED_KINDS.has(f.kind)) merged.push(f);
   }
   const extra = after.filter((f) => byKind(after, f.kind).indexOf(f) >= (seen.get(f.kind) ?? 0));
   return withFigures(edited, [...merged, ...extra]);
