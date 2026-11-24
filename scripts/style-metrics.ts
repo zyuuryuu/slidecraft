@@ -7,10 +7,13 @@
  * path as the MCP tools), then per slide on the layout the export resolves:
  *   - chars          : visible text characters (placeholder text + table cells; whitespace excluded,
  *                      figures' internal labels not counted)
- *   - imageArea      : drawn image area ÷ slide area, summed over EVERY image the export draws (the
- *                      behind image + each region-bound one) — read off the export's own figure plan
- *                      (planSlideFigures over figureRegions → drawnImage, R8: no second enumeration or
- *                      geometry; #671 — it used to read only the singular slide.image = the 1st image)
+ *   - imageArea      : drawn image area ÷ slide area, summed over EVERY <p:pic> the export draws (the
+ *                      behind image + each region-bound one + each non-native Mermaid PNG) — read off the
+ *                      export's own figure plan (planSlideFigures over figureRegions → drawnImage /
+ *                      mermaidPics' box, R8: no second enumeration or geometry; #671 — it used to read only
+ *                      the singular slide.image = the 1st image; #715 — Mermaid PNGs added). Behaviour
+ *                      change kept on purpose since #671: an image with a PATH src (not a data URI) is not
+ *                      counted, because the export does not embed it (no <p:pic>); the old code counted it.
  *   - whitespace     : 1 − (content "ink" area ÷ slide area). Ink = what this slide draws ON TOP OF the
  *                      empty layout (so template decoration never counts): text boxes sized to their
  *                      estimated lines (placeholderFitBox / paragraphLines — the split estimator), the
@@ -28,14 +31,14 @@ import { basename, join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as S from "../src/mcp/session";
 import { parseMdReport } from "../src/engine/md-parser";
-import { autoSelectLayout, findLayout, type LayoutInfo } from "../src/engine/template-loader";
-import { placeholderFitBox } from "../src/engine/template-catalog";
+import { autoSelectLayout, findLayout, type LayoutInfo, type TemplateData } from "../src/engine/template-loader";
+import { placeholderFitBox, type LayoutCatalog } from "../src/engine/template-catalog";
 import { slideBindingPlan } from "../src/engine/group-binding";
 import { planFieldRescue, applyFieldRescue } from "../src/engine/field-rescue";
 import { paragraphLines } from "../src/engine/distill";
 import { visualOccupancy, drawnImage, SLIDE_IN } from "../src/engine/visual-placement";
 import { planSlideFigures } from "../src/engine/slide-figure-ooxml";
-import type { SlideIR, PlaceholderContent, ImageRect } from "../src/engine/slide-schema";
+import type { DeckIR, SlideIR, PlaceholderContent, ImageRect } from "../src/engine/slide-schema";
 import type { ReviewRuleId } from "../src/engine/deck-diagnostics";
 
 /** Diagnostics whose content never reaches the output (#580 「消失系」: unbound / shadowed / 画像記法の残り
@@ -88,11 +91,13 @@ function slideChars(slide: SlideIR): number {
   return text + (slide.table?.rows.flat().reduce((n, cell) => n + visible(cell), 0) ?? 0);
 }
 
-/** Every drawn image rect, exactly as the export places them: its own figure plan (the behind image +
- *  each region-bound image, from figureRegions), each fitted by drawnImage. Empty when none is drawn. */
+/** Every drawn picture rect, exactly as the export places them: its own figure plan (the behind image +
+ *  each region-bound image, fitted by drawnImage, + each Mermaid PNG, stretched over its box as
+ *  mermaidPicXml does). Empty when none is drawn. */
 function imagesDrawn(slide: SlideIR, layout: LayoutInfo): ImageRect[] {
   const plan = planSlideFigures(slide, layout.placeholders);
-  return [...(plan.behind ? [plan.behind] : []), ...plan.images].map((p) => drawnImage(p.image, p.box).rect);
+  const images = [...(plan.behind ? [plan.behind] : []), ...plan.images].map((p) => drawnImage(p.image, p.box).rect);
+  return [...images, ...plan.mermaidPics.map((m) => m.box)];
 }
 
 /** The rects this slide draws over its empty layout (see the module header). */
@@ -135,12 +140,11 @@ function unionArea(rects: readonly ImageRect[]): number {
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-export async function measureTemplate(markdown: string, name: string, bytes: Uint8Array): Promise<TemplateMetrics> {
-  const s = S.createSession(null);
-  const { diagnostics } = await S.newProject(s, bytes, markdown);
-  const { deck, catalog, template } = { deck: s.deck!, catalog: s.catalog!, template: s.template! };
-  const parsed = parseMdReport(markdown, catalog).deck.slides.length; // newProject's own parse, before the split
-  const perSlide = deck.slides.map((slide, i): SlideMetrics => {
+/** Per-slide metrics of an already-loaded deck, each slide on the layout the export resolves. The single
+ *  measuring path: measureTemplate calls it after the intake, and tests call it on a deck they prepared
+ *  (e.g. a Mermaid PNG's svgCache, which only a GUI client fills) to compare against generatePptx. */
+export function measureSlides(deck: DeckIR, catalog: LayoutCatalog, template: TemplateData): SlideMetrics[] {
+  return deck.slides.map((slide, i): SlideMetrics => {
     const layout = findLayout(template, autoSelectLayout(slide, i, deck.slides.length, catalog))!;
     const imgArea = imagesDrawn(slide, layout).reduce((n, r) => n + r.w * r.h, 0);
     return {
@@ -150,6 +154,14 @@ export async function measureTemplate(markdown: string, name: string, bytes: Uin
       whitespace: round(1 - unionArea(inkRects(slide, layout)) / SLIDE_AREA),
     };
   });
+}
+
+export async function measureTemplate(markdown: string, name: string, bytes: Uint8Array): Promise<TemplateMetrics> {
+  const s = S.createSession(null);
+  const { diagnostics } = await S.newProject(s, bytes, markdown);
+  const { deck, catalog, template } = { deck: s.deck!, catalog: s.catalog!, template: s.template! };
+  const parsed = parseMdReport(markdown, catalog).deck.slides.length; // newProject's own parse, before the split
+  const perSlide = measureSlides(deck, catalog, template);
   return {
     template: name,
     slides: deck.slides.length,
