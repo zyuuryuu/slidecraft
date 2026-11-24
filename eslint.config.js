@@ -20,4 +20,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // shadcn/ui からコピーした部品（#724）は、部品と一緒に variant 関数（buttonVariants 等）も export する
+    // shadcn の形のまま保つ（`shadcn add` で上書きしても差分が出ないように）。Fast Refresh が全体再読込に
+    // なるだけで実害は無いので、このフォルダだけ only-export-components を外す。
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

@@ -1,5 +1,11 @@
 {
   "files": [],
+  // shadcn CLI はルートの tsconfig.json の paths を読む（#724）。実際の型検査は tsconfig.app.json の paths。
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
