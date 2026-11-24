@@ -17,11 +17,6 @@ pub fn run() {
     //  - only "run() entered"          → dies building the app / creating the webview (env/webkit)
     //  - "setup() reached" too         → window WAS created; problem is rendering/blank (display/CSP)
     eprintln!("[slidecraft] run() entered — building app");
-    // #732 TEMP: intentional clippy-only warning to prove the CI gate turns `build` red. Reverted next commit.
-    let boot_args: Vec<String> = std::env::args().collect();
-    if boot_args.len() == 0 {
-        eprintln!("[slidecraft] no argv");
-    }
     let mut builder = tauri::Builder::default();
     // single-instance must be registered FIRST: it intercepts a SECOND launch (a warm
     // double-click of a .scft) before other plugins init and routes that file's argv into
