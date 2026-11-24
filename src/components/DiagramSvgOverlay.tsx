@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { loadYaml } from "../engine/yaml-io";
 import { dumpDiagramLikeSource } from "../engine/mermaid-to-diagram";
 import { renderDiagramToSvg } from "../engine/svg-writer";
+import type { DiagramFonts } from "../engine/diagram-fonts";
 import { DiagramSpecSchema, EdgeStyleSchema } from "../engine/schema";
 import { computeLayout, detectCp, cpCoords, SLIDE_W as DIAGRAM_W, SLIDE_H as DIAGRAM_H, type NodePosition } from "../engine/layout-engine";
 import { fitTransform } from "../engine/draw-target";
@@ -20,6 +21,8 @@ type OverlayProps = {
   editable?: boolean;
   onChange?: (yaml: string) => void;
   region?: { x: number; y: number; w: number; h: number };
+  /** #605: the template's diagram typefaces (diagramFontsFor) — the same rule as the PPTX export. */
+  fonts?: DiagramFonts;
 };
 
 /**
@@ -45,7 +48,7 @@ export default function DiagramSvgOverlay(props: OverlayProps) {
 // the export embeds them. No more divergent Mermaid layout for diagrams.
 type Override = { x?: number; y?: number; w?: number; h?: number };
 
-function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }: OverlayProps) {
+function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region, fonts }: OverlayProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const moveRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
@@ -113,9 +116,10 @@ function FlowDiagramOverlay({ diagramYaml, editable = false, onChange, region }:
             transparent: true,
             omitTitle: true,
             transform: region ? baseTf : undefined,
+            fonts,
           })
         : "",
-    [draftSpec, region, baseTf],
+    [draftSpec, region, baseTf, fonts],
   );
 
   // Live positions (incl. draft) used to place selection handles.

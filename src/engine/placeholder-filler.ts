@@ -28,6 +28,7 @@ import { tableGraphicFrameXml } from "./table-ooxml";
 import { notesSlideXml, notesSlideRels, notesMasterXml, notesMasterRels, NOTES_SLIDE_CT, NOTES_MASTER_CT, NOTES_FIRST_LINK_RID } from "./notes-ooxml";
 import { materializeDerivedSlides, sectionFooterFor } from "./deck-sections";
 import { midnightExecutive } from "./theme";
+import { diagramFontsFor, withLatinFonts, type DiagramFonts } from "./diagram-fonts";
 
 /**
  * Rasterizes an SVG string to PNG bytes. Injected by the caller (the UI layer)
@@ -88,6 +89,7 @@ async function buildSlideXml(
   // 同じ「テンプレに枠が無ければテンプレの意思」扱い）— 明示 Footer: が束縛済みの ftr 枠には触れない。
   sectionFooterText: string | null = null,
   charts: ChartsMode = "shapes", // #554: "native" → pie/xychart/radar as a native chart (else shapes)
+  fonts?: DiagramFonts, // #605: the template's diagram typefaces (diagramFontsFor) — else Midnight's
 ): Promise<{ xml: string; media: SlideMedia[]; linkRels: string; charts: { parts: NativeChartParts; relId: string }[]; figures: ("native" | "shapes")[] }> {
   // Bind content to placeholders BY ROLE (not idx) via the SHARED binding — the SAME function the
   // live preview uses, so export and preview can't diverge (WYSIWYG), and any template's idx
@@ -171,9 +173,9 @@ async function buildSlideXml(
   const chartParts: { parts: NativeChartParts; relId: string }[] = [];
   const figures: ("native" | "shapes")[] = [];
   for (const d of fig.diagrams) {
-    const chart = charts === "native" ? await nativeChartPartsForYaml(d.yaml, midnightExecutive(), d.region) : null;
+    const chart = charts === "native" ? await nativeChartPartsForYaml(d.yaml, fonts ? withLatinFonts(midnightExecutive(), fonts) : midnightExecutive(), d.region) : null;
     const relId = chartParts.length === 0 ? CHART_REL_ID : `${CHART_REL_ID}${chartParts.length + 1}`;
-    const diagramShapes = chart ? chart.frameXml.replace(`r:id="${CHART_REL_ID}"`, `r:id="${relId}"`) : await extractDiagramShapes(d.yaml, d.region);
+    const diagramShapes = chart ? chart.frameXml.replace(`r:id="${CHART_REL_ID}"`, `r:id="${relId}"`) : await extractDiagramShapes(d.yaml, d.region, fonts);
     if (chart) chartParts.push({ parts: chart, relId });
     figures.push(chart ? "native" : "shapes");
     // Re-number shape IDs (incl. nestShapeXml's <p:grpSp> 7000-range ids) in ONE document-order pass.
@@ -339,7 +341,7 @@ export async function generatePptx(
     }
 
     // Build slide XML
-    const built = await buildSlideXml(layout, slide, sectionFooterFor(deck, i), opts.charts);
+    const built = await buildSlideXml(layout, slide, sectionFooterFor(deck, i), opts.charts, diagramFontsFor(template.themeFonts));
     const slideXml = built.xml;
     for (const f of built.figures) opts.onFigure?.(f);
     let linkRels = built.linkRels;

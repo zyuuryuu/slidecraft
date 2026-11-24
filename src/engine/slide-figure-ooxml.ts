@@ -23,6 +23,7 @@ import { paintToShapeXml } from "./pptx-writer";
 import { paintDiagram } from "./diagram-painter";
 import { mermaidToDiagramSpec, diagramSpecToYaml } from "./mermaid-to-diagram";
 import { midnightExecutive } from "./theme";
+import { applyDiagramFonts, withFontRefs, type DiagramFonts } from "./diagram-fonts";
 
 type Box = { x: number; y: number; w: number; h: number };
 const EMU = (inches: number) => Math.round(inches * 914400);
@@ -151,14 +152,16 @@ export function imageWithCaptionXml(shapeId: number, img: SlideFigurePlan["image
 /** A diagram's PptxGenJS shapes as slide XML. Embedded in a titled slide → the diagram omits its own title
  *  bar so it doesn't duplicate / overlap the slide's title placeholder. When `region` is given (a diagram
  *  beside body text or another figure), the shapes are confined to that placeholder box. The shapes are
- *  nested into PowerPoint sub-groups (figure = one object; node/edge = grabbable parts). */
-export async function extractDiagramShapes(diagramYaml: string, region?: Box): Promise<string> {
+ *  nested into PowerPoint sub-groups (figure = one object; node/edge = grabbable parts). `fonts` (#605): the
+ *  template's typefaces — painted as theme references, then written as latin / ea names (diagram-fonts.ts). */
+export async function extractDiagramShapes(diagramYaml: string, region?: Box, fonts?: DiagramFonts): Promise<string> {
   const data = loadYaml(diagramYaml);
   const result = DiagramSpecSchema.safeParse(data);
   if (!result.success) {
     throw new Error("Invalid diagram YAML: " + result.error.issues[0]?.message);
   }
   const spec: DiagramSpec = result.data;
-  const theme = midnightExecutive();
-  return paintToShapeXml((t) => paintDiagram(t, spec, { theme, omitTitle: true, region }));
+  if (!fonts) return paintToShapeXml((t) => paintDiagram(t, spec, { theme: midnightExecutive(), omitTitle: true, region }));
+  const theme = withFontRefs(midnightExecutive());
+  return applyDiagramFonts(await paintToShapeXml((t) => paintDiagram(t, spec, { theme, omitTitle: true, region })), fonts);
 }
