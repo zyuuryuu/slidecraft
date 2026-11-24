@@ -17,9 +17,7 @@ import type { LayoutCatalog, PlaceholderRole } from "./template-catalog";
 import { slideBindingPlan } from "./group-binding";
 import { sortByIdx } from "./placeholder-binding";
 import { TITLE_NS, META_FIELDS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, figureMd, getSeparatorType, columnFigures, singleBodyFigure, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
-import { slideFigures } from "./slide-figures";
-import { slideMarker } from "./slide-markers";
+import { serializeParagraphs, getPlaceholderText, figureBlock, figureMd, slideSeparatorType, columnFigures, singleBodyFigure, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 
 /**
  * The template context that lets the serializer read a slide back out through the SAME binding
@@ -64,20 +62,14 @@ export function serializeByPlan(slide: SlideIR, layout: string, layoutInfo: Layo
     }
   }
 
-  // Diagram/mermaid figures count as body regions for the Columns fallback below (#392: every one of
-  // them, from slideFigures — R8). Tables don't: their column-scoping is decided by columnFigures.
-  const figIdxs = slideFigures(slide).filter((f) => f.kind === "diagram" || f.kind === "mermaid").map((f) => parseInt(f.placeholderIdx));
-  const bodyIsh = (col: number) => roleOf.get(String(col)) === "body" || figIdxs.includes(col);
   // A table is column-scoped (#100) only when the slide has ANOTHER real body region beside it —
   // else it's the slide's ONLY content, merely (mis)pinned to a Column/KPI/Process layout name,
   // which must still serialize single-body (columnFigures / singleBodyFigure, shared with md-serializer.ts, R8).
   const colFigs = columnFigures(slide);
-  // Separator form when the layout name says so (canonical Column./KPI./Process.), or the slide holds a
-  // title + ≥2 positional body regions — the legacy Columns fallback classification, so a third-party
-  // template's multi-region slide keeps its <!-- col --> markers instead of collapsing into one body.
-  // A statement/quote marker slide (#593) is never split into columns: the parser reads it single-body
-  // (a quote's 2nd box is its attribution line), so it serializes single-body on ANY resolved layout.
-  const sepType = slideMarker(slide) ? null : getSeparatorType(layout) ?? (title && bodyIsh(1) && bodyIsh(2) ? "col" : null);
+  // Separator form: slideSeparatorType — the ONE slide → separator-kind mapping shared with the legacy
+  // readout (R8, #747): marker → canonical layout family → Columns fallback (title + ≥2 body regions).
+  // (No groupKind here: grouped slides never reach this readout.)
+  const sepType = slideSeparatorType(slide, layout, !!title, (idx) => roleOf.get(idx) === "body");
 
   if (sepType && !singleBodyFigure(slide)) {
     let maxCol = 0;

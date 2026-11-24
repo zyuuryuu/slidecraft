@@ -18,7 +18,7 @@
 import type { DeckIR, SlideIR } from "./slide-schema";
 import { autoSelectLayout } from "./template-loader";
 import { META_FIELDS, META_IDXS, TITLE_NS, CONTENT_NS } from "./slide-roles";
-import { serializeParagraphs, getPlaceholderText, figureBlock, figureMd, imageLine, notesLines, fieldRowLines, getSeparatorType, columnFigures, singleBodyFigure, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
+import { serializeParagraphs, getPlaceholderText, figureBlock, figureMd, imageLine, notesLines, fieldRowLines, slideSeparatorType, columnFigures, singleBodyFigure, separatorLine, maxCurrentStepCol } from "./md-serializer-shared";
 import { serializeByPlan, type SerializeTemplate } from "./md-serializer-plan";
 import { slideMarker, markerLine, isGroupedSlide } from "./slide-markers";
 import { SECTION_NAV_LIST_LAYOUT, scanSections, sectionNavParagraphs, type SectionEntry } from "./deck-sections";
@@ -185,7 +185,10 @@ function serializeLegacy(slide: SlideIR, layout: string, lines: string[]): void 
     // column-scoped (#100: bound to its own region beside other real column content), which
     // columnFigures / singleBodyFigure (shared with md-serializer-plan, R8) distinguish from that mis-pin.
     // A statement/quote marker slide (#593) is single-body on any layout — same rule as serializeByPlan.
-    const sepType = slideMarker(slide) ? null : (slide.groupKind ?? getSeparatorType(layout));
+    // The slide → separator-kind mapping is slideSeparatorType, shared with serializeByPlan (R8, #747):
+    // its Columns fallback (title + ≥2 body regions → col) keeps a plain `<!-- col -->` slide's markers
+    // when its layout resolves to a non-column name (Closing.* on the last slide, with no catalog).
+    const sepType = slideSeparatorType(slide, layout, !!title, (idx) => !!getPlaceholderText(slide, idx));
 
     if (sepType && !singleBodyFigure(slide)) {
       // Multi-section: each numbered region (column) becomes a section. A region may
