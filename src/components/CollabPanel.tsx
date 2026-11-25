@@ -1,7 +1,7 @@
 /**
  * CollabPanel.tsx — the 協働 surface, in two layers (#689):
  *  - top: ONE status line (協働中 / AI 待ち / 停止中 …, the allowed clients, 承認待ち N 件) + 停止 / 再開.
- *  - bottom: 「接続の設定（初回だけ）」 (CollabSetup) — the stdio registration (#520/#530), .mcpb, 接続テスト, the folded
+ *  - bottom: 「接続の設定」 (CollabSetup) — the stdio registration (#520/#530), .mcpb, 接続テスト, the folded
  *    HTTP-direct fallback (#283/#297), the allowed-clients list and the follow toggle. Open until the user has ever
  *    connected (collab-panel-view.ts), folded after; the fold is remembered by the same rule as ai-settings-fold.ts (#669/#743).
  * What is locked while collaborating, and why, is said ONCE in the notice slot (NoticeSlot, #689) — not here.
@@ -13,7 +13,7 @@ import type { CollabStatus } from "../ipc/collab-projection";
 import type { GrantView } from "../mcp/host-approval";
 import { collabEditLocked } from "./collab-lock";
 import {
-  collabEverConnected, collabStatusView, initialSetupOpen, loadSetupFolded, rememberSetupFold, saveSetupFolded,
+  collabEverConnected, collabSetupDecidable, collabStatusView, initialSetupOpen, loadSetupFolded, rememberSetupFold, saveSetupFolded,
 } from "./collab-panel-view";
 import CollabSetup from "./CollabSetup";
 
@@ -37,6 +37,9 @@ interface CollabPanelProps {
   /** #727 (D3-5): the clients the human allowed, each revocable. Omitted → the list is hidden. */
   grants?: GrantView[];
   onRevoke?: (key: string) => void;
+  /** #689 review a: false while the allowed clients are still being read (keychain → host) — the setup fold is not
+   *  decided until then (no open-then-fold flicker at launch). Omitted → read. */
+  grantsRead?: boolean;
   /** #689: AI clients waiting for [許可] (the decision is the approval dialog) — shown in the status line. */
   pendingCount?: number;
   /** #407: whether the view follows (jumps to + flashes) the AI's edits. Omitted → toggle hidden. */
@@ -44,17 +47,19 @@ interface CollabPanelProps {
   onFollowAiChange?: (v: boolean) => void;
 }
 
-/** The setup fold: open until the user has ever connected; a fold made before that is remembered. */
-function useSetupFold(everConnected: boolean) {
-  const [open, setOpen] = useState(() => initialSetupOpen(everConnected, loadSetupFolded()));
+/** The setup fold: open until the user has ever connected; a fold made before that is remembered.
+ *  `everConnected` null = not decidable yet (the allowed clients are still being read) → stay folded, decide once
+ *  they are known (no open-then-fold flicker at launch; #689 review a). */
+function useSetupFold(everConnected: boolean | null) {
+  const [open, setOpen] = useState(() => everConnected !== null && initialSetupOpen(everConnected, loadSetupFolded()));
   const toggle = (next: boolean) => {
     setOpen(next);
-    saveSetupFolded(rememberSetupFold(loadSetupFolded(), next, everConnected));
+    saveSetupFolded(rememberSetupFold(loadSetupFolded(), next, !!everConnected));
   };
-  // Connected for the first time while the panel is open → fold the setup away (and forget an old fold).
+  // Decided, or connected for the first time while the panel is open → (re)decide (and forget an old fold).
   const prev = useRef(everConnected);
   useEffect(() => {
-    if (everConnected === prev.current) return;
+    if (everConnected === null || everConnected === prev.current) return;
     prev.current = everConnected;
     saveSetupFolded(rememberSetupFold(loadSetupFolded(), null, everConnected));
     setOpen(initialSetupOpen(everConnected, loadSetupFolded()));
@@ -63,13 +68,14 @@ function useSetupFold(everConnected: boolean) {
 }
 
 export default function CollabPanel({
-  embedded, onClose, available, status, url, token, hostJsonPath, error, onStart, onStop, aiActive, grants, onRevoke,
+  embedded, onClose, available, status, url, token, hostJsonPath, error, onStart, onStop, aiActive, grants, onRevoke, grantsRead = true,
   pendingCount = 0, followAi, onFollowAiChange,
 }: CollabPanelProps) {
   const { t } = useTranslation();
   const connected = status === "connected";
   const locked = collabEditLocked({ status, aiActive: !!aiActive });
-  const [setupOpen, setSetupOpen] = useSetupFold(collabEverConnected({ locked, grants }));
+  const decidable = collabSetupDecidable({ available, locked, grantsRead });
+  const [setupOpen, setSetupOpen] = useSetupFold(decidable ? collabEverConnected({ locked, grants }) : null);
   const view = collabStatusView(status, locked);
   const statusLabel = t(`collabPanel.${view.key}`);
   const clients = [...new Set((grants ?? []).map((g) => g.name))].join(t("collabPanel.clientSeparator"));

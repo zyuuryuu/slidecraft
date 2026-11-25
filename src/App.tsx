@@ -596,7 +596,7 @@ export default function App() {
                 error={collab.error}
                 onStart={collab.start}
                 onStop={collab.stop}
-                aiActive={collab.aiActive} grants={collab.approvals?.grants} onRevoke={(k) => void collab.revoke(k)} pendingCount={pendingApprovals}
+                aiActive={collab.aiActive} grants={collab.grants} grantsRead={collab.grantsRead} onRevoke={(k) => void collab.revoke(k)} pendingCount={pendingApprovals}
                 followAi={follow.enabled}
                 onFollowAiChange={follow.setEnabled}
               />

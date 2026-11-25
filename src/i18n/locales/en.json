@@ -260,8 +260,8 @@
     "clientSeparator": ", ",
     "statusSeparator": " · ",
     "pendingCount": "{{count}} waiting for permission",
-    "setupSummary": "Connection setup (first time only)",
-    "lockedNotice": "Collaborating: adding, deleting and reordering slides, opening files, templates and the draft are paused (the AI edits the same deck; until you Stop).",
+    "setupSummary": "Connection setup",
+    "lockedNotice": "Collaborating: adding, deleting, duplicating and reordering slides, closing tabs, opening files, templates, the draft, and AI bulk edits and accepting AI suggestions are paused (the AI edits the same deck; until you Stop).",
     "handshakeLabel": "handshake: {{path}}"
   },
   "controller": {

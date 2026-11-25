@@ -15,7 +15,7 @@ import { runningInTauri } from "../ipc/commands";
 import { CollabProjection, type CollabStatus, type DocSummary, type FollowTarget } from "../ipc/collab-projection";
 import { CollabApprovals, type ApprovalSnapshot } from "../ipc/collab-approvals";
 import { loadClientGrants, addClientGrant, removeClientGrant } from "../ipc/client-grants-store";
-import type { Decision } from "../mcp/host-approval";
+import type { Decision, GrantView } from "../mcp/host-approval";
 import { seedHost } from "./collab-seed";
 import { releaseCollab } from "./collab-release";
 import type { DeckIR } from "../engine/slide-schema";
@@ -72,6 +72,11 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   // #727: an allowed AI has started calling (= collaborating; App's edit lock) + the approval snapshot.
   const [aiActive, setAiActive] = useState(false);
   const [approvals, setApprovals] = useState<ApprovalSnapshot | undefined>(undefined);
+  // #689 (review a): the allowed clients as known AFTER the keychain grants were handed to the host — undefined until
+  // then (the channel's first snapshot comes before loadGrants, with grants [] — not "none allowed"). Kept across
+  // 停止 / error / 再開, so the 協働 panel's 「接続の設定」 neither re-opens nor flickers (the keychain still holds them).
+  const [grants, setGrants] = useState<GrantView[] | undefined>(undefined);
+  const grantsLoadedRef = useRef(false);
   const chanRef = useRef<CollabApprovals | null>(null);
 
   // Refs so start/stop keep a stable identity yet always read the latest deck / template / apply fn.
@@ -128,6 +133,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
           setStatus(s);
           if (s === "error") {
             setError(detail);
+            grantsLoadedRef.current = false; // the last known grants stay (#689 review a)
             // The projection tore itself down → release the approval channel WITH it, so 再開 starts clean
             // (start() checks projRef only; an orphaned channel would keep polling the host).
             void releaseCollab(projRef, chanRef);
@@ -163,7 +169,10 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
         url: ci.url,
         guiToken: ci.guiToken,
         fetch,
-        onView: setApprovals,
+        onView: (v) => {
+          setApprovals(v);
+          if (grantsLoadedRef.current) setGrants(v.grants);
+        },
         onAiActive: () => {
           setAiActive(true);
           void (async () => {
@@ -189,9 +198,13 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
       // host over the GUI port (never argv, D3-8).
       await chan.reportSeed("pending");
       await chan.loadGrants(await loadClientGrants().catch(() => [])).catch(() => {});
+      if (chanRef.current !== chan) return; // released while loading → keep the grants we knew
+      grantsLoadedRef.current = true;
+      await chan.refresh().catch(() => {}); // the host does not announce loaded grants → pull them now
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : String(e));
+      grantsLoadedRef.current = false;
       await releaseCollab(projRef, chanRef);
       setApprovals(undefined);
       setAiActive(false);
@@ -199,6 +212,7 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
   }, [available]);
 
   const stop = useCallback(async () => {
+    grantsLoadedRef.current = false; // a later 再開 re-loads them; until then the last known grants stay
     await releaseCollab(projRef, chanRef);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
@@ -270,6 +284,8 @@ export function useCollab({ applyDeck, deck, templateData, templateName, masters
     stop,
     aiActive,
     approvals,
+    grants,
+    grantsRead: grants !== undefined,
     grantsUnsaved,
     dismissGrantsUnsaved,
     decide,

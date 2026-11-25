@@ -260,8 +260,8 @@
     "clientSeparator": "、",
     "statusSeparator": " · ",
     "pendingCount": "承認待ち {{count}} 件",
-    "setupSummary": "接続の設定（初回だけ）",
-    "lockedNotice": "協働中のため、スライドの追加・削除・並べ替え、開く、テンプレート、原稿入力は止まっています（AI と同じデッキを編集中・停止まで続きます）。",
+    "setupSummary": "接続の設定",
+    "lockedNotice": "協働中のため、スライドの追加・削除・複製・並べ替え、タブを閉じる、開く、テンプレート、原稿入力、AI の一括編集と提案の採用は止まっています（AI と同じデッキを編集中・停止まで続きます）。",
     "handshakeLabel": "handshake: {{path}}"
   },
   "controller": {

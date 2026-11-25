@@ -1,5 +1,5 @@
 /**
- * CollabSetup.tsx — #689: 協働パネルの下の層「接続の設定（初回だけ）」。登録の手順（CollabRegistration: コマンド・
+ * CollabSetup.tsx — #689: 協働パネルの下の層「接続の設定」（並びは 登録 → 接続テスト → HTTP 直結 → 許可したクライアント → 追随・#689 裁定）。登録の手順（CollabRegistration: コマンド・
  * JSON・.mcpb・mcp.json・接続テスト）、上級の HTTP 直結、許可したクライアントの一覧、AI の変更への追随、協働編集の
  * 仕組みの説明をひとつの折りたたみ（shadcn/ui Collapsible・Base UI）に収める。閉じているときは中身を描かない。
  * 開くか閉じるか（と記憶）は CollabPanel が collab-panel-view.ts で決める。ここは描くだけ。
@@ -155,7 +155,9 @@ export default function CollabSetup({
         {connected && (
           <AdvancedHttp open={advancedOpen} onToggle={() => setAdvancedOpen((v) => !v)} url={url} token={token} hostJsonPath={hostJsonPath} />
         )}
-        {grants && onRevoke && <ClientGrantList open={grantsOpen} onToggle={() => setGrantsOpen((v) => !v)} grants={grants} onRevoke={onRevoke} />}
+        {/* Only while the host runs: 取り消し goes through it (after 停止 the last known grants are kept for the fold
+            decision, but a revoke there would do nothing). */}
+        {connected && grants && onRevoke && <ClientGrantList open={grantsOpen} onToggle={() => setGrantsOpen((v) => !v)} grants={grants} onRevoke={onRevoke} />}
         {connected && onFollowAiChange && (
           <label className="flex items-center gap-1.5 text-[11px] text-fg2 cursor-pointer select-none">
             <input type="checkbox" checked={!!followAi} onChange={(e) => onFollowAiChange(e.target.checked)} />

@@ -1,5 +1,5 @@
 /**
- * collab-panel-view.ts — #689: 協働パネルの 2 層（上＝状態 1 行＋停止・下＝「接続の設定（初回だけ）」）のための
+ * collab-panel-view.ts — #689: 協働パネルの 2 層（上＝状態 1 行＋停止・下＝「接続の設定」）のための
  * 純粋な判定。
  *
  *  - 一度つないだか（collabEverConnected）: 協働中（＝編集ロック中。判定は collab-lock.ts の collabEditLocked だけ・
@@ -16,6 +16,13 @@ export const COLLAB_SETUP_FOLDED_KEY = "slidecraft_collab_setup_folded";
 
 export function collabEverConnected(s: { locked: boolean; grants: readonly unknown[] | undefined }): boolean {
   return s.locked || (s.grants?.length ?? 0) > 0;
+}
+
+/** 開閉を決めてよいか（統括レビュー 要修正 a）: 許可したクライアントを読み終えた（useCollab の grantsRead＝
+ *  キーチェーンの許可を host に渡し終えた）か、協働中か、協働がそもそも使えない（ブラウザ版）。読み終える前に
+ *  決めると、起動直後に開いてから畳む（ちらつく）。 */
+export function collabSetupDecidable(s: { available: boolean; locked: boolean; grantsRead: boolean }): boolean {
+  return !s.available || s.locked || s.grantsRead;
 }
 
 /** 規則は ai-settings-fold.ts だけが持つ（R8）。「つないだ」＝resolved、「まだつないでいない」＝pending に当てる。 */
