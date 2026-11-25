@@ -42,6 +42,7 @@ export default function RefineProposal({
     "figure-yaml": t("refineProposal.routeFigureYaml"),
     markdown: t("refineProposal.routeMarkdown"),
     fallback: t("refineProposal.routeFallback"),
+    rejected: t("refineProposal.routeRejected"),
   };
   const routeOf = (c: RefineChange): RouteRecord | undefined =>
     c.kind === "ai" ? proposal.routes?.find((r) => r.applied && r.slideIndex === c.slideIndex) : undefined;

@@ -524,6 +524,7 @@
     "routeFigureYaml": "図の置き換え",
     "routeMarkdown": "全文編集",
     "routeFallback": "全文編集（ops 形式不正）",
+    "routeRejected": "ops 拒否（系統の混在）",
     "skippedSuffix": " ・ スキップ {{n}}",
     "notApplied": "{{route}}: 変更は適用されませんでした"
   },
