@@ -255,6 +255,7 @@ export default function App() {
   // The ONE place editLocked is computed; ref-gated handlers, button disables, and UI locks all
   // derive from it so they can never diverge again. Synced into the ref read by useDeckController.
   const editLocked = collabEditLocked(collab); // #727: an allowed AI is calling — not merely "the host runs"
+  const pendingApprovals = collab.approvals?.pending.length ?? 0; // #689: the band, the dialog and the 協働 status line
   // 📝 原稿 gate — shared by the toolbar button and the AI dock's no-slide hint (#690) so they never diverge.
   const draftGate = editLocked ? "locked" : adjust.session ? "busy" : undefined;
 
@@ -450,10 +451,10 @@ export default function App() {
         />
       </div>
 
-      {/* #613: ONE notice strip under the toolbar (flow, not overlay) — template adjust > intake
-          (progress/result) > update notice (ADR-0021); the others wait behind a "+N" badge. */}
+      {/* #613: ONE notice strip under the toolbar (flow, not overlay) — approval > collab lock (#689) > template adjust >
+          intake (progress/result) > update notice (ADR-0021); the others wait behind a "+N" badge. */}
       <NoticeSlot
-        approval={{ count: collab.approvals?.pending.length ?? 0, unsaved: collab.grantsUnsaved, onDismissUnsaved: collab.dismissGrantsUnsaved }}
+        approval={{ count: pendingApprovals, unsaved: collab.grantsUnsaved, onDismissUnsaved: collab.dismissGrantsUnsaved }} collabLock={editLocked ? { onStop: collab.stop } : null}
         update={showUpdateBanner && latestVersion ? { latestVersion, onDismiss: dismissUpdateBanner } : null}
         intake={{ busy: intakeBusy, result: intakeDismissed ? null : intakeResult, onDismiss: () => setIntakeDismissed(true),
           template: templateData, unbound: diagnostics.filter((d) => d.id === "unbound-content"), augmentHint: !editLocked && !adjust.session }}
@@ -593,10 +594,9 @@ export default function App() {
                 token={collab.token}
                 hostJsonPath={collab.hostJsonPath}
                 error={collab.error}
-                docCount={collab.docCount}
                 onStart={collab.start}
                 onStop={collab.stop}
-                aiActive={collab.aiActive} grants={collab.approvals?.grants} onRevoke={(k) => void collab.revoke(k)}
+                aiActive={collab.aiActive} grants={collab.grants} grantsRead={collab.grantsRead} onRevoke={(k) => void collab.revoke(k)} pendingCount={pendingApprovals}
                 followAi={follow.enabled}
                 onFollowAiChange={follow.setEnabled}
               />
@@ -667,7 +667,7 @@ export default function App() {
         ai={ai}
       />
 
-      <CollabApprovalDialog request={collab.approvals?.pending[0] ?? null} waiting={collab.approvals?.pending.length ?? 0} onDecide={(id, d) => void collab.decide(id, d)} />
+      <CollabApprovalDialog request={collab.approvals?.pending[0] ?? null} waiting={pendingApprovals} onDecide={(id, d) => void collab.decide(id, d)} />
       {/* Multi-select batch edit: review the before→after per slide, then 採用 (one undo) */}
       {refine.proposal && (
         <RefineProposal

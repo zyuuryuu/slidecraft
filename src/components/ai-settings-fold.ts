@@ -12,7 +12,12 @@ export const AI_SETTINGS_FOLDED_KEY = "slidecraft_ai_settings_folded";
 
 /** 開いた時点で設定を展開するか：利用者の操作が要り（computeConnection が決める・R8）、かつ畳んだ記憶が無いとき。 */
 export function initialSettingsOpen(conn: Pick<ConnectionStatus, "needsUserAction">, folded: boolean): boolean {
-  return conn.needsUserAction && !folded;
+  return foldOpenAtStart(conn.needsUserAction, folded);
+}
+
+/** 規則の本体（接続の型に依らない形）。pending＝利用者の操作が要る。協働パネルの「接続の設定」（#689）も使う。 */
+export function foldOpenAtStart(pending: boolean, folded: boolean): boolean {
+  return pending && !folded;
 }
 
 /** 「畳んだ」の記憶の次の値。記憶を決めるのはこの関数だけ（R8・#713／#743）。
@@ -25,24 +30,34 @@ export function initialSettingsOpen(conn: Pick<ConnectionStatus, "needsUserActio
  *  - 操作が無いときは今の記憶のまま。
  *  ok・needsUserAction は読むだけ（書き手は computeConnection のみ）。 */
 export function rememberFold(prev: boolean, nextOpen: boolean | null, conn: Pick<ConnectionStatus, "ok" | "needsUserAction">): boolean {
-  if (conn.ok) return false;
-  if (nextOpen === null) return prev;
-  return !nextOpen && conn.needsUserAction;
+  return nextFoldMemory(prev, nextOpen, conn.ok, conn.needsUserAction);
 }
 
-export function loadSettingsFolded(): boolean {
+/** rememberFold の本体（接続の型に依らない形）。resolved＝使える（ok）、pending＝利用者の操作が要る。 */
+export function nextFoldMemory(prev: boolean, nextOpen: boolean | null, resolved: boolean, pending: boolean): boolean {
+  if (resolved) return false;
+  if (nextOpen === null) return prev;
+  return !nextOpen && pending;
+}
+
+/** 単一フラグ（"1" かなし）の読み書き。キーごとに 1 つ。協働パネルの「接続の設定」（#689・collab-panel-view.ts）も
+ *  同じ仕組みを使う（記憶の仕組みを増やさない）。 */
+export function loadFolded(key: string): boolean {
   try {
-    return localStorage.getItem(AI_SETTINGS_FOLDED_KEY) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 }
 
-export function saveSettingsFolded(folded: boolean): void {
+export function saveFolded(key: string, folded: boolean): void {
   try {
-    if (folded) localStorage.setItem(AI_SETTINGS_FOLDED_KEY, "1");
-    else localStorage.removeItem(AI_SETTINGS_FOLDED_KEY);
+    if (folded) localStorage.setItem(key, "1");
+    else localStorage.removeItem(key);
   } catch {
     /* 記憶できなくても開閉そのものは動く */
   }
 }
+
+export const loadSettingsFolded = (): boolean => loadFolded(AI_SETTINGS_FOLDED_KEY);
+export const saveSettingsFolded = (folded: boolean): void => saveFolded(AI_SETTINGS_FOLDED_KEY, folded);

@@ -200,9 +200,7 @@
     "introHighlight": "appear live on this screen",
     "introAfter": " (no port/token management). Use Stop to stop it and Resume to bring it back (for this launch only).",
     "startButton": "Resume",
-    "liveViewing": "Connected — showing the host's deck live",
-    "documentCount": "Documents: {{docCount}}",
-    "coEditNotice": "Co-editing: your edits are sent to the host (the single source of truth) and shared live with the AI. The AI's edits appear here too. Undo (⌘Z) runs against the host's history (structure changes, templates, and tab switching are locked while connected).",
+    "coEditNotice": "How co-editing works: your edits go to the host (the single source of truth) and are shared live with the AI; the AI's edits show up here too. Undo (⌘Z) runs on the host's history.",
     "followAi": "Follow the AI's edits (jump to and highlight changed slides)",
     "endpointLabel": "MCP endpoint",
     "tokenLabel": "Token (per-launch)",
@@ -252,11 +250,19 @@
     "mcpbUnsupported": "There is no Claude Desktop for this OS, so there is no .mcpb. Register with the command / JSON above.",
     "mcpbError": "Could not check the latest release ({{error}}). You can register with the JSON above.",
     "mcpbOpenFailed": "Could not open the browser. Download from: {{url}}",
-    "waitingForAi": "Host running · waiting for an AI to connect (your editing is not locked)",
+    "waitingForAi": "Waiting for an AI (your editing is not paused)",
     "grantsSummary": "Allowed clients ({{count}})",
     "grantsEmpty": "None yet. An AI app asks for permission the first time it connects.",
     "grantSessionOnly": "this session only",
-    "revoke": "Revoke"
+    "revoke": "Revoke",
+    "statusCollaborating": "Collaborating",
+    "allowedClients": "Allowed: {{names}}",
+    "clientSeparator": ", ",
+    "statusSeparator": " · ",
+    "pendingCount": "{{count}} waiting for permission",
+    "setupSummary": "Connection setup",
+    "lockedNotice": "Collaborating: adding, deleting, duplicating and reordering slides, closing tabs, opening files, templates, the draft, and AI bulk edits and accepting AI suggestions are paused (the AI edits the same deck; until you Stop).",
+    "handshakeLabel": "handshake: {{path}}"
   },
   "controller": {
     "untitledDoc": "Untitled",
@@ -334,7 +340,8 @@
       "adjust": "template adjust",
       "intake": "template import",
       "update": "update notice",
-      "approval": "connection requests"
+      "approval": "connection requests",
+      "collab": "collaboration lock"
     }
   },
   "updateBanner": {

@@ -11,6 +11,7 @@ shadcn CLI の既定 preset `base-nova`）。設定は リポジトリ直下の 
 | DropdownMenu | `dropdown-menu.tsx` | 上部バーのメニュー 3 つ（開く・保存・書き出し／🎨 テンプレート／⚙）。`../BarMenu.tsx`（区画・項目・箱）経由。項目は `nativeButton` で `<button role="menuitem">` |
 | Popover | `popover.tsx` | AI 接続設定（AI ドックの状態ピル → `AiSettingsPopover`）。`AiPanel.tsx` |
 | Dialog | `dialog.tsx` | 原稿入力（`InitializeModal.tsx`）・テンプレートを作成（`TemplateCreator.tsx`）。どちらも `showCloseButton={false}`（自前の × を `DialogClose` で置く）・`disablePointerDismissal`（背景クリックで閉じない） |
+| Collapsible | `collapsible.tsx` | 協働パネルの「接続の設定」（`../CollabSetup.tsx`・#689）。色・角丸の class を持たないので置換は不要だった |
 
 ## 色の名前（トークン）の写像
 

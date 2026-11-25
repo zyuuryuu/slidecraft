@@ -200,9 +200,7 @@
     "introHighlight": "この画面にライブ反映",
     "introAfter": " されます（port・token の管理は不要）。止めたいときは「停止」、戻すときは「再開」（この起動中だけ有効）。",
     "startButton": "再開",
-    "liveViewing": "接続中・ホストの deck をライブ表示中",
-    "documentCount": "ドキュメント: {{docCount}}",
-    "coEditNotice": "協働編集：あなたの編集はホスト（単一の真実）へ送られ AI とライブ共有されます。AI の編集もここに反映。取り消し（⌘Z）はホスト側の履歴で実行されます（構造変更・テンプレート・タブ切替は接続中ロック）。",
+    "coEditNotice": "協働編集の仕組み：あなたの編集はホスト（単一の真実）へ送られ、AI とライブで共有されます。AI の編集もここに反映されます。取り消し（⌘Z）はホスト側の履歴で実行されます。",
     "followAi": "AI の変更に追随（該当スライドへ移動してハイライト）",
     "endpointLabel": "MCP エンドポイント",
     "tokenLabel": "トークン（per-launch）",
@@ -252,11 +250,19 @@
     "mcpbUnsupported": "この OS には Claude Desktop が無いため .mcpb はありません。上のコマンド / JSON で登録してください。",
     "mcpbError": "最新リリースを確認できませんでした（{{error}}）。上の JSON で登録できます。",
     "mcpbOpenFailed": "ブラウザを開けませんでした。次の URL からダウンロードしてください: {{url}}",
-    "waitingForAi": "ホスト起動中・AI の接続を待っています（あなたの編集は止まりません）",
+    "waitingForAi": "AI の接続待ち（あなたの編集は止まりません）",
     "grantsSummary": "接続を許可したクライアント（{{count}}）",
     "grantsEmpty": "まだありません。AI アプリが初めてつながるときに許可を求めます。",
     "grantSessionOnly": "このセッションのみ",
-    "revoke": "取り消し"
+    "revoke": "取り消し",
+    "statusCollaborating": "協働中",
+    "allowedClients": "許可: {{names}}",
+    "clientSeparator": "、",
+    "statusSeparator": " · ",
+    "pendingCount": "承認待ち {{count}} 件",
+    "setupSummary": "接続の設定",
+    "lockedNotice": "協働中のため、スライドの追加・削除・複製・並べ替え、タブを閉じる、開く、テンプレート、原稿入力、AI の一括編集と提案の採用は止まっています（AI と同じデッキを編集中・停止まで続きます）。",
+    "handshakeLabel": "handshake: {{path}}"
   },
   "controller": {
     "untitledDoc": "無題",
@@ -334,7 +340,8 @@
       "adjust": "テンプレート調整",
       "intake": "取り込み",
       "update": "更新のお知らせ",
-      "approval": "接続の許可待ち"
+      "approval": "接続の許可待ち",
+      "collab": "協働中のロック"
     }
   },
   "updateBanner": {
