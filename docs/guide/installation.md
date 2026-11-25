@@ -25,6 +25,12 @@ SlideCraft は Windows / macOS / Linux 向けのデスクトップアプリで�
 | macOS | Homebrew cask（推奨）/ `.dmg` | 下記コマンド。公式配布は **Apple Silicon（arm64）のみ**（`_aarch64.dmg`）。Intel Mac はソースからビルド |
 | Linux | `.AppImage`（推奨）/ `.deb` / `.rpm` | AppImage は実行権限を付けて起動、または deb / rpm を導入 |
 
+::: info 動作要件（図の描画）
+Mermaid の図を描くには、OS の WebView が WebKit 17.4 相当以上である必要があります（Mermaid 12 の要件）。
+macOS は Safari 17.4 以上（macOS 14.4 以降、または Safari を更新した macOS 12.7／13.6）、
+Windows は WebView2（自動更新されるので通常は対応済み）、Linux は webkit2gtk 2.44 以上です。
+:::
+
 ### Windows
 
 `.msi` をダウンロードして実行するのが最も簡単です。同じリリースには `.exe`（NSIS）インストーラも

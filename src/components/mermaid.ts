@@ -21,7 +21,16 @@ export const MERMAID_CONFIG: MermaidConfig = {
   // via dangerouslySetInnerHTML (SlidePreview), so pin securityLevel:"strict" — entity-
   // encodes label text and disables click/script — instead of relying on the default.
   securityLevel: "strict",
-  flowchart: { htmlLabels: false },
+  // mermaid 12 changed several defaults that re-lay out existing diagrams. Pin the mermaid-11 values so
+  // existing decks draw the same (#642; node positions pinned by tests/e2e/mermaid-layout-642.spec.ts):
+  //  - layout ELK → dagre and look "neo" → "classic" (flowchart/state/class/ER…). These top-level keys win
+  //    over the new per-diagram defaults (state.layout:"elk", <diagram>.look:"neo").
+  //  - flowchart/state minNodeWidth 120 (new; 11 had none = 0) and wrappingWidth 120 (11: flowchart 200,
+  //    and state labels fell back to flowchart's 200).
+  flowchart: { htmlLabels: false, minNodeWidth: 0, wrappingWidth: 200 },
+  state: { minNodeWidth: 0, wrappingWidth: 200 },
+  layout: "dagre",
+  look: "classic",
 };
 
 // Intrinsic pixel size of a Mermaid SVG (prefer viewBox; fall back to width/height).

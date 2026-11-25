@@ -1,0 +1,25 @@
+{
+  "viewBox": "0 0 326.8 646",
+  "nodes": [
+    {
+      "id": "classId-Deck-0",
+      "transform": "translate(170.2, 92)"
+    },
+    {
+      "id": "classId-Figure-2",
+      "transform": "translate(170.2, 462)"
+    },
+    {
+      "id": "classId-MermaidFigure-3",
+      "transform": "translate(80, 596)"
+    },
+    {
+      "id": "classId-Slide-1",
+      "transform": "translate(170.2, 298)"
+    },
+    {
+      "id": "classId-TableFigure-4",
+      "transform": "translate(260.4, 596)"
+    }
+  ]
+}

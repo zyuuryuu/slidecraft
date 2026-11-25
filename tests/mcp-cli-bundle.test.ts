@@ -4,7 +4,8 @@
 // node_modules), (2) it shipped as a bundle resource, (3) wired into beforeBuildCommand, and (4) a
 // PATH launcher that finds the bundled node + cli.cjs through Homebrew's symlink.
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync, mkdtempSync, copyFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,6 +97,24 @@ describe("MCP CLI bundling — the bundled server actually runs standalone", () 
     );
   });
 
+  it("#642: answers initialize from an isolated dir with no node_modules anywhere above it", async () => {
+    // `cwd` alone does not isolate: Node resolves require() from the FILE's location, so dist/mcp/cli.cjs
+    // can still reach the repo's node_modules. Copy it under the OS temp dir (outside the repo) so a
+    // top-level require of an --external dep (elkjs) would crash here. elkjs is only reached through
+    // mermaid's lazy ELK-layout import, which the MCP server never runs.
+    const dir = mkdtempSync(join(tmpdir(), "slidecraft-cli-isolated-"));
+    try {
+      expect(existsSync(join(dir, "node_modules"))).toBe(false);
+      const copy = join(dir, "cli.cjs");
+      copyFileSync(out, copy);
+      const { stderr, response } = await runInitialize(copy);
+      expect(stderr).not.toMatch(/Cannot find module|MODULE_NOT_FOUND/);
+      expect(response?.result?.serverInfo?.name).toBe("slidecraft");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("#518: answers Claude Code's `server/discover` probe (top-level _meta) BEFORE initialize, not silence", async () => {
     // The real repro from the Issue: the 2026-07-28 version probe as the very first line on stdin.
     // Before the fix the SDK's strict schema dropped it on deserialisation and nothing came back.
@@ -106,6 +125,40 @@ describe("MCP CLI bundling — the bundled server actually runs standalone", () 
     const { response } = await runInitialize(out, probe);
     expect(response).toEqual({ jsonrpc: "2.0", id: 1, error: { code: -32601, message: "Method not found" } });
   });
+});
+
+// #642 ratchet: mermaid 12 lazily imports elkjs (ELK layout, ~3.5MB). We pin layout:"dagre" and the MCP
+// server never lays out a diagram, so both node bundles keep elkjs --external. The size cap is the
+// mermaid-12 + external-elkjs size measured in PR #772 (13,289,243 B) plus ~1.6% headroom; raise it only
+// deliberately (and say why in the PR) — it exists so the next silent +4MB shows up as a red test.
+const MAX_NODE_BUNDLE_BYTES = 13_500_000;
+// A string only elkjs contains (its Java-transpiled package names); 362 occurrences when elkjs is inlined.
+const ELK_MARKER = "org.eclipse.elk";
+
+describe("MCP node bundles — elkjs stays external and the size is capped (#642)", () => {
+  const bundles = [
+    { script: "build:mcp:bundled", file: "dist/mcp/cli.cjs" },
+    { script: "build:host", file: "dist/mcp/host.cjs" },
+  ];
+
+  beforeAll(() => {
+    for (const b of bundles) execFileSync("npm", ["run", b.script], { cwd: root, stdio: "pipe" });
+  }, 60_000);
+
+  for (const b of bundles) {
+    it(`${b.script} externalizes elkjs`, () => {
+      const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
+      expect(pkg.scripts[b.script]).toContain("--external:elkjs");
+    });
+
+    it(`${b.file} does not inline elkjs`, () => {
+      expect(read(b.file).split(ELK_MARKER).length - 1).toBe(0);
+    });
+
+    it(`${b.file} stays under ${MAX_NODE_BUNDLE_BYTES} bytes`, () => {
+      expect(statSync(join(root, b.file)).size).toBeLessThanOrEqual(MAX_NODE_BUNDLE_BYTES);
+    });
+  }
 });
 
 // Spawn `node <cliCjs>` in a scratch cwd (proving it does NOT lean on the repo's node_modules), send one

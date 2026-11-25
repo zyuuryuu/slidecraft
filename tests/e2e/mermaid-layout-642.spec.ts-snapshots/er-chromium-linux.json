@@ -1,0 +1,21 @@
+{
+  "viewBox": "0 0 409.3 572.5",
+  "nodes": [
+    {
+      "id": "entity-CUSTOMER-0",
+      "transform": "translate(77.6, 72.1)"
+    },
+    {
+      "id": "entity-LINE_ITEM-2",
+      "transform": "translate(210.9, 522.5)"
+    },
+    {
+      "id": "entity-ORDER-1",
+      "transform": "translate(77.6, 308.4)"
+    },
+    {
+      "id": "entity-PRODUCT-3",
+      "transform": "translate(344.3, 308.4)"
+    }
+  ]
+}

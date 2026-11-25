@@ -25,6 +25,12 @@ Each version on [Releases](https://github.com/zyuuryuu/slidecraft/releases) incl
 | macOS | Homebrew cask (recommended) / `.dmg` | Command below. Official builds are **Apple Silicon (arm64) only** (`_aarch64.dmg`). Intel Macs build from source |
 | Linux | `.AppImage` (recommended) / `.deb` / `.rpm` | Make the AppImage executable and run it, or install the deb / rpm |
 
+::: info System requirement (diagram rendering)
+Rendering Mermaid diagrams needs an OS WebView at WebKit 17.4 level or newer (a Mermaid 12 requirement).
+On macOS that means Safari 17.4 or later (macOS 14.4+, or macOS 12.7 / 13.6 with Safari updated);
+on Windows, WebView2 (auto-updated, so normally already met); on Linux, webkit2gtk 2.44 or later.
+:::
+
 ### Windows
 
 The simplest path is to download and run the `.msi`. The same release may also include a `.exe` (NSIS) installer.
