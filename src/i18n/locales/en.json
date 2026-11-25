@@ -531,6 +531,7 @@
     "routeFigureYaml": "Figure replaced",
     "routeMarkdown": "Full rewrite",
     "routeFallback": "Full rewrite (malformed ops)",
+    "routeRejected": "Ops rejected (mixed kinds)",
     "skippedSuffix": " · {{n}} skipped",
     "notApplied": "{{route}}: no change was applied"
   },
